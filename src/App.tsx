@@ -15,7 +15,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
-      <BrowserRouter>
+      <BrowserRouter basename="/event-pix">
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
