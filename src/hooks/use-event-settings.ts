@@ -18,11 +18,17 @@ export const useEventSettings = () => {
             const { data, error } = await supabase
                 .from("event_settings")
                 .select("*")
-                .single();
+                .maybeSingle();
 
-            if (error) throw error;
+            if (error) {
+                console.error("Error fetching settings:", error);
+                return null;
+            }
+
             return data as EventSettings;
         },
+        retry: 1,
+        staleTime: 1000 * 60 * 5, // 5 minutes
     });
 };
 
