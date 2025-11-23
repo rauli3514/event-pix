@@ -183,18 +183,7 @@ const Admin = () => {
                                     />
                                 </div>
 
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Plantilla de Visualización</label>
-                                    <select
-                                        className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                        value={formData.display_template}
-                                        onChange={(e) => setFormData({ ...formData, display_template: e.target.value })}
-                                    >
-                                        <option value="grid">Cuadrícula (Grid)</option>
-                                        <option value="slideshow">Presentación (Slideshow)</option>
-                                        <option value="masonry">Mosaico (Masonry)</option>
-                                    </select>
-                                </div>
+
 
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium">Imagen de Fondo (Inicio)</label>

@@ -68,8 +68,7 @@ export const SlideshowTemplate = () => {
             className="relative min-h-screen bg-background flex items-center justify-center overflow-hidden bg-cover bg-center transition-all duration-1000"
             style={backgroundUrl ? { backgroundImage: `url(${backgroundUrl})` } : {}}
         >
-            {/* Background Overlay */}
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+            {/* Background Overlay removed for clear image visibility */}
 
             <div className="relative z-10 w-full h-screen flex items-center justify-center p-4 md:p-12">
                 {/* Standardized Container for both Photos and Messages */}
@@ -140,8 +139,8 @@ export const SlideshowTemplate = () => {
                             key={index}
                             onClick={() => setCurrentIndex(index)}
                             className={`h-2 rounded-full transition-all duration-300 ${index === currentIndex
-                                    ? "bg-white w-8"
-                                    : "bg-white/30 w-2 hover:bg-white/50"
+                                ? "bg-white w-8"
+                                : "bg-white/30 w-2 hover:bg-white/50"
                                 }`}
                         />
                     ))}

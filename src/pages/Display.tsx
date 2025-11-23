@@ -14,7 +14,7 @@ const Display = () => {
         );
     }
 
-    const template = settings?.display_template || 'grid';
+    const template = settings?.display_template || 'slideshow';
 
     return (
         <div className="min-h-screen bg-background">
