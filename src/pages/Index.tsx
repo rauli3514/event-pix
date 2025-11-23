@@ -3,34 +3,29 @@ import { EventCard } from "@/components/EventCard";
 import { UploadModal } from "@/components/UploadModal";
 import { MessageModal } from "@/components/MessageModal";
 import { TermsModal } from "@/components/TermsModal";
+import { useEventSettings } from "@/hooks/use-event-settings";
 
 const Index = () => {
     const [uploadOpen, setUploadOpen] = useState(false);
     const [messageOpen, setMessageOpen] = useState(false);
+    const { data: settings } = useEventSettings();
 
     return (
-        <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-background via-background to-primary/5">
-            {/* Decorative Elements */}
-            <div className="absolute top-20 left-10 w-64 h-64 bg-primary/20 rounded-full blur-[100px] animate-pulse" />
-            <div className="absolute bottom-20 right-10 w-64 h-64 bg-secondary/20 rounded-full blur-[100px] animate-pulse delay-1000" />
+        <div
+            className="min-h-screen bg-background bg-cover bg-center bg-no-repeat relative"
+            style={settings?.background_image_url ? { backgroundImage: `url(${settings.background_image_url})` } : {}}
+        >
+            {settings?.background_image_url && (
+                <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" />
+            )}
 
-            {/* Butterflies */}
-            <div className="absolute top-1/4 left-10 w-16 h-16 animate-float opacity-80 pointer-events-none">
-                {/* Placeholder for butterfly-purple */}
-                <div className="w-full h-full bg-secondary/50 rounded-full blur-sm" />
-            </div>
-            <div className="absolute bottom-1/3 right-10 w-12 h-12 animate-float opacity-80 pointer-events-none" style={{ animationDelay: "1.5s" }}>
-                {/* Placeholder for butterfly-teal */}
-                <div className="w-full h-full bg-primary/50 rounded-full blur-sm" />
-            </div>
-
-            <div className="container px-4 py-8 mx-auto relative z-10 min-h-screen flex flex-col items-center justify-center">
-                <div className="mb-8 text-center">
-                    <h1 className="text-5xl md:text-7xl font-script text-transparent bg-clip-text bg-gradient-to-r from-primary via-white to-secondary mb-4 drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">
-                        EventPix
+            <div className="container px-4 py-16 mx-auto max-w-4xl relative z-10">
+                <div className="mb-16 text-center space-y-4">
+                    <h1 className="text-6xl md:text-7xl font-serif text-foreground tracking-tight">
+                        {settings?.title || "EventPix"}
                     </h1>
-                    <p className="text-muted-foreground text-lg max-w-md mx-auto">
-                        Captura el momento, comparte la magia
+                    <p className="text-muted-foreground text-lg">
+                        {settings?.description || "Captura el momento, comparte la magia"}
                     </p>
                 </div>
 
