@@ -72,7 +72,7 @@ export const SlideshowTemplate = () => {
 
             <div className="relative z-10 w-full h-screen flex items-center justify-center p-4 md:p-12">
                 {/* Standardized Container for both Photos and Messages */}
-                <div className="w-full max-w-4xl aspect-[16/9] relative flex items-center justify-center bg-black/20 backdrop-blur-md rounded-xl border border-white/10 shadow-2xl overflow-hidden p-6">
+                <div className="w-full max-w-3xl aspect-[16/9] relative flex items-center justify-center bg-black/20 backdrop-blur-md rounded-xl border border-white/10 shadow-2xl overflow-hidden p-6">
 
                     {currentItem.type === 'photo' ? (
                         // PHOTO DISPLAY
