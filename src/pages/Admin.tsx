@@ -53,7 +53,7 @@ const Admin = () => {
         });
     };
 
-    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: 'background_image_url' | 'display_background_url') => {
         const file = e.target.files?.[0];
         if (!file || !settings) return;
 
@@ -61,9 +61,9 @@ const Admin = () => {
             const imageUrl = await uploadImage.mutateAsync(file);
             updateSettings.mutate({
                 id: settings.id,
-                background_image_url: imageUrl,
+                [field]: imageUrl,
             } as any);
-            toast.success("Imagen de fondo actualizada");
+            toast.success("Imagen actualizada correctamente");
         } catch (error) {
             toast.error("Error al subir la imagen");
         }
@@ -197,7 +197,7 @@ const Admin = () => {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium">Imagen de Fondo</label>
+                                    <label className="text-sm font-medium">Imagen de Fondo (Inicio)</label>
                                     <div className="flex items-center gap-4">
                                         {settings?.background_image_url && (
                                             <img
@@ -209,7 +209,26 @@ const Admin = () => {
                                         <Input
                                             type="file"
                                             accept="image/*"
-                                            onChange={handleImageUpload}
+                                            onChange={(e) => handleImageUpload(e, 'background_image_url')}
+                                            className="cursor-pointer"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Imagen de Fondo (Pantalla/Proyector)</label>
+                                    <div className="flex items-center gap-4">
+                                        {settings?.display_background_url && (
+                                            <img
+                                                src={settings.display_background_url}
+                                                alt="Display Background"
+                                                className="w-20 h-20 object-cover rounded-md"
+                                            />
+                                        )}
+                                        <Input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={(e) => handleImageUpload(e, 'display_background_url')}
                                             className="cursor-pointer"
                                         />
                                     </div>

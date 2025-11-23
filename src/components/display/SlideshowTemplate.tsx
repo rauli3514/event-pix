@@ -61,16 +61,19 @@ export const SlideshowTemplate = () => {
         setCurrentIndex((prev) => (prev + 1) % approvedContent.length);
     };
 
+    const backgroundUrl = settings?.display_background_url || settings?.background_image_url;
+
     return (
         <div
             className="relative min-h-screen bg-background flex items-center justify-center overflow-hidden bg-cover bg-center transition-all duration-1000"
-            style={settings?.background_image_url ? { backgroundImage: `url(${settings.background_image_url})` } : {}}
+            style={backgroundUrl ? { backgroundImage: `url(${backgroundUrl})` } : {}}
         >
             {/* Background Overlay */}
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
 
             <div className="relative z-10 w-full h-screen flex items-center justify-center p-4 md:p-12">
-                <div className="w-full max-w-5xl aspect-video relative flex items-center justify-center">
+                {/* Standardized Container for both Photos and Messages */}
+                <div className="w-full max-w-5xl aspect-[16/9] relative flex items-center justify-center bg-black/20 backdrop-blur-md rounded-xl border border-white/10 shadow-2xl overflow-hidden p-8">
 
                     {currentItem.type === 'photo' ? (
                         // PHOTO DISPLAY
@@ -79,29 +82,31 @@ export const SlideshowTemplate = () => {
                                 key={currentItem.id}
                                 src={currentItem.content}
                                 alt="Foto del evento"
-                                className="max-w-full max-h-full object-contain rounded-lg shadow-2xl border-4 border-white/20"
+                                className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
                             />
                             {currentItem.author && (
-                                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-black/70 backdrop-blur-md px-6 py-3 rounded-full border border-white/10">
+                                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 backdrop-blur-md px-6 py-2 rounded-full border border-white/10">
                                     <p className="text-white text-lg font-medium">📸 {currentItem.author}</p>
                                 </div>
                             )}
                         </div>
                     ) : (
                         // MESSAGE DISPLAY
-                        <div className="w-full max-w-3xl bg-white text-black p-12 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-fade-in transform transition-all hover:scale-105 relative">
-                            {/* Speech Bubble Tail */}
-                            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-8 h-8 bg-white rotate-45 transform origin-center"></div>
+                        <div className="w-full h-full flex items-center justify-center animate-fade-in">
+                            <div className="w-full max-w-3xl bg-white text-black p-12 rounded-3xl shadow-xl transform transition-all hover:scale-105 relative flex flex-col items-center justify-center min-h-[400px]">
+                                {/* Speech Bubble Tail */}
+                                <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-8 h-8 bg-white rotate-45 transform origin-center"></div>
 
-                            <div className="text-center space-y-6">
-                                <div className="inline-block p-3 bg-gray-100 rounded-full mb-4">
-                                    <span className="text-4xl">💬</span>
-                                </div>
-                                <p className="text-4xl md:text-6xl font-bold leading-tight text-gray-900 break-words">
-                                    "{currentItem.content}"
-                                </p>
-                                <div className="pt-4 border-t border-gray-200">
-                                    <p className="text-2xl text-gray-600 font-serif italic">- {currentItem.author}</p>
+                                <div className="text-center space-y-6">
+                                    <div className="inline-block p-3 bg-gray-100 rounded-full mb-4">
+                                        <span className="text-4xl">💬</span>
+                                    </div>
+                                    <p className="text-4xl md:text-5xl font-bold leading-tight text-gray-900 break-words line-clamp-4">
+                                        "{currentItem.content}"
+                                    </p>
+                                    <div className="pt-4 border-t border-gray-200 w-full">
+                                        <p className="text-2xl text-gray-600 font-serif italic">- {currentItem.author}</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -113,19 +118,19 @@ export const SlideshowTemplate = () => {
                 <Button
                     variant="ghost"
                     size="icon"
-                    className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:bg-white/20 h-12 w-12 rounded-full"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:bg-white/20 h-16 w-16 rounded-full"
                     onClick={goToPrevious}
                 >
-                    <ChevronLeft className="h-8 w-8" />
+                    <ChevronLeft className="h-10 w-10" />
                 </Button>
 
                 <Button
                     variant="ghost"
                     size="icon"
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:bg-white/20 h-12 w-12 rounded-full"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:bg-white/20 h-16 w-16 rounded-full"
                     onClick={goToNext}
                 >
-                    <ChevronRight className="h-8 w-8" />
+                    <ChevronRight className="h-10 w-10" />
                 </Button>
 
                 {/* Progress Dots */}

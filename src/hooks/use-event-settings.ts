@@ -6,6 +6,7 @@ export interface EventSettings {
     title: string;
     description: string;
     background_image_url: string | null;
+    display_background_url: string | null;
     display_template: 'grid' | 'slideshow' | 'masonry';
     created_at: string;
     updated_at: string;
