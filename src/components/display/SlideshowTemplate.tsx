@@ -1,79 +1,119 @@
 import { useState, useEffect } from "react";
-import { usePhotos } from "@/hooks/use-photos";
+import { useSubmissions } from "@/hooks/use-submissions";
+import { useEventSettings } from "@/hooks/use-event-settings";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-interface SlideshowTemplateProps {
-    eventId?: string;
-}
+export const SlideshowTemplate = () => {
+    const { submissions, isLoading } = useSubmissions();
+    const { data: settings } = useEventSettings();
 
-export const SlideshowTemplate = ({ eventId }: SlideshowTemplateProps) => {
-    const { data: photos, isLoading } = usePhotos(eventId);
+    // Filter only approved content (both photos and messages)
+    const approvedContent = submissions.filter(s => s.status === 'approved');
     const [currentIndex, setCurrentIndex] = useState(0);
 
     useEffect(() => {
-        if (!photos || photos.length === 0) return;
+        if (!approvedContent || approvedContent.length === 0) return;
 
         const interval = setInterval(() => {
-            setCurrentIndex((prev) => (prev + 1) % photos.length);
-        }, 5000); // Change photo every 5 seconds
+            setCurrentIndex((prev) => (prev + 1) % approvedContent.length);
+        }, 8000); // Change every 8 seconds for better readability
 
         return () => clearInterval(interval);
-    }, [photos]);
+    }, [approvedContent.length]);
 
     if (isLoading) {
         return (
             <div className="flex items-center justify-center min-h-screen bg-background">
-                <div className="text-muted-foreground">Cargando fotos...</div>
+                <div className="text-muted-foreground">Cargando contenido...</div>
             </div>
         );
     }
 
-    if (!photos || photos.length === 0) {
+    if (!approvedContent || approvedContent.length === 0) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-background">
-                <div className="text-center space-y-2">
+            <div
+                className="flex items-center justify-center min-h-screen bg-background bg-cover bg-center"
+                style={settings?.background_image_url ? { backgroundImage: `url(${settings.background_image_url})` } : {}}
+            >
+                {settings?.background_image_url && (
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+                )}
+                <div className="relative z-10 text-center space-y-2 p-8 bg-card/80 backdrop-blur rounded-xl border border-white/10">
                     <p className="text-2xl font-serif text-foreground">
-                        Aún no hay fotos
+                        Esperando contenido...
                     </p>
                     <p className="text-sm text-muted-foreground">
-                        Las fotos aparecerán aquí cuando los invitados las suban
+                        ¡Sube tus fotos y mensajes para verlos aquí!
                     </p>
                 </div>
             </div>
         );
     }
 
-    const currentPhoto = photos[currentIndex];
+    const currentItem = approvedContent[currentIndex];
 
     const goToPrevious = () => {
-        setCurrentIndex((prev) => (prev - 1 + photos.length) % photos.length);
+        setCurrentIndex((prev) => (prev - 1 + approvedContent.length) % approvedContent.length);
     };
 
     const goToNext = () => {
-        setCurrentIndex((prev) => (prev + 1) % photos.length);
+        setCurrentIndex((prev) => (prev + 1) % approvedContent.length);
     };
 
     return (
-        <div className="relative min-h-screen bg-background flex items-center justify-center">
-            <div className="relative w-full h-screen flex items-center justify-center p-8">
-                <img
-                    key={currentPhoto.id}
-                    src={currentPhoto.image_url}
-                    alt={currentPhoto.message || "Foto del evento"}
-                    className="max-w-full max-h-full object-contain animate-fade-in"
-                />
+        <div
+            className="relative min-h-screen bg-background flex items-center justify-center overflow-hidden bg-cover bg-center transition-all duration-1000"
+            style={settings?.background_image_url ? { backgroundImage: `url(${settings.background_image_url})` } : {}}
+        >
+            {/* Background Overlay */}
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
 
-                {currentPhoto.message && (
-                    <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-background/90 backdrop-blur-sm px-6 py-3 rounded-lg max-w-2xl">
-                        <p className="text-foreground text-center">{currentPhoto.message}</p>
-                    </div>
-                )}
+            <div className="relative z-10 w-full h-screen flex items-center justify-center p-4 md:p-12">
+                <div className="w-full max-w-5xl aspect-video relative flex items-center justify-center">
 
+                    {currentItem.type === 'photo' ? (
+                        // PHOTO DISPLAY
+                        <div className="relative w-full h-full flex items-center justify-center animate-fade-in">
+                            <img
+                                key={currentItem.id}
+                                src={currentItem.content}
+                                alt="Foto del evento"
+                                className="max-w-full max-h-full object-contain rounded-lg shadow-2xl border-4 border-white/20"
+                            />
+                            {currentItem.author && (
+                                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-black/70 backdrop-blur-md px-6 py-3 rounded-full border border-white/10">
+                                    <p className="text-white text-lg font-medium">📸 {currentItem.author}</p>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        // MESSAGE DISPLAY
+                        <div className="w-full max-w-3xl bg-white text-black p-12 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-fade-in transform transition-all hover:scale-105 relative">
+                            {/* Speech Bubble Tail */}
+                            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-8 h-8 bg-white rotate-45 transform origin-center"></div>
+
+                            <div className="text-center space-y-6">
+                                <div className="inline-block p-3 bg-gray-100 rounded-full mb-4">
+                                    <span className="text-4xl">💬</span>
+                                </div>
+                                <p className="text-4xl md:text-6xl font-bold leading-tight text-gray-900 break-words">
+                                    "{currentItem.content}"
+                                </p>
+                                <div className="pt-4 border-t border-gray-200">
+                                    <p className="text-2xl text-gray-600 font-serif italic">- {currentItem.author}</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                </div>
+
+                {/* Navigation Controls */}
                 <Button
                     variant="ghost"
                     size="icon"
-                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-background/50 hover:bg-background/80"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:bg-white/20 h-12 w-12 rounded-full"
                     onClick={goToPrevious}
                 >
                     <ChevronLeft className="h-8 w-8" />
@@ -82,20 +122,21 @@ export const SlideshowTemplate = ({ eventId }: SlideshowTemplateProps) => {
                 <Button
                     variant="ghost"
                     size="icon"
-                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-background/50 hover:bg-background/80"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:bg-white/20 h-12 w-12 rounded-full"
                     onClick={goToNext}
                 >
                     <ChevronRight className="h-8 w-8" />
                 </Button>
 
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-                    {photos.map((_, index) => (
+                {/* Progress Dots */}
+                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-2">
+                    {approvedContent.map((_, index) => (
                         <button
                             key={index}
                             onClick={() => setCurrentIndex(index)}
-                            className={`w-2 h-2 rounded-full transition-all ${index === currentIndex
-                                    ? "bg-foreground w-8"
-                                    : "bg-muted-foreground/50"
+                            className={`h-2 rounded-full transition-all duration-300 ${index === currentIndex
+                                    ? "bg-white w-8"
+                                    : "bg-white/30 w-2 hover:bg-white/50"
                                 }`}
                         />
                     ))}
