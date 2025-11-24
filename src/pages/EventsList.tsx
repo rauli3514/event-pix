@@ -60,7 +60,7 @@ const EventsList = () => {
                     event_id: event.id,
                     title: event.name,
                     description: '¡Bienvenidos a nuestra fiesta!',
-                    display_template: 'grid'
+                    display_template: 'slideshow'
                 }]);
 
             if (settingsError) throw settingsError;
