@@ -16,7 +16,7 @@ const Index = () => {
 
             {/* Header */}
             <header className="relative z-10 pt-8 pb-4 text-center animate-fade-in-down">
-                <h1 className="text-3xl font-bold tracking-tight text-violet-900 font-serif">EventPix</h1>
+                <h1 className="text-3xl font-bold tracking-tight text-violet-900 font-sans">EventPix</h1>
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">by Tecno Eventos</p>
             </header>
 

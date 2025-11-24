@@ -23,7 +23,7 @@ export const EventCard = ({ onUploadClick, onMessageClick }: EventCardProps) => 
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-90" />
 
                 <div className="absolute bottom-0 left-0 p-8 w-full space-y-2">
-                    <h2 className="text-3xl md:text-4xl font-serif font-bold text-white tracking-tight leading-tight drop-shadow-md">
+                    <h2 className="text-3xl md:text-4xl font-serif font-bold text-white tracking-tight leading-tight drop-shadow-md capitalize">
                         {settings?.title || "EventPix"}
                     </h2>
                     <p className="text-white/90 text-sm md:text-base font-medium leading-relaxed drop-shadow-sm">
@@ -44,7 +44,7 @@ export const EventCard = ({ onUploadClick, onMessageClick }: EventCardProps) => 
                 <Button
                     onClick={onMessageClick}
                     variant="outline"
-                    className="w-full h-14 text-lg font-medium bg-white border-2 border-slate-200 hover:border-violet-200 hover:bg-violet-50 text-slate-700 rounded-full transition-all hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2"
+                    className="w-full h-14 text-lg font-medium bg-slate-50 border-2 border-slate-200 hover:border-violet-200 hover:bg-white text-slate-700 rounded-full transition-all hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2"
                 >
                     <MessageSquare className="h-5 w-5 text-violet-500" />
                     Dejar Mensaje
