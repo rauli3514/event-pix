@@ -16,23 +16,16 @@ const Index = () => {
             style={settings?.background_image_url ? { backgroundImage: `url(${settings.background_image_url})` } : {}}
         >
             {settings?.background_image_url && (
-                <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" />
+                <div className="absolute inset-0 bg-gradient-to-b from-white/80 via-white/90 to-white/95 backdrop-blur-sm" />
             )}
 
-            <div className="container px-4 py-16 mx-auto max-w-4xl relative z-10">
-                <div className="mb-16 text-center space-y-4">
-                    <h1 className="text-6xl md:text-7xl font-serif text-foreground tracking-tight">
-                        {settings?.title || "EventPix"}
-                    </h1>
-                    <p className="text-muted-foreground text-lg">
-                        {settings?.description || "Captura el momento, comparte la magia"}
-                    </p>
+            <div className="container px-4 min-h-screen flex items-center justify-center relative z-10 py-12">
+                <div className="w-full max-w-md mx-auto">
+                    <EventCard
+                        onUploadClick={() => setUploadOpen(true)}
+                        onMessageClick={() => setMessageOpen(true)}
+                    />
                 </div>
-
-                <EventCard
-                    onUploadClick={() => setUploadOpen(true)}
-                    onMessageClick={() => setMessageOpen(true)}
-                />
             </div>
 
             <UploadModal open={uploadOpen} onOpenChange={setUploadOpen} />
