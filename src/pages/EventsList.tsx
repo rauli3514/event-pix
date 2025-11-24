@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Calendar, ExternalLink, Settings, LogOut } from 'lucide-react';
+import { Plus, Calendar, ExternalLink, Settings, LogOut, Trash2, Lock, Unlock } from 'lucide-react';
 
 type Event = {
     id: string;
@@ -76,6 +76,46 @@ const EventsList = () => {
         onError: (error: any) => {
             console.error(error);
             toast.error(error.message || 'Error al crear evento');
+        }
+    });
+
+    const toggleEventStatus = useMutation({
+        mutationFn: async ({ id, currentStatus }: { id: string; currentStatus: 'active' | 'closed' }) => {
+            const newStatus = currentStatus === 'active' ? 'closed' : 'active';
+            const { error } = await supabase
+                .from('events')
+                .update({ status: newStatus })
+                .eq('id', id);
+
+            if (error) throw error;
+            return newStatus;
+        },
+        onSuccess: (newStatus) => {
+            queryClient.invalidateQueries({ queryKey: ['events'] });
+            toast.success(`Evento ${newStatus === 'closed' ? 'cerrado' : 'activado'} exitosamente`);
+        },
+        onError: (error: any) => {
+            console.error(error);
+            toast.error('Error al cambiar el estado del evento');
+        }
+    });
+
+    const deleteEvent = useMutation({
+        mutationFn: async (id: string) => {
+            const { error } = await supabase
+                .from('events')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['events'] });
+            toast.success('Evento eliminado exitosamente');
+        },
+        onError: (error: any) => {
+            console.error(error);
+            toast.error('Error al eliminar el evento');
         }
     });
 
@@ -182,22 +222,50 @@ const EventsList = () => {
                                 {new Date(event.date).toLocaleDateString()}
                             </div>
                         </CardHeader>
-                        <CardContent className="pb-4">
+                        <CardContent className="pb-4 space-y-3">
                             <div className="text-sm text-slate-600 bg-slate-50 p-2 rounded border border-slate-100 truncate">
                                 /{event.slug}
                             </div>
                         </CardContent>
-                        <CardFooter className="flex gap-2 pt-0">
-                            <Button asChild className="flex-1" variant="default">
-                                <Link to={`/admin/${event.slug}`}>
-                                    <Settings className="w-4 h-4 mr-2" /> Administrar
-                                </Link>
-                            </Button>
-                            <Button asChild variant="outline" className="flex-1">
-                                <a href={`/event-pix/${event.slug}`} target="_blank" rel="noopener noreferrer">
-                                    <ExternalLink className="w-4 h-4 mr-2" /> Ver Web
-                                </a>
-                            </Button>
+                        <CardFooter className="flex flex-col gap-2 pt-0">
+                            <div className="flex gap-2 w-full">
+                                <Button asChild className="flex-1" variant="default">
+                                    <Link to={`/admin/${event.slug}`}>
+                                        <Settings className="w-4 h-4 mr-2" /> Administrar
+                                    </Link>
+                                </Button>
+                                <Button asChild variant="outline" className="flex-1">
+                                    <a href={`/event-pix/${event.slug}`} target="_blank" rel="noopener noreferrer">
+                                        <ExternalLink className="w-4 h-4 mr-2" /> Ver Web
+                                    </a>
+                                </Button>
+                            </div>
+                            <div className="flex gap-2 w-full">
+                                <Button
+                                    variant={event.status === 'active' ? 'outline' : 'secondary'}
+                                    className="flex-1"
+                                    onClick={() => toggleEventStatus.mutate({ id: event.id, currentStatus: event.status })}
+                                    disabled={toggleEventStatus.isPending}
+                                >
+                                    {event.status === 'active' ? (
+                                        <><Lock className="w-4 h-4 mr-2" /> Cerrar</>
+                                    ) : (
+                                        <><Unlock className="w-4 h-4 mr-2" /> Abrir</>
+                                    )}
+                                </Button>
+                                <Button
+                                    variant="destructive"
+                                    className="flex-1"
+                                    onClick={() => {
+                                        if (confirm(`¿Estás seguro de eliminar el evento "${event.name}"? Esta acción no se puede deshacer.`)) {
+                                            deleteEvent.mutate(event.id);
+                                        }
+                                    }}
+                                    disabled={deleteEvent.isPending}
+                                >
+                                    <Trash2 className="w-4 h-4 mr-2" /> Eliminar
+                                </Button>
+                            </div>
                         </CardFooter>
                     </Card>
                 ))}
