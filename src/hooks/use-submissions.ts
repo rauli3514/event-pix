@@ -35,6 +35,7 @@ export const useSubmissions = () => {
 
             return data as Submission[];
         },
+        refetchInterval: 5000, // Auto-refresh every 5 seconds
     });
 
     const updateStatus = useMutation({
