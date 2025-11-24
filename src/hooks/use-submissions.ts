@@ -107,5 +107,87 @@ export const useSubmissions = () => {
         }
     });
 
-    return { submissions: submissions || [], isLoading, updateStatus, createSubmission };
+    const toggleAlbum = useMutation({
+        mutationFn: async ({ id, in_album }: { id: string; in_album: boolean }) => {
+            const { error } = await supabase
+                .from('submissions')
+                .update({ in_album })
+                .eq('id', id);
+
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['submissions'] });
+            toast.success('Álbum actualizado');
+        },
+        onError: () => {
+            toast.error('Error al actualizar el álbum');
+        }
+    });
+
+    const deleteSubmission = useMutation({
+        mutationFn: async (id: string) => {
+            const { error } = await supabase
+                .from('submissions')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['submissions'] });
+            toast.success('Foto eliminada');
+        },
+        onError: () => {
+            toast.error('Error al eliminar la foto');
+        }
+    });
+
+    const emptyAlbum = useMutation({
+        mutationFn: async () => {
+            const { error } = await supabase
+                .from('submissions')
+                .update({ in_album: false })
+                .eq('in_album', true);
+
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['submissions'] });
+            toast.success('Álbum vaciado');
+        },
+        onError: () => {
+            toast.error('Error al vaciar el álbum');
+        }
+    });
+
+    const resetAll = useMutation({
+        mutationFn: async () => {
+            // Delete all submissions
+            const { error } = await supabase
+                .from('submissions')
+                .delete()
+                .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['submissions'] });
+            toast.success('Todo el contenido ha sido eliminado');
+        },
+        onError: () => {
+            toast.error('Error al resetear todo');
+        }
+    });
+
+    return {
+        submissions: submissions || [],
+        isLoading,
+        updateStatus,
+        createSubmission,
+        toggleAlbum,
+        deleteSubmission,
+        emptyAlbum,
+        resetAll
+    };
 };

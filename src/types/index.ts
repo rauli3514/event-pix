@@ -6,5 +6,6 @@ export interface Submission {
     content: string;
     author?: string;
     status: SubmissionStatus;
+    in_album?: boolean;
     created_at: string;
 }

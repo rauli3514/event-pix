@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, X, Clock } from "lucide-react";
+import { Check, X, Clock, Trash2, Download, ImagePlus, ImageMinus, RefreshCw } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useSubmissions } from "@/hooks/use-submissions";
 import { useEventSettings, useUpdateEventSettings, useUploadEventImage } from "@/hooks/use-event-settings";
@@ -13,9 +13,11 @@ import { es } from "date-fns/locale";
 import { supabase } from "@/lib/supabase";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
 
 const Admin = () => {
-    const { submissions, isLoading, updateStatus } = useSubmissions();
+    const { submissions, isLoading, updateStatus, toggleAlbum, deleteSubmission, emptyAlbum, resetAll } = useSubmissions();
     const { data: settings, isLoading: settingsLoading } = useEventSettings();
     const updateSettings = useUpdateEventSettings();
     const uploadImage = useUploadEventImage();
@@ -38,6 +40,65 @@ const Admin = () => {
 
     const handleModeration = (id: string, status: SubmissionStatus) => {
         updateStatus.mutate({ id, status });
+    };
+
+    const handleDelete = (id: string) => {
+        if (confirm("¿Estás seguro de eliminar esta foto permanentemente?")) {
+            deleteSubmission.mutate(id);
+        }
+    };
+
+    const handleToggleAlbum = (id: string, currentStatus: boolean) => {
+        toggleAlbum.mutate({ id, in_album: !currentStatus });
+    };
+
+    const handleDownloadAlbum = async () => {
+        const albumPhotos = submissions.filter(s => s.in_album && s.type === 'photo');
+        if (albumPhotos.length === 0) {
+            toast.error("El álbum está vacío");
+            return;
+        }
+
+        const zip = new JSZip();
+        const folder = zip.folder("album-eventpix");
+
+        const downloadToast = toast.loading("Generando álbum...");
+
+        try {
+            const promises = albumPhotos.map(async (photo, index) => {
+                try {
+                    const response = await fetch(photo.content);
+                    const blob = await response.blob();
+                    const extension = photo.content.split('.').pop()?.split('?')[0] || 'jpg';
+                    folder?.file(`foto-${index + 1}.${extension}`, blob);
+                } catch (e) {
+                    console.error("Error downloading photo", e);
+                }
+            });
+
+            await Promise.all(promises);
+            const content = await zip.generateAsync({ type: "blob" });
+            saveAs(content, "album-eventpix.zip");
+            toast.dismiss(downloadToast);
+            toast.success("Álbum descargado");
+        } catch (error) {
+            console.error(error);
+            toast.dismiss(downloadToast);
+            toast.error("Error al generar el ZIP");
+        }
+    };
+
+    const handleEmptyAlbum = () => {
+        if (confirm("¿Vaciar el álbum? Las fotos seguirán aprobadas pero se quitarán de la selección.")) {
+            emptyAlbum.mutate();
+        }
+    };
+
+    const handleResetAll = () => {
+        const confirmText = prompt("Escribe 'BORRAR TODO' para confirmar que deseas eliminar TODAS las fotos y mensajes.");
+        if (confirmText === 'BORRAR TODO') {
+            resetAll.mutate();
+        }
     };
 
     const handleSettingsSubmit = (e: React.FormEvent) => {
@@ -77,17 +138,37 @@ const Admin = () => {
                         <Clock className="w-4 h-4 mr-1" />
                         {formatDistanceToNow(new Date(item.created_at), { addSuffix: true, locale: es })}
                     </div>
-                    <div className={`px-2 py-1 rounded-full text-xs ${item.status === 'pending' ? 'bg-yellow-500/20 text-yellow-500' :
-                        item.status === 'approved' ? 'bg-green-500/20 text-green-500' :
-                            'bg-red-500/20 text-red-500'
-                        }`}>
-                        {item.status.toUpperCase()}
+                    <div className="flex gap-2">
+                        {item.status === 'approved' && item.type === 'photo' && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className={item.in_album ? "text-blue-500 bg-blue-500/10" : "text-muted-foreground"}
+                                onClick={() => handleToggleAlbum(item.id, item.in_album || false)}
+                                title={item.in_album ? "Quitar del álbum" : "Agregar al álbum"}
+                            >
+                                {item.in_album ? <ImageMinus className="w-4 h-4" /> : <ImagePlus className="w-4 h-4" />}
+                            </Button>
+                        )}
+                        <div className={`px-2 py-1 rounded-full text-xs flex items-center ${item.status === 'pending' ? 'bg-yellow-500/20 text-yellow-500' :
+                            item.status === 'approved' ? 'bg-green-500/20 text-green-500' :
+                                'bg-red-500/20 text-red-500'
+                            }`}>
+                            {item.status.toUpperCase()}
+                        </div>
                     </div>
                 </div>
 
                 {item.type === 'photo' ? (
-                    <div className="aspect-video rounded-md overflow-hidden bg-black/20 mb-4">
+                    <div className="aspect-video rounded-md overflow-hidden bg-black/20 mb-4 relative group">
                         <img src={item.content} alt="Submission" className="w-full h-full object-cover" />
+                        {item.status === 'approved' && (
+                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button variant="destructive" size="icon" className="h-8 w-8" onClick={() => handleDelete(item.id)}>
+                                    <Trash2 className="w-4 h-4" />
+                                </Button>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <div className="bg-black/20 p-4 rounded-md mb-4">
@@ -139,9 +220,10 @@ const Admin = () => {
             </header>
 
             <Tabs defaultValue="pending" className="w-full">
-                <TabsList className="grid w-full grid-cols-4 mb-8">
+                <TabsList className="grid w-full grid-cols-5 mb-8">
                     <TabsTrigger value="pending">Pendientes ({submissions.filter(s => s.status === 'pending').length})</TabsTrigger>
                     <TabsTrigger value="approved">Aprobados ({submissions.filter(s => s.status === 'approved').length})</TabsTrigger>
+                    <TabsTrigger value="album">Álbum ({submissions.filter(s => s.in_album).length})</TabsTrigger>
                     <TabsTrigger value="rejected">Rechazados ({submissions.filter(s => s.status === 'rejected').length})</TabsTrigger>
                     <TabsTrigger value="settings">Configuración</TabsTrigger>
                 </TabsList>
@@ -157,6 +239,32 @@ const Admin = () => {
                         </div>
                     </TabsContent>
                 ))}
+
+                <TabsContent value="album">
+                    <div className="mb-6 flex justify-between items-center">
+                        <h2 className="text-xl font-medium">Fotos seleccionadas para el álbum</h2>
+                        <div className="flex gap-2">
+                            <Button variant="outline" onClick={handleEmptyAlbum} disabled={!submissions.some(s => s.in_album)}>
+                                <Trash2 className="w-4 h-4 mr-2" /> Vaciar Álbum
+                            </Button>
+                            <Button onClick={handleDownloadAlbum} disabled={!submissions.some(s => s.in_album)}>
+                                <Download className="w-4 h-4 mr-2" /> Descargar ZIP
+                            </Button>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {submissions
+                            .filter(item => item.in_album)
+                            .map(item => (
+                                <SubmissionCard key={item.id} item={item} />
+                            ))}
+                        {submissions.filter(item => item.in_album).length === 0 && (
+                            <div className="col-span-full text-center py-12 text-muted-foreground">
+                                No hay fotos en el álbum. Ve a la pestaña "Aprobados" y selecciona algunas.
+                            </div>
+                        )}
+                    </div>
+                </TabsContent>
 
                 <TabsContent value="settings">
                     <Card className="max-w-2xl mx-auto">
@@ -182,8 +290,6 @@ const Admin = () => {
                                         placeholder="Una breve descripción para tus invitados"
                                     />
                                 </div>
-
-
 
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium">Imagen de Fondo (Inicio)</label>
@@ -226,6 +332,16 @@ const Admin = () => {
                                 <Button type="submit" className="w-full">
                                     Guardar Cambios
                                 </Button>
+
+                                <div className="pt-8 border-t mt-8">
+                                    <h3 className="text-destructive font-medium mb-4">Zona de Peligro</h3>
+                                    <Button type="button" variant="destructive" className="w-full" onClick={handleResetAll}>
+                                        <RefreshCw className="w-4 h-4 mr-2" /> RESETEAR TODO EL EVENTO
+                                    </Button>
+                                    <p className="text-xs text-muted-foreground mt-2 text-center">
+                                        Esto eliminará todas las fotos y mensajes permanentemente.
+                                    </p>
+                                </div>
                             </form>
                         </CardContent>
                     </Card>
