@@ -14,10 +14,11 @@ import { useSubmissions } from "@/hooks/use-submissions";
 interface MessageModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    eventId?: string;
 }
 
-export const MessageModal = ({ open, onOpenChange }: MessageModalProps) => {
-    const { createSubmission } = useSubmissions();
+export const MessageModal = ({ open, onOpenChange, eventId }: MessageModalProps) => {
+    const { createSubmission } = useSubmissions(eventId);
     const [message, setMessage] = useState("");
     const [name, setName] = useState("");
     const [showSuccess, setShowSuccess] = useState(false);

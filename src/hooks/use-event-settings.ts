@@ -12,13 +12,16 @@ export interface EventSettings {
     updated_at: string;
 }
 
-export const useEventSettings = () => {
+export const useEventSettings = (eventId?: string) => {
     return useQuery({
-        queryKey: ["event-settings"],
+        queryKey: ["event-settings", eventId],
         queryFn: async () => {
+            if (!eventId) return null;
+
             const { data, error } = await supabase
                 .from("event_settings")
                 .select("*")
+                .eq("event_id", eventId)
                 .maybeSingle();
 
             if (error) {
@@ -30,10 +33,11 @@ export const useEventSettings = () => {
         },
         retry: 1,
         staleTime: 1000 * 60 * 5, // 5 minutes
+        enabled: !!eventId,
     });
 };
 
-export const useUpdateEventSettings = () => {
+export const useUpdateEventSettings = (eventId?: string) => {
     const queryClient = useQueryClient();
 
     return useMutation({
@@ -52,7 +56,7 @@ export const useUpdateEventSettings = () => {
             return data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["event-settings"] });
+            queryClient.invalidateQueries({ queryKey: ["event-settings", eventId] });
         },
     });
 };

@@ -3,8 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, X, Clock, Trash2, Download, RefreshCw, Zap } from "lucide-react";
-import { NavLink } from "@/components/NavLink";
+import { Check, X, Clock, Trash2, Download, RefreshCw, Zap, ArrowLeft } from "lucide-react";
 import { useSubmissions } from "@/hooks/use-submissions";
 import { useEventSettings, useUpdateEventSettings, useUploadEventImage } from "@/hooks/use-event-settings";
 import { Submission, SubmissionStatus } from "@/types";
@@ -16,10 +15,14 @@ import { toast } from "sonner";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 
+import { useEvent } from "@/context/EventContext";
+import { Link } from "react-router-dom";
+
 const Admin = () => {
-    const { submissions, isLoading, updateStatus, deleteSubmission, deleteAllApproved, resetAll } = useSubmissions();
-    const { data: settings, isLoading: settingsLoading } = useEventSettings();
-    const updateSettings = useUpdateEventSettings();
+    const { event, isLoading: eventLoading } = useEvent();
+    const { submissions, isLoading, updateStatus, deleteSubmission, deleteAllApproved, resetAll } = useSubmissions(event?.id);
+    const { data: settings, isLoading: settingsLoading } = useEventSettings(event?.id);
+    const updateSettings = useUpdateEventSettings(event?.id);
     const uploadImage = useUploadEventImage();
 
     const [formData, setFormData] = useState({
@@ -246,7 +249,8 @@ const Admin = () => {
                 content,
                 author: `Simulado ${count + 1}`,
                 status: 'approved', // Directo al wall para probar carga
-                created_at: new Date().toISOString()
+                created_at: new Date().toISOString(),
+                event_id: event?.id // Importante: Asociar al evento actual
             }]);
 
             count++;
@@ -254,17 +258,27 @@ const Admin = () => {
         }, 200); // 5 por segundo
     };
 
-    if (isLoading || settingsLoading) {
+    if (eventLoading || isLoading || settingsLoading) {
         return <div className="min-h-screen flex items-center justify-center text-foreground">Cargando...</div>;
     }
+
+    if (!event) return <div className="min-h-screen flex items-center justify-center text-foreground">Evento no encontrado</div>;
 
     return (
         <div className="min-h-screen bg-background p-6">
             <header className="flex justify-between items-center mb-8">
-                <h1 className="text-3xl font-serif text-primary">Panel de Administración</h1>
+                <div className="flex items-center gap-4">
+                    <Link to="/admin" className="text-muted-foreground hover:text-primary transition-colors">
+                        <ArrowLeft className="w-6 h-6" />
+                    </Link>
+                    <div>
+                        <h1 className="text-3xl font-serif text-primary">Panel de Administración</h1>
+                        <p className="text-sm text-muted-foreground font-medium">{event.name}</p>
+                    </div>
+                </div>
                 <nav className="flex gap-4 items-center">
-                    <NavLink to="/">Inicio</NavLink>
-                    <NavLink to="/display">Pantalla</NavLink>
+                    <a href={`/event-pix/${event.slug}`} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-primary">Ver Web</a>
+                    <a href={`/event-pix/${event.slug}/display`} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-primary">Ver Pantalla</a>
                     <Button variant="ghost" onClick={handleLogout} className="text-muted-foreground hover:text-destructive">
                         Salir
                     </Button>

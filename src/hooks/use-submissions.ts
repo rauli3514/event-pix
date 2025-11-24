@@ -9,11 +9,11 @@ const MOCK_SUBMISSIONS: Submission[] = [
     { id: '3', type: 'photo', content: 'https://images.unsplash.com/photo-1511285560982-1351cdeb9821?auto=format&fit=crop&q=80', created_at: new Date(Date.now() - 1000 * 60 * 10).toISOString(), status: 'approved' },
 ];
 
-export const useSubmissions = () => {
+export const useSubmissions = (eventId?: string) => {
     const queryClient = useQueryClient();
 
     const { data: submissions, isLoading } = useQuery({
-        queryKey: ['submissions'],
+        queryKey: ['submissions', eventId],
         queryFn: async () => {
             const isConfigured = import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -22,10 +22,16 @@ export const useSubmissions = () => {
                 return MOCK_SUBMISSIONS;
             }
 
-            const { data, error } = await supabase
+            let query = supabase
                 .from('submissions')
                 .select('*')
                 .order('created_at', { ascending: false });
+
+            if (eventId) {
+                query = query.eq('event_id', eventId);
+            }
+
+            const { data, error } = await query;
 
             if (error) {
                 console.error('Error fetching submissions:', error);
@@ -35,7 +41,8 @@ export const useSubmissions = () => {
 
             return data as Submission[];
         },
-        refetchInterval: 5000, // Auto-refresh every 5 seconds
+        refetchInterval: 5000,
+        enabled: !!eventId || (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL?.includes('your_supabase_url')),
     });
 
     const updateStatus = useMutation({
@@ -53,7 +60,7 @@ export const useSubmissions = () => {
             if (error) throw error;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['submissions'] });
+            queryClient.invalidateQueries({ queryKey: ['submissions', eventId] });
         },
         onError: () => {
             toast.error('Error al actualizar el estado');
@@ -65,10 +72,11 @@ export const useSubmissions = () => {
             const isConfigured = import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY;
 
             if (!isConfigured || import.meta.env.VITE_SUPABASE_URL?.includes('your_supabase_url')) {
-                // Simulate success
-                await new Promise(resolve => setTimeout(resolve, 1000)); // Fake delay
+                await new Promise(resolve => setTimeout(resolve, 1000));
                 return;
             }
+
+            if (!eventId) throw new Error("No event ID provided");
 
             let contentUrl = newSubmission.content;
 
@@ -93,13 +101,14 @@ export const useSubmissions = () => {
                     type: newSubmission.type,
                     content: contentUrl,
                     author: newSubmission.author,
-                    status: 'pending'
+                    status: 'pending',
+                    event_id: eventId
                 }]);
 
             if (error) throw error;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['submissions'] });
+            queryClient.invalidateQueries({ queryKey: ['submissions', eventId] });
             toast.success('Enviado con éxito! Pendiente de aprobación.');
         },
         onError: (error) => {
@@ -118,7 +127,7 @@ export const useSubmissions = () => {
             if (error) throw error;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['submissions'] });
+            queryClient.invalidateQueries({ queryKey: ['submissions', eventId] });
             toast.success('Álbum actualizado');
         },
         onError: () => {
@@ -136,7 +145,7 @@ export const useSubmissions = () => {
             if (error) throw error;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['submissions'] });
+            queryClient.invalidateQueries({ queryKey: ['submissions', eventId] });
             toast.success('Foto eliminada');
         },
         onError: () => {
@@ -146,15 +155,17 @@ export const useSubmissions = () => {
 
     const deleteAllApproved = useMutation({
         mutationFn: async () => {
+            if (!eventId) return;
             const { error } = await supabase
                 .from('submissions')
                 .delete()
-                .eq('status', 'approved');
+                .eq('status', 'approved')
+                .eq('event_id', eventId);
 
             if (error) throw error;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['submissions'] });
+            queryClient.invalidateQueries({ queryKey: ['submissions', eventId] });
             toast.success('Contenido aprobado eliminado');
         },
         onError: () => {
@@ -164,16 +175,16 @@ export const useSubmissions = () => {
 
     const resetAll = useMutation({
         mutationFn: async () => {
-            // Delete all submissions
+            if (!eventId) return;
             const { error } = await supabase
                 .from('submissions')
                 .delete()
-                .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+                .eq('event_id', eventId);
 
             if (error) throw error;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['submissions'] });
+            queryClient.invalidateQueries({ queryKey: ['submissions', eventId] });
             toast.success('Todo el contenido ha sido eliminado');
         },
         onError: () => {

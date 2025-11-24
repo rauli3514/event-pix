@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useEvent } from "@/context/EventContext";
 import { EventCard } from "@/components/EventCard";
 import { UploadModal } from "@/components/UploadModal";
 import { MessageModal } from "@/components/MessageModal";
@@ -8,6 +9,10 @@ import { FaWhatsapp, FaInstagram, FaTiktok } from "react-icons/fa";
 const Index = () => {
     const [uploadOpen, setUploadOpen] = useState(false);
     const [messageOpen, setMessageOpen] = useState(false);
+    const { event, isLoading, error } = useEvent();
+
+    if (isLoading) return <div className="min-h-screen flex items-center justify-center text-slate-500">Cargando evento...</div>;
+    if (error || !event) return <div className="min-h-screen flex items-center justify-center text-slate-500">Evento no encontrado</div>;
 
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col relative overflow-hidden font-sans">
@@ -16,17 +21,25 @@ const Index = () => {
 
             {/* Header */}
             <header className="relative z-10 pt-8 pb-4 text-center animate-fade-in-down">
-                <h1 className="text-3xl font-bold tracking-tight text-violet-900 font-sans">EventPix</h1>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">by Tecno Eventos</p>
+                <h1 className="text-3xl font-bold tracking-tight text-violet-900 font-sans">{event.name}</h1>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">by EventPix</p>
             </header>
 
             {/* Main Content */}
             <main className="flex-1 relative z-10 container px-4 flex items-center justify-center py-6">
                 <div className="w-full max-w-md mx-auto animate-fade-in-up">
-                    <EventCard
-                        onUploadClick={() => setUploadOpen(true)}
-                        onMessageClick={() => setMessageOpen(true)}
-                    />
+                    {event.status === 'active' ? (
+                        <EventCard
+                            onUploadClick={() => setUploadOpen(true)}
+                            onMessageClick={() => setMessageOpen(true)}
+                        />
+                    ) : (
+                        <div className="bg-white p-8 rounded-2xl shadow-xl text-center border border-slate-200">
+                            <h2 className="text-2xl font-bold text-slate-800 mb-4">Evento Finalizado</h2>
+                            <p className="text-slate-600">Muchas gracias por participar en {event.name}.</p>
+                            <p className="text-slate-500 mt-2 text-sm">Ya no se aceptan nuevas fotos ni mensajes.</p>
+                        </div>
+                    )}
                 </div>
             </main>
 
@@ -51,8 +64,12 @@ const Index = () => {
                 </div>
             </footer>
 
-            <UploadModal open={uploadOpen} onOpenChange={setUploadOpen} />
-            <MessageModal open={messageOpen} onOpenChange={setMessageOpen} />
+            {event.status === 'active' && (
+                <>
+                    <UploadModal open={uploadOpen} onOpenChange={setUploadOpen} eventId={event.id} />
+                    <MessageModal open={messageOpen} onOpenChange={setMessageOpen} eventId={event.id} />
+                </>
+            )}
             <TermsModal />
         </div>
     );

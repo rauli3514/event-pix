@@ -13,10 +13,11 @@ import { useSubmissions } from "@/hooks/use-submissions";
 interface UploadModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    eventId?: string;
 }
 
-export const UploadModal = ({ open, onOpenChange }: UploadModalProps) => {
-    const { createSubmission } = useSubmissions();
+export const UploadModal = ({ open, onOpenChange, eventId }: UploadModalProps) => {
+    const { createSubmission } = useSubmissions(eventId);
     const [preview, setPreview] = useState<string | null>(null);
     const [file, setFile] = useState<File | null>(null);
     const [showSuccess, setShowSuccess] = useState(false);

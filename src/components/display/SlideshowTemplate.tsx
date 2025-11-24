@@ -4,9 +4,13 @@ import { useEventSettings } from "@/hooks/use-event-settings";
 import { RouletteModal } from "@/components/display/RouletteModal";
 import QRCode from "react-qr-code";
 
-export const SlideshowTemplate = () => {
-    const { submissions } = useSubmissions();
-    const { data: settings } = useEventSettings();
+interface SlideshowTemplateProps {
+    eventId?: string;
+}
+
+export const SlideshowTemplate = ({ eventId }: SlideshowTemplateProps) => {
+    const { submissions } = useSubmissions(eventId);
+    const { data: settings } = useEventSettings(eventId);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [emptyMessageIndex, setEmptyMessageIndex] = useState(0);
 
