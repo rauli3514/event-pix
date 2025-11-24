@@ -35,13 +35,16 @@ const Index = () => {
                 <div className="container px-4 mx-auto text-center space-y-4">
                     <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Tecno Eventos – Servicios interactivos para eventos</p>
                     <div className="flex justify-center gap-8">
-                        <a href="#" className="text-slate-400 hover:text-green-500 transition-colors transform hover:scale-110 duration-300">
+                        {/* Reemplaza con tu número de WhatsApp (ej: https://wa.me/5491112345678) */}
+                        <a href="https://wa.me/543624547382" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-green-500 transition-colors transform hover:scale-110 duration-300">
                             <FaWhatsapp size={24} />
                         </a>
-                        <a href="#" className="text-slate-400 hover:text-pink-500 transition-colors transform hover:scale-110 duration-300">
+                        {/* Reemplaza con tu perfil de Instagram */}
+                        <a href="https://instagram.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-pink-500 transition-colors transform hover:scale-110 duration-300">
                             <FaInstagram size={24} />
                         </a>
-                        <a href="#" className="text-slate-400 hover:text-black transition-colors transform hover:scale-110 duration-300">
+                        {/* Reemplaza con tu perfil de TikTok */}
+                        <a href="https://tiktok.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-black transition-colors transform hover:scale-110 duration-300">
                             <FaTiktok size={24} />
                         </a>
                     </div>
