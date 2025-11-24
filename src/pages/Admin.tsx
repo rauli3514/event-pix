@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, X, Clock, Trash2, Download, ImagePlus, ImageMinus, RefreshCw } from "lucide-react";
+import { Check, X, Clock, Trash2, Download, ImagePlus, ImageMinus, RefreshCw, Zap } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useSubmissions } from "@/hooks/use-submissions";
 import { useEventSettings, useUpdateEventSettings, useUploadEventImage } from "@/hooks/use-event-settings";
@@ -202,6 +202,57 @@ const Admin = () => {
         await supabase.auth.signOut();
     };
 
+    const simulateParty = async () => {
+        if (!confirm("Esto generará 50 interacciones simuladas (APROBADAS) para probar el Wall. ¿Continuar?")) return;
+
+        const toastId = toast.loading("Simulando fiesta... (0/50)");
+
+        const MESSAGES = [
+            "¡Qué gran fiesta!", "¡Vivan los novios!", "La comida está deliciosa",
+            "¡Qué buena música!", "Saludos desde la mesa 5", "¡Felicidades!",
+            "Pasándola genial", "¡Foto pal face!", "¡Salud!", "Bailando hasta el amanecer",
+            "¡El DJ la rompe!", "¡Qué viva el amor!", "Mesa 8 presente", "¡Fiestón!"
+        ];
+
+        const PHOTOS = [
+            "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80",
+            "https://images.unsplash.com/photo-1511285560982-1351cdeb9821?auto=format&fit=crop&q=80",
+            "https://images.unsplash.com/photo-1541532713592-79a0317b6b77?auto=format&fit=crop&q=80",
+            "https://images.unsplash.com/photo-1520854221256-17451cc330e7?auto=format&fit=crop&q=80",
+            "https://images.unsplash.com/photo-1530103862676-de3c9a59af57?auto=format&fit=crop&q=80",
+            "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80",
+            "https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&q=80"
+        ];
+
+        let count = 0;
+        const total = 50;
+
+        const interval = setInterval(async () => {
+            if (count >= total) {
+                clearInterval(interval);
+                toast.dismiss(toastId);
+                toast.success("Simulación completada");
+                return;
+            }
+
+            const type = Math.random() > 0.6 ? 'photo' : 'message'; // 60% fotos
+            const content = type === 'photo'
+                ? PHOTOS[Math.floor(Math.random() * PHOTOS.length)]
+                : MESSAGES[Math.floor(Math.random() * MESSAGES.length)];
+
+            await supabase.from('submissions').insert([{
+                type,
+                content,
+                author: `Simulado ${count + 1}`,
+                status: 'approved', // Directo al wall para probar carga
+                created_at: new Date().toISOString()
+            }]);
+
+            count++;
+            toast.loading(`Simulando fiesta... (${count}/${total})`, { id: toastId });
+        }, 200); // 5 por segundo
+    };
+
     if (isLoading || settingsLoading) {
         return <div className="min-h-screen flex items-center justify-center text-foreground">Cargando...</div>;
     }
@@ -332,6 +383,16 @@ const Admin = () => {
                                 <Button type="submit" className="w-full">
                                     Guardar Cambios
                                 </Button>
+
+                                <div className="pt-8 border-t mt-8">
+                                    <h3 className="text-blue-400 font-medium mb-4">Herramientas de Prueba</h3>
+                                    <Button type="button" variant="outline" className="w-full border-blue-500/50 text-blue-400 hover:bg-blue-500/10" onClick={simulateParty}>
+                                        <Zap className="w-4 h-4 mr-2" /> ⚡ SIMULAR FIESTA (Stress Test)
+                                    </Button>
+                                    <p className="text-xs text-muted-foreground mt-2 text-center">
+                                        Genera 50 fotos y mensajes automáticamente para probar el rendimiento.
+                                    </p>
+                                </div>
 
                                 <div className="pt-8 border-t mt-8">
                                     <h3 className="text-destructive font-medium mb-4">Zona de Peligro</h3>
