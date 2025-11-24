@@ -144,21 +144,21 @@ export const useSubmissions = () => {
         }
     });
 
-    const emptyAlbum = useMutation({
+    const deleteAllApproved = useMutation({
         mutationFn: async () => {
             const { error } = await supabase
                 .from('submissions')
-                .update({ in_album: false })
-                .eq('in_album', true);
+                .delete()
+                .eq('status', 'approved');
 
             if (error) throw error;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['submissions'] });
-            toast.success('Álbum vaciado');
+            toast.success('Contenido aprobado eliminado');
         },
         onError: () => {
-            toast.error('Error al vaciar el álbum');
+            toast.error('Error al eliminar aprobados');
         }
     });
 
@@ -188,7 +188,7 @@ export const useSubmissions = () => {
         createSubmission,
         toggleAlbum,
         deleteSubmission,
-        emptyAlbum,
+        deleteAllApproved,
         resetAll
     };
 };

@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, X, Clock, Trash2, Download, ImagePlus, ImageMinus, RefreshCw, Zap } from "lucide-react";
+import { Check, X, Clock, Trash2, Download, RefreshCw, Zap } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useSubmissions } from "@/hooks/use-submissions";
 import { useEventSettings, useUpdateEventSettings, useUploadEventImage } from "@/hooks/use-event-settings";
@@ -17,7 +17,7 @@ import JSZip from "jszip";
 import { saveAs } from "file-saver";
 
 const Admin = () => {
-    const { submissions, isLoading, updateStatus, toggleAlbum, deleteSubmission, emptyAlbum, resetAll } = useSubmissions();
+    const { submissions, isLoading, updateStatus, deleteSubmission, deleteAllApproved, resetAll } = useSubmissions();
     const { data: settings, isLoading: settingsLoading } = useEventSettings();
     const updateSettings = useUpdateEventSettings();
     const uploadImage = useUploadEventImage();
@@ -48,24 +48,19 @@ const Admin = () => {
         }
     };
 
-    const handleToggleAlbum = (id: string, currentStatus: boolean) => {
-        toggleAlbum.mutate({ id, in_album: !currentStatus });
-    };
-
-    const handleDownloadAlbum = async () => {
-        const albumPhotos = submissions.filter(s => s.in_album && s.type === 'photo');
-        if (albumPhotos.length === 0) {
-            toast.error("El álbum está vacío");
+    const handleDownloadApprovedPhotos = async () => {
+        const photos = submissions.filter(s => s.status === 'approved' && s.type === 'photo');
+        if (photos.length === 0) {
+            toast.error("No hay fotos aprobadas para descargar");
             return;
         }
 
         const zip = new JSZip();
-        const folder = zip.folder("album-eventpix");
-
-        const downloadToast = toast.loading("Generando álbum...");
+        const folder = zip.folder("fotos-eventpix");
+        const downloadToast = toast.loading(`Generando ZIP con ${photos.length} fotos...`);
 
         try {
-            const promises = albumPhotos.map(async (photo, index) => {
+            const promises = photos.map(async (photo, index) => {
                 try {
                     const response = await fetch(photo.content);
                     const blob = await response.blob();
@@ -78,9 +73,9 @@ const Admin = () => {
 
             await Promise.all(promises);
             const content = await zip.generateAsync({ type: "blob" });
-            saveAs(content, "album-eventpix.zip");
+            saveAs(content, "fotos-eventpix.zip");
             toast.dismiss(downloadToast);
-            toast.success("Álbum descargado");
+            toast.success("Fotos descargadas");
         } catch (error) {
             console.error(error);
             toast.dismiss(downloadToast);
@@ -88,9 +83,28 @@ const Admin = () => {
         }
     };
 
-    const handleEmptyAlbum = () => {
-        if (confirm("¿Vaciar el álbum? Las fotos seguirán aprobadas pero se quitarán de la selección.")) {
-            emptyAlbum.mutate();
+    const handleDownloadApprovedMessages = () => {
+        const messages = submissions.filter(s => s.status === 'approved' && s.type === 'message');
+        if (messages.length === 0) {
+            toast.error("No hay mensajes aprobados");
+            return;
+        }
+
+        let textContent = "MENSAJES DEL EVENTO\n===================\n\n";
+        messages.forEach((msg, i) => {
+            const date = new Date(msg.created_at).toLocaleString();
+            textContent += `${i + 1}. DE: ${msg.author || 'Anónimo'} (${date})\n`;
+            textContent += `   "${msg.content}"\n\n`;
+        });
+
+        const blob = new Blob([textContent], { type: "text/plain;charset=utf-8" });
+        saveAs(blob, "mensajes-eventpix.txt");
+        toast.success("Mensajes descargados");
+    };
+
+    const handleClearApproved = () => {
+        if (confirm("¿Estás seguro de ELIMINAR todo el contenido aprobado? Asegúrate de haberlo descargado primero.")) {
+            deleteAllApproved.mutate();
         }
     };
 
@@ -138,24 +152,11 @@ const Admin = () => {
                         <Clock className="w-4 h-4 mr-1" />
                         {formatDistanceToNow(new Date(item.created_at), { addSuffix: true, locale: es })}
                     </div>
-                    <div className="flex gap-2">
-                        {item.status === 'approved' && item.type === 'photo' && (
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                className={item.in_album ? "text-blue-500 bg-blue-500/10" : "text-muted-foreground"}
-                                onClick={() => handleToggleAlbum(item.id, item.in_album || false)}
-                                title={item.in_album ? "Quitar del álbum" : "Agregar al álbum"}
-                            >
-                                {item.in_album ? <ImageMinus className="w-4 h-4" /> : <ImagePlus className="w-4 h-4" />}
-                            </Button>
-                        )}
-                        <div className={`px-2 py-1 rounded-full text-xs flex items-center ${item.status === 'pending' ? 'bg-yellow-500/20 text-yellow-500' :
-                            item.status === 'approved' ? 'bg-green-500/20 text-green-500' :
-                                'bg-red-500/20 text-red-500'
-                            }`}>
-                            {item.status.toUpperCase()}
-                        </div>
+                    <div className={`px-2 py-1 rounded-full text-xs flex items-center ${item.status === 'pending' ? 'bg-yellow-500/20 text-yellow-500' :
+                        item.status === 'approved' ? 'bg-green-500/20 text-green-500' :
+                            'bg-red-500/20 text-red-500'
+                        }`}>
+                        {item.status.toUpperCase()}
                     </div>
                 </div>
 
@@ -271,47 +272,67 @@ const Admin = () => {
             </header>
 
             <Tabs defaultValue="pending" className="w-full">
-                <TabsList className="grid w-full grid-cols-5 mb-8">
+                <TabsList className="grid w-full grid-cols-4 mb-8">
                     <TabsTrigger value="pending">Pendientes ({submissions.filter(s => s.status === 'pending').length})</TabsTrigger>
                     <TabsTrigger value="approved">Aprobados ({submissions.filter(s => s.status === 'approved').length})</TabsTrigger>
-                    <TabsTrigger value="album">Álbum ({submissions.filter(s => s.in_album).length})</TabsTrigger>
                     <TabsTrigger value="rejected">Rechazados ({submissions.filter(s => s.status === 'rejected').length})</TabsTrigger>
                     <TabsTrigger value="settings">Configuración</TabsTrigger>
                 </TabsList>
 
-                {['pending', 'approved', 'rejected'].map((status) => (
-                    <TabsContent key={status} value={status}>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {submissions
-                                .filter(item => item.status === status)
-                                .map(item => (
-                                    <SubmissionCard key={item.id} item={item} />
-                                ))}
-                        </div>
-                    </TabsContent>
-                ))}
-
-                <TabsContent value="album">
-                    <div className="mb-6 flex justify-between items-center">
-                        <h2 className="text-xl font-medium">Fotos seleccionadas para el álbum</h2>
-                        <div className="flex gap-2">
-                            <Button variant="outline" onClick={handleEmptyAlbum} disabled={!submissions.some(s => s.in_album)}>
-                                <Trash2 className="w-4 h-4 mr-2" /> Vaciar Álbum
-                            </Button>
-                            <Button onClick={handleDownloadAlbum} disabled={!submissions.some(s => s.in_album)}>
-                                <Download className="w-4 h-4 mr-2" /> Descargar ZIP
-                            </Button>
-                        </div>
-                    </div>
+                <TabsContent value="pending">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {submissions
-                            .filter(item => item.in_album)
+                            .filter(item => item.status === 'pending')
                             .map(item => (
                                 <SubmissionCard key={item.id} item={item} />
                             ))}
-                        {submissions.filter(item => item.in_album).length === 0 && (
+                        {submissions.filter(s => s.status === 'pending').length === 0 && (
                             <div className="col-span-full text-center py-12 text-muted-foreground">
-                                No hay fotos en el álbum. Ve a la pestaña "Aprobados" y selecciona algunas.
+                                No hay contenido pendiente.
+                            </div>
+                        )}
+                    </div>
+                </TabsContent>
+
+                <TabsContent value="approved">
+                    <div className="mb-6 flex flex-col md:flex-row gap-4 items-center justify-between bg-card/50 p-4 rounded-xl border border-white/10">
+                        <div className="flex flex-wrap gap-2">
+                            <Button onClick={handleDownloadApprovedPhotos} className="bg-blue-600 hover:bg-blue-700">
+                                <Download className="w-4 h-4 mr-2" /> Descargar Fotos (ZIP)
+                            </Button>
+                            <Button onClick={handleDownloadApprovedMessages} variant="secondary">
+                                <Download className="w-4 h-4 mr-2" /> Descargar Mensajes (TXT)
+                            </Button>
+                        </div>
+                        <Button onClick={handleClearApproved} variant="destructive">
+                            <Trash2 className="w-4 h-4 mr-2" /> Vaciar Aprobados
+                        </Button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {submissions
+                            .filter(item => item.status === 'approved')
+                            .map(item => (
+                                <SubmissionCard key={item.id} item={item} />
+                            ))}
+                        {submissions.filter(s => s.status === 'approved').length === 0 && (
+                            <div className="col-span-full text-center py-12 text-muted-foreground">
+                                No hay contenido aprobado.
+                            </div>
+                        )}
+                    </div>
+                </TabsContent>
+
+                <TabsContent value="rejected">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {submissions
+                            .filter(item => item.status === 'rejected')
+                            .map(item => (
+                                <SubmissionCard key={item.id} item={item} />
+                            ))}
+                        {submissions.filter(s => s.status === 'rejected').length === 0 && (
+                            <div className="col-span-full text-center py-12 text-muted-foreground">
+                                No hay contenido rechazado.
                             </div>
                         )}
                     </div>
