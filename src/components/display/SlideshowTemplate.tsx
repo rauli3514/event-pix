@@ -7,9 +7,10 @@ import QRCode from "react-qr-code";
 export const SlideshowTemplate = () => {
     const { submissions } = useSubmissions();
     const { data: settings } = useEventSettings();
+    const [currentIndex, setCurrentIndex] = useState(0);
     const [emptyMessageIndex, setEmptyMessageIndex] = useState(0);
 
-    // Get latest 20 approved items for the wall
+    // Get latest 20 approved items (LIMIT for performance)
     const approvedContent = submissions?.filter(s => s.status === 'approved').slice(0, 20) || [];
 
     const emptyMessages = [
@@ -29,6 +30,23 @@ export const SlideshowTemplate = () => {
             return () => clearInterval(interval);
         }
     }, [approvedContent.length]);
+
+    // Rotate content
+    useEffect(() => {
+        if (approvedContent.length > 0) {
+            const interval = setInterval(() => {
+                setCurrentIndex((prev) => (prev + 1) % approvedContent.length);
+            }, 8000); // 8 seconds per slide
+            return () => clearInterval(interval);
+        }
+    }, [approvedContent.length]);
+
+    // Safety check for index
+    useEffect(() => {
+        if (approvedContent.length > 0 && currentIndex >= approvedContent.length) {
+            setCurrentIndex(0);
+        }
+    }, [approvedContent.length, currentIndex]);
 
     const backgroundUrl = settings?.display_background_url || settings?.background_image_url;
     // Fix: Ensure QR points to the root of the app, handling subpaths like /event-pix/
@@ -57,55 +75,56 @@ export const SlideshowTemplate = () => {
                 </div>
             </header>
 
-            {/* Main Content: Masonry Wall (Flexible height, takes remaining space) */}
-            <main className="flex-1 relative z-10 p-4 md:p-6 overflow-hidden w-full">
+            {/* Main Content: Slideshow Area (Flexible height, takes remaining space) */}
+            <main className="flex-1 relative z-10 flex items-center justify-center p-4 md:p-6 overflow-hidden w-full">
                 {(!approvedContent || approvedContent.length === 0) ? (
                     // Empty State
-                    <div className="h-full flex items-center justify-center">
-                        <div className="text-center space-y-4 max-w-2xl animate-fade-in">
-                            <div className="bg-white/5 p-8 md:p-10 rounded-[2rem] border border-white/10 shadow-xl">
-                                <p className="text-3xl md:text-4xl lg:text-5xl font-serif font-medium leading-relaxed drop-shadow-md text-violet-100">
-                                    {emptyMessages[emptyMessageIndex]}
-                                </p>
-                                <p className="text-lg text-slate-300 mt-4 font-light">
-                                    ¡Escanea el código QR abajo para participar!
-                                </p>
-                            </div>
+                    <div className="text-center space-y-4 max-w-2xl animate-fade-in">
+                        <div className="bg-white/5 p-8 md:p-10 rounded-[2rem] border border-white/10 shadow-xl">
+                            <p className="text-3xl md:text-4xl lg:text-5xl font-serif font-medium leading-relaxed drop-shadow-md text-violet-100">
+                                {emptyMessages[emptyMessageIndex]}
+                            </p>
+                            <p className="text-lg text-slate-300 mt-4 font-light">
+                                ¡Escanea el código QR abajo para participar!
+                            </p>
                         </div>
                     </div>
                 ) : (
-                    // Masonry Grid Content
-                    <div className="w-full h-full columns-1 md:columns-3 lg:columns-4 gap-4 space-y-4 overflow-hidden">
-                        {approvedContent.map((item) => (
-                            <div key={item.id} className="break-inside-avoid bg-black/40 rounded-xl border border-white/10 shadow-lg overflow-hidden relative group animate-in fade-in zoom-in duration-500 hover:scale-[1.02] transition-transform">
-                                {item.type === 'photo' ? (
-                                    <div className="relative">
+                    // Slideshow Content
+                    <div className="w-full h-full relative flex items-center justify-center">
+                        {/* Content Card - Auto scales to fit without scroll */}
+                        <div className="relative w-full h-full max-w-[90vw] max-h-[75vh] flex items-center justify-center" key={currentIndex}>
+                            <div className="w-full h-full bg-black/40 rounded-[1.5rem] border border-white/10 shadow-xl overflow-hidden relative group animate-in fade-in zoom-in duration-500 flex items-center justify-center">
+                                {approvedContent[currentIndex].type === 'photo' ? (
+                                    <div className="w-full h-full relative flex items-center justify-center p-2">
                                         <img
-                                            src={item.content}
-                                            alt="Event moment"
-                                            className="w-full h-auto object-cover"
-                                            loading="lazy"
+                                            src={approvedContent[currentIndex].content}
+                                            alt="Slideshow"
+                                            className="w-full h-full object-contain max-h-full"
                                         />
-                                        {item.author && (
-                                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3 pt-8">
-                                                <p className="text-white text-sm font-medium truncate">📸 {item.author}</p>
+                                        {/* Author Badge */}
+                                        {approvedContent[currentIndex].author && (
+                                            <div className="absolute bottom-6 right-6 bg-black/60 px-5 py-2 rounded-full border border-white/10">
+                                                <p className="text-white font-medium text-base md:text-lg">📸 {approvedContent[currentIndex].author}</p>
                                             </div>
                                         )}
                                     </div>
                                 ) : (
-                                    <div className="p-6 bg-gradient-to-br from-violet-900/40 to-fuchsia-900/40 text-center flex flex-col items-center justify-center min-h-[150px]">
-                                        <p className="text-lg md:text-xl font-serif text-white leading-snug drop-shadow-sm line-clamp-6">
-                                            "{item.content}"
-                                        </p>
-                                        {item.author && (
-                                            <p className="text-sm text-violet-200 mt-3 font-medium tracking-wide">
-                                                — {item.author}
+                                    <div className="w-full h-full flex flex-col items-center justify-center p-8 md:p-12 text-center bg-gradient-to-br from-violet-900/30 to-fuchsia-900/30">
+                                        <div className="bg-white/10 p-8 md:p-12 rounded-[2rem] border border-white/20 shadow-lg max-w-4xl transform rotate-1">
+                                            <p className="text-3xl md:text-5xl lg:text-6xl font-serif text-white leading-tight drop-shadow-lg line-clamp-[8]">
+                                                "{approvedContent[currentIndex].content}"
                                             </p>
-                                        )}
+                                            {approvedContent[currentIndex].author && (
+                                                <p className="text-xl md:text-2xl text-violet-200 mt-6 font-medium tracking-wide">
+                                                    — {approvedContent[currentIndex].author}
+                                                </p>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                             </div>
-                        ))}
+                        </div>
                     </div>
                 )}
             </main>
