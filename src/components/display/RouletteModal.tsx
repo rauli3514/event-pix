@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { X, Trash2, Dices } from "lucide-react";
+import { X, Trash2, Dices, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import confetti from "canvas-confetti";
 
-// LISTA FIJA DE 20 DESAFÍOS (NO EDITABLES DESDE LA UI)
+// LISTA FIJA DE 20 DESAFÍOS
 const DESAFIOS = [
     "Sáquense una foto haciendo la cara más divertida que puedan.",
     "Foto de toda la mesa levantando los vasos como brindis.",
@@ -28,18 +29,27 @@ const DESAFIOS = [
     "Foto de la mesa formando una fila, uno detrás de otro, mirando a cámara."
 ];
 
+const WHEEL_COLORS = [
+    "#8b5cf6", // Violeta
+    "#ec4899", // Rosa
+    "#3b82f6", // Azul
+    "#10b981", // Verde
+    "#f59e0b", // Amarillo
+    "#6366f1", // Índigo
+];
+
 export const RouletteModal = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [participants, setParticipants] = useState<string[]>(() => {
-        // Cargar participantes guardados al iniciar
         const saved = localStorage.getItem("roulette_participants");
         return saved ? JSON.parse(saved) : [];
     });
     const [newParticipant, setNewParticipant] = useState("");
     const [isSpinning, setIsSpinning] = useState(false);
+    const [rotation, setRotation] = useState(0);
     const [result, setResult] = useState<{ participant: string; challenge: string } | null>(null);
+    const [showResultModal, setShowResultModal] = useState(false);
 
-    // Guardar participantes cuando cambian
     useEffect(() => {
         localStorage.setItem("roulette_participants", JSON.stringify(participants));
     }, [participants]);
@@ -65,122 +75,231 @@ export const RouletteModal = () => {
             toast.error("Agrega al menos un jugador o mesa para usar la ruleta.");
             return;
         }
+        if (isSpinning) return;
 
         setIsSpinning(true);
         setResult(null);
+        setShowResultModal(false);
 
-        // Animación simple de selección
+        // Seleccionar ganador
+        const randomIndex = Math.floor(Math.random() * participants.length);
+        const selectedParticipant = participants[randomIndex];
+        const selectedChallenge = DESAFIOS[Math.floor(Math.random() * DESAFIOS.length)];
+
+        // Calcular rotación:
+        // Cada segmento ocupa (360 / N) grados.
+        // Queremos que el segmento ganador termine arriba (ángulo 0 o 360).
+        // El puntero está arriba.
+        const segmentAngle = 360 / participants.length;
+        // Vueltas completas (mínimo 5)
+        const spins = 360 * 5;
+        // Ángulo final: spins + (360 - (index * segmentAngle)) - offset
+        // Restamos para girar en sentido horario y que el índice correcto llegue arriba
+        const targetRotation = rotation + spins + (360 - (randomIndex * segmentAngle)) + Math.random() * 10; // Random jitter
+
+        setRotation(targetRotation);
+
+        // Tiempo de giro (debe coincidir con CSS transition duration)
         setTimeout(() => {
-            const randomParticipantIndex = Math.floor(Math.random() * participants.length);
-            const randomChallengeIndex = Math.floor(Math.random() * DESAFIOS.length);
-
-            setResult({
-                participant: participants[randomParticipantIndex],
-                challenge: DESAFIOS[randomChallengeIndex]
-            });
             setIsSpinning(false);
-        }, 2000); // 2 segundos de "giro"
+            setResult({ participant: selectedParticipant, challenge: selectedChallenge });
+            setShowResultModal(true);
+            triggerConfetti();
+        }, 5000);
+    };
+
+    const triggerConfetti = () => {
+        const duration = 3000;
+        const end = Date.now() + duration;
+
+        (function frame() {
+            confetti({
+                particleCount: 5,
+                angle: 60,
+                spread: 55,
+                origin: { x: 0 },
+                colors: WHEEL_COLORS
+            });
+            confetti({
+                particleCount: 5,
+                angle: 120,
+                spread: 55,
+                origin: { x: 1 },
+                colors: WHEEL_COLORS
+            });
+
+            if (Date.now() < end) {
+                requestAnimationFrame(frame);
+            }
+        }());
     };
 
     return (
         <>
-            {/* BOTÓN FLOTANTE (Posición: bottom-8 right-8) */}
+            {/* BOTÓN FLOTANTE */}
             <Button
-                className="fixed bottom-8 right-8 z-50 h-16 w-16 rounded-full shadow-2xl bg-gradient-to-r from-purple-600 to-pink-600 hover:scale-110 transition-transform duration-300 border-4 border-white"
+                className="fixed bottom-8 right-8 z-50 h-16 w-16 rounded-full shadow-2xl bg-gradient-to-r from-violet-600 to-pink-600 hover:scale-110 transition-transform duration-300 border-4 border-white"
                 onClick={() => setIsOpen(true)}
             >
                 <span className="text-3xl">🎰</span>
             </Button>
 
-            {/* MODAL */}
+            {/* MODAL PRINCIPAL */}
             {isOpen && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-                    <div className="bg-background w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden border border-white/10 flex flex-col max-h-[90vh]">
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 animate-fade-in">
+                    <div className="w-full max-w-6xl h-[90vh] flex flex-col md:flex-row gap-8 items-center justify-center relative">
 
-                        {/* Header */}
-                        <div className="p-6 border-b border-border flex justify-between items-center bg-muted/30">
-                            <h2 className="text-2xl font-bold flex items-center gap-2">
-                                <Dices className="w-6 h-6 text-purple-500" />
-                                Ruleta de Desafíos
-                            </h2>
-                            <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)}>
-                                <X className="w-6 h-6" />
-                            </Button>
+                        {/* Botón Cerrar */}
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-0 right-0 text-white hover:bg-white/10 z-50"
+                            onClick={() => setIsOpen(false)}
+                        >
+                            <X className="w-8 h-8" />
+                        </Button>
+
+                        {/* ZONA IZQUIERDA: RULETA */}
+                        <div className="flex-1 flex flex-col items-center justify-center relative w-full max-w-[600px] aspect-square">
+                            {/* Puntero */}
+                            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-4 z-20 w-12 h-16 filter drop-shadow-lg">
+                                <div className="w-0 h-0 border-l-[24px] border-l-transparent border-r-[24px] border-r-transparent border-t-[48px] border-t-white" />
+                            </div>
+
+                            {/* Rueda */}
+                            <div
+                                className="w-full h-full rounded-full border-[12px] border-white shadow-2xl relative overflow-hidden transition-transform duration-[5000ms] cubic-bezier(0.15, 0, 0.15, 1)"
+                                style={{ transform: `rotate(${rotation}deg)` }}
+                            >
+                                {participants.length > 0 ? (
+                                    participants.map((p, i) => {
+                                        const angle = 360 / participants.length;
+                                        const rotate = i * angle;
+                                        const skew = 90 - angle;
+                                        const color = WHEEL_COLORS[i % WHEEL_COLORS.length];
+
+                                        // Si hay solo 1 participante, ocupa todo
+                                        if (participants.length === 1) return (
+                                            <div key={i} className="absolute inset-0 flex items-center justify-center bg-violet-600 text-white font-bold text-2xl">
+                                                {p}
+                                            </div>
+                                        );
+
+                                        return (
+                                            <div
+                                                key={i}
+                                                className="absolute top-0 right-0 w-[50%] h-[50%] origin-bottom-left flex items-end justify-start"
+                                                style={{
+                                                    transform: `rotate(${rotate}deg) skewY(-${skew}deg)`,
+                                                    background: color,
+                                                }}
+                                            >
+                                                <div
+                                                    className="absolute left-8 bottom-8 text-white font-bold text-lg md:text-xl whitespace-nowrap origin-bottom-left"
+                                                    style={{
+                                                        transform: `skewY(${skew}deg) rotate(${angle / 2}deg) translate(20px, 0)`,
+                                                        maxWidth: '140px',
+                                                        textOverflow: 'ellipsis',
+                                                        overflow: 'hidden'
+                                                    }}
+                                                >
+                                                    {p}
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-slate-800 text-slate-400 font-medium">
+                                        Agrega participantes
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Centro de la rueda */}
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-white rounded-full shadow-xl flex items-center justify-center z-10">
+                                <Dices className="w-8 h-8 text-violet-600" />
+                            </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-6 space-y-8">
+                        {/* ZONA DERECHA: CONTROLES Y RESULTADO */}
+                        <div className="w-full md:w-1/3 flex flex-col gap-6">
 
-                            {/* RESULTADO DEL GIRO */}
-                            {result ? (
-                                <div className="bg-gradient-to-br from-purple-900/50 to-pink-900/50 p-8 rounded-xl border border-purple-500/30 text-center space-y-4 animate-scale-in">
-                                    <div className="space-y-2">
-                                        <p className="text-sm text-purple-300 uppercase tracking-wider font-semibold">Participante Seleccionado</p>
-                                        <p className="text-4xl font-bold text-white">{result.participant}</p>
-                                    </div>
-                                    <div className="h-px w-full bg-white/10 my-4" />
-                                    <div className="space-y-2">
-                                        <p className="text-sm text-pink-300 uppercase tracking-wider font-semibold">Tu Desafío</p>
-                                        <p className="text-2xl text-white font-medium leading-relaxed">"{result.challenge}"</p>
-                                    </div>
-                                    <Button
-                                        onClick={() => setResult(null)}
-                                        variant="outline"
-                                        className="mt-4 border-white/20 hover:bg-white/10 text-white"
-                                    >
-                                        Girar de nuevo
-                                    </Button>
-                                </div>
-                            ) : (
-                                /* ESTADO INICIAL / GIRANDO */
-                                <div className="text-center py-8 space-y-6">
-                                    {isSpinning ? (
-                                        <div className="flex flex-col items-center justify-center space-y-4">
-                                            <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
-                                            <p className="text-xl font-medium animate-pulse">Eligiendo víctima...</p>
+                            {/* Panel de Resultado (Overlay) */}
+                            {showResultModal && result && (
+                                <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-xl animate-in fade-in zoom-in duration-300">
+                                    <div className="bg-gradient-to-br from-violet-900 to-fuchsia-900 p-8 rounded-[2rem] border border-white/20 shadow-2xl text-center max-w-md mx-4 relative overflow-hidden">
+                                        <div className="absolute inset-0 bg-white/5" />
+                                        <Sparkles className="w-16 h-16 text-yellow-400 mx-auto mb-4 animate-pulse" />
+
+                                        <h3 className="text-violet-200 text-lg font-bold uppercase tracking-widest mb-2">¡Tenemos un ganador!</h3>
+                                        <p className="text-4xl md:text-5xl font-bold text-white mb-8 drop-shadow-md">{result.participant}</p>
+
+                                        <div className="bg-black/30 p-6 rounded-xl border border-white/10 mb-8">
+                                            <p className="text-sm text-pink-300 font-bold uppercase mb-2">Desafío</p>
+                                            <p className="text-xl text-white font-medium leading-relaxed">"{result.challenge}"</p>
                                         </div>
-                                    ) : (
+
                                         <Button
                                             size="lg"
-                                            className="w-full h-20 text-2xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-lg transform hover:scale-[1.02] transition-all"
-                                            onClick={spinRoulette}
+                                            onClick={() => setShowResultModal(false)}
+                                            className="w-full bg-white text-violet-900 hover:bg-violet-50 font-bold text-lg h-14 rounded-xl"
                                         >
-                                            🎲 ¡GIRAR RULETA!
+                                            Continuar
                                         </Button>
-                                    )}
+                                    </div>
                                 </div>
                             )}
 
-                            {/* GESTIÓN DE PARTICIPANTES */}
-                            <div className="space-y-4 pt-4 border-t border-border">
-                                <h3 className="font-medium text-muted-foreground">Participantes ({participants.length})</h3>
-
-                                <div className="flex gap-2">
-                                    <Input
-                                        placeholder="Nombre del jugador o mesa"
-                                        value={newParticipant}
-                                        onChange={(e) => setNewParticipant(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && addParticipant()}
-                                    />
-                                    <Button onClick={addParticipant}>Agregar</Button>
+                            {/* Controles */}
+                            <div className="bg-slate-900/50 p-6 rounded-2xl border border-white/10 space-y-6 backdrop-blur-sm">
+                                <div className="text-center">
+                                    <h2 className="text-2xl font-bold text-white mb-2">Ruleta de Desafíos</h2>
+                                    <p className="text-slate-400 text-sm">¡Gira la rueda y que la suerte decida!</p>
                                 </div>
 
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-2">
-                                    {participants.map((p, index) => (
-                                        <div key={index} className="flex items-center justify-between bg-muted p-2 rounded-md text-sm group">
-                                            <span className="truncate">{p}</span>
-                                            <button
-                                                onClick={() => removeParticipant(index)}
-                                                className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    ))}
-                                    {participants.length === 0 && (
-                                        <p className="col-span-full text-center text-muted-foreground text-sm py-4 italic">
-                                            Agrega participantes para comenzar...
-                                        </p>
-                                    )}
+                                <Button
+                                    size="lg"
+                                    className={`w-full h-16 text-xl font-bold rounded-xl shadow-lg transition-all ${isSpinning
+                                            ? "bg-slate-700 cursor-not-allowed opacity-80"
+                                            : "bg-gradient-to-r from-violet-600 to-pink-600 hover:scale-[1.02] hover:shadow-violet-500/25"
+                                        }`}
+                                    onClick={spinRoulette}
+                                    disabled={isSpinning || participants.length === 0}
+                                >
+                                    {isSpinning ? "Girando..." : "¡GIRAR AHORA!"}
+                                </Button>
+
+                                {/* Lista de Participantes */}
+                                <div className="space-y-3 pt-4 border-t border-white/10">
+                                    <div className="flex gap-2">
+                                        <Input
+                                            placeholder="Nuevo participante..."
+                                            value={newParticipant}
+                                            onChange={(e) => setNewParticipant(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && addParticipant()}
+                                            className="bg-slate-800 border-slate-700 text-white"
+                                        />
+                                        <Button onClick={addParticipant} variant="secondary">Agregar</Button>
+                                    </div>
+
+                                    <div className="max-h-[200px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                                        {participants.map((p, index) => (
+                                            <div key={index} className="flex items-center justify-between bg-slate-800/50 p-3 rounded-lg border border-white/5 group hover:border-white/20 transition-colors">
+                                                <span className="text-slate-200 font-medium truncate">{p}</span>
+                                                <button
+                                                    onClick={() => removeParticipant(index)}
+                                                    className="text-slate-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                        {participants.length === 0 && (
+                                            <p className="text-center text-slate-500 text-sm py-4 italic">
+                                                Agrega participantes para comenzar
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 
