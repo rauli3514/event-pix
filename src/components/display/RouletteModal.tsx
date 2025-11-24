@@ -47,7 +47,7 @@ export const RouletteModal = ({ mode = "config" }: { mode?: "config" | "show" })
     const [newParticipant, setNewParticipant] = useState("");
     const [isSpinning, setIsSpinning] = useState(false);
     const [rotation, setRotation] = useState(0);
-    const [result, setResult] = useState<{ participant: string; challenge: string } | null>(null);
+    const [result, setResult] = useState<{ participant: string; challenge: string; index: number } | null>(null);
     const [showResultModal, setShowResultModal] = useState(false);
 
     useEffect(() => {
@@ -98,7 +98,7 @@ export const RouletteModal = ({ mode = "config" }: { mode?: "config" | "show" })
         // Tiempo de giro (4 segundos para mejor experiencia)
         setTimeout(() => {
             setIsSpinning(false);
-            setResult({ participant: selectedParticipant, challenge: selectedChallenge });
+            setResult({ participant: selectedParticipant, challenge: selectedChallenge, index: randomIndex });
             setShowResultModal(true);
             triggerConfetti();
         }, 4000);
@@ -203,7 +203,8 @@ export const RouletteModal = ({ mode = "config" }: { mode?: "config" | "show" })
                                                     className="text-white font-bold text-center leading-tight drop-shadow-md"
                                                     style={{
                                                         fontSize: participants.length > 8 ? '1.2rem' : '1.5rem',
-                                                        transform: 'rotate(90deg)' // Rotar número para leerse desde el centro hacia afuera
+                                                        transform: 'rotate(90deg)', // Rotar número para leerse desde el centro hacia afuera
+                                                        textShadow: '0px 2px 4px rgba(0,0,0,0.5)'
                                                     }}
                                                 >
                                                     {i + 1}
@@ -234,7 +235,10 @@ export const RouletteModal = ({ mode = "config" }: { mode?: "config" | "show" })
                                     <Sparkles className="w-16 h-16 text-yellow-400 mx-auto mb-4 animate-pulse" />
 
                                     <h3 className="text-violet-200 text-lg font-bold uppercase tracking-widest mb-2">¡Tenemos un ganador!</h3>
-                                    <p className="text-4xl md:text-5xl font-bold text-white mb-8 drop-shadow-md">{result.participant}</p>
+                                    <p className="text-4xl md:text-5xl font-bold text-white mb-8 drop-shadow-md">
+                                        <span className="text-violet-400 mr-3">#{result.index + 1}</span>
+                                        {result.participant}
+                                    </p>
 
                                     <div className="bg-black/30 p-6 rounded-xl border border-white/10 mb-8">
                                         <p className="text-sm text-pink-300 font-bold uppercase mb-2">Desafío</p>
@@ -342,7 +346,8 @@ export const RouletteModal = ({ mode = "config" }: { mode?: "config" | "show" })
                                                         className="text-white font-bold text-center leading-tight drop-shadow-md"
                                                         style={{
                                                             fontSize: participants.length > 8 ? '1.2rem' : '1.5rem',
-                                                            transform: 'rotate(90deg)' // Rotar número para leerse desde el centro hacia afuera
+                                                            transform: 'rotate(90deg)', // Rotar número para leerse desde el centro hacia afuera
+                                                            textShadow: '0px 2px 4px rgba(0,0,0,0.5)'
                                                         }}
                                                     >
                                                         {i + 1}
@@ -374,7 +379,10 @@ export const RouletteModal = ({ mode = "config" }: { mode?: "config" | "show" })
                                         <Sparkles className="w-16 h-16 text-yellow-400 mx-auto mb-4 animate-pulse" />
 
                                         <h3 className="text-violet-200 text-lg font-bold uppercase tracking-widest mb-2">¡Tenemos un ganador!</h3>
-                                        <p className="text-4xl md:text-5xl font-bold text-white mb-8 drop-shadow-md">{result.participant}</p>
+                                        <p className="text-4xl md:text-5xl font-bold text-white mb-8 drop-shadow-md">
+                                            <span className="text-violet-400 mr-3">#{result.index + 1}</span>
+                                            {result.participant}
+                                        </p>
 
                                         <div className="bg-black/30 p-6 rounded-xl border border-white/10 mb-8">
                                             <p className="text-sm text-pink-300 font-bold uppercase mb-2">Desafío</p>
