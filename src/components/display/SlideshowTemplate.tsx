@@ -3,6 +3,7 @@ import { useSubmissions } from "@/hooks/use-submissions";
 import { useEventSettings } from "@/hooks/use-event-settings";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { RouletteModal } from "@/components/display/RouletteModal";
 
 export const SlideshowTemplate = () => {
     const { submissions, isLoading } = useSubmissions();
@@ -171,6 +172,7 @@ export const SlideshowTemplate = () => {
                     ))}
                 </div>
             </div>
+            <RouletteModal />
         </div>
     );
 };
