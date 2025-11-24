@@ -40,11 +40,11 @@ const Index = () => {
                             <FaWhatsapp size={24} />
                         </a>
                         {/* Reemplaza con tu perfil de Instagram */}
-                        <a href="https://instagram.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-pink-500 transition-colors transform hover:scale-110 duration-300">
+                        <a href="https://www.instagram.com/tecno_eventos_arg/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-pink-500 transition-colors transform hover:scale-110 duration-300">
                             <FaInstagram size={24} />
                         </a>
                         {/* Reemplaza con tu perfil de TikTok */}
-                        <a href="https://tiktok.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-black transition-colors transform hover:scale-110 duration-300">
+                        <a href="https://www.tiktok.com/@tecno_eventos_arg?is_from_webapp=1&sender_device=pc" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-black transition-colors transform hover:scale-110 duration-300">
                             <FaTiktok size={24} />
                         </a>
                     </div>
