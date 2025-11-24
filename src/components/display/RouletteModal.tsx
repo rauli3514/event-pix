@@ -132,8 +132,30 @@ export const RouletteModal = ({ mode = "config" }: { mode?: "config" | "show" })
     if (mode === "show") {
         return (
             <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/80 p-4 pb-[16vh]">
-                <div className="w-full max-w-6xl h-full max-h-[80vh] flex flex-col md:flex-row gap-4 md:gap-8 items-center justify-center">
-                    {/* Wheel UI (Show Mode) */}
+                <div className="w-full max-w-7xl h-full max-h-[80vh] flex flex-col md:flex-row gap-4 md:gap-8 items-center justify-center">
+
+                    {/* Lista de Referencia (Izquierda) */}
+                    <div className="hidden md:flex w-1/4 h-full flex-col bg-slate-900/50 rounded-2xl border border-white/10 p-4 overflow-hidden backdrop-blur-sm">
+                        <h3 className="text-violet-300 font-bold uppercase tracking-widest text-sm mb-4 text-center border-b border-white/10 pb-2">Participantes</h3>
+                        <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                            {participants.map((p, i) => (
+                                <div key={i} className="flex items-center gap-3 p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
+                                    <span
+                                        className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full font-bold text-white text-sm shadow-sm"
+                                        style={{ background: WHEEL_COLORS[i % WHEEL_COLORS.length] }}
+                                    >
+                                        {i + 1}
+                                    </span>
+                                    <span className="text-white font-medium truncate text-sm">{p}</span>
+                                </div>
+                            ))}
+                            {participants.length === 0 && (
+                                <p className="text-slate-500 text-center text-sm italic mt-4">No hay participantes</p>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Wheel UI (Centro) */}
                     <div className="flex-1 flex flex-col items-center justify-center relative w-full max-w-[450px] aspect-square shrink-0">
                         {/* Puntero */}
                         <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-3 z-20 w-8 h-12 filter drop-shadow-lg">
@@ -149,7 +171,7 @@ export const RouletteModal = ({ mode = "config" }: { mode?: "config" | "show" })
                             }}
                         >
                             {participants.length > 0 ? (
-                                participants.map((p, i) => {
+                                participants.map((_p, i) => {
                                     const angle = 360 / participants.length;
                                     const rotate = i * angle;
                                     const skew = 90 - angle;
@@ -157,7 +179,7 @@ export const RouletteModal = ({ mode = "config" }: { mode?: "config" | "show" })
 
                                     if (participants.length === 1) return (
                                         <div key={i} className="absolute inset-0 flex items-center justify-center bg-violet-600 text-white font-bold text-2xl">
-                                            {p}
+                                            1
                                         </div>
                                     );
 
@@ -180,13 +202,11 @@ export const RouletteModal = ({ mode = "config" }: { mode?: "config" | "show" })
                                                 <span
                                                     className="text-white font-bold text-center leading-tight drop-shadow-md"
                                                     style={{
-                                                        fontSize: participants.length > 8 ? '0.85rem' : participants.length > 6 ? '1rem' : '1.1rem',
-                                                        maxWidth: '80px',
-                                                        wordWrap: 'break-word',
-                                                        hyphens: 'auto'
+                                                        fontSize: participants.length > 8 ? '1.2rem' : '1.5rem',
+                                                        transform: 'rotate(90deg)' // Rotar número para leerse desde el centro hacia afuera
                                                     }}
                                                 >
-                                                    {p}
+                                                    {i + 1}
                                                 </span>
                                             </div>
                                         </div>
@@ -194,7 +214,7 @@ export const RouletteModal = ({ mode = "config" }: { mode?: "config" | "show" })
                                 })
                             ) : (
                                 <div className="absolute inset-0 flex items-center justify-center bg-slate-800 text-slate-400 font-medium">
-                                    Agrega participantes
+                                    Vacío
                                 </div>
                             )}
                         </div>
@@ -205,7 +225,8 @@ export const RouletteModal = ({ mode = "config" }: { mode?: "config" | "show" })
                         </div>
                     </div>
 
-                    <div className="w-full md:w-1/3 flex flex-col gap-4 max-h-full overflow-hidden">
+                    {/* Controles y Resultado (Derecha) */}
+                    <div className="w-full md:w-1/4 flex flex-col gap-4 max-h-full overflow-hidden">
                         {/* Panel de Resultado (Overlay) */}
                         {showResultModal && result && (
                             <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 rounded-xl animate-in fade-in zoom-in duration-300">
@@ -289,7 +310,7 @@ export const RouletteModal = ({ mode = "config" }: { mode?: "config" | "show" })
                                 }}
                             >
                                 {participants.length > 0 ? (
-                                    participants.map((p, i) => {
+                                    participants.map((_p, i) => {
                                         const angle = 360 / participants.length;
                                         const rotate = i * angle;
                                         const skew = 90 - angle;
@@ -297,7 +318,7 @@ export const RouletteModal = ({ mode = "config" }: { mode?: "config" | "show" })
 
                                         if (participants.length === 1) return (
                                             <div key={i} className="absolute inset-0 flex items-center justify-center bg-violet-600 text-white font-bold text-2xl">
-                                                {p}
+                                                1
                                             </div>
                                         );
 
@@ -320,13 +341,11 @@ export const RouletteModal = ({ mode = "config" }: { mode?: "config" | "show" })
                                                     <span
                                                         className="text-white font-bold text-center leading-tight drop-shadow-md"
                                                         style={{
-                                                            fontSize: participants.length > 8 ? '0.85rem' : participants.length > 6 ? '1rem' : '1.1rem',
-                                                            maxWidth: '80px',
-                                                            wordWrap: 'break-word',
-                                                            hyphens: 'auto'
+                                                            fontSize: participants.length > 8 ? '1.2rem' : '1.5rem',
+                                                            transform: 'rotate(90deg)' // Rotar número para leerse desde el centro hacia afuera
                                                         }}
                                                     >
-                                                        {p}
+                                                        {i + 1}
                                                     </span>
                                                 </div>
                                             </div>
@@ -334,7 +353,7 @@ export const RouletteModal = ({ mode = "config" }: { mode?: "config" | "show" })
                                     })
                                 ) : (
                                     <div className="absolute inset-0 flex items-center justify-center bg-slate-800 text-slate-400 font-medium">
-                                        Agrega participantes
+                                        Vacío
                                     </div>
                                 )}
                             </div>
@@ -408,10 +427,18 @@ export const RouletteModal = ({ mode = "config" }: { mode?: "config" | "show" })
                                     <div className="max-h-[150px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
                                         {participants.map((p, index) => (
                                             <div key={index} className="flex items-center justify-between bg-slate-800/50 p-2 rounded-lg border border-white/5 group hover:border-white/20 transition-colors">
-                                                <span className="text-slate-200 font-medium truncate">{p}</span>
+                                                <div className="flex items-center gap-3 overflow-hidden">
+                                                    <span
+                                                        className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full font-bold text-white text-xs shadow-sm"
+                                                        style={{ background: WHEEL_COLORS[index % WHEEL_COLORS.length] }}
+                                                    >
+                                                        {index + 1}
+                                                    </span>
+                                                    <span className="text-slate-200 font-medium truncate">{p}</span>
+                                                </div>
                                                 <button
                                                     onClick={() => removeParticipant(index)}
-                                                    className="text-slate-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                                                    className="text-slate-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 ml-2"
                                                 >
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
