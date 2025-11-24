@@ -188,22 +188,24 @@ export const RouletteModal = () => {
                                         return (
                                             <div
                                                 key={i}
-                                                className="absolute top-0 right-0 w-[50%] h-[50%] origin-bottom-left flex items-end justify-start"
+                                                className="absolute top-0 right-0 w-[50%] h-[50%] origin-bottom-left"
                                                 style={{
                                                     transform: `rotate(${rotate}deg) skewY(-${skew}deg)`,
                                                     background: color,
                                                 }}
                                             >
                                                 <div
-                                                    className="absolute left-8 bottom-8 text-white font-bold text-lg md:text-xl whitespace-nowrap origin-bottom-left"
+                                                    className="absolute left-0 bottom-0 flex items-center justify-start origin-bottom-left"
                                                     style={{
-                                                        transform: `skewY(${skew}deg) rotate(${angle / 2}deg) translate(20px, 0)`,
-                                                        maxWidth: '120px',
-                                                        textOverflow: 'ellipsis',
-                                                        overflow: 'hidden'
+                                                        width: '100%',
+                                                        height: '40px',
+                                                        transform: `skewY(${skew}deg) rotate(${angle / 2}deg) translate(0, -50%)`,
+                                                        paddingLeft: '60px', // Alejar del centro
                                                     }}
                                                 >
-                                                    {p}
+                                                    <span className="text-white font-bold text-lg md:text-xl truncate max-w-[160px] drop-shadow-md">
+                                                        {p}
+                                                    </span>
                                                 </div>
                                             </div>
                                         );
@@ -259,8 +261,8 @@ export const RouletteModal = () => {
                                 <Button
                                     size="lg"
                                     className={`w-full h-14 text-xl font-bold rounded-xl shadow-md transition-all ${isSpinning
-                                            ? "bg-slate-700 cursor-not-allowed opacity-80"
-                                            : "bg-gradient-to-r from-violet-600 to-pink-600 hover:scale-[1.01]"
+                                        ? "bg-slate-700 cursor-not-allowed opacity-80"
+                                        : "bg-gradient-to-r from-violet-600 to-pink-600 hover:scale-[1.01]"
                                         }`}
                                     onClick={spinRoulette}
                                     disabled={isSpinning || participants.length === 0}
