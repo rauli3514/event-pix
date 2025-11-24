@@ -126,21 +126,25 @@ export const SlideshowTemplate = () => {
                 )}
             </main>
 
-            {/* Footer: QR Code & Info (Compact, approx 12-15% height) */}
-            <footer className="relative z-50 bg-slate-950/90 border-t border-white/5 px-6 py-3 flex justify-between items-center shrink-0 h-[12vh] min-h-[80px]">
+            {/* Footer: QR Code & Info (More prominent for readability) */}
+            <footer className="relative z-50 bg-slate-950/90 border-t border-white/5 px-6 py-2 flex justify-between items-center shrink-0 h-[15vh] min-h-[100px]">
                 <div className="flex items-center gap-4">
-                    <p className="text-xs md:text-sm text-slate-500 font-medium uppercase tracking-wider hidden md:block">
+                    <p className="text-sm md:text-base text-slate-500 font-medium uppercase tracking-wider hidden md:block">
                         Tecno Eventos – Servicios interactivos
                     </p>
                 </div>
 
-                <div className="flex items-center gap-4 bg-white/5 rounded-xl p-2 pr-4 border border-white/10 hover:bg-white/10 transition-colors h-full max-h-[90%]">
-                    <div className="bg-white p-1.5 rounded-lg h-full aspect-square flex items-center justify-center">
-                        <QRCode value={appUrl} style={{ height: "100%", width: "100%" }} />
+                <div className="flex items-center gap-6 bg-white/5 rounded-2xl p-3 pr-6 border border-white/10 hover:bg-white/10 transition-colors h-[90%]">
+                    <div className="bg-white p-2 rounded-xl h-full aspect-square flex items-center justify-center shadow-lg">
+                        <QRCode
+                            value={appUrl}
+                            style={{ height: "100%", width: "100%" }}
+                            viewBox={`0 0 256 256`}
+                        />
                     </div>
-                    <div className="text-left flex flex-col justify-center">
-                        <p className="text-base md:text-lg font-bold text-white leading-tight">¡Participá!</p>
-                        <p className="text-[10px] md:text-xs text-slate-300 leading-tight">Escaneá para subir fotos</p>
+                    <div className="text-left flex flex-col justify-center space-y-1">
+                        <p className="text-xl md:text-2xl font-bold text-white leading-none">¡Participá!</p>
+                        <p className="text-xs md:text-sm text-slate-300 leading-tight">Escaneá para subir fotos</p>
                     </div>
                 </div>
             </footer>
