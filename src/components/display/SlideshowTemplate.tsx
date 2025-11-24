@@ -12,6 +12,22 @@ export const SlideshowTemplate = () => {
     const approvedContent = submissions.filter(s => s.status === 'approved');
     const [currentIndex, setCurrentIndex] = useState(0);
 
+    const [emptyMessageIndex, setEmptyMessageIndex] = useState(0);
+
+    const emptyMessages = [
+        "Todavía no hay nada por aquí… ¡subí tu primera foto y arrancamos la fiesta!",
+        "Pantalla tímida 😳 — necesita que le subas fotos para animarse."
+    ];
+
+    useEffect(() => {
+        if (approvedContent.length === 0) {
+            const interval = setInterval(() => {
+                setEmptyMessageIndex((prev) => (prev + 1) % emptyMessages.length);
+            }, 5000);
+            return () => clearInterval(interval);
+        }
+    }, [approvedContent.length]);
+
     useEffect(() => {
         if (!approvedContent || approvedContent.length === 0) return;
 
@@ -30,21 +46,21 @@ export const SlideshowTemplate = () => {
         );
     }
 
+    const backgroundUrl = settings?.display_background_url || settings?.background_image_url;
+
     if (!approvedContent || approvedContent.length === 0) {
         return (
             <div
-                className="flex items-center justify-center min-h-screen bg-background bg-cover bg-center"
-                style={settings?.background_image_url ? { backgroundImage: `url(${settings.background_image_url})` } : {}}
+                className="flex items-center justify-center min-h-screen bg-background bg-cover bg-center transition-all duration-1000"
+                style={backgroundUrl ? { backgroundImage: `url(${backgroundUrl})` } : {}}
             >
-                {settings?.background_image_url && (
-                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-                )}
-                <div className="relative z-10 text-center space-y-2 p-8 bg-card/80 backdrop-blur rounded-xl border border-white/10">
-                    <p className="text-2xl font-serif text-foreground">
-                        Esperando contenido...
+                {/* No overlay, just the clear background */}
+                <div className="relative z-10 text-center space-y-4 p-12 bg-black/30 backdrop-blur-md rounded-3xl border border-white/10 max-w-2xl mx-4 animate-fade-in">
+                    <p className="text-3xl md:text-4xl font-serif text-white font-medium leading-relaxed drop-shadow-md">
+                        {emptyMessages[emptyMessageIndex]}
                     </p>
-                    <p className="text-sm text-muted-foreground">
-                        ¡Sube tus fotos y mensajes para verlos aquí!
+                    <p className="text-lg text-white/80">
+                        ¡Escanea el QR y participa!
                     </p>
                 </div>
             </div>
@@ -60,8 +76,6 @@ export const SlideshowTemplate = () => {
     const goToNext = () => {
         setCurrentIndex((prev) => (prev + 1) % approvedContent.length);
     };
-
-    const backgroundUrl = settings?.display_background_url || settings?.background_image_url;
 
     return (
         <div
