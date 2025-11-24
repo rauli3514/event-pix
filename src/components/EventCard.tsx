@@ -20,7 +20,7 @@ export const EventCard = ({ onUploadClick, onMessageClick }: EventCardProps) => 
                     alt="Event Hero"
                     className="object-cover w-full h-full transition-transform duration-1000 group-hover:scale-105"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-90" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
 
                 <div className="absolute bottom-0 left-0 p-8 w-full space-y-2">
                     <h2 className="text-3xl md:text-4xl font-serif font-bold text-white tracking-tight leading-tight drop-shadow-md capitalize">

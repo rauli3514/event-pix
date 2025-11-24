@@ -38,7 +38,7 @@ const WHEEL_COLORS = [
     "#6366f1", // Índigo
 ];
 
-export const RouletteModal = () => {
+export const RouletteModal = ({ mode = "config" }: { mode?: "config" | "show" }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [participants, setParticipants] = useState<string[]>(() => {
         const saved = localStorage.getItem("roulette_participants");
@@ -133,7 +133,115 @@ export const RouletteModal = () => {
             }
         }());
     };
+    if (mode === "show") {
+        return (
+            <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/80 p-4 pb-[16vh]">
+                <div className="w-full max-w-6xl h-full max-h-[80vh] flex flex-col md:flex-row gap-4 md:gap-8 items-center justify-center">
+                    {/* Wheel UI (Show Mode) */}
+                    <div className="flex-1 flex flex-col items-center justify-center relative w-full max-w-[500px] aspect-square shrink-0">
+                        {/* Puntero */}
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-2 z-20 w-10 h-14 filter drop-shadow-md">
+                            <div className="w-0 h-0 border-l-[20px] border-l-transparent border-r-[20px] border-r-transparent border-t-[40px] border-t-white" />
+                        </div>
 
+                        {/* Rueda */}
+                        <div
+                            className="w-full h-full rounded-full border-[8px] border-white shadow-xl relative overflow-hidden transition-transform duration-[5000ms] cubic-bezier(0.15, 0, 0.15, 1) will-change-transform"
+                            style={{ transform: `rotate(${rotation}deg)` }}
+                        >
+                            {participants.length > 0 ? (
+                                participants.map((p, i) => {
+                                    const angle = 360 / participants.length;
+                                    const rotate = i * angle;
+                                    const skew = 90 - angle;
+                                    const color = WHEEL_COLORS[i % WHEEL_COLORS.length];
+
+                                    if (participants.length === 1) return (
+                                        <div key={i} className="absolute inset-0 flex items-center justify-center bg-violet-600 text-white font-bold text-2xl">
+                                            {p}
+                                        </div>
+                                    );
+
+                                    return (
+                                        <div
+                                            key={i}
+                                            className="absolute top-0 right-0 w-[50%] h-[50%] origin-bottom-left"
+                                            style={{
+                                                transform: `rotate(${rotate}deg) skewY(-${skew}deg)`,
+                                                background: color,
+                                            }}
+                                        >
+                                            <div
+                                                className="absolute left-0 bottom-0 flex items-center justify-start origin-bottom-left"
+                                                style={{
+                                                    width: '100%',
+                                                    height: '40px',
+                                                    transform: `skewY(${skew}deg) rotate(${angle / 2}deg) translate(0, -50%)`,
+                                                    paddingLeft: '60px', // Alejar del centro
+                                                }}
+                                            >
+                                                <span className="text-white font-bold text-lg md:text-xl truncate max-w-[160px] drop-shadow-md">
+                                                    {p}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            ) : (
+                                <div className="absolute inset-0 flex items-center justify-center bg-slate-800 text-slate-400 font-medium">
+                                    Agrega participantes
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Centro de la rueda */}
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center z-10">
+                            <Dices className="w-6 h-6 text-violet-600" />
+                        </div>
+                    </div>
+
+                    <div className="w-full md:w-1/3 flex flex-col gap-4 max-h-full overflow-hidden">
+                        {/* Panel de Resultado (Overlay) */}
+                        {showResultModal && result && (
+                            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 rounded-xl animate-in fade-in zoom-in duration-300">
+                                <div className="bg-slate-900 p-8 rounded-[2rem] border border-white/20 shadow-2xl text-center max-w-md mx-4 relative overflow-hidden">
+                                    <Sparkles className="w-16 h-16 text-yellow-400 mx-auto mb-4 animate-pulse" />
+
+                                    <h3 className="text-violet-200 text-lg font-bold uppercase tracking-widest mb-2">¡Tenemos un ganador!</h3>
+                                    <p className="text-4xl md:text-5xl font-bold text-white mb-8 drop-shadow-md">{result.participant}</p>
+
+                                    <div className="bg-black/30 p-6 rounded-xl border border-white/10 mb-8">
+                                        <p className="text-sm text-pink-300 font-bold uppercase mb-2">Desafío</p>
+                                        <p className="text-xl text-white font-medium leading-relaxed">"{result.challenge}"</p>
+                                    </div>
+
+                                    <Button
+                                        size="lg"
+                                        onClick={() => setShowResultModal(false)}
+                                        className="w-full bg-white text-violet-900 hover:bg-violet-50 font-bold text-lg h-14 rounded-xl"
+                                    >
+                                        Continuar
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+
+                        <Button
+                            size="lg"
+                            className={`w-full h-14 text-xl font-bold rounded-xl shadow-md transition-all ${isSpinning
+                                ? "bg-slate-700 cursor-not-allowed opacity-80"
+                                : "bg-gradient-to-r from-violet-600 to-pink-600 hover:scale-[1.01]"
+                                }`}
+                            onClick={spinRoulette}
+                            disabled={isSpinning || participants.length === 0}
+                        >
+                            {isSpinning ? "Girando..." : "¡GIRAR AHORA!"}
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
     return (
         <>
             {/* BOTÓN FLOTANTE */}
