@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSubmissions } from "@/hooks/use-submissions";
 import { useEventSettings } from "@/hooks/use-event-settings";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { RouletteModal } from "@/components/display/RouletteModal";
 import QRCode from "react-qr-code";
 
@@ -49,128 +47,100 @@ export const SlideshowTemplate = () => {
         }
     }, [approvedContent.length, currentIndex]);
 
-    const goToPrevious = () => {
-        if (approvedContent.length > 0) {
-            setCurrentIndex((prev) => (prev - 1 + approvedContent.length) % approvedContent.length);
-        }
-    };
-
-    const goToNext = () => {
-        if (approvedContent.length > 0) {
-            setCurrentIndex((prev) => (prev + 1) % approvedContent.length);
-        }
-    };
-
     const backgroundUrl = settings?.display_background_url || settings?.background_image_url;
     const appUrl = window.location.origin; // Dynamic URL for QR code
 
     return (
-        <div className="relative min-h-screen bg-slate-950 text-white overflow-hidden font-sans flex flex-col">
+        <div className="relative h-screen w-screen bg-slate-950 text-white overflow-hidden font-sans flex flex-col">
             {/* Dynamic Background with Overlay */}
             <div
                 className="absolute inset-0 bg-cover bg-center transition-all duration-1000 opacity-30 blur-sm"
                 style={backgroundUrl ? { backgroundImage: `url(${backgroundUrl})` } : {}}
             />
-            <div className="absolute inset-0 bg-gradient-to-b from-slate-950/80 via-slate-950/60 to-slate-950/90" />
+            <div className="absolute inset-0 bg-gradient-to-b from-slate-950/90 via-slate-950/70 to-slate-950/90" />
 
-            {/* Header: Event Title & Branding */}
-            <header className="relative z-20 px-8 py-6 flex justify-between items-center border-b border-white/10 bg-slate-950/50 backdrop-blur-md">
-                <div>
-                    <h1 className="text-4xl md:text-5xl font-serif font-bold tracking-tight text-white drop-shadow-lg capitalize">
+            {/* Header: Compact & Elegant (approx 10-12% height) */}
+            <header className="relative z-20 px-6 py-3 flex justify-between items-center border-b border-white/5 bg-slate-950/40 backdrop-blur-md shrink-0 h-[10vh] min-h-[60px]">
+                <div className="flex-1">
+                    <h1 className="text-3xl md:text-4xl lg:text-5xl font-serif font-bold tracking-tight text-white drop-shadow-lg capitalize truncate">
                         {settings?.title || "EventPix"}
                     </h1>
                 </div>
-                <div className="text-right">
-                    <h2 className="text-2xl font-bold text-violet-400 font-sans">EventPix</h2>
-                    <p className="text-xs text-slate-400 uppercase tracking-widest font-semibold">by Tecno Eventos</p>
+                <div className="text-right shrink-0 ml-4">
+                    <h2 className="text-xl md:text-2xl font-bold text-violet-400 font-sans leading-none">EventPix</h2>
+                    <p className="text-[10px] md:text-xs text-slate-400 uppercase tracking-widest font-semibold mt-1">by Tecno Eventos</p>
                 </div>
             </header>
 
-            {/* Main Content: Slideshow Area */}
-            <main className="flex-1 relative z-10 flex items-center justify-center p-8">
+            {/* Main Content: Slideshow Area (Flexible height, takes remaining space) */}
+            <main className="flex-1 relative z-10 flex items-center justify-center p-4 md:p-6 overflow-hidden w-full">
                 {(!approvedContent || approvedContent.length === 0) ? (
                     // Empty State
-                    <div className="text-center space-y-6 max-w-3xl animate-fade-in">
-                        <div className="bg-white/10 backdrop-blur-xl p-12 rounded-[3rem] border border-white/20 shadow-2xl">
-                            <p className="text-4xl md:text-5xl font-serif font-medium leading-relaxed drop-shadow-md text-violet-100">
+                    <div className="text-center space-y-4 max-w-2xl animate-fade-in">
+                        <div className="bg-white/5 backdrop-blur-xl p-8 md:p-10 rounded-[2rem] border border-white/10 shadow-2xl">
+                            <p className="text-3xl md:text-4xl lg:text-5xl font-serif font-medium leading-relaxed drop-shadow-md text-violet-100">
                                 {emptyMessages[emptyMessageIndex]}
                             </p>
-                            <p className="text-xl text-slate-300 mt-6 font-light">
+                            <p className="text-lg text-slate-300 mt-4 font-light">
                                 ¡Escanea el código QR abajo para participar!
                             </p>
                         </div>
                     </div>
                 ) : (
                     // Slideshow Content
-                    <div className="w-full max-w-[70rem] aspect-[16/9] relative flex items-center justify-center">
-                        {/* Navigation Buttons (Hidden on hover usually, but kept for manual control if needed) */}
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="absolute left-4 z-30 text-white/50 hover:text-white hover:bg-white/10 rounded-full w-16 h-16 opacity-0 hover:opacity-100 transition-opacity"
-                            onClick={goToPrevious}
-                        >
-                            <ChevronLeft className="w-10 h-10" />
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="absolute right-4 z-30 text-white/50 hover:text-white hover:bg-white/10 rounded-full w-16 h-16 opacity-0 hover:opacity-100 transition-opacity"
-                            onClick={goToNext}
-                        >
-                            <ChevronRight className="w-10 h-10" />
-                        </Button>
-
-                        {/* Content Card */}
-                        <div className="w-full h-full bg-black/40 backdrop-blur-2xl rounded-[2rem] border border-white/10 shadow-2xl overflow-hidden relative group animate-in fade-in zoom-in duration-500" key={currentIndex}>
-                            {approvedContent[currentIndex].type === 'photo' ? (
-                                <div className="w-full h-full relative">
-                                    <img
-                                        src={approvedContent[currentIndex].content}
-                                        alt="Slideshow"
-                                        className="w-full h-full object-contain p-4"
-                                    />
-                                    {/* Author Badge */}
-                                    {approvedContent[currentIndex].author && (
-                                        <div className="absolute bottom-8 right-8 bg-black/60 backdrop-blur-md px-6 py-3 rounded-full border border-white/10">
-                                            <p className="text-white font-medium text-lg">📸 {approvedContent[currentIndex].author}</p>
-                                        </div>
-                                    )}
-                                </div>
-                            ) : (
-                                <div className="w-full h-full flex flex-col items-center justify-center p-16 text-center bg-gradient-to-br from-violet-900/40 to-fuchsia-900/40">
-                                    <div className="bg-white/10 backdrop-blur-md p-12 rounded-[3rem] border border-white/20 shadow-xl max-w-4xl transform rotate-1">
-                                        <p className="text-5xl md:text-6xl font-serif text-white leading-tight drop-shadow-lg">
-                                            "{approvedContent[currentIndex].content}"
-                                        </p>
+                    <div className="w-full h-full relative flex items-center justify-center">
+                        {/* Content Card - Auto scales to fit without scroll */}
+                        <div className="relative w-full h-full max-w-[90vw] max-h-[75vh] flex items-center justify-center" key={currentIndex}>
+                            <div className="w-full h-full bg-black/40 backdrop-blur-xl rounded-[1.5rem] border border-white/10 shadow-2xl overflow-hidden relative group animate-in fade-in zoom-in duration-500 flex items-center justify-center">
+                                {approvedContent[currentIndex].type === 'photo' ? (
+                                    <div className="w-full h-full relative flex items-center justify-center p-2">
+                                        <img
+                                            src={approvedContent[currentIndex].content}
+                                            alt="Slideshow"
+                                            className="w-full h-full object-contain max-h-full"
+                                        />
+                                        {/* Author Badge */}
                                         {approvedContent[currentIndex].author && (
-                                            <p className="text-2xl text-violet-200 mt-8 font-medium tracking-wide">
-                                                — {approvedContent[currentIndex].author}
-                                            </p>
+                                            <div className="absolute bottom-6 right-6 bg-black/60 backdrop-blur-md px-5 py-2 rounded-full border border-white/10">
+                                                <p className="text-white font-medium text-base md:text-lg">📸 {approvedContent[currentIndex].author}</p>
+                                            </div>
                                         )}
                                     </div>
-                                </div>
-                            )}
+                                ) : (
+                                    <div className="w-full h-full flex flex-col items-center justify-center p-8 md:p-12 text-center bg-gradient-to-br from-violet-900/30 to-fuchsia-900/30">
+                                        <div className="bg-white/10 backdrop-blur-md p-8 md:p-12 rounded-[2rem] border border-white/20 shadow-xl max-w-4xl transform rotate-1">
+                                            <p className="text-3xl md:text-5xl lg:text-6xl font-serif text-white leading-tight drop-shadow-lg line-clamp-[8]">
+                                                "{approvedContent[currentIndex].content}"
+                                            </p>
+                                            {approvedContent[currentIndex].author && (
+                                                <p className="text-xl md:text-2xl text-violet-200 mt-6 font-medium tracking-wide">
+                                                    — {approvedContent[currentIndex].author}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 )}
             </main>
 
-            {/* Footer: QR Code & Info */}
-            <footer className="relative z-20 bg-slate-950/80 backdrop-blur-xl border-t border-white/10 px-8 py-4 flex justify-between items-center">
+            {/* Footer: QR Code & Info (Compact, approx 12-15% height) */}
+            <footer className="relative z-20 bg-slate-950/60 backdrop-blur-lg border-t border-white/5 px-6 py-3 flex justify-between items-center shrink-0 h-[12vh] min-h-[80px]">
                 <div className="flex items-center gap-4">
-                    <p className="text-sm text-slate-500 font-medium uppercase tracking-wider">
-                        Tecno Eventos – Servicios interactivos para eventos
+                    <p className="text-xs md:text-sm text-slate-500 font-medium uppercase tracking-wider hidden md:block">
+                        Tecno Eventos – Servicios interactivos
                     </p>
                 </div>
 
-                <div className="flex items-center gap-6 bg-white/5 rounded-2xl p-3 pr-6 border border-white/10 hover:bg-white/10 transition-colors">
-                    <div className="bg-white p-2 rounded-xl">
-                        <QRCode value={appUrl} size={80} />
+                <div className="flex items-center gap-4 bg-white/5 rounded-xl p-2 pr-4 border border-white/10 hover:bg-white/10 transition-colors h-full max-h-[90%]">
+                    <div className="bg-white p-1.5 rounded-lg h-full aspect-square flex items-center justify-center">
+                        <QRCode value={appUrl} style={{ height: "100%", width: "100%" }} />
                     </div>
-                    <div className="text-left">
-                        <p className="text-lg font-bold text-white leading-tight">¡Participá ahora!</p>
-                        <p className="text-sm text-slate-300">Escaneá para subir fotos y mensajes</p>
+                    <div className="text-left flex flex-col justify-center">
+                        <p className="text-base md:text-lg font-bold text-white leading-tight">¡Participá!</p>
+                        <p className="text-[10px] md:text-xs text-slate-300 leading-tight">Escaneá para subir fotos</p>
                     </div>
                 </div>
             </footer>
