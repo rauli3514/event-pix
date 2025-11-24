@@ -28,15 +28,26 @@ export const SlideshowTemplate = () => {
         }
     }, [approvedContent.length]);
 
+    // Safety check: if content changes and index is out of bounds, reset to 0
+    useEffect(() => {
+        if (currentIndex >= approvedContent.length && approvedContent.length > 0) {
+            setCurrentIndex(0);
+        }
+    }, [approvedContent.length, currentIndex]);
+
     useEffect(() => {
         if (!approvedContent || approvedContent.length === 0) return;
 
         const interval = setInterval(() => {
-            setCurrentIndex((prev) => (prev + 1) % approvedContent.length);
-        }, 8000); // Change every 8 seconds for better readability
+            setCurrentIndex((prev) => {
+                // If we are at the end, go back to start
+                // This logic works even if array length changes
+                return (prev + 1) % approvedContent.length;
+            });
+        }, 8000);
 
         return () => clearInterval(interval);
-    }, [approvedContent.length]);
+    }, [approvedContent.length]); // Dependency on length ensures we account for new items
 
     if (isLoading) {
         return (
