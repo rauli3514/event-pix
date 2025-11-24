@@ -48,7 +48,9 @@ export const SlideshowTemplate = () => {
     }, [approvedContent.length, currentIndex]);
 
     const backgroundUrl = settings?.display_background_url || settings?.background_image_url;
-    const appUrl = window.location.origin; // Dynamic URL for QR code
+    // Fix: Ensure QR points to the root of the app, handling subpaths like /event-pix/
+    // We take the current URL and remove '/display' to get the landing page URL
+    const appUrl = window.location.href.replace(/\/display\/?$/, "");
 
     return (
         <div className="relative h-screen w-screen bg-slate-950 text-white overflow-hidden font-sans flex flex-col">
