@@ -21,8 +21,8 @@ const Index = () => {
 
             {/* Header */}
             <header className="relative z-10 pt-8 pb-4 text-center animate-fade-in-down">
-                <h1 className="text-3xl font-bold tracking-tight text-violet-900 font-sans">{event.name}</h1>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">by EventPix</p>
+                <h1 className="text-3xl font-bold tracking-tight text-violet-900 font-sans">EventPix</h1>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">by Tecno Eventos</p>
             </header>
 
             {/* Main Content */}
@@ -32,6 +32,7 @@ const Index = () => {
                         <EventCard
                             onUploadClick={() => setUploadOpen(true)}
                             onMessageClick={() => setMessageOpen(true)}
+                            eventId={event.id}
                         />
                     ) : (
                         <div className="bg-white p-8 rounded-2xl shadow-xl text-center border border-slate-200">

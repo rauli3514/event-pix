@@ -2,15 +2,16 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Camera, MessageSquare } from "lucide-react";
 
+import { useEventSettings } from "@/hooks/use-event-settings";
+
 interface EventCardProps {
     onUploadClick: () => void;
     onMessageClick: () => void;
+    eventId?: string;
 }
 
-import { useEventSettings } from "@/hooks/use-event-settings";
-
-export const EventCard = ({ onUploadClick, onMessageClick }: EventCardProps) => {
-    const { data: settings } = useEventSettings();
+export const EventCard = ({ onUploadClick, onMessageClick, eventId }: EventCardProps) => {
+    const { data: settings } = useEventSettings(eventId);
 
     return (
         <Card className="w-full overflow-hidden rounded-[2rem] shadow-2xl border border-white/60 bg-white/80 backdrop-blur-xl hover:shadow-3xl transition-shadow duration-500">
