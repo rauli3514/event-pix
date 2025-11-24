@@ -86,26 +86,22 @@ export const RouletteModal = ({ mode = "config" }: { mode?: "config" | "show" })
         const selectedParticipant = participants[randomIndex];
         const selectedChallenge = DESAFIOS[Math.floor(Math.random() * DESAFIOS.length)];
 
-        // Calcular rotación:
-        // Cada segmento ocupa (360 / N) grados.
-        // Queremos que el segmento ganador termine arriba (ángulo 0 o 360).
-        // El puntero está arriba.
+        // Calcular rotación más dramática
         const segmentAngle = 360 / participants.length;
-        // Vueltas completas (mínimo 5)
-        const spins = 360 * 5;
-        // Ángulo final: spins + (360 - (index * segmentAngle)) - offset
-        // Restamos para girar en sentido horario y que el índice correcto llegue arriba
-        const targetRotation = rotation + spins + (360 - (randomIndex * segmentAngle)) + Math.random() * 10; // Random jitter
+        // Vueltas completas (8-10 para más emoción)
+        const fullSpins = 360 * (8 + Math.random() * 2);
+        // Ángulo final exacto para el ganador
+        const targetRotation = rotation + fullSpins + (360 - (randomIndex * segmentAngle)) + (Math.random() * 5 - 2.5);
 
         setRotation(targetRotation);
 
-        // Tiempo de giro (debe coincidir con CSS transition duration)
+        // Tiempo de giro (4 segundos para mejor experiencia)
         setTimeout(() => {
             setIsSpinning(false);
             setResult({ participant: selectedParticipant, challenge: selectedChallenge });
             setShowResultModal(true);
             triggerConfetti();
-        }, 5000);
+        }, 4000);
     };
 
     const triggerConfetti = () => {
@@ -138,16 +134,19 @@ export const RouletteModal = ({ mode = "config" }: { mode?: "config" | "show" })
             <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/80 p-4 pb-[16vh]">
                 <div className="w-full max-w-6xl h-full max-h-[80vh] flex flex-col md:flex-row gap-4 md:gap-8 items-center justify-center">
                     {/* Wheel UI (Show Mode) */}
-                    <div className="flex-1 flex flex-col items-center justify-center relative w-full max-w-[500px] aspect-square shrink-0">
+                    <div className="flex-1 flex flex-col items-center justify-center relative w-full max-w-[450px] aspect-square shrink-0">
                         {/* Puntero */}
-                        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-2 z-20 w-10 h-14 filter drop-shadow-md">
-                            <div className="w-0 h-0 border-l-[20px] border-l-transparent border-r-[20px] border-r-transparent border-t-[40px] border-t-white" />
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-3 z-20 w-8 h-12 filter drop-shadow-lg">
+                            <div className="w-0 h-0 border-l-[16px] border-l-transparent border-r-[16px] border-r-transparent border-t-[36px] border-t-yellow-400" />
                         </div>
 
-                        {/* Rueda */}
+                        {/* Rueda - Optimizada */}
                         <div
-                            className="w-full h-full rounded-full border-[8px] border-white shadow-xl relative overflow-hidden transition-transform duration-[5000ms] cubic-bezier(0.15, 0, 0.15, 1) will-change-transform"
-                            style={{ transform: `rotate(${rotation}deg)` }}
+                            className="w-full h-full rounded-full border-4 border-white shadow-2xl relative overflow-hidden will-change-transform"
+                            style={{
+                                transform: `rotate(${rotation}deg)`,
+                                transition: isSpinning ? 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)' : 'none'
+                            }}
                         >
                             {participants.length > 0 ? (
                                 participants.map((p, i) => {
@@ -165,22 +164,28 @@ export const RouletteModal = ({ mode = "config" }: { mode?: "config" | "show" })
                                     return (
                                         <div
                                             key={i}
-                                            className="absolute top-0 right-0 w-[50%] h-[50%] origin-bottom-left"
+                                            className="absolute top-0 right-0 w-1/2 h-1/2 origin-bottom-left"
                                             style={{
                                                 transform: `rotate(${rotate}deg) skewY(-${skew}deg)`,
                                                 background: color,
                                             }}
                                         >
                                             <div
-                                                className="absolute left-0 bottom-0 flex items-center justify-start origin-bottom-left"
+                                                className="absolute inset-0 flex items-center justify-center"
                                                 style={{
-                                                    width: '100%',
-                                                    height: '40px',
-                                                    transform: `skewY(${skew}deg) rotate(${angle / 2}deg) translate(0, -50%)`,
-                                                    paddingLeft: '60px', // Alejar del centro
+                                                    transform: `skewY(${skew}deg) rotate(${angle / 2}deg)`,
+                                                    paddingLeft: participants.length > 6 ? '25%' : '30%',
                                                 }}
                                             >
-                                                <span className="text-white font-bold text-lg md:text-xl truncate max-w-[160px] drop-shadow-md">
+                                                <span
+                                                    className="text-white font-bold text-center leading-tight drop-shadow-md"
+                                                    style={{
+                                                        fontSize: participants.length > 8 ? '0.85rem' : participants.length > 6 ? '1rem' : '1.1rem',
+                                                        maxWidth: '80px',
+                                                        wordWrap: 'break-word',
+                                                        hyphens: 'auto'
+                                                    }}
+                                                >
                                                     {p}
                                                 </span>
                                             </div>
@@ -195,8 +200,8 @@ export const RouletteModal = ({ mode = "config" }: { mode?: "config" | "show" })
                         </div>
 
                         {/* Centro de la rueda */}
-                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center z-10">
-                            <Dices className="w-6 h-6 text-violet-600" />
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-gradient-to-br from-yellow-300 to-yellow-500 rounded-full shadow-xl flex items-center justify-center z-10 border-4 border-white">
+                            <Dices className="w-7 h-7 text-white drop-shadow" />
                         </div>
                     </div>
 
@@ -269,16 +274,19 @@ export const RouletteModal = ({ mode = "config" }: { mode?: "config" | "show" })
                         </Button>
 
                         {/* ZONA IZQUIERDA: RULETA */}
-                        <div className="flex-1 flex flex-col items-center justify-center relative w-full max-w-[500px] aspect-square shrink-0">
+                        <div className="flex-1 flex flex-col items-center justify-center relative w-full max-w-[450px] aspect-square shrink-0">
                             {/* Puntero */}
-                            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-2 z-20 w-10 h-14 filter drop-shadow-md">
-                                <div className="w-0 h-0 border-l-[20px] border-l-transparent border-r-[20px] border-r-transparent border-t-[40px] border-t-white" />
+                            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-3 z-20 w-8 h-12 filter drop-shadow-lg">
+                                <div className="w-0 h-0 border-l-[16px] border-l-transparent border-r-[16px] border-r-transparent border-t-[36px] border-t-yellow-400" />
                             </div>
 
-                            {/* Rueda - Optimizada sin sombras excesivas */}
+                            {/* Rueda - Optimizada */}
                             <div
-                                className="w-full h-full rounded-full border-[8px] border-white shadow-xl relative overflow-hidden transition-transform duration-[5000ms] cubic-bezier(0.15, 0, 0.15, 1) will-change-transform"
-                                style={{ transform: `rotate(${rotation}deg)` }}
+                                className="w-full h-full rounded-full border-4 border-white shadow-2xl relative overflow-hidden will-change-transform"
+                                style={{
+                                    transform: `rotate(${rotation}deg)`,
+                                    transition: isSpinning ? 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)' : 'none'
+                                }}
                             >
                                 {participants.length > 0 ? (
                                     participants.map((p, i) => {
@@ -296,22 +304,28 @@ export const RouletteModal = ({ mode = "config" }: { mode?: "config" | "show" })
                                         return (
                                             <div
                                                 key={i}
-                                                className="absolute top-0 right-0 w-[50%] h-[50%] origin-bottom-left"
+                                                className="absolute top-0 right-0 w-1/2 h-1/2 origin-bottom-left"
                                                 style={{
                                                     transform: `rotate(${rotate}deg) skewY(-${skew}deg)`,
                                                     background: color,
                                                 }}
                                             >
                                                 <div
-                                                    className="absolute left-0 bottom-0 flex items-center justify-start origin-bottom-left"
+                                                    className="absolute inset-0 flex items-center justify-center"
                                                     style={{
-                                                        width: '100%',
-                                                        height: '40px',
-                                                        transform: `skewY(${skew}deg) rotate(${angle / 2}deg) translate(0, -50%)`,
-                                                        paddingLeft: '60px', // Alejar del centro
+                                                        transform: `skewY(${skew}deg) rotate(${angle / 2}deg)`,
+                                                        paddingLeft: participants.length > 6 ? '25%' : '30%',
                                                     }}
                                                 >
-                                                    <span className="text-white font-bold text-lg md:text-xl truncate max-w-[160px] drop-shadow-md">
+                                                    <span
+                                                        className="text-white font-bold text-center leading-tight drop-shadow-md"
+                                                        style={{
+                                                            fontSize: participants.length > 8 ? '0.85rem' : participants.length > 6 ? '1rem' : '1.1rem',
+                                                            maxWidth: '80px',
+                                                            wordWrap: 'break-word',
+                                                            hyphens: 'auto'
+                                                        }}
+                                                    >
                                                         {p}
                                                     </span>
                                                 </div>
@@ -326,8 +340,8 @@ export const RouletteModal = ({ mode = "config" }: { mode?: "config" | "show" })
                             </div>
 
                             {/* Centro de la rueda */}
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center z-10">
-                                <Dices className="w-6 h-6 text-violet-600" />
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-gradient-to-br from-yellow-300 to-yellow-500 rounded-full shadow-xl flex items-center justify-center z-10 border-4 border-white">
+                                <Dices className="w-7 h-7 text-white drop-shadow" />
                             </div>
                         </div>
 
