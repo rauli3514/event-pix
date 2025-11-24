@@ -146,8 +146,9 @@ export const RouletteModal = () => {
 
             {/* MODAL PRINCIPAL */}
             {isOpen && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 animate-fade-in">
-                    <div className="w-full max-w-6xl h-[90vh] flex flex-col md:flex-row gap-8 items-center justify-center relative">
+                <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/80 p-4 animate-fade-in">
+                    {/* Contenedor ajustado para no tapar Header/Footer visualmente si fuera necesario, aunque z-index ya maneja la superposición */}
+                    <div className="w-full max-w-6xl h-full max-h-[80vh] flex flex-col md:flex-row gap-4 md:gap-8 items-center justify-center relative mt-[5vh]">
 
                         {/* Botón Cerrar */}
                         <Button
@@ -160,15 +161,15 @@ export const RouletteModal = () => {
                         </Button>
 
                         {/* ZONA IZQUIERDA: RULETA */}
-                        <div className="flex-1 flex flex-col items-center justify-center relative w-full max-w-[600px] aspect-square">
+                        <div className="flex-1 flex flex-col items-center justify-center relative w-full max-w-[500px] aspect-square shrink-0">
                             {/* Puntero */}
-                            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-4 z-20 w-12 h-16 filter drop-shadow-lg">
-                                <div className="w-0 h-0 border-l-[24px] border-l-transparent border-r-[24px] border-r-transparent border-t-[48px] border-t-white" />
+                            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-2 z-20 w-10 h-14 filter drop-shadow-md">
+                                <div className="w-0 h-0 border-l-[20px] border-l-transparent border-r-[20px] border-r-transparent border-t-[40px] border-t-white" />
                             </div>
 
-                            {/* Rueda */}
+                            {/* Rueda - Optimizada sin sombras excesivas */}
                             <div
-                                className="w-full h-full rounded-full border-[12px] border-white shadow-2xl relative overflow-hidden transition-transform duration-[5000ms] cubic-bezier(0.15, 0, 0.15, 1)"
+                                className="w-full h-full rounded-full border-[8px] border-white shadow-xl relative overflow-hidden transition-transform duration-[5000ms] cubic-bezier(0.15, 0, 0.15, 1) will-change-transform"
                                 style={{ transform: `rotate(${rotation}deg)` }}
                             >
                                 {participants.length > 0 ? (
@@ -178,7 +179,6 @@ export const RouletteModal = () => {
                                         const skew = 90 - angle;
                                         const color = WHEEL_COLORS[i % WHEEL_COLORS.length];
 
-                                        // Si hay solo 1 participante, ocupa todo
                                         if (participants.length === 1) return (
                                             <div key={i} className="absolute inset-0 flex items-center justify-center bg-violet-600 text-white font-bold text-2xl">
                                                 {p}
@@ -198,7 +198,7 @@ export const RouletteModal = () => {
                                                     className="absolute left-8 bottom-8 text-white font-bold text-lg md:text-xl whitespace-nowrap origin-bottom-left"
                                                     style={{
                                                         transform: `skewY(${skew}deg) rotate(${angle / 2}deg) translate(20px, 0)`,
-                                                        maxWidth: '140px',
+                                                        maxWidth: '120px',
                                                         textOverflow: 'ellipsis',
                                                         overflow: 'hidden'
                                                     }}
@@ -216,19 +216,18 @@ export const RouletteModal = () => {
                             </div>
 
                             {/* Centro de la rueda */}
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-white rounded-full shadow-xl flex items-center justify-center z-10">
-                                <Dices className="w-8 h-8 text-violet-600" />
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center z-10">
+                                <Dices className="w-6 h-6 text-violet-600" />
                             </div>
                         </div>
 
                         {/* ZONA DERECHA: CONTROLES Y RESULTADO */}
-                        <div className="w-full md:w-1/3 flex flex-col gap-6">
+                        <div className="w-full md:w-1/3 flex flex-col gap-4 max-h-full overflow-hidden">
 
                             {/* Panel de Resultado (Overlay) */}
                             {showResultModal && result && (
-                                <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-xl animate-in fade-in zoom-in duration-300">
-                                    <div className="bg-gradient-to-br from-violet-900 to-fuchsia-900 p-8 rounded-[2rem] border border-white/20 shadow-2xl text-center max-w-md mx-4 relative overflow-hidden">
-                                        <div className="absolute inset-0 bg-white/5" />
+                                <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 rounded-xl animate-in fade-in zoom-in duration-300">
+                                    <div className="bg-slate-900 p-8 rounded-[2rem] border border-white/20 shadow-2xl text-center max-w-md mx-4 relative overflow-hidden">
                                         <Sparkles className="w-16 h-16 text-yellow-400 mx-auto mb-4 animate-pulse" />
 
                                         <h3 className="text-violet-200 text-lg font-bold uppercase tracking-widest mb-2">¡Tenemos un ganador!</h3>
@@ -251,17 +250,17 @@ export const RouletteModal = () => {
                             )}
 
                             {/* Controles */}
-                            <div className="bg-slate-900/50 p-6 rounded-2xl border border-white/10 space-y-6 backdrop-blur-sm">
+                            <div className="bg-slate-900/80 p-6 rounded-2xl border border-white/10 space-y-4">
                                 <div className="text-center">
-                                    <h2 className="text-2xl font-bold text-white mb-2">Ruleta de Desafíos</h2>
+                                    <h2 className="text-2xl font-bold text-white mb-1">Ruleta de Desafíos</h2>
                                     <p className="text-slate-400 text-sm">¡Gira la rueda y que la suerte decida!</p>
                                 </div>
 
                                 <Button
                                     size="lg"
-                                    className={`w-full h-16 text-xl font-bold rounded-xl shadow-lg transition-all ${isSpinning
+                                    className={`w-full h-14 text-xl font-bold rounded-xl shadow-md transition-all ${isSpinning
                                             ? "bg-slate-700 cursor-not-allowed opacity-80"
-                                            : "bg-gradient-to-r from-violet-600 to-pink-600 hover:scale-[1.02] hover:shadow-violet-500/25"
+                                            : "bg-gradient-to-r from-violet-600 to-pink-600 hover:scale-[1.01]"
                                         }`}
                                     onClick={spinRoulette}
                                     disabled={isSpinning || participants.length === 0}
@@ -282,9 +281,9 @@ export const RouletteModal = () => {
                                         <Button onClick={addParticipant} variant="secondary">Agregar</Button>
                                     </div>
 
-                                    <div className="max-h-[200px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                                    <div className="max-h-[150px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
                                         {participants.map((p, index) => (
-                                            <div key={index} className="flex items-center justify-between bg-slate-800/50 p-3 rounded-lg border border-white/5 group hover:border-white/20 transition-colors">
+                                            <div key={index} className="flex items-center justify-between bg-slate-800/50 p-2 rounded-lg border border-white/5 group hover:border-white/20 transition-colors">
                                                 <span className="text-slate-200 font-medium truncate">{p}</span>
                                                 <button
                                                     onClick={() => removeParticipant(index)}

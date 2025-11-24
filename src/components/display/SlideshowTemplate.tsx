@@ -60,9 +60,9 @@ export const SlideshowTemplate = () => {
             <div className="absolute inset-0 bg-gradient-to-b from-slate-950/90 via-slate-950/70 to-slate-950/90" />
 
             {/* Header: Compact & Elegant (approx 10-12% height) */}
-            <header className="relative z-20 px-6 py-3 flex justify-between items-center border-b border-white/5 bg-slate-950/40 backdrop-blur-md shrink-0 h-[10vh] min-h-[60px]">
+            <header className="relative z-50 px-6 py-3 flex justify-between items-center border-b border-white/5 bg-slate-950/80 shrink-0 h-[10vh] min-h-[60px]">
                 <div className="flex-1">
-                    <h1 className="text-3xl md:text-4xl lg:text-5xl font-serif font-bold tracking-tight text-white drop-shadow-lg capitalize truncate">
+                    <h1 className="text-3xl md:text-4xl lg:text-5xl font-serif font-bold tracking-tight text-white drop-shadow-md capitalize truncate">
                         {settings?.title || "EventPix"}
                     </h1>
                 </div>
@@ -77,7 +77,7 @@ export const SlideshowTemplate = () => {
                 {(!approvedContent || approvedContent.length === 0) ? (
                     // Empty State
                     <div className="text-center space-y-4 max-w-2xl animate-fade-in">
-                        <div className="bg-white/5 backdrop-blur-xl p-8 md:p-10 rounded-[2rem] border border-white/10 shadow-2xl">
+                        <div className="bg-white/5 p-8 md:p-10 rounded-[2rem] border border-white/10 shadow-xl">
                             <p className="text-3xl md:text-4xl lg:text-5xl font-serif font-medium leading-relaxed drop-shadow-md text-violet-100">
                                 {emptyMessages[emptyMessageIndex]}
                             </p>
@@ -91,7 +91,7 @@ export const SlideshowTemplate = () => {
                     <div className="w-full h-full relative flex items-center justify-center">
                         {/* Content Card - Auto scales to fit without scroll */}
                         <div className="relative w-full h-full max-w-[90vw] max-h-[75vh] flex items-center justify-center" key={currentIndex}>
-                            <div className="w-full h-full bg-black/40 backdrop-blur-xl rounded-[1.5rem] border border-white/10 shadow-2xl overflow-hidden relative group animate-in fade-in zoom-in duration-500 flex items-center justify-center">
+                            <div className="w-full h-full bg-black/40 rounded-[1.5rem] border border-white/10 shadow-xl overflow-hidden relative group animate-in fade-in zoom-in duration-500 flex items-center justify-center">
                                 {approvedContent[currentIndex].type === 'photo' ? (
                                     <div className="w-full h-full relative flex items-center justify-center p-2">
                                         <img
@@ -101,14 +101,14 @@ export const SlideshowTemplate = () => {
                                         />
                                         {/* Author Badge */}
                                         {approvedContent[currentIndex].author && (
-                                            <div className="absolute bottom-6 right-6 bg-black/60 backdrop-blur-md px-5 py-2 rounded-full border border-white/10">
+                                            <div className="absolute bottom-6 right-6 bg-black/60 px-5 py-2 rounded-full border border-white/10">
                                                 <p className="text-white font-medium text-base md:text-lg">📸 {approvedContent[currentIndex].author}</p>
                                             </div>
                                         )}
                                     </div>
                                 ) : (
                                     <div className="w-full h-full flex flex-col items-center justify-center p-8 md:p-12 text-center bg-gradient-to-br from-violet-900/30 to-fuchsia-900/30">
-                                        <div className="bg-white/10 backdrop-blur-md p-8 md:p-12 rounded-[2rem] border border-white/20 shadow-xl max-w-4xl transform rotate-1">
+                                        <div className="bg-white/10 p-8 md:p-12 rounded-[2rem] border border-white/20 shadow-lg max-w-4xl transform rotate-1">
                                             <p className="text-3xl md:text-5xl lg:text-6xl font-serif text-white leading-tight drop-shadow-lg line-clamp-[8]">
                                                 "{approvedContent[currentIndex].content}"
                                             </p>
@@ -127,7 +127,7 @@ export const SlideshowTemplate = () => {
             </main>
 
             {/* Footer: QR Code & Info (Compact, approx 12-15% height) */}
-            <footer className="relative z-20 bg-slate-950/60 backdrop-blur-lg border-t border-white/5 px-6 py-3 flex justify-between items-center shrink-0 h-[12vh] min-h-[80px]">
+            <footer className="relative z-50 bg-slate-950/90 border-t border-white/5 px-6 py-3 flex justify-between items-center shrink-0 h-[12vh] min-h-[80px]">
                 <div className="flex items-center gap-4">
                     <p className="text-xs md:text-sm text-slate-500 font-medium uppercase tracking-wider hidden md:block">
                         Tecno Eventos – Servicios interactivos
