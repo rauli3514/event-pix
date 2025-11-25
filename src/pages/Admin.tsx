@@ -277,8 +277,8 @@ const Admin = () => {
                     </div>
                 </div>
                 <nav className="flex gap-4 items-center">
-                    <a href={`/event-pix/${event.slug}`} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-primary">Ver Web</a>
-                    <a href={`/event-pix/${event.slug}/display`} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-primary">Ver Pantalla</a>
+                    <a href={`/${event.slug}`} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-primary">Ver Web</a>
+                    <a href={`/${event.slug}/display`} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-primary">Ver Pantalla</a>
                     <Button variant="ghost" onClick={handleLogout} className="text-muted-foreground hover:text-destructive">
                         Salir
                     </Button>

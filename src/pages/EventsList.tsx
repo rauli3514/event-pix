@@ -174,7 +174,7 @@ const EventsList = () => {
                                 <div className="space-y-2">
                                     <Label htmlFor="slug">URL del Evento (Slug)</Label>
                                     <div className="flex items-center gap-2">
-                                        <span className="text-sm text-muted-foreground">eventpix.com/</span>
+                                        <span className="text-sm text-muted-foreground">app.event-pix.com.ar/</span>
                                         <Input
                                             id="slug"
                                             value={newEvent.slug}
@@ -235,7 +235,7 @@ const EventsList = () => {
                                     </Link>
                                 </Button>
                                 <Button asChild variant="outline" className="flex-1">
-                                    <a href={`/event-pix/${event.slug}`} target="_blank" rel="noopener noreferrer">
+                                    <a href={`/${event.slug}`} target="_blank" rel="noopener noreferrer">
                                         <ExternalLink className="w-4 h-4 mr-2" /> Ver Web
                                     </a>
                                 </Button>
