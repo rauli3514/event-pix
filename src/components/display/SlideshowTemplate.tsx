@@ -97,14 +97,14 @@ export const SlideshowTemplate = ({ eventId }: SlideshowTemplateProps) => {
                     // Slideshow Content
                     <div className="w-full h-full relative flex items-center justify-center">
                         {/* Content Card - Auto scales to fit without scroll */}
-                        <div className="relative w-full h-full max-w-[90vw] max-h-[75vh] flex items-center justify-center" key={currentIndex}>
+                        <div className="relative w-full h-full flex items-center justify-center p-4" key={currentIndex}>
                             <div className="w-full h-full bg-black/40 rounded-[1.5rem] border border-white/10 shadow-xl overflow-hidden relative group animate-in fade-in zoom-in duration-500 flex items-center justify-center backdrop-blur-sm">
                                 {approvedContent[currentIndex].type === 'photo' ? (
                                     <div className="w-full h-full relative flex items-center justify-center p-2">
                                         <img
                                             src={approvedContent[currentIndex].content}
                                             alt="Slideshow"
-                                            className="w-full h-full object-contain max-h-full"
+                                            className="w-full h-full object-contain"
                                         />
                                         {/* Author Badge */}
                                         {approvedContent[currentIndex].author && (
