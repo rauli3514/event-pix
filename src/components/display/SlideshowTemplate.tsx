@@ -149,9 +149,9 @@ export const SlideshowTemplate = ({ eventId }: SlideshowTemplateProps) => {
                             viewBox={`0 0 256 256`}
                         />
                     </div>
-                    <div className="text-left flex flex-col justify-center space-y-2">
-                        <p className="text-4xl md:text-5xl font-bold text-white leading-none">¡Participá!</p>
-                        <p className="text-xl md:text-2xl text-slate-300 leading-tight">Escaneá para subir fotos</p>
+                    <div className="text-left flex flex-col justify-center space-y-1">
+                        <p className="text-xl md:text-2xl font-bold text-white leading-none">¡Participá!</p>
+                        <p className="text-xs md:text-sm text-slate-300 leading-tight">Escaneá para subir fotos</p>
                     </div>
                 </div>
             </footer>
