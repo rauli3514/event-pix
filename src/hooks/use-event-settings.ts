@@ -8,6 +8,7 @@ export interface EventSettings {
     background_image_url: string | null;
     display_background_url: string | null;
     display_template: 'grid' | 'slideshow' | 'masonry';
+    text_messages_enabled: boolean;
     created_at: string;
     updated_at: string;
 }

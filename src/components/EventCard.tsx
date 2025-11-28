@@ -13,6 +13,9 @@ interface EventCardProps {
 export const EventCard = ({ onUploadClick, onMessageClick, eventId }: EventCardProps) => {
     const { data: settings } = useEventSettings(eventId);
 
+    // Control para permitir mensajes de texto (default: true si no está definido)
+    const textMessagesEnabled = settings?.text_messages_enabled ?? true;
+
     return (
         <Card className="w-full overflow-hidden rounded-[2rem] shadow-2xl border border-white/60 bg-white/80 backdrop-blur-xl hover:shadow-3xl transition-shadow duration-500">
             <div className="relative aspect-[4/5] w-full overflow-hidden group">
@@ -42,14 +45,21 @@ export const EventCard = ({ onUploadClick, onMessageClick, eventId }: EventCardP
                     Subir Foto
                 </Button>
 
-                <Button
-                    onClick={onMessageClick}
-                    variant="outline"
-                    className="w-full h-14 text-lg font-medium bg-slate-50 border-2 border-slate-200 hover:border-violet-200 hover:bg-white text-slate-700 rounded-full transition-all hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2"
-                >
-                    <MessageSquare className="h-5 w-5 text-violet-500" />
-                    Dejar Mensaje
-                </Button>
+                {/* Solo mostrar botón de mensaje si está habilitado */}
+                {textMessagesEnabled ? (
+                    <Button
+                        onClick={onMessageClick}
+                        variant="outline"
+                        className="w-full h-14 text-lg font-medium bg-slate-50 border-2 border-slate-200 hover:border-violet-200 hover:bg-white text-slate-700 rounded-full transition-all hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2"
+                    >
+                        <MessageSquare className="h-5 w-5 text-violet-500" />
+                        Dejar Mensaje
+                    </Button>
+                ) : (
+                    <p className="text-center text-sm text-slate-500 py-2">
+                        En este evento solo podés subir fotos.
+                    </p>
+                )}
             </div>
         </Card>
     );

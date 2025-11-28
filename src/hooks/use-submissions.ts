@@ -192,6 +192,26 @@ export const useSubmissions = (eventId?: string) => {
         }
     });
 
+    const approveAllPending = useMutation({
+        mutationFn: async () => {
+            if (!eventId) return;
+            const { error } = await supabase
+                .from('submissions')
+                .update({ status: 'approved' })
+                .eq('status', 'pending')
+                .eq('event_id', eventId);
+
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['submissions', eventId] });
+            toast.success('Todo el contenido pendiente ha sido aprobado');
+        },
+        onError: () => {
+            toast.error('Error al aprobar todo');
+        }
+    });
+
     return {
         submissions: submissions || [],
         isLoading,
@@ -200,6 +220,7 @@ export const useSubmissions = (eventId?: string) => {
         toggleAlbum,
         deleteSubmission,
         deleteAllApproved,
-        resetAll
+        resetAll,
+        approveAllPending
     };
 };

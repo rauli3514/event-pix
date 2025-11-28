@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, X, Clock, Trash2, Download, RefreshCw, Zap, ArrowLeft } from "lucide-react";
+import { Check, X, Clock, Trash2, Download, RefreshCw, Zap, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { useSubmissions } from "@/hooks/use-submissions";
 import { useEventSettings, useUpdateEventSettings, useUploadEventImage } from "@/hooks/use-event-settings";
 import { Submission, SubmissionStatus } from "@/types";
@@ -14,13 +14,14 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
+import { Switch } from "@/components/ui/switch";
 
 import { useEvent } from "@/context/EventContext";
 import { Link } from "react-router-dom";
 
 const Admin = () => {
     const { event, isLoading: eventLoading } = useEvent();
-    const { submissions, isLoading, updateStatus, deleteSubmission, deleteAllApproved, resetAll } = useSubmissions(event?.id);
+    const { submissions, isLoading, updateStatus, deleteSubmission, deleteAllApproved, resetAll, approveAllPending } = useSubmissions(event?.id);
     const { data: settings, isLoading: settingsLoading } = useEventSettings(event?.id);
     const updateSettings = useUpdateEventSettings(event?.id);
     const uploadImage = useUploadEventImage();
@@ -29,6 +30,7 @@ const Admin = () => {
         title: "",
         description: "",
         display_template: "grid",
+        text_messages_enabled: true,
     });
 
     useEffect(() => {
@@ -37,12 +39,19 @@ const Admin = () => {
                 title: settings.title || "",
                 description: settings.description || "",
                 display_template: settings.display_template || "grid",
+                text_messages_enabled: settings.text_messages_enabled ?? true,
             });
         }
     }, [settings]);
 
     const handleModeration = (id: string, status: SubmissionStatus) => {
         updateStatus.mutate({ id, status });
+    };
+
+    const handleApproveAll = () => {
+        if (confirm("¿Seguro que querés aprobar todos los mensajes y fotos pendientes de este evento? Esta acción no se puede deshacer.")) {
+            approveAllPending.mutate();
+        }
     };
 
     const handleDelete = (id: string) => {
@@ -294,6 +303,20 @@ const Admin = () => {
                 </TabsList>
 
                 <TabsContent value="pending">
+                    {/* Approve All button - Only shown if there are pending items */}
+                    {submissions.filter(s => s.status === 'pending').length > 0 && (
+                        <div className="mb-6 flex items-center justify-center bg-card/50 p-4 rounded-xl border border-white/10">
+                            <Button
+                                onClick={handleApproveAll}
+                                className="bg-green-600 hover:bg-green-700"
+                                disabled={approveAllPending.isPending}
+                            >
+                                <CheckCircle2 className="w-4 h-4 mr-2" />
+                                {approveAllPending.isPending ? "Aprobando..." : "Aprobar Todo lo Pendiente"}
+                            </Button>
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {submissions
                             .filter(item => item.status === 'pending')
@@ -374,6 +397,19 @@ const Admin = () => {
                                         value={formData.description}
                                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                                         placeholder="Una breve descripción para tus invitados"
+                                    />
+                                </div>
+
+                                <div className="flex items-center justify-between rounded-lg border p-4 bg-card/50">
+                                    <div className="space-y-0.5">
+                                        <label className="text-base font-medium">Permitir mensajes de texto</label>
+                                        <p className="text-sm text-muted-foreground">
+                                            Si se desactiva, los invitados solo podrán subir fotos.
+                                        </p>
+                                    </div>
+                                    <Switch
+                                        checked={formData.text_messages_enabled}
+                                        onCheckedChange={(checked) => setFormData({ ...formData, text_messages_enabled: checked })}
                                     />
                                 </div>
 
