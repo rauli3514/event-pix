@@ -126,12 +126,12 @@ export const SlideshowTemplate = ({ eventId }: SlideshowTemplateProps) => {
             />
             <div className="absolute inset-0 bg-black/50" />
 
-            {/* Simplified Header - Only event name and EventPix */}
-            <header className="relative z-50 px-8 py-4 flex justify-between items-center shrink-0">
-                <h1 className="text-3xl md:text-4xl lg:text-5xl font-serif font-bold tracking-tight text-white drop-shadow-md capitalize">
-                    {settings?.title || "EventPix"}
+            {/* Compact Header - Event name with EventPix inline */}
+            <header className="relative z-50 px-6 py-2 flex flex-col shrink-0">
+                <h1 className="text-2xl md:text-3xl lg:text-4xl font-serif font-bold tracking-tight text-white drop-shadow-md capitalize">
+                    {settings?.title || "Mi Evento"} <span className="text-violet-400 font-sans">| EventPix</span>
                 </h1>
-                <h2 className="text-2xl md:text-3xl font-bold text-violet-400 font-sans">EventPix</h2>
+                <p className="text-xs md:text-sm text-slate-400 mt-1 font-light tracking-wide">by Tecno Eventos</p>
             </header>
 
             {/* Main Content - Maximized for photos */}
@@ -151,30 +151,30 @@ export const SlideshowTemplate = ({ eventId }: SlideshowTemplateProps) => {
                 ) : mode === 'qr' ? (
                     // QR Mode Screen - Full screen QR
                     <div className="w-full h-full flex flex-col items-center justify-center animate-in fade-in duration-500">
-                        <div className="bg-black/60 backdrop-blur-md p-16 rounded-[3rem] border border-white/20 shadow-2xl text-center max-w-5xl">
-                            <h2 className="text-5xl md:text-7xl font-serif font-bold text-white mb-12 drop-shadow-lg">
+                        <div className="bg-black/60 backdrop-blur-md p-8 md:p-12 rounded-[3rem] border border-white/20 shadow-2xl text-center max-w-4xl">
+                            <h2 className="text-3xl md:text-5xl font-serif font-bold text-white mb-6 drop-shadow-lg">
                                 ¡Escaneá el QR para subir tus fotos!
                             </h2>
-                            <div className="bg-white p-8 rounded-3xl inline-block shadow-xl mb-12">
+                            <div className="bg-white p-5 rounded-3xl inline-block shadow-xl mb-6">
                                 <QRCode
                                     value={appUrl}
-                                    size={400}
-                                    className="h-auto w-full max-w-[400px]"
+                                    size={280}
+                                    className="h-auto w-full max-w-[280px]"
                                     viewBox={`0 0 256 256`}
                                 />
                             </div>
-                            <p className="text-3xl text-violet-200 font-medium">
+                            <p className="text-xl md:text-2xl text-violet-200 font-medium">
                                 Sumate a la fiesta y compartí tus momentos
                             </p>
 
                             {showControls && (
-                                <div className="mt-16">
+                                <div className="mt-8">
                                     <Button
                                         onClick={handleResume}
                                         size="lg"
-                                        className="bg-violet-600 hover:bg-violet-700 text-white text-2xl px-10 py-8 rounded-full shadow-lg transition-all hover:scale-105"
+                                        className="bg-violet-600 hover:bg-violet-700 text-white text-lg md:text-xl px-8 py-4 md:py-6 rounded-full shadow-lg transition-all hover:scale-105"
                                     >
-                                        <Play className="mr-3 h-8 w-8" /> Reanudar Carrusel
+                                        <Play className="mr-2 h-6 w-6" /> Reanudar Carrusel
                                     </Button>
                                 </div>
                             )}
