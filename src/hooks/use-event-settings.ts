@@ -9,6 +9,9 @@ export interface EventSettings {
     display_background_url: string | null;
     display_template: 'grid' | 'slideshow' | 'masonry';
     text_messages_enabled: boolean;
+    carousel_max_loops: number;
+    carousel_interval_ms: number;
+    wall_show_controls: boolean;
     created_at: string;
     updated_at: string;
 }

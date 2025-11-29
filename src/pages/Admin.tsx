@@ -31,6 +31,9 @@ const Admin = () => {
         description: "",
         display_template: "grid",
         text_messages_enabled: true,
+        carousel_max_loops: 3,
+        carousel_interval_ms: 5000,
+        wall_show_controls: true,
     });
 
     useEffect(() => {
@@ -40,6 +43,9 @@ const Admin = () => {
                 description: settings.description || "",
                 display_template: settings.display_template || "grid",
                 text_messages_enabled: settings.text_messages_enabled ?? true,
+                carousel_max_loops: settings.carousel_max_loops ?? 3,
+                carousel_interval_ms: settings.carousel_interval_ms ?? 5000,
+                wall_show_controls: settings.wall_show_controls ?? true,
             });
         }
     }, [settings]);
@@ -413,7 +419,54 @@ const Admin = () => {
                                     />
                                 </div>
 
-                                <div className="space-y-2">
+                                <div className="space-y-4 border-t pt-4">
+                                    <h3 className="font-medium text-lg">Configuración del Wall (Carrusel)</h3>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium">Vueltas antes del QR</label>
+                                            <Input
+                                                type="number"
+                                                min="1"
+                                                max="100"
+                                                value={formData.carousel_max_loops}
+                                                onChange={(e) => setFormData({ ...formData, carousel_max_loops: parseInt(e.target.value) || 1 })}
+                                            />
+                                            <p className="text-xs text-muted-foreground">
+                                                Cuántas veces se muestran todas las fotos antes de pausar.
+                                            </p>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium">Tiempo por foto (segundos)</label>
+                                            <Input
+                                                type="number"
+                                                min="1"
+                                                max="60"
+                                                value={formData.carousel_interval_ms / 1000}
+                                                onChange={(e) => setFormData({ ...formData, carousel_interval_ms: (parseInt(e.target.value) || 5) * 1000 })}
+                                            />
+                                            <p className="text-xs text-muted-foreground">
+                                                Duración de cada foto en pantalla.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between rounded-lg border p-4 bg-card/50">
+                                        <div className="space-y-0.5">
+                                            <label className="text-base font-medium">Mostrar controles en pantalla</label>
+                                            <p className="text-sm text-muted-foreground">
+                                                Botones de pausa/play visibles en el Wall.
+                                            </p>
+                                        </div>
+                                        <Switch
+                                            checked={formData.wall_show_controls}
+                                            onCheckedChange={(checked) => setFormData({ ...formData, wall_show_controls: checked })}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2 border-t pt-4">
                                     <label className="text-sm font-medium">Imagen de Fondo (Inicio)</label>
                                     <div className="flex items-center gap-4">
                                         {settings?.background_image_url && (
