@@ -12,6 +12,15 @@ export interface EventSettings {
     carousel_max_loops: number;
     carousel_interval_ms: number;
     wall_show_controls: boolean;
+    frame_image_url?: string | null;
+    frame_enabled?: boolean;
+    splash_logo_url?: string | null;
+    show_splash_logo?: boolean;
+    reactions_enabled?: boolean;
+    public_gallery_enabled?: boolean;
+    dj_mode_enabled?: boolean;
+    photo_booth_enabled?: boolean;
+    photobooth_frame_url?: string | null;
     created_at: string;
     updated_at: string;
 }

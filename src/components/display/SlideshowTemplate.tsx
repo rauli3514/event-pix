@@ -1,10 +1,13 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useSubmissions } from "@/hooks/use-submissions";
 import { useEventSettings } from "@/hooks/use-event-settings";
+import { useEvent } from "@/context/EventContext";
 import { RouletteModal } from "@/components/display/RouletteModal";
 import QRCode from "react-qr-code";
-import { Play, Pause } from "lucide-react";
+import { Play, Pause, Camera, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import confetti from 'canvas-confetti';
+import { supabase } from "@/lib/supabase";
 
 interface SlideshowTemplateProps {
     eventId?: string;
@@ -13,34 +16,163 @@ interface SlideshowTemplateProps {
 export const SlideshowTemplate = ({ eventId }: SlideshowTemplateProps) => {
     const { submissions } = useSubmissions(eventId);
     const { data: settings } = useEventSettings(eventId);
+    const { event } = useEvent();
 
-    // Configuration from settings
+    // Escuchar reacciones en tiempo real
+    useEffect(() => {
+        if (!eventId || settings?.reactions_enabled === false) return;
+
+        console.log("🔌 Iniciando conexión Realtime para reacciones...", { eventId, enabled: settings?.reactions_enabled });
+
+        const channel = supabase
+            .channel('public:reactions')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'reactions',
+                    filter: `event_id=eq.${eventId}`
+                },
+                (payload) => {
+                    console.log("🎉 Reacción recibida!", payload.new);
+                    const newReaction = payload.new as { emoji: string };
+                    triggerReaction(newReaction.emoji);
+                }
+            )
+            .subscribe((status) => {
+                console.log("📡 Estado de suscripción Realtime:", status);
+            });
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [eventId, settings?.reactions_enabled]);
+
+    // Escuchar efectos DJ (Broadcast)
+    useEffect(() => {
+        if (!eventId || settings?.dj_mode_enabled === false) return;
+
+        const channel = supabase.channel('dj-effects');
+
+        channel.on(
+            'broadcast',
+            { event: 'dj-effect' },
+            (payload) => {
+                if (payload.payload.eventId === eventId) {
+                    triggerDjVisuals(payload.payload.effect);
+                }
+            }
+        ).subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [eventId, settings?.dj_mode_enabled]);
+
+    const triggerReaction = (emoji: string) => {
+        // Configuración base del confeti
+        const scalar = 4; // Emojis MUCHO más grandes (antes 2)
+        const emojiShape = confetti.shapeFromText({ text: emoji, scalar });
+
+        // Lanzar confeti con efecto "flotante" y lento
+        confetti({
+            particleCount: 20, // Un poco más de partículas
+            scalar,
+            shapes: [emojiShape],
+            spread: 100, // Más dispersión para ocupar más ancho
+            origin: { x: Math.random(), y: 1.1 }, // Desde abajo
+            gravity: 0.35, // Gravedad baja para que "floten" (antes 0.8)
+            drift: 0,
+            ticks: 400, // Duran mucho más tiempo en pantalla (aprox 4s)
+            startVelocity: 50, // Impulso inicial fuerte hacia arriba
+            decay: 0.92, // Se frenan suavemente en el aire
+            colors: ['#ffffff'] // No afecta emojis pero requerido
+        });
+    };
+
+    const triggerDjVisuals = (effect: string) => {
+        // Configuración común: Origen central inferior, movimiento hacia arriba
+        const commonConfig = {
+            origin: { x: 0.5, y: 0.85 }, // Centro abajo
+            ticks: 600, // 10 segundos
+            gravity: 0.6, // Gravedad normal para que suban y bajen natural
+            decay: 0.96, // Desvanecimiento suave
+            startVelocity: 45, // Velocidad moderada, no explosiva
+            scalar: 2 // Tamaño moderado (no gigante)
+        };
+
+        if (effect === 'siren') {
+            // Efecto Alerta: Fuente roja y blanca contenida
+            confetti({
+                ...commonConfig,
+                particleCount: 80,
+                spread: 40, // Muy concentrado (chorro vertical)
+                colors: ['#ff0000', '#ffffff'],
+            });
+        } else if (effect === 'love') {
+            // Efecto Romance: Corazones subiendo suavemente
+            const heart = confetti.shapeFromText({ text: '❤️', scalar: 3 });
+            confetti({
+                ...commonConfig,
+                particleCount: 40,
+                shapes: [heart],
+                gravity: 0.3, // Flotan un poco más
+                spread: 50,
+                startVelocity: 35,
+                scalar: 3
+            });
+        } else if (effect === 'party') {
+            // Efecto Fiesta: Fuente multicolor clásica
+            confetti({
+                ...commonConfig,
+                particleCount: 100,
+                spread: 60,
+            });
+        } else if (effect === 'camera') {
+            // Efecto Foto: Destellos blancos concentrados
+            confetti({
+                ...commonConfig,
+                particleCount: 60,
+                spread: 360, // Radial pero pequeño
+                startVelocity: 25, // Lento
+                colors: ['#ffffff'],
+                ticks: 100, // Corto (flash)
+                origin: { x: 0.5, y: 0.5 }, // Centro absoluto
+                scalar: 1.5
+            });
+        }
+    };
+
+    // Configuration
     const maxLoops = settings?.carousel_max_loops ?? 3;
-    const intervalMs = settings?.carousel_interval_ms ?? 5000;
+    const intervalMs = settings?.carousel_interval_ms ?? 8000; // Más lento para disfrutar la foto
     const showControls = settings?.wall_show_controls ?? true;
 
     const [currentIndex, setCurrentIndex] = useState(0);
     const [emptyMessageIndex, setEmptyMessageIndex] = useState(0);
-
-    // Carousel State
     const [mode, setMode] = useState<'carousel' | 'qr'>('carousel');
     const [, setLoopCount] = useState(0);
 
-    // Get latest 20 approved items (LIMIT for performance)
-    const approvedContent = submissions?.filter(s => s.status === 'approved').slice(0, 20) || [];
+    // Animación aleatoria para cada foto
+    const [animationClass, setAnimationClass] = useState("animate-ken-burns-in");
 
-    // Track previous content length to detect new photos
+    // Filtrar contenido aprobado (limitado a 50 para performance)
+    const approvedContent = useMemo(() =>
+        submissions?.filter(s => s.status === 'approved').slice(0, 50) || [],
+        [submissions]);
+
     const prevContentLengthRef = useRef(approvedContent.length);
 
     const emptyMessages = [
-        "Todavía no hay nada por aquí… ¡subí tu primera foto y arrancamos la fiesta!",
-        "Pantalla tímida 😳 — necesita que le subas fotos para animarse.",
-        "¿Y las fotos? ¡No sean tímidos, queremos ver sus caras!",
-        "¡Este mural está esperando tus mejores momentos!",
-        "Escanea el QR y sé el primero en aparecer aquí 📸"
+        "¡La fiesta recién empieza! Subí tu foto 📸",
+        "Escaneá el QR y aparecé en pantalla gigante 🚀",
+        "¿Quién falta en el muro? ¡Suban sus selfies! 🤳",
+        "Capturá el momento y compartilo con todos ✨",
+        "¡Queremos ver sus caras de felicidad! 😄"
     ];
 
-    // Rotate empty messages
+    // Rotar mensajes vacíos
     useEffect(() => {
         if (approvedContent.length === 0) {
             const interval = setInterval(() => {
@@ -50,27 +182,26 @@ export const SlideshowTemplate = ({ eventId }: SlideshowTemplateProps) => {
         }
     }, [approvedContent.length]);
 
-    // Carousel Logic
+    // Lógica del Carrusel
     useEffect(() => {
         if (approvedContent.length > 0 && mode === 'carousel') {
+            // Cambiar animación al azar en cada cambio de foto
+            const animations = ["animate-ken-burns-in", "animate-ken-burns-out", "animate-ken-burns-pan"];
+            setAnimationClass(animations[Math.floor(Math.random() * animations.length)]);
+
             const interval = setInterval(() => {
                 setCurrentIndex((prev) => {
                     const next = prev + 1;
-
-                    // Check if we reached the end of the list
                     if (next >= approvedContent.length) {
-                        // Increment loop counter
                         setLoopCount(currentLoop => {
                             const newLoop = currentLoop + 1;
-                            // Check if we reached max loops
                             if (newLoop >= maxLoops) {
-                                // Switch to QR mode
                                 setMode('qr');
-                                return 0; // Reset loop count
+                                return 0;
                             }
                             return newLoop;
                         });
-                        return 0; // Restart index
+                        return 0;
                     }
                     return next;
                 });
@@ -79,156 +210,190 @@ export const SlideshowTemplate = ({ eventId }: SlideshowTemplateProps) => {
         }
     }, [approvedContent.length, mode, maxLoops, intervalMs]);
 
-    // Auto-restart if new photos arrive while in QR mode
+    // Auto-reinicio si llegan fotos nuevas
     useEffect(() => {
         if (approvedContent.length > prevContentLengthRef.current) {
             if (mode === 'qr') {
-                // Optional delay before restarting
-                const timer = setTimeout(() => {
+                setTimeout(() => {
                     setMode('carousel');
                     setLoopCount(0);
                     setCurrentIndex(0);
                 }, 3000);
-                return () => clearTimeout(timer);
             }
         }
         prevContentLengthRef.current = approvedContent.length;
     }, [approvedContent.length, mode]);
 
-    // Safety check for index
-    useEffect(() => {
-        if (approvedContent.length > 0 && currentIndex >= approvedContent.length) {
-            setCurrentIndex(0);
+    // Safety check
+    if (approvedContent.length > 0 && currentIndex >= approvedContent.length) {
+        setCurrentIndex(0);
+    }
+
+    const currentItem = approvedContent[currentIndex];
+
+    // Construir URL correcta para el QR usando el slug del evento
+    const appUrl = useMemo(() => {
+        if (!event?.slug) {
+            console.warn('⚠️ QR: No hay evento o slug disponible', { event });
+            return window.location.origin;
         }
-    }, [approvedContent.length, currentIndex]);
+        const url = `${window.location.origin}/${event.slug}`;
+        console.log('📱 QR generado con URL:', url, { eventSlug: event.slug, eventName: event.name });
+        return url;
+    }, [event?.slug]);
 
-    const backgroundUrl = settings?.display_background_url || settings?.background_image_url;
-    // Fix: Ensure QR points to the root of the app
-    const appUrl = window.location.href.replace(/\/display\/?$/, "");
+    // Renderizado del contenido actual (Foto o Texto)
+    const renderContent = () => {
+        if (!currentItem) return null;
 
-    const handleResume = () => {
-        setMode('carousel');
-        setLoopCount(0);
-        // Optionally reset index or keep current
-        // setCurrentIndex(0); 
-    };
+        if (currentItem.type === 'photo') {
+            return (
+                <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+                    {/* Fondo borroso expandido (Efecto Ambilight) */}
+                    <div
+                        className={`absolute inset-0 bg-cover bg-center blur-3xl opacity-50 scale-110 transition-all duration-1000`}
+                        style={{ backgroundImage: `url(${currentItem.content})` }}
+                    />
 
-    const handlePause = () => {
-        setMode('qr');
-    };
-
-    return (
-        <div className="relative h-screen w-screen bg-slate-950 text-white overflow-hidden font-sans flex flex-col">
-            {/* Dynamic Background with Overlay */}
-            <div
-                className="absolute inset-0 bg-cover bg-center transition-all duration-1000 opacity-60"
-                style={backgroundUrl ? { backgroundImage: `url(${backgroundUrl})` } : {}}
-            />
-            <div className="absolute inset-0 bg-black/50" />
-
-            {/* Compact Header - Event name with EventPix inline */}
-            <header className="relative z-50 px-6 py-2 flex flex-col shrink-0">
-                <h1 className="text-2xl md:text-3xl lg:text-4xl font-serif font-bold tracking-tight text-white drop-shadow-md capitalize">
-                    {settings?.title || "Mi Evento"} <span className="text-violet-400 font-sans">| EventPix</span>
-                </h1>
-                <p className="text-xs md:text-sm text-slate-400 mt-1 font-light tracking-wide">by Tecno Eventos</p>
-            </header>
-
-            {/* Main Content - Maximized for photos */}
-            <main className="flex-1 relative z-10 flex items-center justify-center p-6 md:p-8 overflow-hidden w-full">
-                {(!approvedContent || approvedContent.length === 0) ? (
-                    // Empty State
-                    <div className="text-center space-y-4 max-w-3xl animate-fade-in">
-                        <div className="bg-white/5 p-10 md:p-12 rounded-[2rem] border border-white/10 shadow-xl backdrop-blur-sm">
-                            <p className="text-4xl md:text-5xl lg:text-6xl font-serif font-medium leading-relaxed drop-shadow-md text-violet-100">
-                                {emptyMessages[emptyMessageIndex]}
-                            </p>
-                            <p className="text-xl text-slate-300 mt-6 font-light">
-                                ¡Escanea el código QR para participar!
-                            </p>
+                    {/* Imagen Principal con Ken Burns */}
+                    <div className="relative z-10 w-full h-full flex items-center justify-center p-4 md:p-12">
+                        <div className={`relative max-h-full max-w-full shadow-2xl rounded-xl overflow-hidden border-4 border-white/20 ${animationClass}`}>
+                            <img
+                                src={currentItem.content}
+                                alt="Event Moment"
+                                className="max-h-[70vh] w-auto object-contain shadow-2xl"
+                            />
                         </div>
-                    </div>
-                ) : mode === 'qr' ? (
-                    // QR Mode Screen - Full screen QR
-                    <div className="w-full h-full flex flex-col items-center justify-center animate-in fade-in duration-500">
-                        <div className="bg-black/60 backdrop-blur-md p-8 md:p-12 rounded-[3rem] border border-white/20 shadow-2xl text-center max-w-4xl">
-                            <h2 className="text-3xl md:text-5xl font-serif font-bold text-white mb-6 drop-shadow-lg">
-                                ¡Escaneá el QR para subir tus fotos!
-                            </h2>
-                            <div className="bg-white p-5 rounded-3xl inline-block shadow-xl mb-6">
-                                <QRCode
-                                    value={appUrl}
-                                    size={280}
-                                    className="h-auto w-full max-w-[280px]"
-                                    viewBox={`0 0 256 256`}
-                                />
-                            </div>
-                            <p className="text-xl md:text-2xl text-violet-200 font-medium">
-                                Sumate a la fiesta y compartí tus momentos
-                            </p>
 
-                            {showControls && (
-                                <div className="mt-8">
-                                    <Button
-                                        onClick={handleResume}
-                                        size="lg"
-                                        className="bg-violet-600 hover:bg-violet-700 text-white text-lg md:text-xl px-8 py-4 md:py-6 rounded-full shadow-lg transition-all hover:scale-105"
-                                    >
-                                        <Play className="mr-2 h-6 w-6" /> Reanudar Carrusel
-                                    </Button>
+                        {/* Autor de la foto */}
+                        {currentItem.author && (
+                            <div className="absolute bottom-12 right-12 bg-black/60 backdrop-blur-md px-6 py-3 rounded-full border border-white/10 flex items-center gap-3 animate-fade-in-up">
+                                <Camera className="w-5 h-5 text-violet-400" />
+                                <span className="text-white font-medium text-lg">{currentItem.author}</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        } else {
+            // Mensaje de Texto
+            return (
+                <div className="w-full h-full flex items-center justify-center p-8 bg-gradient-to-br from-violet-900 via-slate-900 to-black relative overflow-hidden">
+                    {/* Elementos decorativos de fondo */}
+                    <div className="absolute top-0 left-0 w-full h-full opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+
+                    <div className="relative z-10 max-w-5xl w-full">
+                        <div className="bg-white/10 backdrop-blur-xl p-16 md:p-24 rounded-[3rem] border border-white/20 shadow-2xl text-center transform hover:scale-105 transition-transform duration-700">
+                            <MessageSquare className="w-16 h-16 text-violet-400 mx-auto mb-8 opacity-80" />
+                            <p className="text-4xl md:text-6xl lg:text-7xl font-serif text-white leading-tight drop-shadow-2xl font-medium italic">
+                                "{currentItem.content}"
+                            </p>
+                            {currentItem.author && (
+                                <div className="mt-12 flex items-center justify-center gap-3 opacity-80">
+                                    <div className="h-1 w-12 bg-violet-400 rounded-full"></div>
+                                    <p className="text-2xl md:text-3xl text-violet-200 font-light tracking-widest uppercase">
+                                        {currentItem.author}
+                                    </p>
+                                    <div className="h-1 w-12 bg-violet-400 rounded-full"></div>
                                 </div>
                             )}
                         </div>
                     </div>
-                ) : (
-                    // Slideshow Content - Maximized
-                    <div className="w-full h-full relative flex items-center justify-center">
-                        <div className="relative w-full h-full flex items-center justify-center" key={currentIndex}>
-                            <div className="w-full h-full bg-black/40 rounded-[2rem] border border-white/10 shadow-xl overflow-hidden relative group animate-in fade-in zoom-in duration-500 flex items-center justify-center backdrop-blur-sm">
-                                {approvedContent[currentIndex].type === 'photo' ? (
-                                    <div className="w-full h-full relative flex items-center justify-center p-4">
-                                        <img
-                                            src={approvedContent[currentIndex].content}
-                                            alt="Slideshow"
-                                            className="w-full h-full object-contain"
-                                        />
-                                        {approvedContent[currentIndex].author && (
-                                            <div className="absolute bottom-8 right-8 bg-black/70 px-6 py-3 rounded-full border border-white/20">
-                                                <p className="text-white font-medium text-lg md:text-xl">📸 {approvedContent[currentIndex].author}</p>
-                                            </div>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className="w-full h-full flex flex-col items-center justify-center p-12 md:p-16 text-center bg-gradient-to-br from-violet-900/30 to-fuchsia-900/30">
-                                        <div className="bg-white/10 p-10 md:p-14 rounded-[2rem] border border-white/20 shadow-lg max-w-5xl transform rotate-1">
-                                            <p className="text-4xl md:text-6xl lg:text-7xl font-serif text-white leading-tight drop-shadow-lg line-clamp-[8]">
-                                                "{approvedContent[currentIndex].content}"
-                                            </p>
-                                            {approvedContent[currentIndex].author && (
-                                                <p className="text-2xl md:text-3xl text-violet-200 mt-8 font-medium tracking-wide">
-                                                    — {approvedContent[currentIndex].author}
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
+                </div>
+            );
+        }
+    };
+
+    return (
+        <div className="relative h-screen w-screen bg-black text-white overflow-hidden font-sans">
+            {/* Header Flotante Minimalista */}
+            <header className="absolute top-0 left-0 z-50 p-6 w-full flex justify-between items-start bg-gradient-to-b from-black/80 to-transparent">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight text-white drop-shadow-lg flex items-center gap-2">
+                        {settings?.title || "EventPix"}
+                        <span className="text-violet-400 font-sans">| EventPix</span>
+                    </h1>
+                </div>
+
+                {/* QR Pequeño siempre visible (Opcional) */}
+                {mode === 'carousel' && (
+                    <div className="bg-white p-2 rounded-lg shadow-lg opacity-80 hover:opacity-100 transition-opacity">
+                        <QRCode value={appUrl} size={60} />
+                    </div>
+                )}
+            </header>
+
+            {/* ========== MARCO FIJO EN EL LATERAL DERECHO (solo 1) ========== */}
+            {settings?.frame_enabled && settings?.frame_image_url && mode === 'carousel' && approvedContent.length > 0 && (
+                <div className="absolute right-6 top-1/2 -translate-y-1/2 z-40">
+                    <img
+                        src={settings.frame_image_url}
+                        alt="Marca"
+                        className="h-20 w-auto object-contain drop-shadow-xl opacity-75"
+                    />
+                </div>
+            )}
+
+            {/* Contenido Principal */}
+            <main className="w-full h-full">
+                {(!approvedContent || approvedContent.length === 0) ? (
+                    // Estado Vacío (Esperando fotos)
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 relative overflow-hidden">
+                        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center opacity-20 animate-pulse-slow"></div>
+                        <div className="relative z-10 text-center max-w-4xl px-4">
+                            <h2 className="text-5xl md:text-7xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-fuchsia-400 mb-8 drop-shadow-sm animate-fade-in-up">
+                                {emptyMessages[emptyMessageIndex]}
+                            </h2>
+                            <div className="bg-white p-6 rounded-3xl inline-block shadow-2xl animate-bounce-slow">
+                                <QRCode value={appUrl} size={250} />
                             </div>
+                            <p className="text-2xl text-slate-300 mt-8 font-light tracking-wide">
+                                Escaneá para comenzar la magia ✨
+                            </p>
                         </div>
                     </div>
+                ) : mode === 'qr' ? (
+                    // Pantalla QR Full Screen (Intermedio)
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 relative">
+                        <div className="absolute inset-0 bg-gradient-to-br from-violet-900/40 to-black z-0"></div>
+                        <div className="relative z-10 bg-black/40 backdrop-blur-xl p-16 rounded-[3rem] border border-white/10 shadow-2xl text-center max-w-5xl animate-in zoom-in duration-500">
+                            <h2 className="text-5xl md:text-6xl font-bold text-white mb-10 drop-shadow-xl">
+                                ¡Es tu turno! 📸
+                            </h2>
+                            <div className="bg-white p-8 rounded-[2rem] inline-block shadow-[0_0_50px_rgba(139,92,246,0.3)] mb-10 transform hover:scale-105 transition-transform duration-500">
+                                <QRCode value={appUrl} size={350} />
+                            </div>
+                            <p className="text-3xl text-violet-200 font-medium mb-8">
+                                Escaneá el código y subí tus fotos ahora
+                            </p>
+
+                            {showControls && (
+                                <Button
+                                    onClick={() => { setMode('carousel'); setLoopCount(0); }}
+                                    size="lg"
+                                    className="bg-white text-black hover:bg-slate-200 text-xl px-10 py-8 rounded-full font-bold shadow-xl transition-all hover:scale-110"
+                                >
+                                    <Play className="mr-3 h-6 w-6 fill-current" /> Continuar Show
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+                ) : (
+                    // Modo Carrusel (Super Muro)
+                    renderContent()
                 )}
             </main>
 
-            {/* Controls Overlay - Floating in bottom-right */}
+            {/* Controles Flotantes */}
             {showControls && mode === 'carousel' && approvedContent.length > 0 && (
-                <div className="absolute bottom-8 right-8 z-50">
+                <div className="absolute bottom-8 left-8 z-50">
                     <Button
-                        variant="secondary"
+                        variant="ghost"
                         size="icon"
-                        onClick={handlePause}
-                        className="h-14 w-14 rounded-full shadow-lg bg-white/10 hover:bg-white/20 border border-white/10 backdrop-blur-md"
-                        title="Pausar y mostrar QR"
+                        onClick={() => setMode('qr')}
+                        className="h-16 w-16 rounded-full bg-black/50 hover:bg-black/70 text-white border border-white/20 backdrop-blur-md transition-all hover:scale-110"
                     >
-                        <Pause className="h-7 w-7 text-white" />
+                        <Pause className="h-8 w-8 fill-current" />
                     </Button>
                 </div>
             )}

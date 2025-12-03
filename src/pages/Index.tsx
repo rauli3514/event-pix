@@ -1,18 +1,56 @@
 import { useState } from "react";
 import { useEvent } from "@/context/EventContext";
+import { useParams } from "react-router-dom";
 import { EventCard } from "@/components/EventCard";
 import { UploadModal } from "@/components/UploadModal";
 import { MessageModal } from "@/components/MessageModal";
 import { TermsModal } from "@/components/TermsModal";
+import { ChallengeRoulette } from "@/components/ChallengeRoulette";
+import { SplashScreen } from "@/components/SplashScreen";
+import { PhotoBoothModal } from "@/components/PhotoBoothModal";
+import { useEventSettings } from "@/hooks/use-event-settings";
 import { FaWhatsapp, FaInstagram, FaTiktok } from "react-icons/fa";
 
 const Index = () => {
     const [uploadOpen, setUploadOpen] = useState(false);
     const [messageOpen, setMessageOpen] = useState(false);
-    const { event, isLoading, error } = useEvent();
 
-    if (isLoading) return <div className="min-h-screen flex items-center justify-center text-slate-500">Cargando evento...</div>;
-    if (error || !event) return <div className="min-h-screen flex items-center justify-center text-slate-500">Evento no encontrado</div>;
+    // Estados para Photo Booth
+    const [photoBoothOpen, setPhotoBoothOpen] = useState(false);
+    const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState<string | null>(null);
+
+    const { event, isLoading, error } = useEvent();
+    const { data: settings } = useEventSettings(event?.id);
+    const params = useParams<{ slug?: string }>();
+
+    if (isLoading) return <SplashScreen />;
+    if (error || !event) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-slate-100 to-slate-200">
+                <div className="text-center max-w-md bg-white p-8 rounded-2xl shadow-xl">
+                    <div className="text-6xl mb-4">❌</div>
+                    <h1 className="text-2xl font-bold text-slate-800 mb-2">Evento No Encontrado</h1>
+                    <p className="text-slate-600 mb-4">
+                        No pudimos encontrar el evento: <span className="font-mono bg-slate-100 px-2 py-1 rounded">{params.slug || '(sin slug)'}</span>
+                    </p>
+                    <p className="text-sm text-slate-500">
+                        Verifica que la URL sea correcta o contacta al administrador del evento.
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    const handleUploadSuccess = (photoUrl: string) => {
+        // Solo abrir Photo Booth si está habilitado y hay un marco configurado
+        if (settings?.photo_booth_enabled && settings?.photobooth_frame_url) {
+            setUploadedPhotoUrl(photoUrl);
+            // Pequeño delay para que la transición del modal de éxito sea suave
+            setTimeout(() => {
+                setPhotoBoothOpen(true);
+            }, 2000);
+        }
+    };
 
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col relative overflow-hidden font-sans">
@@ -49,15 +87,12 @@ const Index = () => {
                 <div className="container px-4 mx-auto text-center space-y-4">
                     <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Tecno Eventos – Servicios interactivos para eventos</p>
                     <div className="flex justify-center gap-8">
-                        {/* Reemplaza con tu número de WhatsApp (ej: https://wa.me/5491112345678) */}
                         <a href="https://wa.me/543624547382" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-green-500 transition-colors transform hover:scale-110 duration-300">
                             <FaWhatsapp size={24} />
                         </a>
-                        {/* Reemplaza con tu perfil de Instagram */}
                         <a href="https://www.instagram.com/tecno_eventos_arg/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-pink-500 transition-colors transform hover:scale-110 duration-300">
                             <FaInstagram size={24} />
                         </a>
-                        {/* Reemplaza con tu perfil de TikTok */}
                         <a href="https://www.tiktok.com/@tecno_eventos_arg?is_from_webapp=1&sender_device=pc" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-black transition-colors transform hover:scale-110 duration-300">
                             <FaTiktok size={24} />
                         </a>
@@ -67,8 +102,24 @@ const Index = () => {
 
             {event.status === 'active' && (
                 <>
-                    <UploadModal open={uploadOpen} onOpenChange={setUploadOpen} eventId={event.id} />
+                    <UploadModal
+                        open={uploadOpen}
+                        onOpenChange={setUploadOpen}
+                        eventId={event.id}
+                        onSuccess={handleUploadSuccess}
+                    />
                     <MessageModal open={messageOpen} onOpenChange={setMessageOpen} eventId={event.id} />
+                    <ChallengeRoulette onOpenCamera={() => setUploadOpen(true)} />
+
+                    {/* Photo Booth Modal - Solo si hay marco configurado */}
+                    {uploadedPhotoUrl && settings?.photobooth_frame_url && (
+                        <PhotoBoothModal
+                            isOpen={photoBoothOpen}
+                            onClose={() => setPhotoBoothOpen(false)}
+                            photoUrl={uploadedPhotoUrl}
+                            frameUrl={settings.photobooth_frame_url}
+                        />
+                    )}
                 </>
             )}
             <TermsModal />

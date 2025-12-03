@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Calendar, ExternalLink, Settings, LogOut, Trash2, Lock, Unlock } from 'lucide-react';
+import { Plus, Calendar, ExternalLink, Settings, LogOut, Trash2, Lock, Unlock, Users } from 'lucide-react';
 
 type Event = {
     id: string;
@@ -18,15 +18,25 @@ type Event = {
     status: 'active' | 'closed';
 };
 
+import { useUserProfile, useIsSuperAdmin } from "@/hooks/use-roles";
+
 const EventsList = () => {
     const queryClient = useQueryClient();
     const navigate = useNavigate();
+
+    // Sistema de roles
+    const { data: userProfile } = useUserProfile();
+    const isSuperAdmin = useIsSuperAdmin();
+
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [newEvent, setNewEvent] = useState({ name: '', slug: '', date: new Date().toISOString().split('T')[0] });
 
     const { data: events, isLoading } = useQuery({
         queryKey: ['events'],
         queryFn: async () => {
+            // Gracias a RLS (Row Level Security), esta query simple es segura.
+            // - Si es Super Admin, Supabase devuelve todos los eventos.
+            // - Si es Provider, Supabase solo devuelve los eventos asignados.
             const { data, error } = await supabase
                 .from('events')
                 .select('*')
@@ -146,60 +156,79 @@ const EventsList = () => {
         <div className="min-h-screen bg-slate-50 p-8">
             <header className="max-w-6xl mx-auto flex justify-between items-center mb-12">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900">Mis Eventos</h1>
+                    <div className="flex items-center gap-3 mb-1">
+                        <h1 className="text-3xl font-bold text-slate-900">Mis Eventos</h1>
+                        {userProfile && (
+                            <div className={`px-3 py-1 rounded-full text-xs font-medium ${isSuperAdmin
+                                ? 'bg-violet-100 text-violet-700 border border-violet-200'
+                                : 'bg-blue-100 text-blue-700 border border-blue-200'
+                                }`}>
+                                {isSuperAdmin ? '👑 Super Admin' : '🎯 Provider'}
+                            </div>
+                        )}
+                    </div>
                     <p className="text-slate-500">Administra tus eventos de EventPix</p>
                 </div>
                 <div className="flex gap-4">
-                    <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-                        <DialogTrigger asChild>
-                            <Button className="bg-blue-600 hover:bg-blue-700">
-                                <Plus className="w-4 h-4 mr-2" /> Nuevo Evento
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Crear Nuevo Evento</DialogTitle>
-                            </DialogHeader>
-                            <form onSubmit={handleCreateSubmit} className="space-y-4 mt-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="name">Nombre del Evento</Label>
-                                    <Input
-                                        id="name"
-                                        value={newEvent.name}
-                                        onChange={handleNameChange}
-                                        placeholder="Ej: Boda Lau y Raúl"
-                                        required
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="slug">URL del Evento (Slug)</Label>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm text-muted-foreground">app.event-pix.com.ar/</span>
+                    {isSuperAdmin && (
+                        <Button asChild variant="secondary" className="bg-white hover:bg-slate-100 border border-slate-200">
+                            <Link to="/admin/providers">
+                                <Users className="w-4 h-4 mr-2" /> Usuarios
+                            </Link>
+                        </Button>
+                    )}
+                    {isSuperAdmin && (
+                        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+                            <DialogTrigger asChild>
+                                <Button className="bg-blue-600 hover:bg-blue-700">
+                                    <Plus className="w-4 h-4 mr-2" /> Nuevo Evento
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Crear Nuevo Evento</DialogTitle>
+                                </DialogHeader>
+                                <form onSubmit={handleCreateSubmit} className="space-y-4 mt-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="name">Nombre del Evento</Label>
                                         <Input
-                                            id="slug"
-                                            value={newEvent.slug}
-                                            onChange={(e) => setNewEvent({ ...newEvent, slug: e.target.value })}
-                                            placeholder="boda-lau-raul"
+                                            id="name"
+                                            value={newEvent.name}
+                                            onChange={handleNameChange}
+                                            placeholder="Ej: Boda Lau y Raúl"
                                             required
                                         />
                                     </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="date">Fecha</Label>
-                                    <Input
-                                        id="date"
-                                        type="date"
-                                        value={newEvent.date}
-                                        onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
-                                        required
-                                    />
-                                </div>
-                                <Button type="submit" className="w-full" disabled={createEvent.isPending}>
-                                    {createEvent.isPending ? 'Creando...' : 'Crear Evento'}
-                                </Button>
-                            </form>
-                        </DialogContent>
-                    </Dialog>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="slug">URL del Evento (Slug)</Label>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm text-muted-foreground">app.event-pix.com.ar/</span>
+                                            <Input
+                                                id="slug"
+                                                value={newEvent.slug}
+                                                onChange={(e) => setNewEvent({ ...newEvent, slug: e.target.value })}
+                                                placeholder="boda-lau-raul"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="date">Fecha</Label>
+                                        <Input
+                                            id="date"
+                                            type="date"
+                                            value={newEvent.date}
+                                            onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
+                                            required
+                                        />
+                                    </div>
+                                    <Button type="submit" className="w-full" disabled={createEvent.isPending}>
+                                        {createEvent.isPending ? 'Creando...' : 'Crear Evento'}
+                                    </Button>
+                                </form>
+                            </DialogContent>
+                        </Dialog>
+                    )}
                     <Button variant="outline" onClick={handleLogout}>
                         <LogOut className="w-4 h-4 mr-2" /> Salir
                     </Button>
@@ -240,32 +269,34 @@ const EventsList = () => {
                                     </a>
                                 </Button>
                             </div>
-                            <div className="flex gap-2 w-full">
-                                <Button
-                                    variant={event.status === 'active' ? 'outline' : 'secondary'}
-                                    className="flex-1"
-                                    onClick={() => toggleEventStatus.mutate({ id: event.id, currentStatus: event.status })}
-                                    disabled={toggleEventStatus.isPending}
-                                >
-                                    {event.status === 'active' ? (
-                                        <><Lock className="w-4 h-4 mr-2" /> Cerrar</>
-                                    ) : (
-                                        <><Unlock className="w-4 h-4 mr-2" /> Abrir</>
-                                    )}
-                                </Button>
-                                <Button
-                                    variant="destructive"
-                                    className="flex-1"
-                                    onClick={() => {
-                                        if (confirm(`¿Estás seguro de eliminar el evento "${event.name}"? Esta acción no se puede deshacer.`)) {
-                                            deleteEvent.mutate(event.id);
-                                        }
-                                    }}
-                                    disabled={deleteEvent.isPending}
-                                >
-                                    <Trash2 className="w-4 h-4 mr-2" /> Eliminar
-                                </Button>
-                            </div>
+                            {isSuperAdmin && (
+                                <div className="flex gap-2 w-full">
+                                    <Button
+                                        variant={event.status === 'active' ? 'outline' : 'secondary'}
+                                        className="flex-1"
+                                        onClick={() => toggleEventStatus.mutate({ id: event.id, currentStatus: event.status })}
+                                        disabled={toggleEventStatus.isPending}
+                                    >
+                                        {event.status === 'active' ? (
+                                            <><Lock className="w-4 h-4 mr-2" /> Cerrar</>
+                                        ) : (
+                                            <><Unlock className="w-4 h-4 mr-2" /> Abrir</>
+                                        )}
+                                    </Button>
+                                    <Button
+                                        variant="destructive"
+                                        className="flex-1"
+                                        onClick={() => {
+                                            if (confirm(`¿Estás seguro de eliminar el evento "${event.name}"? Esta acción no se puede deshacer.`)) {
+                                                deleteEvent.mutate(event.id);
+                                            }
+                                        }}
+                                        disabled={deleteEvent.isPending}
+                                    >
+                                        <Trash2 className="w-4 h-4 mr-2" /> Eliminar
+                                    </Button>
+                                </div>
+                            )}
                         </CardFooter>
                     </Card>
                 ))}
