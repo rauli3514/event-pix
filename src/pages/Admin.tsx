@@ -273,8 +273,8 @@ const Admin = () => {
                 </div>
 
                 {item.type === 'photo' ? (
-                    <div className="aspect-video rounded-md overflow-hidden bg-black/20 mb-4 relative group">
-                        <img src={item.content} alt="Submission" className="w-full h-full object-cover" />
+                    <div className="rounded-md overflow-hidden bg-black/20 mb-4 relative group min-h-64 max-h-96 flex items-center justify-center">
+                        <img src={item.content} alt="Submission" className="w-full h-auto max-h-96 object-contain" />
                         {item.status === 'approved' && (
                             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <Button variant="destructive" size="icon" className="h-8 w-8" onClick={() => handleDelete(item.id)}>
