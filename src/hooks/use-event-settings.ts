@@ -21,6 +21,13 @@ export interface EventSettings {
     dj_mode_enabled?: boolean;
     photo_booth_enabled?: boolean;
     photobooth_frame_url?: string | null;
+    promo_banner_url?: string | null;
+    promo_banner_link?: string | null;
+    promo_banner_enabled?: boolean;
+    audio_messages_enabled?: boolean;
+    ai_moderation_enabled?: boolean;
+    ai_moderation_level?: 'low' | 'medium' | 'high';
+    font_family?: string;
     created_at: string;
     updated_at: string;
 }
@@ -45,7 +52,7 @@ export const useEventSettings = (eventId?: string) => {
             return data as EventSettings;
         },
         retry: 1,
-        staleTime: 1000 * 60 * 5, // 5 minutes
+        staleTime: 0, // Always fetch fresh data
         enabled: !!eventId,
     });
 };

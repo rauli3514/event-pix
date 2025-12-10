@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Admin — EventPix</title>
+    <style>
+        body {
+            font-family: Arial, system-ui;
+            background: #0f1720;
+            color: #fff;
+            margin: 0;
+            padding: 20px
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto
+        }
+
+        .login-box {
+            max-width: 300px;
+            margin: 100px auto;
+            padding: 20px;
+            background: #1f2937;
+            border-radius: 8px;
+            text-align: center
+        }
+
+        input {
+            width: 100%;
+            margin: 10px 0;
+            padding: 8px;
+            box-sizing: border-box;
+            background: #374151;
+            border: 1px solid #4b5563;
+            color: white;
+            border-radius: 4px
+        }
+
+        button {
+            padding: 8px 16px;
+            background: #0ea5e9;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer
+        }
+
+        button:hover {
+            background: #0284c7
+        }
+
+        .hidden {
+            display: none
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px
+        }
+
+        .card {
+            background: #1f2937;
+            padding: 10px;
+            border-radius: 8px
+        }
+
+        .card img,
+        .card video {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 4px
+        }
+
+        .actions {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px
+        }
+
+        .btn-approve {
+            background: #22c55e
+        }
+
+        .btn-delete {
+            background: #ef4444
+        }
+
+        .upload-section {
+            background: #1f2937;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="login-view" class="login-box hidden">
+        <h2>Ingreso Administrador</h2>
+        <input type="email" id="email" placeholder="Correo electrónico" />
+        <input type="password" id="password" placeholder="Contraseña" />
+        <button id="login-btn">Ingresar</button>
+        <p id="login-error" style="color:red"></p>
+    </div>
+
+    <div id="admin-view" class="container">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+            <h1>Panel de Administración</h1>
+            <button onclick="logout()">Salir</button>
+        </div>
+
+        <div class="upload-section">
+            <h3>Cargar Álbum de Fotos</h3>
+            <input type="file" id="admin-file" multiple accept="image/*,video/*" />
+            <button id="admin-upload-btn">Subir Archivos</button>
+            <p id="upload-status"></p>
+        </div>
+
+        <h3>Fotos Pendientes / Aprobadas</h3>
+        <div id="gallery" class="grid"></div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-storage-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.24.0/firebase-firestore-compat.js"></script>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAQW779AzyP8h1XKP0UCbd6G_WQPyYpGyE",
+            authDomain: "inta-wa.firebaseapp.com",
+            projectId: "inta-wa",
+            storageBucket: "inta-wa.firebasestorage.app",
+            messagingSenderId: "54916277584",
+            appId: "1:54916277584:web:83bfcf7920f54aa123b855",
+            measurementId: "G-BHZ33E3QKQ"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const storage = firebase.storage();
+
+        // Login Logic
+        const CREDENTIALS = {
+            email: 'tecnoeventos@gmail.com',
+            pass: 'Isab2025'
+        };
+
+        const loginView = document.getElementById('login-view');
+        const adminView = document.getElementById('admin-view');
+        const emailInput = document.getElementById('email');
+        const passInput = document.getElementById('password');
+        const loginBtn = document.getElementById('login-btn');
+        const loginError = document.getElementById('login-error');
+
+        // Check session (Force Auto-Login for User)
+        localStorage.setItem('admin_logged_in', 'true'); // AUTO-LOGIN ENABLED
+        if (localStorage.getItem('admin_logged_in') === 'true') {
+            showAdmin();
+        }
+
+        loginBtn.addEventListener('click', () => {
+            console.log('Entered email:', emailInput.value.trim());
+            console.log('Expected email:', CREDENTIALS.email);
+            console.log('Entered pass:', passInput.value.trim());
+            console.log('Expected pass:', CREDENTIALS.pass);
+
+            if (emailInput.value.trim() === CREDENTIALS.email && passInput.value.trim() === CREDENTIALS.pass) {
+                localStorage.setItem('admin_logged_in', 'true');
+                showAdmin();
+            } else {
+                loginError.textContent = 'Credenciales incorrectas (Revisa la consola)';
+            }
+        });
+
+        function showAdmin() {
+            loginView.classList.add('hidden');
+            adminView.classList.remove('hidden');
+            loadSubmissions();
+        }
+
+        function logout() {
+            localStorage.removeItem('admin_logged_in');
+            location.reload();
+        }
+
+        // Admin Logic
+        const gallery = document.getElementById('gallery');
+
+        function loadSubmissions() {
+            db.collection('submissions').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
+                gallery.innerHTML = '';
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const card = document.createElement('div');
+                    card.className = 'card';
+
+                    let media = '';
+                    if (data.type === 'video') {
+                        media = `<video src="https://firebasestorage.googleapis.com/v0/b/${firebaseConfig.storageBucket}/o/${encodeURIComponent(data.storagePath)}?alt=media" controls></video>`;
+                    } else {
+                        media = `<img src="https://firebasestorage.googleapis.com/v0/b/${firebaseConfig.storageBucket}/o/${encodeURIComponent(data.storagePath)}?alt=media" loading="lazy" />`;
+                    }
+
+                    card.innerHTML = `
+            ${media}
+            <p><small>${data.uploaderName || 'Anónimo'}</small></p>
+            <div class="actions">
+              ${!data.approved ? `<button class="btn-approve" onclick="approve('${doc.id}')">Aprobar</button>` : '<span style="color:#22c55e">Aprobado</span>'}
+              <button class="btn-delete" onclick="remove('${doc.id}', '${data.storagePath}')">Borrar</button>
+            </div>
+          `;
+                    gallery.appendChild(card);
+                });
+            });
+        }
+
+        window.approve = async (id) => {
+            try {
+                await db.collection('submissions').doc(id).update({ approved: true });
+            } catch (e) { alert(e.message); }
+        };
+
+        window.remove = async (id, path) => {
+            if (!confirm('¿Seguro de borrar?')) return;
+            try {
+                await storage.ref(path).delete();
+                await db.collection('submissions').doc(id).delete();
+            } catch (e) { alert(e.message); }
+        };
+
+        // Upload Logic
+        const adminFile = document.getElementById('admin-file');
+        const adminUploadBtn = document.getElementById('admin-upload-btn');
+        const uploadStatus = document.getElementById('upload-status');
+
+        adminUploadBtn.addEventListener('click', async () => {
+            const files = adminFile.files;
+            if (files.length === 0) return;
+
+            adminUploadBtn.disabled = true;
+            uploadStatus.textContent = `Subiendo ${files.length} archivos...`;
+
+            let count = 0;
+            for (let file of files) {
+                try {
+                    const id = Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+                    const ext = file.name.split('.').pop();
+                    const storageRef = storage.ref().child('uploads/' + id + '.' + ext);
+                    const snap = await storageRef.put(file);
+
+                    await db.collection('submissions').add({
+                        storagePath: snap.ref.fullPath,
+                        type: file.type.startsWith('video') ? 'video' : 'image',
+                        uploaderName: 'Admin',
+                        message: 'Carga masiva',
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        approved: true // Admin uploads are auto-approved
+                    });
+                    count++;
+                    uploadStatus.textContent = `Subido ${count}/${files.length}`;
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+
+            uploadStatus.textContent = 'Carga completa!';
+            adminUploadBtn.disabled = false;
+            adminFile.value = '';
+        });
+    </script>
+</body>
+
+</html>

@@ -54,7 +54,7 @@ export const useProviders = () => {
             const { data, error } = await supabase
                 .from("profiles")
                 .select("*")
-                .eq("role", "provider")
+                .in("role", ["provider", "super_admin"]) // Traer admins y proveedores
                 .order("created_at", { ascending: false });
 
             if (error) throw error;
@@ -147,7 +147,7 @@ export const useCreateProvider = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ email, name, password }: { email: string; name?: string; password: string }) => {
+        mutationFn: async ({ email, name, password, user_type }: { email: string; name?: string; password: string; user_type?: string }) => {
             // 1. Crear un cliente temporal para no perder la sesión del admin
             // Necesitamos la URL y la KEY del cliente actual
             const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -166,7 +166,7 @@ export const useCreateProvider = () => {
                 body: JSON.stringify({
                     email,
                     password,
-                    data: { name } // Metadata
+                    data: { name, user_type } // Metadata
                 }),
             });
 

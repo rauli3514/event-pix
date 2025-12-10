@@ -1,4 +1,6 @@
 /** @type {import('tailwindcss').Config} */
+const defaultTheme = require("tailwindcss/defaultTheme");
+
 export default {
     darkMode: ["class"],
     content: [
@@ -77,8 +79,16 @@ export default {
                 "fade-in": "fade-in 0.5s ease-out",
             },
             fontFamily: {
-                sans: ["Inter", "system-ui", "sans-serif"],
-                serif: ["Playfair Display", "serif"],
+                sans: ["Inter", ...defaultTheme.fontFamily.sans],
+                serif: ["Playfair Display", ...defaultTheme.fontFamily.serif],
+                script: ["Pinyon Script", "cursive"],
+                modern: ["Montserrat", "sans-serif"],
+                neon: ["Orbitron", "sans-serif"],
+                hand: ["Fredoka", "sans-serif"],
+                cursive: ["Parisienne", "cursive"],
+                luxury: ["Cinzel", "serif"],
+                wedding: ["Great Vibes", "cursive"],
+                mono: ["Roboto Mono", ...defaultTheme.fontFamily.mono],
             },
         },
     },

@@ -1,39 +1,62 @@
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useState, useEffect, useMemo } from "react";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, X, Clock, Trash2, Download, Zap, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { ArrowLeft, QrCode, Download, Images, MessageSquare, Monitor, Palette, Trash2, Zap, BarChart2, CheckCircle2, Music } from "lucide-react";
+import { XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area } from 'recharts';
+import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { useSubmissions } from "@/hooks/use-submissions";
 import { useEventSettings, useUpdateEventSettings, useUploadEventImage } from "@/hooks/use-event-settings";
-import { Submission, SubmissionStatus } from "@/types";
-import { formatDistanceToNow } from "date-fns";
-import { es } from "date-fns/locale";
 import { supabase } from "@/lib/supabase";
-import { useState, useEffect } from "react";
-import { toast } from "sonner";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
-import { Switch } from "@/components/ui/switch";
 import { jsPDF } from "jspdf";
-
 import { useEvent } from "@/context/EventContext";
-import { Link } from "react-router-dom";
-import { useUserProfile, useIsSuperAdmin } from "@/hooks/use-roles";
+import { useIsSuperAdmin } from "@/hooks/use-roles";
 import { ProvidersManagement } from "@/components/ProvidersManagement";
-import { PhotoBoothModal } from "@/components/PhotoBoothModal";
+import { ThemeSelector } from "@/components/admin/ThemeSelector";
+import { SubmissionCard } from "@/components/admin/SubmissionCard";
 
 const Admin = () => {
     const { event, isLoading: eventLoading } = useEvent();
-    const { submissions, isLoading, updateStatus, deleteSubmission, deleteAllApproved, resetAll, approveAllPending } = useSubmissions(event?.id);
+    const { submissions, isLoading, deleteAllApproved, resetAll, approveAllPending } = useSubmissions(event?.id);
     const { data: settings, isLoading: settingsLoading } = useEventSettings(event?.id);
     const updateSettings = useUpdateEventSettings(event?.id);
     const uploadImage = useUploadEventImage();
-    const [testPhotoBoothOpen, setTestPhotoBoothOpen] = useState(false);
-
-    // Sistema de roles
-    const { data: userProfile } = useUserProfile();
     const isSuperAdmin = useIsSuperAdmin();
+
+    const [activeTab, setActiveTab] = useState("dashboard");
+    const [moderationFilter, setModerationFilter] = useState<'pending' | 'approved' | 'rejected'>('pending');
+
+    const [formData, setFormData] = useState({
+        title: "",
+        description: "",
+        display_template: "grid",
+        text_messages_enabled: true,
+        carousel_max_loops: 3,
+        carousel_interval_ms: 5000,
+        wall_show_controls: true,
+    });
+
+    useEffect(() => {
+        if (settings) {
+            setFormData({
+                title: settings.title || "",
+                description: settings.description || "",
+                display_template: settings.display_template || "grid",
+                text_messages_enabled: settings.text_messages_enabled ?? true,
+                carousel_max_loops: settings.carousel_max_loops ?? 3,
+                carousel_interval_ms: settings.carousel_interval_ms ?? 5000,
+                wall_show_controls: settings.wall_show_controls ?? true,
+            });
+        }
+    }, [settings]);
+
+    // Initialize form data when event loads
+    // useEffect(() => { ... }) logic should be here or handled in Settings tab logic
 
     // Filtrar contenido
     const approvedMessages = submissions?.filter(s => s.type === 'message' && s.status === 'approved') || [];
@@ -60,7 +83,7 @@ const Admin = () => {
         doc.setFontSize(12);
         doc.setTextColor(100, 100, 100);
         const dateStr = event?.date ? new Date(event.date).toLocaleDateString() : new Date().toLocaleDateString();
-        doc.text(`EventPix - ${dateStr}`, pageWidth / 2, y, { align: "center" });
+        doc.text(`EventPix - ${dateStr} `, pageWidth / 2, y, { align: "center" });
         y += 20;
 
         // Línea separadora
@@ -99,7 +122,7 @@ const Admin = () => {
                 doc.setFont("helvetica", "bold");
                 doc.setTextColor(100, 100, 100);
                 doc.setFontSize(10);
-                doc.text(`- ${msg.author}`, pageWidth - margin - 10, y + cardHeight - 7, { align: "right" });
+                doc.text(`- ${msg.author} `, pageWidth - margin - 10, y + cardHeight - 7, { align: "right" });
                 doc.setFontSize(12); // Restaurar tamaño
             }
 
@@ -119,43 +142,147 @@ const Admin = () => {
         toast.success("Libro de firmas descargado correctamente");
     };
 
-    const [formData, setFormData] = useState({
-        title: "",
-        description: "",
-        display_template: "grid",
-        text_messages_enabled: true,
-        carousel_max_loops: 3,
-        carousel_interval_ms: 5000,
-        wall_show_controls: true,
-    });
 
-    useEffect(() => {
-        if (settings) {
-            setFormData({
-                title: settings.title || "",
-                description: settings.description || "",
-                display_template: settings.display_template || "grid",
-                text_messages_enabled: settings.text_messages_enabled ?? true,
-                carousel_max_loops: settings.carousel_max_loops ?? 3,
-                carousel_interval_ms: settings.carousel_interval_ms ?? 5000,
-                wall_show_controls: settings.wall_show_controls ?? true,
+
+
+
+
+    const handleApproveAll = async () => {
+        if (!event?.id) return;
+        if (confirm("¿Estás seguro de aprobar TODAS las fotos y mensajes pendientes?")) {
+            await approveAllPending.mutateAsync();
+            toast.success("Todo el contenido pendiente ha sido aprobado");
+        }
+    };
+
+    const handleDownloadQRPoster = async () => {
+        if (!event?.slug) return;
+        const url = `${window.location.origin}/${event.slug}`;
+
+        try {
+            const toastId = toast.loading("Generando Póster PDF...");
+
+            const doc = new jsPDF({
+                orientation: "portrait",
+                unit: "mm",
+                format: "a4"
             });
-        }
-    }, [settings]);
 
-    const handleModeration = (id: string, status: SubmissionStatus) => {
-        updateStatus.mutate({ id, status });
-    };
+            // 1. Fondo (Imagen del tema o Color sólido)
+            if (settings?.background_image_url) {
+                try {
+                    const bgImage = new Image();
+                    bgImage.src = settings.background_image_url;
+                    bgImage.crossOrigin = "Anonymous";
+                    await new Promise((resolve, reject) => {
+                        bgImage.onload = resolve;
+                        bgImage.onerror = reject;
+                    });
 
-    const handleApproveAll = () => {
-        if (confirm("¿Seguro que querés aprobar todos los mensajes y fotos pendientes de este evento? Esta acción no se puede deshacer.")) {
-            approveAllPending.mutate();
-        }
-    };
+                    // Ajustar imagen para cubrir A4 (210x297) manteniendo aspecto (cover) o estirar
+                    // Para simplificar y asegurar cobertura total:
+                    doc.addImage(bgImage, 'JPEG', 0, 0, 210, 297);
 
-    const handleDelete = (id: string) => {
-        if (confirm("¿Estás seguro de eliminar esta foto permanentemente?")) {
-            deleteSubmission.mutate(id);
+                    // Añadir overlay oscuro para legibilidad (simulado con rect negro y luego texto encima, 
+                    // jsPDF básico no maneja transparencia alpha fácil, pero intentaremos un truco o simplemente usaremos cajas de texto con fondo)
+
+                    // Opción A: Dibujar un rectángulo semitransparente NO es trivial en jsPDF básico sin plugins.
+                    // Opción B: Dibujar cajas negras detrás del texto.
+                    // Opción C: Asumir que el usuario quiere ver la imagen y el texto debe ser legible.
+
+                    // Intentaremos GState si está disponible en la versión, sino fallback.
+                    try {
+                        // @ts-ignore
+                        doc.setGState(new doc.GState({ opacity: 0.7 }));
+                        doc.setFillColor(0, 0, 0);
+                        doc.rect(0, 0, 210, 297, 'F');
+                        // @ts-ignore
+                        doc.setGState(new doc.GState({ opacity: 1.0 })); // Restaurar
+                    } catch (e) {
+                        // Si falla GState, no hacemos el overlay global, pero podríamos poner cajas detrás del texto
+                        console.warn("GState no disponible, sin overlay global");
+                    }
+
+                } catch (e) {
+                    console.error("Error cargando fondo", e);
+                    doc.setFillColor(15, 23, 42);
+                    doc.rect(0, 0, 210, 297, 'F');
+                }
+            } else {
+                doc.setFillColor(15, 23, 42); // Slate 950
+                doc.rect(0, 0, 210, 297, 'F');
+            }
+
+            // 2. Título y Textos
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(30);
+            doc.setFont("helvetica", "bold");
+
+            // Sombra de texto simple (dibujar negro desplazado)
+            doc.setTextColor(0, 0, 0);
+            doc.text("¡Sube tus fotos!", 106, 41, { align: "center" });
+            doc.setTextColor(255, 255, 255);
+            doc.text("¡Sube tus fotos!", 105, 40, { align: "center" });
+
+            doc.setFontSize(16);
+            doc.setFont("helvetica", "normal");
+            doc.text(`${event.name || 'EventPix'}`, 105, 52, { align: "center" });
+
+            // 3. QR Code
+            // URL con color transparente? No, JPG no soporta alpha, PNG si.
+            // Usaremos fondo blanco para el QR para asegurar que se lea sobre cualquier imagen
+            // bgcolor=ffffff
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(url)}&color=000000&bgcolor=ffffff&margin=10`;
+
+            const qrImage = new Image();
+            qrImage.src = qrUrl;
+            qrImage.crossOrigin = "Anonymous";
+
+            await new Promise((resolve) => {
+                qrImage.onload = resolve;
+                qrImage.onerror = resolve;
+            });
+
+            // Fondo blanco para el QR (marco)
+            doc.setFillColor(255, 255, 255);
+            doc.roundedRect(50, 65, 110, 110, 5, 5, 'F');
+
+            try {
+                doc.addImage(qrImage, 'PNG', 55, 70, 100, 100);
+            } catch (e) {
+                doc.text("Error QR", 105, 120, { align: "center" });
+            }
+
+            // 4. Instrucciones
+            doc.setFontSize(14);
+            // Fondo semitransparente para instrucciones si hay imagen?
+            // Mejor texto con sombra.
+            const instructions = [
+                "1. Escanea el código QR",
+                "2. Sube tus fotos o mensajes",
+                "3. ¡Míralas en la pantalla!"
+            ];
+
+            let yPos = 200;
+            instructions.forEach(line => {
+                doc.setTextColor(0, 0, 0);
+                doc.text(line, 105.5, yPos + 0.5, { align: "center" });
+                doc.setTextColor(255, 255, 255);
+                doc.text(line, 105, yPos, { align: "center" });
+                yPos += 12;
+            });
+
+            // Link texto
+            doc.setFontSize(10);
+            doc.setTextColor(200, 200, 200);
+            doc.text(url, 105, 280, { align: "center" });
+
+            doc.save(`Poster_QR_${event.slug}.pdf`);
+            toast.dismiss(toastId);
+            toast.success("Póster PDF generado");
+        } catch (error) {
+            console.error(error);
+            toast.error("Error al generar el PDF");
         }
     };
 
@@ -176,7 +303,7 @@ const Admin = () => {
                     const response = await fetch(photo.content);
                     const blob = await response.blob();
                     const extension = photo.content.split('.').pop()?.split('?')[0] || 'jpg';
-                    folder?.file(`foto-${index + 1}.${extension}`, blob);
+                    folder?.file(`foto - ${index + 1}.${extension} `, blob);
                 } catch (e) {
                     console.error("Error downloading photo", e);
                 }
@@ -191,6 +318,44 @@ const Admin = () => {
             console.error(error);
             toast.dismiss(downloadToast);
             toast.error("Error al generar el ZIP");
+        }
+    };
+
+    const handleDownloadApprovedAudios = async () => {
+        const audios = submissions.filter(s => s.status === 'approved' && s.type === 'audio');
+        if (audios.length === 0) {
+            toast.error("No hay audios aprobados para descargar");
+            return;
+        }
+
+        const zip = new JSZip();
+        const folder = zip.folder("audios-eventpix");
+        const downloadToast = toast.loading(`Generando ZIP con ${audios.length} audios...`);
+
+        try {
+            const promises = audios.map(async (audio, index) => {
+                try {
+                    const response = await fetch(audio.content);
+                    const blob = await response.blob();
+                    // Intentar deducir extensión, audio suele ser webm o mp3 según recording
+                    let extension = audio.content.split('.').pop()?.split('?')[0] || 'webm';
+                    if (extension.length > 4) extension = 'webm'; // Fallback común
+
+                    folder?.file(`audio - ${index + 1} - ${audio.author || 'anon'}.${extension}`, blob);
+                } catch (e) {
+                    console.error("Error downloading audio", e);
+                }
+            });
+
+            await Promise.all(promises);
+            const content = await zip.generateAsync({ type: "blob" });
+            saveAs(content, "audios-eventpix.zip");
+            toast.dismiss(downloadToast);
+            toast.success("Audios descargados");
+        } catch (error) {
+            console.error(error);
+            toast.dismiss(downloadToast);
+            toast.error("Error al generar el ZIP de audios");
         }
     };
 
@@ -213,7 +378,10 @@ const Admin = () => {
             ...formData,
         } as any, {
             onSuccess: () => toast.success("Configuración actualizada"),
-            onError: () => toast.error("Error al actualizar la configuración"),
+            onError: (err) => {
+                console.error("Error updating settings:", err);
+                toast.error("Error al actualizar la configuración");
+            },
         });
     };
 
@@ -256,68 +424,7 @@ const Admin = () => {
         });
     };
 
-    const SubmissionCard = ({ item }: { item: Submission }) => (
-        <Card className="overflow-hidden bg-card/50 backdrop-blur border-white/10">
-            <div className="p-4">
-                <div className="flex justify-between items-start mb-4">
-                    <div className="flex items-center text-sm text-muted-foreground">
-                        <Clock className="w-4 h-4 mr-1" />
-                        {formatDistanceToNow(new Date(item.created_at), { addSuffix: true, locale: es })}
-                    </div>
-                    <div className={`px-2 py-1 rounded-full text-xs flex items-center ${item.status === 'pending' ? 'bg-yellow-500/20 text-yellow-500' :
-                        item.status === 'approved' ? 'bg-green-500/20 text-green-500' :
-                            'bg-red-500/20 text-red-500'
-                        }`}>
-                        {item.status.toUpperCase()}
-                    </div>
-                </div>
 
-                {item.type === 'photo' ? (
-                    <div className="rounded-md overflow-hidden bg-black/20 mb-4 relative group min-h-64 max-h-96 flex items-center justify-center">
-                        <img src={item.content} alt="Submission" className="w-full h-auto max-h-96 object-contain" />
-                        {item.status === 'approved' && (
-                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Button variant="destructive" size="icon" className="h-8 w-8" onClick={() => handleDelete(item.id)}>
-                                    <Trash2 className="w-4 h-4" />
-                                </Button>
-                            </div>
-                        )}
-                    </div>
-                ) : (
-                    <div className="bg-black/20 p-4 rounded-md mb-4 relative group">
-                        <p className="text-lg">{item.content}</p>
-                        {item.author && <p className="text-sm text-muted-foreground mt-2">- {item.author}</p>}
-
-                        {item.status === 'approved' && (
-                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Button variant="destructive" size="icon" className="h-8 w-8" onClick={() => handleDelete(item.id)}>
-                                    <Trash2 className="w-4 h-4" />
-                                </Button>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {item.status === 'pending' && (
-                    <div className="flex gap-2">
-                        <Button
-                            className="flex-1 bg-green-600 hover:bg-green-700"
-                            onClick={() => handleModeration(item.id, 'approved')}
-                        >
-                            <Check className="w-4 h-4 mr-2" /> Aprobar
-                        </Button>
-                        <Button
-                            variant="destructive"
-                            className="flex-1"
-                            onClick={() => handleModeration(item.id, 'rejected')}
-                        >
-                            <X className="w-4 h-4 mr-2" /> Rechazar
-                        </Button>
-                    </div>
-                )}
-            </div>
-        </Card>
-    );
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
@@ -364,7 +471,7 @@ const Admin = () => {
             await supabase.from('submissions').insert([{
                 type,
                 content,
-                author: `Simulado ${count + 1}`,
+                author: `Simulado ${count + 1} `,
                 status: 'approved', // Directo al wall para probar carga
                 created_at: new Date().toISOString(),
                 event_id: event?.id // Importante: Asociar al evento actual
@@ -375,531 +482,756 @@ const Admin = () => {
         }, 200); // 5 por segundo
     };
 
-    if (eventLoading || isLoading || settingsLoading) {
-        return <div className="min-h-screen flex items-center justify-center text-foreground">Cargando...</div>;
+
+
+    // ... (existing hooks)
+
+    // Calculate stats
+    const stats = {
+        pending: submissions?.filter(s => s.status === 'pending').length || 0,
+        approved: submissions?.filter(s => s.status === 'approved').length || 0,
+        rejected: submissions?.filter(s => s.status === 'rejected').length || 0,
+        total: submissions?.length || 0
+    };
+
+    // ... (rest of logic remains, jumping to RETURN)
+
+    // Chart Calculations
+    const chartData = useMemo(() => {
+        if (!submissions) return [];
+        const hourly: Record<string, { time: string; photos: number; messages: number; audios: number }> = {};
+
+        submissions.forEach(sub => {
+            const date = new Date(sub.created_at);
+            const hour = date.getHours().toString().padStart(2, '0') + ":00";
+
+            if (!hourly[hour]) {
+                hourly[hour] = { time: hour, photos: 0, messages: 0, audios: 0 };
+            }
+
+            if (sub.type === 'photo') hourly[hour].photos++;
+            else if (sub.type === 'message') hourly[hour].messages++;
+            else if (sub.type === 'audio') hourly[hour].audios++;
+        });
+
+        // Fill missing hours if needed or just sort existing
+        return Object.values(hourly).sort((a, b) => a.time.localeCompare(b.time));
+    }, [submissions]);
+
+    const activeUsers = useMemo(() => {
+        if (!submissions) return 0;
+        const authors = new Set(submissions.map(s => s.author).filter(Boolean));
+        return authors.size;
+    }, [submissions]);
+
+    if (eventLoading) {
+        return <div className="min-h-screen flex items-center justify-center text-foreground bg-slate-950">Cargando datos del evento...</div>;
+    }
+    if (settingsLoading) {
+        return <div className="min-h-screen flex items-center justify-center text-foreground bg-slate-950">Cargando configuración...</div>;
+    }
+    if (isLoading) {
+        return <div className="min-h-screen flex items-center justify-center text-foreground bg-slate-950">Cargando contenido...</div>;
     }
 
     if (!event) return <div className="min-h-screen flex items-center justify-center text-foreground">Evento no encontrado</div>;
 
     return (
-        <div className="min-h-screen bg-background p-6">
-            <header className="flex justify-between items-center mb-8">
-                <div className="flex items-center gap-4">
-                    <Link to="/admin" className="text-muted-foreground hover:text-primary transition-colors">
-                        <ArrowLeft className="w-6 h-6" />
-                    </Link>
+        <div className="min-h-screen bg-slate-950 flex font-sans text-slate-100">
+            <AdminSidebar
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                onLogout={handleLogout}
+                eventName={event.name}
+            />
+
+            <main className="flex-1 md:ml-64 p-8 overflow-y-auto h-screen">
+                <header className="mb-8 flex justify-between items-center bg-slate-900/50 p-6 rounded-2xl border border-white/5 backdrop-blur-xl">
                     <div>
-                        <h1 className="text-3xl font-serif text-primary">Panel de Administración</h1>
-                        <p className="text-sm text-muted-foreground font-medium">{event.name}</p>
+                        <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
+                            {activeTab === 'dashboard' && 'Panel de Control'}
+                            {activeTab === 'moderation' && 'Moderación de Contenido'}
+                            {activeTab === 'design' && 'Diseño y Apariencia'}
+                            {activeTab === 'settings' && 'Ajustes del Evento'}
+                            {activeTab === 'display' && 'Control de Pantalla'}
+                            {activeTab === 'downloads' && 'Descargas y Reportes'}
+                        </h1>
+                        <p className="text-slate-400 text-sm mt-1">Gestionando: <span className="text-white font-medium">{event.name}</span></p>
                     </div>
-                </div>
-                <nav className="flex gap-4 items-center">
-                    {userProfile && (
-                        <div className={`px-3 py-1 rounded-full text-xs font-medium ${isSuperAdmin
-                            ? 'bg-violet-500/20 text-violet-400 border border-violet-500/30'
-                            : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                            }`}>
-                            {isSuperAdmin ? '👑 Super Admin' : '🎯 Provider'}
-                        </div>
-                    )}
-                    <a href={`/${event.slug}`} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-primary">Ver Web</a>
-                    <a href={`/${event.slug}/display`} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-primary">Ver Pantalla</a>
-                    <Button variant="ghost" onClick={handleLogout} className="text-muted-foreground hover:text-destructive">
-                        Salir
-                    </Button>
-                </nav>
-            </header>
 
-            <Tabs defaultValue="pending" className="w-full">
-                <TabsList className={`grid w-full mb-8 ${isSuperAdmin ? 'grid-cols-5' : 'grid-cols-4'}`}>
-                    <TabsTrigger value="pending">Pendientes ({submissions.filter(s => s.status === 'pending').length})</TabsTrigger>
-                    <TabsTrigger value="approved">Aprobados ({submissions.filter(s => s.status === 'approved').length})</TabsTrigger>
-                    <TabsTrigger value="rejected">Rechazados ({submissions.filter(s => s.status === 'rejected').length})</TabsTrigger>
-                    <TabsTrigger value="settings">Configuración</TabsTrigger>
-                    {isSuperAdmin && <TabsTrigger value="access">Acceso</TabsTrigger>}
-                </TabsList>
-
-                <TabsContent value="pending">
-
-                    {/* ========== DJ CONTROL PANEL ========== */}
-                    {settings?.dj_mode_enabled && (
-                        <Card className="border-amber-500/50 bg-amber-500/5 shadow-lg animate-in fade-in slide-in-from-top-4 mb-6">
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-amber-600 flex items-center gap-2 text-lg">
-                                    <Zap className="w-5 h-5 fill-amber-500" /> Panel de Control DJ
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                    <Button
-                                        variant="outline"
-                                        className="h-20 flex flex-col gap-2 border-red-200 hover:bg-red-50 hover:border-red-500 transition-all"
-                                        onClick={() => triggerDjEffect('siren')}
-                                    >
-                                        <span className="text-2xl">🚨</span>
-                                        <span className="font-bold text-red-600">Alerta</span>
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        className="h-20 flex flex-col gap-2 border-pink-200 hover:bg-pink-50 hover:border-pink-500 transition-all"
-                                        onClick={() => triggerDjEffect('love')}
-                                    >
-                                        <span className="text-2xl">💘</span>
-                                        <span className="font-bold text-pink-600">Romance</span>
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        className="h-20 flex flex-col gap-2 border-cyan-200 hover:bg-cyan-50 hover:border-cyan-500 transition-all"
-                                        onClick={() => triggerDjEffect('party')}
-                                    >
-                                        <span className="text-2xl">🕺</span>
-                                        <span className="font-bold text-cyan-600">Fiesta</span>
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        className="h-20 flex flex-col gap-2 border-yellow-200 hover:bg-yellow-50 hover:border-yellow-500 transition-all"
-                                        onClick={() => triggerDjEffect('camera')}
-                                    >
-                                        <span className="text-2xl">📸</span>
-                                        <span className="font-bold text-yellow-600">Foto Grupal</span>
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
-
-                    {/* Approve All button - Only shown if there are pending items */}
-                    {submissions.filter(s => s.status === 'pending').length > 0 && (
-                        <div className="mb-6 flex items-center justify-center bg-card/50 p-4 rounded-xl border border-white/10">
-                            <Button
-                                onClick={handleApproveAll}
-                                className="bg-green-600 hover:bg-green-700"
-                                disabled={approveAllPending.isPending}
-                            >
-                                <CheckCircle2 className="w-4 h-4 mr-2" />
-                                {approveAllPending.isPending ? "Aprobando..." : "Aprobar Todo lo Pendiente"}
+                    <div className="flex gap-3">
+                        <a href={`/${event.slug}`} target="_blank" rel="noopener noreferrer">
+                            <Button className="bg-slate-800 text-white border border-slate-700 hover:bg-slate-700 hover:text-white transition-colors">
+                                <span className="mr-2">📱</span> Ver Invitado
                             </Button>
-                        </div>
-                    )}
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {submissions
-                            .filter(item => item.status === 'pending')
-                            .map(item => (
-                                <SubmissionCard key={item.id} item={item} />
-                            ))}
-                        {submissions.filter(s => s.status === 'pending').length === 0 && (
-                            <div className="col-span-full text-center py-12 text-muted-foreground">
-                                No hay contenido pendiente.
-                            </div>
-                        )}
-                    </div>
-                </TabsContent>
-
-                <TabsContent value="approved">
-                    {isSuperAdmin && (
-                        <div className="mb-6 flex flex-col md:flex-row gap-4 items-center justify-between bg-card/50 p-4 rounded-xl border border-white/10">
-                            <div className="flex flex-wrap gap-2">
-                                <Button onClick={handleDownloadApprovedPhotos} className="bg-blue-600 hover:bg-blue-700">
-                                    <Download className="w-4 h-4 mr-2" /> Descargar Fotos (ZIP)
-                                </Button>
-                                <Button onClick={downloadMessagesPDF} variant="secondary">
-                                    <Download className="w-4 h-4 mr-2" /> Descargar Libro de Firmas (PDF)
-                                </Button>
-                            </div>
-                            <Button onClick={handleClearApproved} variant="destructive">
-                                <Trash2 className="w-4 h-4 mr-2" /> Vaciar Aprobados
+                        </a>
+                        <a href={`/${event.slug}/display`} target="_blank" rel="noopener noreferrer">
+                            <Button className="bg-violet-600 hover:bg-violet-700">
+                                <span className="mr-2">🖥️</span> Ver Pantalla
                             </Button>
-                        </div>
-                    )}
+                        </a >
+                    </div >
+                </header >
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {submissions
-                            .filter(item => item.status === 'approved')
-                            .map(item => (
-                                <SubmissionCard key={item.id} item={item} />
-                            ))}
-                        {submissions.filter(s => s.status === 'approved').length === 0 && (
-                            <div className="col-span-full text-center py-12 text-muted-foreground">
-                                No hay contenido aprobado.
+                {/* ================= DASHBOARD TAB ================= */}
+                {
+                    activeTab === 'dashboard' && (
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <Card className="bg-slate-900 border-slate-800">
+                                    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-slate-400">Pendientes</CardTitle></CardHeader>
+                                    <CardContent><div className="text-3xl font-bold text-yellow-400">{stats.pending}</div></CardContent>
+                                </Card>
+                                <Card className="bg-slate-900 border-slate-800">
+                                    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-slate-400">Aprobados</CardTitle></CardHeader>
+                                    <CardContent><div className="text-3xl font-bold text-green-400">{stats.approved}</div></CardContent>
+                                </Card>
+                                <Card className="bg-slate-900 border-slate-800">
+                                    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-slate-400">Total Fotos</CardTitle></CardHeader>
+                                    <CardContent><div className="text-3xl font-bold text-white">{stats.total}</div></CardContent>
+                                </Card>
+                                <Card className="bg-slate-900 border-slate-800">
+                                    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-slate-400">Estado</CardTitle></CardHeader>
+                                    <CardContent>
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
+                                            <span className="text-sm font-medium">En Vivo</span>
+                                        </div>
+                                    </CardContent>
+                                </Card>
                             </div>
-                        )}
-                    </div>
-                </TabsContent>
 
-                <TabsContent value="rejected">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {submissions
-                            .filter(item => item.status === 'rejected')
-                            .map(item => (
-                                <SubmissionCard key={item.id} item={item} />
-                            ))}
-                        {submissions.filter(s => s.status === 'rejected').length === 0 && (
-                            <div className="col-span-full text-center py-12 text-muted-foreground">
-                                No hay contenido rechazado.
-                            </div>
-                        )}
-                    </div>
-                </TabsContent>
-
-                <TabsContent value="settings">
-                    <Card className="max-w-2xl mx-auto">
-                        <CardHeader>
-                            <CardTitle>Configuración del Evento</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <form onSubmit={handleSettingsSubmit} className="space-y-6">
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Título del Evento</label>
-                                    <Input
-                                        value={formData.title}
-                                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                                        placeholder="Ej: Boda de Ana y Juan"
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Descripción</label>
-                                    <Textarea
-                                        value={formData.description}
-                                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                        placeholder="Una breve descripción para tus invitados"
-                                    />
-                                </div>
-
-                                <div className="flex items-center justify-between rounded-lg border p-4 bg-card/50">
-                                    <div className="space-y-0.5">
-                                        <label className="text-base font-medium">Permitir mensajes de texto</label>
-                                        <p className="text-sm text-muted-foreground">
-                                            Si se desactiva, los invitados solo podrán subir fotos.
-                                        </p>
-                                    </div>
-                                    <Switch
-                                        checked={formData.text_messages_enabled}
-                                        onCheckedChange={(checked) => setFormData({ ...formData, text_messages_enabled: checked })}
-                                    />
-                                </div>
-
-                                {/* ========== SECCIÓN: FUNCIONALIDADES PRO ========== */}
-                                <div className="space-y-4 border-t pt-6 mt-6">
-                                    <h3 className="font-semibold text-lg text-amber-500 flex items-center gap-2">
-                                        <Zap className="w-5 h-5" /> Funcionalidades PRO
-                                    </h3>
-
-                                    {/* Reacciones en Vivo */}
-                                    <div className="flex items-center justify-between rounded-lg border p-4 bg-card/50">
-                                        <div className="space-y-0.5">
-                                            <label className="text-base font-medium">Reacciones en Vivo 🎉</label>
-                                            <p className="text-sm text-muted-foreground">
-                                                Los invitados pueden enviar emojis que aparecen en el muro.
-                                            </p>
-                                        </div>
-                                        <Switch
-                                            checked={settings?.reactions_enabled ?? true}
-                                            onCheckedChange={(checked) => updateSettings.mutate({ id: settings?.id, reactions_enabled: checked } as any)}
-                                        />
-                                    </div>
-
-                                    {/* DJ Mode */}            <div className="flex items-center justify-between rounded-lg border p-4 bg-card/50">
-                                        <div className="space-y-0.5">
-                                            <label className="text-base font-medium">Modo DJ / Efectos Manuales 🎛️</label>
-                                            <p className="text-sm text-muted-foreground">
-                                                Habilita un panel para lanzar efectos masivos (sirenas, humo, amor) en el muro.
-                                            </p>
-                                        </div>
-                                        <Switch
-                                            checked={settings?.dj_mode_enabled ?? false}
-                                            onCheckedChange={(checked) => updateSettings.mutate({ id: settings?.id, dj_mode_enabled: checked } as any)}
-                                        />
-                                    </div>
-
-                                    {/* Photo Booth Mode */}
-                                    <div className="rounded-lg border p-4 bg-card/50 space-y-4">
-                                        <div className="flex items-center justify-between">
-                                            <div className="space-y-0.5">
-                                                <label className="text-base font-medium">Modo Photo Booth (Souvenir) 🖼️</label>
-                                                <p className="text-sm text-muted-foreground">
-                                                    Genera una foto descargable con marco al subir una imagen.
-                                                </p>
-                                            </div>
-                                            <Switch
-                                                checked={settings?.photo_booth_enabled ?? false}
-                                                onCheckedChange={(checked) => updateSettings.mutate({ id: settings?.id, photo_booth_enabled: checked } as any)}
-                                            />
-                                        </div>
-
-                                        {settings?.photo_booth_enabled && (
-                                            <div className="pt-2 border-t border-white/10 animate-in fade-in slide-in-from-top-2">
-                                                <label className="block text-sm font-medium mb-2">
-                                                    Fondo / Marco para Photo Booth (JPG o PNG - 10x15cm)
-                                                </label>
-                                                <div className="flex items-center gap-4">
-                                                    {settings?.photobooth_frame_url && (
-                                                        <div className="relative w-16 h-24 bg-slate-800 rounded border border-white/20 overflow-hidden">
-                                                            <img src={settings.photobooth_frame_url} alt="Marco" className="w-full h-full object-cover" />
-                                                        </div>
-                                                    )}
-                                                    <div className="flex flex-col gap-2">
-                                                        <Input
-                                                            type="file"
-                                                            accept="image/jpeg,image/png"
-                                                            onChange={(e) => {
-                                                                const file = e.target.files?.[0];
-                                                                if (file) handleImageUpload(e, 'photobooth_frame_url');
-                                                            }}
-                                                        />
-                                                        {settings?.photobooth_frame_url && (
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() => setTestPhotoBoothOpen(true)}
-                                                                className="w-full"
-                                                            >
-                                                                <Zap className="w-4 h-4 mr-2" />
-                                                                Probar Marco
-                                                            </Button>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                <p className="text-xs text-muted-foreground mt-1">
-                                                    Sube una imagen vertical (ratio 2:3). La foto del invitado se colocará encima.
-                                                </p>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Galería Pública */}
-                                    <div className="flex items-center justify-between rounded-lg border p-4 bg-card/50">
-                                        <div className="space-y-0.5">
-                                            <label className="text-base font-medium">Galería Pública en Móvil 📱</label>
-                                            <p className="text-sm text-muted-foreground">
-                                                Permite a los invitados ver todas las fotos aprobadas en sus celulares.
-                                                <span className="block text-amber-500 text-xs mt-1">⚠️ Consume más datos de internet.</span>
-                                            </p>
-                                        </div>
-                                        <Switch
-                                            checked={settings?.public_gallery_enabled ?? false}
-                                            onCheckedChange={(checked) => updateSettings.mutate({ id: settings?.id, public_gallery_enabled: checked } as any)}
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="space-y-4 pt-4 border-t">
-                                    <h3 className="font-medium">Configuración del Carrusel</h3>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium">Vueltas del Carrusel</label>
-                                            <Input
-                                                type="number"
-                                                min={1}
-                                                max={10}
-                                                value={formData.carousel_max_loops}
-                                                onChange={(e) => setFormData({ ...formData, carousel_max_loops: parseInt(e.target.value) || 1 })}
-                                            />
-                                            <p className="text-xs text-muted-foreground">
-                                                Cuántas veces pasar todas las fotos antes de mostrar el QR.
-                                            </p>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium">Tiempo por Foto (ms)</label>
-                                            <Input
-                                                type="number"
-                                                min={1000}
-                                                step={500}
-                                                value={formData.carousel_interval_ms}
-                                                onChange={(e) => setFormData({ ...formData, carousel_interval_ms: parseInt(e.target.value) || 5000 })}
-                                            />
-                                            <p className="text-xs text-muted-foreground">
-                                                Milisegundos que se muestra cada foto (5000ms = 5s).
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center justify-between rounded-lg border p-4 bg-card/50">
-                                        <div className="space-y-0.5">
-                                            <label className="text-base font-medium">Mostrar Controles en Pantalla</label>
-                                            <p className="text-sm text-muted-foreground">
-                                                Botones de Pausa/Reanudar en la esquina inferior.
-                                            </p>
-                                        </div>
-                                        <Switch
-                                            checked={formData.wall_show_controls}
-                                            onCheckedChange={(checked) => setFormData({ ...formData, wall_show_controls: checked })}
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2 border-t pt-4">
-                                    <label className="text-sm font-medium">Imagen de Fondo (Inicio)</label>
-                                    <div className="flex items-center gap-4">
-                                        {settings?.background_image_url && (
-                                            <img
-                                                src={settings.background_image_url}
-                                                alt="Background"
-                                                className="w-20 h-20 object-cover rounded-md"
-                                            />
-                                        )}
-                                        <Input
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={(e) => handleImageUpload(e, 'background_image_url')}
-                                            className="cursor-pointer"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Imagen de Fondo (Pantalla/Proyector)</label>
-                                    <div className="flex items-center gap-4">
-                                        {settings?.display_background_url && (
-                                            <img
-                                                src={settings.display_background_url}
-                                                alt="Display Background"
-                                                className="w-20 h-20 object-cover rounded-md"
-                                            />
-                                        )}
-                                        <Input
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={(e) => handleImageUpload(e, 'display_background_url')}
-                                            className="cursor-pointer"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* ========== SECCIÓN: MARCOS Y LOGOS DE MARCA ========== */}
-                                <div className="space-y-4 border-t pt-6">
-                                    <h3 className="font-semibold text-lg text-violet-400">🎨 Marcos y Logos de Marca</h3>
-                                    <p className="text-sm text-muted-foreground">Personaliza la experiencia con tu logo y marcos personalizados.</p>
-
-                                    {/* Marco PNG para el muro */}
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">Marco de Marca (PNG transparente)</label>
-                                        <p className="text-xs text-muted-foreground">Se superpondrá sobre cada foto en el muro. Ideal para "Boda Ana & Juan - 29/11"</p>
-                                        <div className="flex items-center gap-4">
-                                            {settings?.frame_image_url && (
-                                                <img
-                                                    src={settings.frame_image_url}
-                                                    alt="Marco"
-                                                    className="w-20 h-20 object-contain rounded-md border"
+                            {/* Activity Analytics */}
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                <Card className="bg-slate-900 border-slate-800 lg:col-span-2">
+                                    <CardHeader>
+                                        <CardTitle className="text-lg font-semibold text-slate-100 flex items-center gap-2">
+                                            <BarChart2 className="w-5 h-5 text-violet-500" /> Actividad del Evento
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="h-[300px]">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <AreaChart data={chartData}>
+                                                <defs>
+                                                    <linearGradient id="colorPhotos" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8} />
+                                                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                                                    </linearGradient>
+                                                </defs>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                                                <XAxis dataKey="time" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                                                <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                                                <Tooltip
+                                                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#f1f5f9', borderRadius: '8px' }}
+                                                    itemStyle={{ color: '#e2e8f0' }}
                                                 />
+                                                <Area type="monotone" dataKey="photos" name="Fotos" stroke="#8b5cf6" strokeWidth={2} fillOpacity={1} fill="url(#colorPhotos)" />
+                                                <Area type="monotone" dataKey="messages" name="Mensajes" stroke="#10b981" strokeWidth={2} fill="none" />
+                                                <Area type="monotone" dataKey="audios" name="Audios" stroke="#ef4444" strokeWidth={2} fill="none" />
+                                            </AreaChart>
+                                        </ResponsiveContainer>
+                                    </CardContent>
+                                </Card>
+
+                                <Card className="bg-slate-900 border-slate-800">
+                                    <CardHeader>
+                                        <CardTitle className="text-lg font-semibold text-slate-100">Interacción</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-6">
+                                        <div className="flex items-center justify-between p-3 bg-slate-950 rounded-lg border border-slate-800">
+                                            <span className="text-slate-400 text-sm">Usuarios (Autores)</span>
+                                            <span className="text-xl font-bold text-white">{activeUsers}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between p-3 bg-slate-950 rounded-lg border border-slate-800">
+                                            <span className="text-slate-400 text-sm">Mensajes Texto</span>
+                                            <span className="text-xl font-bold text-white">{submissions?.filter(s => s.type === 'message').length}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between p-3 bg-slate-950 rounded-lg border border-slate-800">
+                                            <span className="text-slate-400 text-sm">Audios</span>
+                                            <span className="text-xl font-bold text-white">{submissions?.filter(s => s.type === 'audio').length}</span>
+                                        </div>
+
+                                        <div className="pt-4">
+                                            <h4 className="text-xs font-semibold text-slate-500 uppercase mb-3">Hora Pico</h4>
+                                            {chartData.length > 0 ? (
+                                                <div className="flex items-baseline gap-2">
+                                                    <span className="text-2xl font-bold text-violet-400">
+                                                        {(() => {
+                                                            const peak = [...chartData].sort((a, b) => b.photos - a.photos)[0];
+                                                            return peak?.time || "--:--";
+                                                        })()}
+                                                    </span>
+                                                    <span className="text-xs text-slate-500">Mayor actividad</span>
+                                                </div>
+                                            ) : (
+                                                <span className="text-sm text-slate-600">Sin datos suficientes</span>
                                             )}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </div>
+
+                            {/* Quick Actions */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <Card className="bg-slate-900 border-slate-800">
+                                    <CardHeader><CardTitle>Accesos Rápidos</CardTitle></CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <div className="p-4 bg-slate-950 rounded-lg border border-slate-800 flex justify-between items-center group cursor-pointer hover:border-violet-500/50 transition-all" onClick={() => setActiveTab('moderation')}>
+                                            <div className="flex items-center gap-4">
+                                                <div className="p-3 bg-blue-500/10 rounded-lg text-blue-400 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                                                    <CheckCircle2 className="w-6 h-6" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-semibold text-white">Moderar Fotos</h4>
+                                                    <p className="text-sm text-slate-400">Tienes {stats.pending} fotos esperando.</p>
+                                                </div>
+                                            </div>
+                                            <ArrowLeft className="rotate-180 text-slate-600 group-hover:text-white transition-colors" />
+                                        </div>
+
+                                        <div className="p-4 bg-slate-950 rounded-lg border border-slate-800 flex justify-between items-center group cursor-pointer hover:border-violet-500/50 transition-all" onClick={() => setActiveTab('design')}>
+                                            <div className="flex items-center gap-4">
+                                                <div className="p-3 bg-purple-500/10 rounded-lg text-purple-400 group-hover:bg-purple-500 group-hover:text-white transition-colors">
+                                                    <Zap className="w-6 h-6" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-semibold text-white">Cambiar Diseño</h4>
+                                                    <p className="text-sm text-slate-400">Personaliza temas y marcos.</p>
+                                                </div>
+                                            </div>
+                                            <ArrowLeft className="rotate-180 text-slate-600 group-hover:text-white transition-colors" />
+                                        </div>
+                                    </CardContent>
+                                </Card>
+
+                                {isSuperAdmin && (
+                                    <div className="space-y-4">
+                                        <Card className="bg-slate-900 border-slate-800">
+                                            <CardHeader><CardTitle>Gestión (Super Admin)</CardTitle></CardHeader>
+                                            <CardContent>
+                                                <ProvidersManagement eventId={event.id} />
+                                            </CardContent>
+                                        </Card>
+                                    </div>
+                                )}
+
+                                {/* AI Moderation - Available for ALL admins (Providers included) */}
+                                <div className="p-4 bg-slate-950 rounded-lg border border-slate-800 space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="space-y-0.5">
+                                            <div className="flex items-center gap-2">
+                                                <label className="text-base font-medium text-slate-200">Moderación IA Automática</label>
+                                                <span className="bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                                                    <Zap className="w-3 h-3" /> BETA
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-slate-500">
+                                                La IA aprobará automáticamente el contenido seguro. Lo dudoso quedará pendiente.
+                                            </p>
+                                        </div>
+                                        <Switch
+                                            checked={settings?.ai_moderation_enabled ?? false}
+                                            onCheckedChange={(c) => updateSettings.mutate({ id: settings?.id, ai_moderation_enabled: c } as any)}
+                                        />
+                                    </div>
+
+                                    {settings?.ai_moderation_enabled && (
+                                        <div className="pt-2 border-t border-slate-900 space-y-3 animate-in slide-in-from-top-2 fade-in duration-300">
+                                            <div>
+                                                <label className="text-xs font-semibold text-slate-400 mb-2 block uppercase">Nivel de Rigurosidad</label>
+                                                <div className="grid grid-cols-3 gap-2">
+                                                    {['low', 'medium', 'high'].map((level) => (
+                                                        <button
+                                                            key={level}
+                                                            onClick={() => updateSettings.mutate({ id: settings?.id, ai_moderation_level: level as any } as any)}
+                                                            className={`px-3 py-2 rounded-md text-xs font-medium border transition-all ${(settings?.ai_moderation_level || 'medium') === level
+                                                                ? 'bg-violet-600 border-violet-500 text-white'
+                                                                : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                                                                }`}
+                                                        >
+                                                            {level === 'low' && 'Baja'}
+                                                            {level === 'medium' && 'Media'}
+                                                            {level === 'high' && 'Alta'}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                                <p className="text-[10px] text-slate-500 mt-2">
+                                                    {(settings?.ai_moderation_level || 'medium') === 'low' && "Aprueba casi todo, salvo contenido muy explícito. Ideal para eventos privados de confianza."}
+                                                    {(settings?.ai_moderation_level || 'medium') === 'medium' && "Equilibrado. Filtra violencia, desnudez y contenido ofensivo claro."}
+                                                    {(settings?.ai_moderation_level || 'medium') === 'high' && "Muy estricto. Ante la mínima duda, dejará la foto como pendiente. Recomendado para eventos públicos y corporativos."}
+                                                </p>
+                                            </div>
+
+                                            <div className="bg-yellow-900/10 border border-yellow-700/20 p-3 rounded-md flex gap-2">
+                                                <div className="text-yellow-500 mt-0.5"><Monitor className="w-3 h-3" /></div>
+                                                <p className="text-[10px] text-yellow-200/60 leading-tight">
+                                                    <strong>Descargo de responsabilidad:</strong> EventPix no se hace responsable por errores en la moderación automática ni por el contenido que pudiera aprobarse indebidamente. La responsabilidad final del contenido mostrado es del organizador.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                            </div>
+                        </div>
+                    )
+                }
+                {
+                    activeTab === 'moderation' && (
+                        <div className="space-y-6">
+                            {/* Sub-tabs for moderation */}
+                            <div className="flex gap-2 p-1 bg-slate-900 w-fit rounded-lg border border-slate-800">
+                                {[
+                                    { id: 'pending', label: `Pendientes (${stats.pending})`, color: 'text-yellow-400' },
+                                    { id: 'approved', label: `Aprobadas (${stats.approved})`, color: 'text-green-400' },
+                                    { id: 'rejected', label: `Rechazadas (${stats.rejected})`, color: 'text-red-400' }
+                                ].map((tab) => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setModerationFilter(tab.id as any)}
+                                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${moderationFilter === tab.id
+                                            ? 'bg-slate-800 text-white shadow-sm'
+                                            : 'text-slate-400 hover:text-white'
+                                            }`}
+                                    >
+                                        {tab.label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Approve All Button (Only in pending) */}
+                            {moderationFilter === 'pending' && stats.pending > 0 && (
+                                <div className="p-6 bg-gradient-to-r from-green-900/20 to-emerald-900/20 rounded-xl border border-green-500/20 flex flex-col items-center justify-center gap-4">
+                                    <p className="text-green-200">Hay {stats.pending} fotos esperando aprobación.</p>
+                                    <Button
+                                        onClick={handleApproveAll}
+                                        className="bg-green-600 hover:bg-green-700 shadow-lg shadow-green-900/20 hover:scale-105 transition-all"
+                                        disabled={approveAllPending.isPending}
+                                    >
+                                        <CheckCircle2 className="w-5 h-5 mr-2" />
+                                        {approveAllPending.isPending ? "Procesando..." : "Aprobar TODO de una vez"}
+                                    </Button>
+                                </div>
+                            )}
+
+                            {/* Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                {submissions
+                                    .filter(item => item.status === moderationFilter)
+                                    .map(item => (
+                                        <SubmissionCard key={item.id} item={item} />
+                                    ))}
+
+                                {submissions.filter(s => s.status === moderationFilter).length === 0 && (
+                                    <div className="col-span-full py-20 text-center">
+                                        <div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center mx-auto mb-4">
+                                            <Images className="w-10 h-10 text-slate-600" />
+                                        </div>
+                                        <h3 className="text-slate-400 text-lg">No hay contenido en esta sección</h3>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )
+                }
+
+                {/* ================= DESIGN TAB ================= */}
+                {
+                    activeTab === 'design' && (
+                        <div className="max-w-4xl space-y-8">
+                            {/* Theme Selector Section */}
+                            <div className="space-y-4">
+                                <h3 className="text-xl font-semibold text-violet-400 flex items-center gap-2">
+                                    <Palette className="w-5 h-5" /> Selector de Temas
+                                </h3>
+                                <div className="bg-slate-900/50 p-6 rounded-2xl border border-white/5">
+                                    <ThemeSelector
+                                        currentBackground={settings?.background_image_url || null}
+                                        onSelectTheme={(imageUrl, fontFamily, frameUrl) => {
+                                            if (!settings) return;
+                                            updateSettings.mutate({
+                                                id: settings.id,
+                                                background_image_url: imageUrl,
+                                                font_family: fontFamily,
+                                                frame_image_url: frameUrl || null,
+                                                frame_enabled: !!frameUrl
+                                            } as any, {
+                                                onSuccess: () => toast.success("Tema actualizado correctamente ✨")
+                                            });
+                                        }}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Custom Uploads */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                <Card className="bg-slate-900 border-slate-800">
+                                    <CardHeader><CardTitle className="text-base">Fondo Personalizado</CardTitle></CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <div className="w-full h-32 bg-slate-950 rounded-lg flex items-center justify-center border border-dashed border-slate-700 relative overflow-hidden group">
+                                            {settings?.background_image_url ? (
+                                                <img src={settings.background_image_url} className="w-full h-full object-cover opacity-50 group-hover:opacity-100 transition-opacity" />
+                                            ) : <span className="text-slate-500">Sin fondo</span>}
+                                            <Input
+                                                type="file"
+                                                className="absolute inset-0 opacity-0 cursor-pointer"
+                                                onChange={(e) => handleImageUpload(e, 'background_image_url')}
+                                            />
+                                        </div>
+                                        <p className="text-xs text-slate-500 text-center">Click para subir imagen (Recomendado: 1920x1080px, JPG/PNG, Máx 5MB)</p>
+                                    </CardContent>
+                                </Card>
+
+                                <Card className="bg-slate-900 border-slate-800">
+                                    <CardHeader><CardTitle className="text-base">Marco / Overlay (PNG)</CardTitle></CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <div className="w-full h-32 bg-slate-950 rounded-lg flex items-center justify-center border border-dashed border-slate-700 relative overflow-hidden group">
+                                            {settings?.frame_image_url ? (
+                                                <img src={settings.frame_image_url} className="w-full h-full object-contain p-2" />
+                                            ) : <span className="text-slate-500">Sin marco</span>}
                                             <Input
                                                 type="file"
                                                 accept="image/png"
+                                                className="absolute inset-0 opacity-0 cursor-pointer"
                                                 onChange={(e) => handleImageUpload(e, 'frame_image_url')}
-                                                className="cursor-pointer"
                                             />
                                         </div>
-
-                                        {/* Switch para activar/desactivar marco */}
-                                        <div className="flex items-center justify-between rounded-lg border p-3 bg-card/30 mt-2">
-                                            <div className="space-y-0.5">
-                                                <label className="text-sm font-medium">Mostrar marco en el muro</label>
-                                                <p className="text-xs text-muted-foreground">
-                                                    Activa o desactiva la superposición del marco sobre las fotos.
-                                                </p>
-                                            </div>
+                                        <div className="flex items-center justify-between">
+                                            <p className="text-xs text-slate-500">PNG Transparente (1920x1080px)</p>
                                             <Switch
-                                                checked={settings?.frame_enabled ?? true}
-                                                onCheckedChange={(checked) =>
-                                                    updateSettings.mutate({ id: settings?.id, frame_enabled: checked } as any)
-                                                }
+                                                checked={settings?.frame_enabled}
+                                                onCheckedChange={(c) => updateSettings.mutate({ id: settings?.id, frame_enabled: c } as any)}
                                             />
                                         </div>
-                                    </div>
+                                    </CardContent>
+                                </Card>
 
-                                    {/* Logo para pantalla de carga */}
-                                    <div className="space-y-2 pt-4 border-t">
-                                        <label className="text-sm font-medium">Logo de Carga (Splash Screen)</label>
-                                        <p className="text-xs text-muted-foreground">Se mostrará cuando la app esté cargando. Si no subes uno, usará la imagen de fondo.</p>
-                                        <div className="flex items-center gap-4">
-                                            {settings?.splash_logo_url && (
-                                                <img
-                                                    src={settings.splash_logo_url}
-                                                    alt="Logo Splash"
-                                                    className="w-20 h-20 object-contain rounded-md border"
-                                                />
-                                            )}
+                                <Card className="bg-slate-900 border-slate-800">
+                                    <CardHeader><CardTitle className="text-base">Logo Splash / Carga (Circular)</CardTitle></CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <div className="w-full h-32 bg-slate-950 rounded-lg flex items-center justify-center border border-dashed border-slate-700 relative overflow-hidden group">
+                                            {settings?.splash_logo_url ? (
+                                                <img src={settings.splash_logo_url} className="w-auto h-24 object-contain" />
+                                            ) : <span className="text-slate-500">Sin logo</span>}
                                             <Input
                                                 type="file"
                                                 accept="image/*"
+                                                className="absolute inset-0 opacity-0 cursor-pointer"
                                                 onChange={(e) => handleImageUpload(e, 'splash_logo_url')}
-                                                className="cursor-pointer"
                                             />
                                         </div>
+                                        <div className="flex items-center justify-between">
+                                            <p className="text-xs text-slate-500">Aparece en el círculo de carga</p>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </div>
 
-                                        {/* Switch para activar/desactivar splash */}
-                                        <div className="flex items-center justify-between rounded-lg border p-3 bg-card/30 mt-2">
-                                            <div className="space-y-0.5">
-                                                <label className="text-sm font-medium">Mostrar logo en pantalla de carga</label>
-                                                <p className="text-xs text-muted-foreground">
-                                                    Si se desactiva, la carga será solo el mensaje de "Cargando...".
-                                                </p>
+                            {/* Promo Banner & Extra (Super Admin Only) */}
+                            {isSuperAdmin && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <Card className="bg-slate-900 border-slate-800">
+                                        <CardHeader><CardTitle className="text-base">Banner Promocional (Sorteo)</CardTitle></CardHeader>
+                                        <CardContent className="space-y-4">
+                                            <div className="w-full h-32 bg-slate-950 rounded-lg flex items-center justify-center border border-dashed border-slate-700 relative overflow-hidden group">
+                                                {settings?.promo_banner_url ? (
+                                                    <img src={settings.promo_banner_url} className="w-full h-full object-contain p-2" />
+                                                ) : <span className="text-slate-500">Sin banner</span>}
+                                                <Input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    className="absolute inset-0 opacity-0 cursor-pointer"
+                                                    onChange={(e) => handleImageUpload(e, 'promo_banner_url' as any)}
+                                                />
                                             </div>
-                                            <Switch
-                                                checked={settings?.show_splash_logo ?? true}
-                                                onCheckedChange={(checked) =>
-                                                    updateSettings.mutate({ id: settings?.id, show_splash_logo: checked } as any)
-                                                }
-                                            />
+                                            <p className="text-xs text-slate-500 text-center">Aparece en la pantalla de carga (Index). Soporta GIF, PNG, JPG. Tamaño sugerido: 600x150px.</p>
+
+                                            <div className="pt-2">
+                                                <label className="text-xs text-slate-500 mb-1 block">Enlace al hacer click (Opcional)</label>
+                                                <Input
+                                                    placeholder="https://instagram.com/..."
+                                                    defaultValue={settings?.promo_banner_link || ''}
+                                                    onBlur={(e) => {
+                                                        if (settings?.id && e.target.value !== settings.promo_banner_link) {
+                                                            updateSettings.mutate({ id: settings.id, promo_banner_link: e.target.value } as any);
+                                                            toast.success("Enlace guardado");
+                                                        }
+                                                    }}
+                                                    className="bg-slate-950 border-slate-800 text-xs h-8"
+                                                />
+                                            </div>
+                                            <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+                                                <p className="text-sm font-medium text-slate-300">Habilitar Banner</p>
+                                                <Switch
+                                                    checked={settings?.promo_banner_enabled ?? true}
+                                                    onCheckedChange={(c) => updateSettings.mutate({ id: settings?.id, promo_banner_enabled: c } as any)}
+                                                />
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                </div>
+                            )}
+
+                            {/* Message Settings */}
+                            <div className="space-y-4">
+                                <h3 className="text-xl font-semibold text-violet-400 flex items-center gap-2">
+                                    <MessageSquare className="w-5 h-5" /> Configuración de Mensajes
+                                </h3>
+                                <div className="bg-slate-900/50 p-6 rounded-2xl border border-white/5 space-y-4">
+                                    <div className="flex items-center justify-between p-4 bg-slate-950 rounded-lg border border-slate-800">
+                                        <div className="space-y-0.5">
+                                            <label className="text-base font-medium text-slate-200">Mensajes de Texto</label>
+                                            <p className="text-xs text-slate-500">Permitir que los invitados envíen textos.</p>
                                         </div>
+                                        <Switch
+                                            checked={settings?.text_messages_enabled ?? true}
+                                            onCheckedChange={(c) => updateSettings.mutate({ id: settings?.id, text_messages_enabled: c } as any)}
+                                        />
+                                    </div>
+                                    <div className="flex items-center justify-between p-4 bg-slate-950 rounded-lg border border-slate-800">
+                                        <div className="space-y-0.5">
+                                            <label className="text-base font-medium text-slate-200">Mensajes de Audio</label>
+                                            <p className="text-xs text-slate-500">Permitir que los invitados envíen audios.</p>
+                                        </div>
+                                        <Switch
+                                            checked={settings?.audio_messages_enabled ?? true}
+                                            onCheckedChange={(c) => updateSettings.mutate({ id: settings?.id, audio_messages_enabled: c } as any)}
+                                        />
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    )
+                }
 
-                                <Button type="submit" className="w-full" disabled={updateSettings.isPending}>
-                                    {updateSettings.isPending ? "Guardando..." : "Guardar Cambios"}
-                                </Button>
+                {/* ================= DISPLAY CONTROLS TAB ================= */}
+                {
+                    activeTab === 'display' && (
+                        <div className="max-w-4xl space-y-6">
+                            <Card className="bg-slate-900 border-slate-800 border-l-4 border-l-violet-500 text-slate-100">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2 text-slate-100">
+                                        <Monitor className="w-5 h-5 text-violet-400" /> Control del Carrusel
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                                        {/* Fader: Loops */}
+                                        <div className="space-y-4 bg-slate-950/50 p-6 rounded-xl border border-white/5">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <label className="text-sm font-medium text-slate-300">Repeticiones (Loops)</label>
+                                                <span className="bg-violet-500/10 text-violet-400 px-3 py-1 rounded-full text-xs font-bold border border-violet-500/20">
+                                                    {formData.carousel_max_loops} vueltas
+                                                </span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min="1"
+                                                max="10"
+                                                step="1"
+                                                value={formData.carousel_max_loops}
+                                                onChange={(e) => setFormData({ ...formData, carousel_max_loops: parseInt(e.target.value) || 1 })}
+                                                className="w-full h-3 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-violet-500 hover:accent-violet-400 transition-all"
+                                            />
+                                            <div className="flex justify-between text-[10px] text-slate-600 font-mono mt-1">
+                                                <span>1</span>
+                                                <span>5</span>
+                                                <span>10</span>
+                                            </div>
+                                            <p className="text-xs text-slate-500 mt-2">Veces que se muestran las fotos antes de pedir nuevas.</p>
+                                        </div>
 
-                                <div className="pt-8 border-t mt-8">
-                                    <h3 className="text-blue-400 font-medium mb-4">Herramientas de Prueba</h3>
-                                    <Button type="button" variant="outline" className="w-full border-blue-500/50 text-blue-400 hover:bg-blue-500/10" onClick={simulateParty}>
-                                        <Zap className="w-4 h-4 mr-2" /> ⚡ SIMULAR FIESTA (Stress Test)
-                                    </Button>
-                                    <p className="text-xs text-muted-foreground mt-2 text-center">
-                                        Genera fotos y mensajes falsos para probar el carrusel.
+                                        {/* Fader: Interval */}
+                                        <div className="space-y-4 bg-slate-950/50 p-6 rounded-xl border border-white/5">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <label className="text-sm font-medium text-slate-300">Velocidad (Tiempo por foto)</label>
+                                                <span className="bg-blue-500/10 text-blue-400 px-3 py-1 rounded-full text-xs font-bold border border-blue-500/20">
+                                                    {formData.carousel_interval_ms / 1000} seg
+                                                </span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min="2000"
+                                                max="15000"
+                                                step="500"
+                                                value={formData.carousel_interval_ms}
+                                                onChange={(e) => setFormData({ ...formData, carousel_interval_ms: parseInt(e.target.value) || 5000 })}
+                                                className="w-full h-3 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400 transition-all"
+                                            />
+                                            <div className="flex justify-between text-[10px] text-slate-600 font-mono mt-1">
+                                                <span>2s</span>
+                                                <span>8s</span>
+                                                <span>15s</span>
+                                            </div>
+                                            <p className="text-xs text-slate-500 mt-2">Controla qué tan rápido pasan las fotos.</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-end">
+                                        <Button onClick={handleSettingsSubmit} disabled={updateSettings.isPending} className="bg-violet-600 hover:bg-violet-700 text-white">
+                                            Guardar Configuración
+                                        </Button>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* DJ Mode */}
+                            <Card className="bg-slate-900 border-slate-800 border-l-4 border-l-amber-500 text-slate-100">
+                                <CardHeader>
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle className="flex items-center gap-2 text-slate-100">
+                                            <Zap className="w-5 h-5 text-amber-500" /> Panel DJ (Efectos en Vivo)
+                                        </CardTitle>
+                                        <Switch
+                                            checked={settings?.dj_mode_enabled}
+                                            onCheckedChange={(c) => updateSettings.mutate({ id: settings?.id, dj_mode_enabled: c } as any)}
+                                        />
+                                    </div>
+                                </CardHeader>
+                                {settings?.dj_mode_enabled && (
+                                    <CardContent>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                            <Button variant="outline" className="h-24 flex flex-col hover:bg-red-500/10 hover:text-red-400 border-slate-700 text-slate-300 hover:border-red-500/50" onClick={() => triggerDjEffect('siren')}>
+                                                <span className="text-3xl mb-2">🚨</span> Alerta
+                                            </Button>
+                                            <Button variant="outline" className="h-24 flex flex-col hover:bg-pink-500/10 hover:text-pink-400 border-slate-700 text-slate-300 hover:border-pink-500/50" onClick={() => triggerDjEffect('love')}>
+                                                <span className="text-3xl mb-2">💘</span> Romance
+                                            </Button>
+                                            <Button variant="outline" className="h-24 flex flex-col hover:bg-cyan-500/10 hover:text-cyan-400 border-slate-700 text-slate-300 hover:border-cyan-500/50" onClick={() => triggerDjEffect('party')}>
+                                                <span className="text-3xl mb-2">🕺</span> Fiesta
+                                            </Button>
+                                            <Button variant="outline" className="h-24 flex flex-col hover:bg-yellow-500/10 hover:text-yellow-400 border-slate-700 text-slate-300 hover:border-yellow-500/50" onClick={() => triggerDjEffect('camera')}>
+                                                <span className="text-3xl mb-2">📸</span> Foto Grupal
+                                            </Button>
+                                        </div>
+                                    </CardContent>
+                                )}
+                            </Card>
+
+                            {/* Photo Booth */}
+                            <Card className="bg-slate-900 border-slate-800 border-l-4 border-l-pink-500 text-slate-100">
+                                <CardHeader>
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle className="flex items-center gap-2 text-slate-100">
+                                            <span className="text-2xl">📸</span> Photo Booth (Souvenir)
+                                        </CardTitle>
+                                        <Switch
+                                            checked={settings?.photo_booth_enabled}
+                                            onCheckedChange={(c) => updateSettings.mutate({ id: settings?.id, photo_booth_enabled: c } as any)}
+                                        />
+                                    </div>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-slate-400 text-sm">
+                                        Permite a los invitados descargar sus fotos con el marco o tema del evento como recuerdo.
+                                        Se mostrará automáticamente después de subir una foto.
                                     </p>
-                                </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    )
+                }
 
-                                <div className="pt-8 border-t">
-                                    <h3 className="text-lg font-medium text-destructive mb-4">Zona de Peligro</h3>
-                                    <Button
-                                        type="button"
-                                        variant="destructive"
-                                        className="w-full"
-                                        onClick={async () => {
-                                            await resetAll.mutateAsync();
-                                            toast.success("Evento reiniciado correctamente");
-                                        }}
-                                    >
+                {/* ================= DOWNLOADS TAB ================= */}
+                {
+                    activeTab === 'downloads' && (
+                        <div className="max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <Card className="bg-slate-900 border-slate-800 hover:border-blue-500/50 transition-all cursor-pointer group" onClick={handleDownloadApprovedPhotos}>
+                                <CardContent className="flex flex-col items-center justify-center py-12 gap-6">
+                                    <div className="w-20 h-20 bg-blue-500/10 rounded-full flex items-center justify-center text-blue-500 group-hover:scale-110 transition-transform">
+                                        <Images className="w-10 h-10" />
+                                    </div>
+                                    <div className="text-center">
+                                        <h3 className="text-xl font-bold text-white mb-2">Descargar Fotos (ZIP)</h3>
+                                        <p className="text-slate-400">Obtén todas las {stats.approved} fotos aprobadas en alta calidad.</p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="bg-slate-900 border-slate-800 hover:border-violet-500/50 transition-all cursor-pointer group" onClick={downloadMessagesPDF}>
+                                <CardContent className="flex flex-col items-center justify-center py-12 gap-6">
+                                    <div className="w-20 h-20 bg-violet-500/10 rounded-full flex items-center justify-center text-violet-500 group-hover:scale-110 transition-transform">
+                                        <Download className="w-10 h-10" />
+                                    </div>
+                                    <div className="text-center">
+                                        <h3 className="text-xl font-bold text-white mb-2">Libro de Firmas (PDF)</h3>
+                                        <p className="text-slate-400">Descarga un PDF elegante con los mensajes y saludos.</p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="bg-slate-900 border-slate-800 hover:border-pink-500/50 transition-all cursor-pointer group" onClick={handleDownloadQRPoster}>
+                                <CardContent className="flex flex-col items-center justify-center py-12 gap-6">
+                                    <div className="w-20 h-20 bg-pink-500/10 rounded-full flex items-center justify-center text-pink-500 group-hover:scale-110 transition-transform">
+                                        <QrCode className="w-10 h-10" />
+                                    </div>
+                                    <div className="text-center">
+                                        <h3 className="text-xl font-bold text-white mb-2">Póster QR (PDF)</h3>
+                                        <p className="text-slate-400">Descarga un póster listo para imprimir con el diseño del evento.</p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="bg-slate-900 border-slate-800 hover:border-red-500/50 transition-all cursor-pointer group" onClick={handleDownloadApprovedAudios}>
+                                <CardContent className="flex flex-col items-center justify-center py-12 gap-6">
+                                    <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center text-red-500 group-hover:scale-110 transition-transform">
+                                        <Music className="w-10 h-10" />
+                                    </div>
+                                    <div className="text-center">
+                                        <h3 className="text-xl font-bold text-white mb-2">Descargar Audios (ZIP)</h3>
+                                        <p className="text-slate-400">Obtén todas las notas de voz y saludos de audio aprobados.</p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    )
+                }
+
+                {/* ================= SETTINGS TAB (Legacy Form) ================= */}
+                {
+                    activeTab === 'settings' && (
+                        <div className="max-w-2xl">
+                            <Card className="bg-slate-900 border-slate-800 text-slate-100">
+                                <CardHeader><CardTitle className="text-slate-100">Información General</CardTitle></CardHeader>
+                                <CardContent className="space-y-6">
+                                    <div className="space-y-2">
+                                        <label className="text-sm text-slate-300">Título del Evento</label>
+                                        <Input value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} className="bg-slate-950 border-slate-700 text-white" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm text-slate-300">Descripción</label>
+                                        <Textarea value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} className="bg-slate-950 border-slate-700 text-white" />
+                                    </div>
+                                    <div className="pt-4 flex justify-end">
+                                        <Button onClick={handleSettingsSubmit} disabled={updateSettings.isPending}>Guardar Cambios</Button>
+                                    </div>
+
+                                    <div className="pt-8 border-t mt-8">
+                                        <h3 className="text-blue-400 font-medium mb-4">Herramientas de Prueba</h3>
+                                        <Button type="button" variant="outline" className="w-full border-blue-500/50 text-blue-400 hover:bg-blue-500/10" onClick={simulateParty}>
+                                            <Zap className="w-4 h-4 mr-2" /> ⚡ SIMULAR FIESTA (Stress Test)
+                                        </Button>
+                                        <p className="text-xs text-muted-foreground mt-2 text-center">
+                                            Genera fotos y mensajes falsos para probar el carrusel.
+                                        </p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <div className="mt-8 p-6 border border-red-900/30 bg-red-900/10 rounded-xl">
+                                <h3 className="text-red-400 font-bold mb-2">Zona de Peligro</h3>
+                                <div className="space-y-4">
+                                    <Button variant="destructive" className="w-full justify-start" onClick={handleClearApproved}>
+                                        <Trash2 className="w-4 h-4 mr-2" /> Vaciar Aprobados
+                                    </Button>
+                                    <Button variant="destructive" className="w-full justify-start" onClick={async () => { await resetAll.mutateAsync(); toast.success("Reset completo"); }}>
                                         <Trash2 className="w-4 h-4 mr-2" /> Reiniciar Evento (Borrar Todo)
                                     </Button>
-                                    <p className="text-xs text-muted-foreground mt-2 text-center">
-                                        Esto eliminará todas las fotos y mensajes permanentemente.
-                                    </p>
                                 </div>
-                            </form>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-
-                {isSuperAdmin && (
-                    <TabsContent value="access">
-                        <ProvidersManagement eventId={event.id} />
-                    </TabsContent>
-                )}
-            </Tabs>
-            {/* Modal de Prueba Photo Booth */}
-            {testPhotoBoothOpen && settings?.photobooth_frame_url && (
-                <PhotoBoothModal
-                    isOpen={testPhotoBoothOpen}
-                    onClose={() => setTestPhotoBoothOpen(false)}
-                    photoUrl="https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?q=80&w=1000&auto=format&fit=crop"
-                    frameUrl={settings.photobooth_frame_url}
-                />
-            )}
+                            </div>
+                        </div>
+                    )
+                }
+            </main >
         </div >
     );
 };

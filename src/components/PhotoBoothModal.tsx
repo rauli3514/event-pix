@@ -9,9 +9,11 @@ interface PhotoBoothModalProps {
     onClose: () => void;
     photoUrl: string;
     frameUrl?: string | null;
+    themeBackgroundUrl?: string | null;
+    eventName?: string;
 }
 
-export const PhotoBoothModal = ({ isOpen, onClose, photoUrl, frameUrl }: PhotoBoothModalProps) => {
+export const PhotoBoothModal = ({ isOpen, onClose, photoUrl, frameUrl, themeBackgroundUrl, eventName }: PhotoBoothModalProps) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isGenerating, setIsGenerating] = useState(true);
     const [finalImage, setFinalImage] = useState<string | null>(null);
@@ -45,27 +47,9 @@ export const PhotoBoothModal = ({ isOpen, onClose, photoUrl, frameUrl }: PhotoBo
             });
         };
 
-        // Helper: Redimensionar imagen para ahorrar memoria/tiempo
-        const resizeImage = (img: HTMLImageElement, maxWidth: number, maxHeight: number): HTMLCanvasElement => {
-            try {
-                const tempCanvas = document.createElement('canvas');
-                const tempCtx = tempCanvas.getContext('2d');
-                if (!tempCtx) throw new Error('No context');
-
-                const scale = Math.min(maxWidth / img.width, maxHeight / img.height, 1);
-                tempCanvas.width = img.width * scale;
-                tempCanvas.height = img.height * scale;
-
-                tempCtx.drawImage(img, 0, 0, tempCanvas.width, tempCanvas.height);
-                return tempCanvas;
-            } catch (e) {
-                console.error("Error resizing:", e);
-                return img as any; // Fallback
-            }
-        };
 
         const generateImage = async (retryCount = 0) => {
-            // Límite de reintentos (10 intentos * 100ms = 1 segundo máx)
+            // Límite de reintentos
             if (retryCount > 10) {
                 setError("Error interno: El canvas no se pudo inicializar a tiempo.");
                 setIsGenerating(false);
@@ -74,7 +58,6 @@ export const PhotoBoothModal = ({ isOpen, onClose, photoUrl, frameUrl }: PhotoBo
 
             const canvas = canvasRef.current;
             if (!canvas) {
-                // Si no hay canvas, esperar 100ms y reintentar
                 setTimeout(() => generateImage(retryCount + 1), 100);
                 return;
             }
@@ -88,105 +71,176 @@ export const PhotoBoothModal = ({ isOpen, onClose, photoUrl, frameUrl }: PhotoBo
             });
 
             if (!ctx) {
-                setError("Error interno: Contexto 2D no disponible");
+                setError("Contexto 2D no disponible");
                 setIsGenerating(false);
                 return;
             }
 
             try {
-                // 1. Configuración
-                const canvasWidth = 600;
-                const canvasHeight = 900;
+                // 1. Configuración (Instagram Story 900x1600 para buen balance calidad/peso)
+                const canvasWidth = 1080;
+                const canvasHeight = 1920;
                 canvas.width = canvasWidth;
                 canvas.height = canvasHeight;
 
-                // 2. Cargar Marco
-                if (frameUrl) {
+                // 2. Fondo Base (Themes)
+                // Intentar cargar fondo del tema
+                if (themeBackgroundUrl) {
                     try {
-                        console.log('Cargando marco...');
-                        // Usar fetch para evitar problemas de CORS con caché de navegador
-                        const response = await fetch(frameUrl);
-                        const blob = await response.blob();
-                        const objectUrl = URL.createObjectURL(blob);
+                        const themeBg = await loadImageWithTimeout(themeBackgroundUrl, 8000);
+                        // Object-fit: cover
+                        const scale = Math.max(canvasWidth / themeBg.width, canvasHeight / themeBg.height);
+                        const x = (canvasWidth - themeBg.width * scale) / 2;
+                        const y = (canvasHeight - themeBg.height * scale) / 2;
+                        ctx.drawImage(themeBg, x, y, themeBg.width * scale, themeBg.height * scale);
 
-                        const frame = await loadImageWithTimeout(objectUrl, 5000);
-                        URL.revokeObjectURL(objectUrl); // Limpiar memoria
+                        // Overlay oscuro elegante para resaltar el contenido central
+                        const gradient = ctx.createLinearGradient(0, 0, 0, canvasHeight);
+                        gradient.addColorStop(0, 'rgba(0,0,0,0.3)');
+                        gradient.addColorStop(0.5, 'rgba(0,0,0,0.5)'); // Más oscuro al centro si se quiere, o al revés
+                        gradient.addColorStop(1, 'rgba(0,0,0,0.7)');
+                        ctx.fillStyle = gradient;
+                        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-                        const optimizedFrame = resizeImage(frame, canvasWidth, canvasHeight);
-
-                        const scale = Math.max(canvasWidth / optimizedFrame.width, canvasHeight / optimizedFrame.height);
-                        const x = (canvasWidth - optimizedFrame.width * scale) / 2;
-                        const y = (canvasHeight - optimizedFrame.height * scale) / 2;
-                        ctx.drawImage(optimizedFrame, x, y, optimizedFrame.width * scale, optimizedFrame.height * scale);
                     } catch (e) {
-                        console.warn('Fallo carga de marco:', e);
-                        // No bloqueamos, seguimos con fondo blanco
-                        ctx.fillStyle = '#ffffff';
+                        console.warn('Fallo carga de fondo theme:', e);
+                        ctx.fillStyle = '#1a1a1a';
                         ctx.fillRect(0, 0, canvasWidth, canvasHeight);
                     }
                 } else {
-                    ctx.fillStyle = '#ffffff';
+                    // Gradiente por defecto si no hay tema
+                    const gradient = ctx.createLinearGradient(0, 0, 0, canvasHeight);
+                    gradient.addColorStop(0, '#2d1b4e'); // Purple dark
+                    gradient.addColorStop(1, '#000000');
+                    ctx.fillStyle = gradient;
                     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
                 }
 
-                // 3. Cargar Foto
-                console.log('Cargando foto...');
-                const photo = await loadImageWithTimeout(photoUrl, 8000);
-                console.log('✓ Foto lista');
+                // 3. Cargar Foto Usuario
+                const photo = await loadImageWithTimeout(photoUrl, 10000);
 
-                // 4. Dibujar
+                // 4. Dibujar Foto (Estilo Polaroid Flotante)
                 ctx.save();
-                const randomRotation = (Math.random() - 0.5) * 12 * (Math.PI / 180);
-                const randomX = (Math.random() - 0.5) * 40;
-                const randomY = (Math.random() - 0.5) * 40;
 
-                ctx.translate(canvasWidth / 2 + randomX, canvasHeight / 2 + randomY);
+                // Posición central desplazada ligeramente arriba para dejar espacio al texto abajo
+                const centerX = canvasWidth / 2;
+                const centerY = canvasHeight * 0.45;
+
+                // Rotación aleatoria muy sutil para naturalidad
+                const randomRotation = (Math.random() - 0.5) * 4 * (Math.PI / 180);
+
+                ctx.translate(centerX, centerY);
                 ctx.rotate(randomRotation);
 
-                const targetWidth = canvasWidth * 0.60; // Reducido al 60% (antes 75%)
-                const targetHeight = (photo.height / photo.width) * targetWidth;
+                // Dimensiones del Polaroid
+                const cardWidth = 850; // 80% del ancho aprox
+                const cardPadding = 40;
+                // Altura dinámica según foto pero con base mínima de polaroid
 
-                // Sombra más pronunciada (Efecto profundidad)
-                ctx.shadowColor = "rgba(0, 0, 0, 0.6)"; // Más oscura
-                ctx.shadowBlur = 30; // Más difusa
-                ctx.shadowOffsetX = 10;
-                ctx.shadowOffsetY = 15;
+                // Calcular dimensiones de foto para que entre en el ancho disponible (Card - Padding)
+                const availableWidth = cardWidth - (cardPadding * 2);
+                const scaleFactor = availableWidth / photo.width;
+                const photoDrawWidth = availableWidth;
+                const photoDrawHeight = photo.height * scaleFactor;
 
-                // Borde blanco (Polaroid)
-                const borderSize = 20; // Un poco más grueso para que se vea bien
+                // El alto total de la tarjeta es: PaddingTop + PhotoHeight + PaddingBottom (Extra para estilo polaroid)
+                const cardHeight = cardPadding + photoDrawHeight + cardPadding + 120; // 150px extra abajo
+
+                // Dibujar Sombra de la tarjeta
+                ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
+                ctx.shadowBlur = 60;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 30;
+
+                // Dibujar Tarjeta Blanca
                 ctx.fillStyle = "#ffffff";
-                ctx.fillRect(
-                    (-targetWidth / 2) - borderSize,
-                    (-targetHeight / 2) - borderSize,
-                    targetWidth + (borderSize * 2),
-                    targetHeight + (borderSize * 2)
-                );
+                // Centramos rectángulo en 0,0 relativo a la traslación
+                const cardX = -cardWidth / 2;
+                const cardY = -cardHeight / 2;
 
+                // Rounded rect manual simple o fillRect
+                ctx.fillRect(cardX, cardY, cardWidth, cardHeight);
+
+                // Reset shadow para la foto
                 ctx.shadowColor = "transparent";
-                ctx.drawImage(photo, -targetWidth / 2, -targetHeight / 2, targetWidth, targetHeight);
+                ctx.shadowBlur = 0;
+
+                // Dibujar Foto
+                const photoX = cardX + cardPadding;
+                const photoY = cardY + cardPadding;
+                ctx.drawImage(photo, photoX, photoY, photoDrawWidth, photoDrawHeight);
+
+                // Borde sutil a la foto para separarla del blanco si es muy clara
+                ctx.strokeStyle = "rgba(0,0,0,0.05)";
+                ctx.lineWidth = 1;
+                ctx.strokeRect(photoX, photoY, photoDrawWidth, photoDrawHeight);
+
+                // Marca de Agua (EventPix) dentro del borde blanco inferior
+                // Calculamos centro del espacio inferior disponible
+                // El espacio blanco abajo mide: cardPadding + 120px
+                const bottomSpaceHeight = cardPadding + 120;
+                const watermarkY = (cardHeight / 2) - (bottomSpaceHeight / 2) + 10; // +10 ajuste visual
+
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.font = 'bold 45px "Orbitron", sans-serif'; // Más grande y tecno
+                ctx.fillStyle = "#2563eb"; // Azul Eléctrico (Tailwind blue-600)
+                ctx.shadowColor = "rgba(0,0,0,0.1)"; // Sombra muy sutil
+                ctx.shadowBlur = 0;
+                ctx.fillText("EventPix", 0, watermarkY);
+
                 ctx.restore();
 
-                // 5. Exportar
+                // 5. Textos (Fuera de la rotación)
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                // Config text shadow común
+                ctx.shadowColor = "rgba(0,0,0,0.8)";
+                ctx.shadowBlur = 15;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 4;
+
+                // Nombre Evento
+                if (eventName) {
+                    // Ajustar fuente según largo
+                    const fontSize = eventName.length > 20 ? 70 : 90;
+                    ctx.font = `bold ${fontSize}px "Playfair Display", serif`; // Fuente elegante
+                    ctx.fillStyle = "#ffffff";
+
+                    const textY = canvasHeight * 0.82; // Abajo
+                    ctx.fillText(eventName, canvasWidth / 2, textY);
+
+                    // Fecha (Pequeña abajo del nombre)
+                    const date = new Date();
+                    const dateStr = date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                    // O formato texto: { day: 'numeric', month: 'long' }
+
+                    ctx.font = '300 36px "Montserrat", sans-serif'; // Fuente moderna limpia
+                    ctx.fillStyle = "rgba(255,255,255,0.9)";
+                    ctx.fillText(dateStr.replace(/\//g, '.'), canvasWidth / 2, textY + 70);
+                }
+
+                // 7. Exportar
                 try {
-                    const dataUrl = canvas.toDataURL('image/jpeg', 0.60);
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.90); // Alta calidad
                     setFinalImage(dataUrl);
-                    console.log('✅ Listo');
                 } catch (e: any) {
                     console.error("Error exportando canvas:", e);
-                    throw new Error("Error de seguridad (CORS) al exportar imagen. El marco debe permitir acceso cruzado.");
+                    throw new Error("Error de seguridad (CORS) al guardar imagen.");
                 }
 
             } catch (err: any) {
                 console.error("Error general:", err);
-                setError(err.message || "Error desconocido al generar imagen");
-                setFinalImage(photoUrl); // Fallback a foto original
+                setError(err.message || "Error generando imagen");
+                setFinalImage(photoUrl);
             } finally {
                 setIsGenerating(false);
             }
         };
 
         generateImage();
-    }, [isOpen, photoUrl, frameUrl]);
+    }, [isOpen, photoUrl, frameUrl, themeBackgroundUrl, eventName]); // Deps actualizadas
 
     const handleDownload = () => {
         if (finalImage) {
@@ -236,7 +290,7 @@ export const PhotoBoothModal = ({ isOpen, onClose, photoUrl, frameUrl }: PhotoBo
                 </DialogHeader>
 
                 <div className="p-6 flex flex-col items-center gap-6">
-                    <div className="relative w-full aspect-[2/3] bg-slate-900 flex items-center justify-center">
+                    <div className="relative w-full aspect-[9/16] bg-slate-900 flex items-center justify-center border border-slate-800 rounded-sm">
                         {isGenerating ? (
                             <div className="flex flex-col items-center gap-4">
                                 <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />

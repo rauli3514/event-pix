@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import imageCompression from 'browser-image-compression';
 import {
     Dialog,
@@ -29,6 +30,13 @@ export const UploadModal = ({ open, onOpenChange, eventId, onSuccess }: UploadMo
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const originalFile = e.target.files?.[0];
         if (originalFile) {
+            // Safety check: Prevent browser crash with massive files
+            if (originalFile.size > 50 * 1024 * 1024) {
+                toast.error("El archivo es demasiado grande (Máx 50MB).");
+                if (fileInputRef.current) fileInputRef.current.value = '';
+                return;
+            }
+
             try {
                 setIsCompressing(true);
 
@@ -56,7 +64,17 @@ export const UploadModal = ({ open, onOpenChange, eventId, onSuccess }: UploadMo
 
             } catch (error) {
                 console.error("Error al comprimir imagen:", error);
-                // Fallback: usar original si falla la compresión
+
+                // Si falla la compresión, verificamos si el original cumple los requisitos
+                const MAX_SIZE_MB = 5;
+                if (originalFile.size > MAX_SIZE_MB * 1024 * 1024) {
+                    toast.error(`La imagen es muy pesada (>${MAX_SIZE_MB}MB) y no se pudo comprimir automáticamente. Por favor intenta con una más ligera.`);
+                    setIsCompressing(false);
+                    if (fileInputRef.current) fileInputRef.current.value = '';
+                    return;
+                }
+
+                // Fallback: usar original si es < 5MB
                 setFile(originalFile);
                 const reader = new FileReader();
                 reader.onloadend = () => {

@@ -8,6 +8,7 @@ import EventsList from "./pages/EventsList";
 import ProvidersList from "./pages/ProvidersList";
 import Display from "./pages/Display";
 import Login from "./pages/Login";
+import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { EventProvider } from "./context/EventContext";
@@ -21,6 +22,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
 
           <Route element={<EventProvider><Outlet /></EventProvider>}>
             <Route element={<ProtectedRoute />}>

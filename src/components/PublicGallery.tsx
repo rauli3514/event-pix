@@ -30,7 +30,7 @@ export const PublicGallery = ({ eventId }: PublicGalleryProps) => {
             <DialogTrigger asChild>
                 <Button
                     variant="ghost"
-                    className="w-full mt-4 text-slate-500 hover:text-violet-600 hover:bg-violet-50 transition-colors gap-2"
+                    className="w-full mt-4 text-white/70 hover:text-white hover:bg-white/10 transition-colors gap-2"
                 >
                     <ImageIcon className="w-4 h-4" />
                     Ver Galería de Fotos

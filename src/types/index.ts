@@ -3,7 +3,7 @@ export type UserRole = 'super_admin' | 'provider';
 
 export interface Submission {
     id: string;
-    type: 'photo' | 'message';
+    type: 'photo' | 'message' | 'audio';
     content: string;
     author?: string;
     status: SubmissionStatus;
@@ -20,6 +20,8 @@ export interface Profile {
     email: string;
     name?: string;
     role: UserRole;
+    user_type?: 'client' | 'provider' | 'admin';
+    is_active?: boolean;
     created_at: string;
     updated_at: string;
 }

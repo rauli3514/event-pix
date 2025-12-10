@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Camera, MessageSquare } from "lucide-react";
-import { useEffect, useState } from "react";
+
+import { Camera, MessageSquare, Mic } from "lucide-react";
 import { ReactionBar } from "@/components/ReactionBar";
 import { PublicGallery } from "./PublicGallery";
 
@@ -10,100 +9,109 @@ import { useEventSettings } from "@/hooks/use-event-settings";
 interface EventCardProps {
     onUploadClick: () => void;
     onMessageClick: () => void;
+    onAudioClick: () => void;
     eventId: string;
 }
 
-export const EventCard = ({ onUploadClick, onMessageClick, eventId }: EventCardProps) => {
+export const EventCard = ({ onUploadClick, onMessageClick, onAudioClick, eventId }: EventCardProps) => {
     const { data: settings } = useEventSettings(eventId);
-    const [darkMode, setDarkMode] = useState(false);
-
-    // Detectar preferencia de modo oscuro del sistema
-    useEffect(() => {
-        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-        setDarkMode(mediaQuery.matches);
-
-        const handleChange = (e: MediaQueryListEvent) => setDarkMode(e.matches);
-        mediaQuery.addEventListener('change', handleChange);
-
-        return () => mediaQuery.removeEventListener('change', handleChange);
-    }, []);
 
     // Control para permitir mensajes de texto (default: true si no está definido)
-    const textMessagesEnabled = settings?.text_messages_enabled ?? true;
+    // const textMessagesEnabled = settings?.text_messages_enabled ?? true;
 
     return (
-        <Card className={`w-full overflow-hidden rounded-[2rem] shadow-2xl border transition-colors duration-300 ${darkMode
-            ? 'border-slate-700 bg-slate-800/90 backdrop-blur-xl hover:shadow-violet-900/50'
-            : 'border-white/60 bg-white/80 backdrop-blur-xl hover:shadow-3xl'
-            }`}>
-            <div className="relative aspect-[4/5] w-full overflow-hidden group">
-                <img
-                    src={settings?.background_image_url || "/event-hero.jpg"}
-                    alt="Event Hero"
-                    className="object-cover w-full h-full transition-transform duration-1000 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
+        <div className="w-full max-w-md mx-auto space-y-6">
+            {/* 1. Main Visual Card (Recuadro Grande) */}
+            <div className="relative w-full aspect-[4/3] rounded-[2rem] overflow-hidden shadow-2xl bg-slate-900 border border-white/10 group">
+                {/* Theme Background */}
+                <div className="absolute inset-0 z-0">
+                    <img
+                        src={settings?.background_image_url || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop"}
+                        alt="Event Banner"
+                        className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
+                    />
+                    {/* Gradient overlay for text readability */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/30" />
+                </div>
 
-                <div className="absolute bottom-0 left-0 p-8 w-full space-y-2">
-                    <h2 className="text-3xl md:text-4xl font-serif font-bold text-white tracking-tight leading-tight drop-shadow-md capitalize">
+                {/* Content: Logo Circle + Title */}
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-6 text-center">
+                    {/* Circle Logo */}
+                    <div className="relative w-32 h-32 mb-4 rounded-full p-1.5 bg-black/30 backdrop-blur-sm border border-white/20 shadow-2xl ring-2 ring-white/10">
+                        {settings?.splash_logo_url ? (
+                            <img
+                                src={settings.splash_logo_url}
+                                alt="Logo Evento"
+                                className="w-full h-full object-cover rounded-full shadow-inner"
+                            />
+                        ) : (
+                            <div className="w-full h-full bg-slate-800 rounded-full flex items-center justify-center border border-white/10">
+                                <span className="text-4xl">🎉</span>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Event Title */}
+                    <h2 className={`text-3xl md:text-4xl font-bold ${settings?.font_family || 'font-sans'} text-white drop-shadow-md leading-tight`}>
                         {settings?.title || "EventPix"}
                     </h2>
-                    <p className="text-white/90 text-sm md:text-base font-medium leading-relaxed drop-shadow-sm">
-                        {settings?.description || "Captura el momento, comparte la magia"}
-                    </p>
+                    {settings?.description && (
+                        <p className="text-white/80 text-sm mt-2 font-medium drop-shadow">{settings.description}</p>
+                    )}
                 </div>
             </div>
 
-            <div className={`p-8 grid gap-4 transition-colors duration-300 ${darkMode ? 'bg-slate-800/70 backdrop-blur-sm' : 'bg-white/50 backdrop-blur-sm'
-                }`}>
+            {/* 2. Action Buttons (Two separated blocks) */}
+            <div className="grid grid-cols-2 gap-4">
                 <Button
                     onClick={onUploadClick}
-                    className="w-full h-14 text-lg font-semibold bg-violet-600 hover:bg-violet-700 text-white rounded-full shadow-lg shadow-violet-200 transition-all hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2"
+                    className="h-16 bg-white hover:bg-slate-100 text-slate-900 font-bold text-lg rounded-2xl shadow-lg border-b-4 border-slate-300 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-2 group"
                 >
-                    <Camera className="h-5 w-5" />
-                    Subir Foto
+                    <Camera className="w-6 h-6 group-hover:scale-110 transition-transform text-violet-600" />
+                    SELFIE
                 </Button>
+                <Button
+                    onClick={onMessageClick}
+                    className="h-16 bg-white hover:bg-slate-100 text-slate-900 font-bold text-lg rounded-2xl shadow-lg border-b-4 border-slate-300 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-2 group"
+                >
+                    <MessageSquare className="w-6 h-6 group-hover:scale-110 transition-transform text-violet-600" />
+                    MENSAJE
+                </Button>
+            </div>
 
-                {/* Solo mostrar botón de mensaje si está habilitado */}
-                {textMessagesEnabled ? (
-                    <Button
-                        onClick={onMessageClick}
-                        variant="outline"
-                        className={`w-full h-14 text-lg font-medium rounded-full transition-all hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2 ${darkMode
-                            ? 'bg-slate-700 border-2 border-slate-600 hover:border-violet-400 hover:bg-slate-600 text-white'
-                            : 'bg-slate-50 border-2 border-slate-200 hover:border-violet-200 hover:bg-white text-slate-700'
-                            }`}
-                    >
-                        <MessageSquare className="h-5 w-5 text-violet-500" />
-                        Dejar Mensaje
-                    </Button>
-                ) : (
-                    <p className={`text-center text-sm py-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                        En este evento solo podés subir fotos.
-                    </p>
-                )}
+            {/* 3. Helper Text */}
+            <p className="text-center text-slate-300 text-sm font-medium px-4">
+                Comparte tus fotos y envía tus mensajes a la pantalla. <br />
+                <span className="text-violet-400">¡Vive la experiencia EventPix!</span>
+            </p>
 
-                {/* Barra de Reacciones en Vivo */}
+            {/* 4. Audio Button (Pill shape) */}
+            {(settings?.audio_messages_enabled ?? true) && (
+                <div
+                    className="relative h-16 rounded-full bg-slate-800/80 backdrop-blur-md border border-white/10 flex items-center pl-6 pr-2 cursor-pointer group hover:bg-slate-800 transition-colors shadow-lg"
+                    onClick={onAudioClick}
+                >
+                    <div className="flex-1 text-left">
+                        <span className="text-white/90 text-sm font-semibold">
+                            Envía un audio de recuerdo
+                        </span>
+                    </div>
+                    <div className="h-12 w-12 bg-red-500 rounded-full flex items-center justify-center shadow-lg shadow-red-500/30 group-hover:scale-110 transition-transform animate-pulse">
+                        <Mic className="text-white w-6 h-6" />
+                    </div>
+                </div>
+            )}
+
+            {/* 5. Extra Content (Reactions/Gallery) */}
+            <div className="space-y-4 pt-4">
                 {(settings?.reactions_enabled ?? true) && (
-                    <div className="pt-2 border-t border-slate-100/50">
+                    <div className="flex justify-center">
                         <ReactionBar eventId={eventId} />
                     </div>
                 )}
-
-                {/* Galería Pública (Solo si está activada) */}
                 <PublicGallery eventId={eventId} />
-
-                {/* Banner de marca fijo abajo */}
-                {settings?.frame_enabled && settings?.frame_image_url && (
-                    <div className="mt-2 w-full flex justify-center">
-                        <img
-                            src={settings.frame_image_url}
-                            alt="Patrocinado por"
-                            className="h-12 w-auto object-contain opacity-90"
-                        />
-                    </div>
-                )}
             </div>
-        </Card>
+        </div>
     );
 };
+

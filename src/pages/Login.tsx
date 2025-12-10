@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,43 +39,62 @@ const Login = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-background p-4">
-            <Card className="w-full max-w-md bg-card/50 backdrop-blur border-white/10">
-                <CardHeader>
-                    <CardTitle className="text-2xl font-script text-center text-primary">
-                        Admin Access
+        <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4 relative overflow-hidden">
+            {/* Background decoration */}
+            <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
+                <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-blue-600/20 rounded-full mix-blend-screen filter blur-[100px] animate-blob" />
+                <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-violet-600/20 rounded-full mix-blend-screen filter blur-[100px] animate-blob animation-delay-2000" />
+            </div>
+
+            <Card className="w-full max-w-md bg-slate-900/40 backdrop-blur-xl border-slate-800 shadow-2xl">
+                <CardHeader className="text-center pb-2">
+                    <div className="mx-auto w-16 h-16 bg-blue-600/20 rounded-2xl flex items-center justify-center mb-4 border border-blue-500/20 shadow-[0_0_15px_rgba(37,99,235,0.3)]">
+                        <span className="text-2xl">⚡</span>
+                    </div>
+                    <CardTitle className="text-3xl font-bold text-white font-[Orbitron] tracking-wide">
+                        EventPix <span className="text-blue-500">.</span>
                     </CardTitle>
+                    <p className="text-slate-400 text-sm mt-2">Acceso Administrativo</p>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-6">
                     <form onSubmit={handleLogin} className="space-y-4">
                         <div className="space-y-2">
                             <Input
                                 type="email"
-                                placeholder="Email"
+                                placeholder="Correo Electrónico"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                className="bg-black/20 border-white/10"
+                                className="bg-slate-950/50 border-slate-800 text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-blue-500/20"
                                 required
                             />
                         </div>
                         <div className="space-y-2">
                             <Input
                                 type="password"
-                                placeholder="Password"
+                                placeholder="Contraseña"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="bg-black/20 border-white/10"
+                                className="bg-slate-950/50 border-slate-800 text-white placeholder:text-slate-500 focus:border-blue-500/50 focus:ring-blue-500/20"
                                 required
                             />
                         </div>
                         <Button
                             type="submit"
-                            className="w-full bg-primary hover:bg-primary/90"
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-11 shadow-[0_4px_14px_0_rgba(37,99,235,0.39)] transition-all hover:scale-[1.02]"
                             disabled={loading}
                         >
-                            {loading ? "Entrando..." : "Entrar"}
+                            {loading ? "Verificando..." : "Ingresar"}
                         </Button>
                     </form>
+
+                    <div className="text-center pt-8">
+                        <p className="text-sm text-slate-500">
+                            ¿No tienes cuenta?{' '}
+                            <Link to="/register" className="font-semibold text-blue-400 hover:text-blue-300 transition-colors">
+                                Solicitar acceso
+                            </Link>
+                        </p>
+                    </div>
                 </CardContent>
             </Card>
         </div>

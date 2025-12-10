@@ -80,10 +80,18 @@ export const useSubmissions = (eventId?: string) => {
 
             let contentUrl = newSubmission.content;
 
-            if (newSubmission.type === 'photo' && newSubmission.file) {
-                const fileName = `${Date.now()}-${newSubmission.file.name}`;
+            if ((newSubmission.type === 'photo' || newSubmission.type === 'audio') && newSubmission.file) {
+                // Hard limit check (Safety net)
+                // If compression worked, it should be small. If logic bypassed or audio, limit to 15MB.
+                const MAX_SIZE = 15 * 1024 * 1024;
+                if (newSubmission.file.size > MAX_SIZE) {
+                    throw new Error(`El archivo es demasiado pesado (>${MAX_SIZE / 1024 / 1024}MB).`);
+                }
+
+                const folder = newSubmission.type === 'audio' ? 'audios' : 'photos';
+                const fileName = `${folder}/${Date.now()}-${newSubmission.file.name}`;
                 const { error: uploadError } = await supabase.storage
-                    .from('photos')
+                    .from('photos') // Reutilizamos el bucket 'photos' pero organizamos en carpetas si es posible, o todo en root con prefijo
                     .upload(fileName, newSubmission.file);
 
                 if (uploadError) throw uploadError;
@@ -95,17 +103,90 @@ export const useSubmissions = (eventId?: string) => {
                 contentUrl = publicUrl;
             }
 
-            const { error } = await supabase
+            const { data: settings } = await supabase
+                .from('event_settings')
+                .select('ai_moderation_enabled, ai_moderation_level')
+                .eq('event_id', eventId)
+                .maybeSingle();
+
+            const aiEnabled = settings?.ai_moderation_enabled ?? false;
+            let status = 'pending';
+
+            // Audio is auto-approved unless we want to change that later
+            if (newSubmission.type === 'audio') status = 'approved';
+
+            const { data: inserted, error } = await supabase
                 .from('submissions')
                 .insert([{
                     type: newSubmission.type,
                     content: contentUrl,
                     author: newSubmission.author,
-                    status: 'pending',
+                    status: status,
                     event_id: eventId
-                }]);
+                }])
+                .select()
+                .single();
 
             if (error) throw error;
+
+            // Trigger Client-Side AI Moderation
+            const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+
+            if (aiEnabled && apiKey && (newSubmission.type === 'photo' || newSubmission.type === 'message') && inserted) {
+                const level = settings?.ai_moderation_level || 'medium';
+                let promptInstruction = "Answer JSON: { \"safe\": boolean, \"reason\": string }.";
+                if (level === 'low') promptInstruction += " Be lenient. Only flag explicit nudity, sexual acts, or extreme gore.";
+                else if (level === 'high') promptInstruction += " Be strict. Flag any partial nudity, excessive alcohol, or rude gestures.";
+                else promptInstruction += " Standard moderation. Flag nudity, violence, hate symbols, and offensive content.";
+
+                // Non-blocking check
+                (async () => {
+                    try {
+                        let isSafe = true;
+
+                        if (newSubmission.type === 'message') {
+                            const res = await fetch('https://api.openai.com/v1/moderations', {
+                                method: 'POST',
+                                headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ input: contentUrl })
+                            });
+                            const data = await res.json();
+                            if (data.results) isSafe = !data.results[0].flagged;
+                        } else {
+                            const res = await fetch('https://api.openai.com/v1/chat/completions', {
+                                method: 'POST',
+                                headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    model: "gpt-4o",
+                                    messages: [{
+                                        role: "user",
+                                        content: [
+                                            { type: "text", text: `Is this image appropriate for a family event? ${promptInstruction}` },
+                                            { type: "image_url", image_url: { url: contentUrl } }
+                                        ]
+                                    }],
+                                    max_tokens: 300
+                                })
+                            });
+                            const data = await res.json();
+                            if (data.choices) {
+                                const jsonStr = data.choices[0].message.content.replace(/```json\n|\n```/g, '').trim();
+                                const analysis = JSON.parse(jsonStr);
+                                isSafe = analysis.safe;
+                            }
+                        }
+
+                        if (isSafe) {
+                            await supabase.from('submissions').update({ status: 'approved' }).eq('id', inserted.id);
+                            toast.success("¡Aprobado automáticamente por IA!");
+                        } else {
+                            toast.info("Contenido en revisión (Filtro IA)");
+                        }
+                    } catch (err) {
+                        console.error("AI Auto-Moderation Failed:", err);
+                    }
+                })();
+            }
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['submissions', eventId] });
