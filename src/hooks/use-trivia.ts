@@ -276,6 +276,47 @@ export const useFinishTriviaGame = (eventId?: string) => {
     });
 };
 
+export const useResetTriviaGame = (eventId?: string) => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (gameId: string) => {
+            // 1. Borrar respuestas
+            await supabase
+                .from('trivia_answers')
+                .delete()
+                .eq('game_id', gameId);
+
+            // 2. Borrar jugadores
+            await supabase
+                .from('trivia_players')
+                .delete()
+                .eq('game_id', gameId);
+
+            // 3. Resetear estado del juego a lobby
+            const { data, error } = await supabase
+                .from('trivia_games')
+                .update({
+                    status: 'lobby',
+                    current_question_id: null,
+                    question_started_at: null,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', gameId)
+                .select()
+                .single();
+
+            if (error) throw error;
+            return data as TriviaGame;
+        },
+        onSuccess: (_, gameId) => {
+            queryClient.invalidateQueries({ queryKey: ['trivia_game', eventId] });
+            queryClient.invalidateQueries({ queryKey: ['trivia_players', gameId] });
+            queryClient.invalidateQueries({ queryKey: ['trivia_answers_q'] });
+            queryClient.invalidateQueries({ queryKey: ['trivia_active', eventId] });
+        },
+    });
+};
+
 // ============================================================
 // GUEST HOOKS
 // ============================================================
@@ -289,7 +330,7 @@ export const useActiveTrivia = (eventId?: string) => {
                 .from('trivia_games')
                 .select('*')
                 .eq('event_id', eventId)
-                .in('status', ['lobby', 'active', 'results'])
+                .in('status', ['lobby', 'active', 'results', 'finished'])
                 .order('updated_at', { ascending: false })
                 .limit(1)
                 .maybeSingle();
@@ -415,6 +456,9 @@ export const useTriviaRealtime = (gameId: string | undefined, onUpdate: () => vo
                 filter: `id=eq.${gameId}`,
             }, () => { onUpdateRef.current(); })
             .on('broadcast', { event: 'question_launched' }, () => {
+                onUpdateRef.current();
+            })
+            .on('broadcast', { event: 'game_reset' }, () => {
                 onUpdateRef.current();
             })
             .subscribe();

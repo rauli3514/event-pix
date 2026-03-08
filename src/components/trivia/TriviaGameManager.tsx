@@ -14,7 +14,7 @@ import {
     useTriviaAnswersForQuestion, useCreateTriviaGame, useDeleteTriviaGame,
     useAddTriviaQuestion, useDeleteTriviaQuestion, useUpdateTriviaGame,
     useLaunchQuestion, useShowResults, useFinishTriviaGame,
-    useTriviaGamesList
+    useResetTriviaGame, useTriviaGamesList
 } from "@/hooks/use-trivia";
 import { TriviaOption } from "@/types";
 
@@ -70,6 +70,7 @@ export const TriviaGameManager = ({ eventId }: TriviaGameManagerProps) => {
     const launchQuestion = useLaunchQuestion(eventId);
     const showResults = useShowResults(eventId);
     const finishGame = useFinishTriviaGame(eventId);
+    const resetTrivia = useResetTriviaGame(eventId);
 
     const currentQuestionIndex = game?.current_question_id
         ? questions.findIndex(q => q.id === game.current_question_id)
@@ -143,6 +144,18 @@ export const TriviaGameManager = ({ eventId }: TriviaGameManagerProps) => {
     const handleShowResults = async () => {
         if (!game) return;
         await showResults.mutateAsync(game.id);
+    };
+
+    const handleResetTrivia = async () => {
+        if (!game) return;
+        setConfirmDialog({
+            message: '¿Estás seguro? Se borrarán TODOS los jugadores y sus respuestas. El juego volverá al Lobby.',
+            onConfirm: async () => {
+                await resetTrivia.mutateAsync(game.id);
+                toast.success("♻️ Trivia reseteada por completo");
+                setConfirmDialog(null);
+            }
+        });
     };
 
     const handleNextStep = async () => {
@@ -435,6 +448,16 @@ export const TriviaGameManager = ({ eventId }: TriviaGameManagerProps) => {
                                                     )}
                                                 </Button>
                                             )}
+                                        </div>
+
+                                        <div className="pt-4 border-t border-slate-800 flex justify-center">
+                                            <Button
+                                                variant="ghost"
+                                                onClick={handleResetTrivia}
+                                                className="text-red-500/50 hover:text-red-500 hover:bg-red-500/10 text-[10px] font-black uppercase tracking-tighter h-8"
+                                            >
+                                                Reiniciar por completo (Borrar todo)
+                                            </Button>
                                         </div>
                                     </CardContent>
                                 </Card>
