@@ -61,8 +61,12 @@ export const PhotoVoteDisplayOverlay = ({ eventId }: PhotoVoteDisplayOverlayProp
     // ===================== ACTIVE VOTING =====================
     if (session.status === 'active') {
         return (
-            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex flex-col items-center justify-center pointer-events-none p-12">
-                <div className="w-full max-w-5xl space-y-12">
+            <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-xl flex flex-col items-center justify-center p-12 overflow-hidden">
+                {/* Background Decor */}
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-pink-500 to-transparent shadow-[0_0_20px_rgba(236,72,153,1)]" />
+                <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-rose-500 to-transparent shadow-[0_0_20px_rgba(244,63,94,1)]" />
+
+                <div className="w-full max-w-6xl space-y-12 relative z-10 animate-fade-in">
                     {/* Header */}
                     <div className="text-center space-y-2">
                         <div className="flex items-center justify-center gap-4">
@@ -72,8 +76,11 @@ export const PhotoVoteDisplayOverlay = ({ eventId }: PhotoVoteDisplayOverlayProp
                             </h1>
                             <Zap className="w-12 h-12 text-pink-500 animate-pulse fill-pink-500" />
                         </div>
-                        <p className="text-xl text-pink-200/70 font-bold uppercase tracking-[0.2em]">
-                            Elegí tu favorita en tu celular y sumá puntos ❤️
+                        <p className="text-2xl text-pink-500 font-black uppercase tracking-[0.1em] bg-white/10 px-6 py-2 rounded-full border border-pink-500/30 animate-pulse">
+                            🎁 Votá en tu celular para ganar un premio 🎁
+                        </p>
+                        <p className="text-lg text-slate-300 font-bold uppercase tracking-widest pt-2">
+                            Escaneá el QR y elegí tu favorita ❤️
                         </p>
                     </div>
 
@@ -138,6 +145,16 @@ export const PhotoVoteDisplayOverlay = ({ eventId }: PhotoVoteDisplayOverlayProp
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    {/* Footer Call to Action */}
+                    <div className="bg-pink-600/20 border-2 border-pink-500/50 rounded-[2rem] p-8 text-center animate-bounce-slow">
+                        <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter mb-2">
+                            🎁 ¡PARTICIPÁ POR UN PREMIO! 🎁
+                        </h2>
+                        <p className="text-xl text-pink-100 font-bold uppercase tracking-widest">
+                            Escaneá el QR y votá la mejor foto en tu celular
+                        </p>
                     </div>
                 </div>
             </div>
