@@ -47,7 +47,6 @@ export const TriviaGameManager = ({ eventId }: TriviaGameManagerProps) => {
     const [newTriviaTitle, setNewTriviaTitle] = useState("");
 
     const [editingQuestion, setEditingQuestion] = useState<typeof EMPTY_QUESTION | null>(null);
-    const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [confirmDialog, setConfirmDialog] = useState<{
         message: string;
         onConfirm: () => void;
@@ -71,6 +70,10 @@ export const TriviaGameManager = ({ eventId }: TriviaGameManagerProps) => {
     const launchQuestion = useLaunchQuestion(eventId);
     const showResults = useShowResults(eventId);
     const finishGame = useFinishTriviaGame(eventId);
+
+    const currentQuestionIndex = game?.current_question_id
+        ? questions.findIndex(q => q.id === game.current_question_id)
+        : 0;
 
     const currentQuestion = questions[currentQuestionIndex] ?? null;
     const answeredCount = answersForCurrentQ.length;
@@ -122,40 +125,47 @@ export const TriviaGameManager = ({ eventId }: TriviaGameManagerProps) => {
 
     const handleOpenLobby = async () => {
         if (!game) return;
-        await updateGame.mutateAsync({ gameId: game.id, updates: { status: 'lobby' } });
+        await updateGame.mutateAsync({ gameId: game.id, updates: { status: 'lobby', current_question_id: questions[0]?.id || null } });
         toast.success("🏠 Lobby abierto — los invitados ya pueden unirse");
         setView('live');
     };
 
+    const handleLaunchQuestion = async (index?: number) => {
+        if (!game) return;
+        const targetIndex = index !== undefined ? index : currentQuestionIndex;
+        const targetQ = questions[targetIndex];
+        if (!targetQ) return;
 
-    const handleLaunchQuestion = async () => {
-        if (!game || !currentQuestion) return;
-        await launchQuestion.mutateAsync({ gameId: game.id, questionId: currentQuestion.id });
-        toast.success(`🚀 Pregunta ${currentQuestionIndex + 1} lanzada!`);
+        await launchQuestion.mutateAsync({ gameId: game.id, questionId: targetQ.id });
+        toast.success(`🚀 Lanzada Pregunta #${targetIndex + 1}`);
     };
 
     const handleShowResults = async () => {
         if (!game) return;
         await showResults.mutateAsync(game.id);
-        toast.info("📊 Mostrando resultados de la pregunta");
     };
 
-    const handleNextQuestion = async () => {
-        const nextIndex = currentQuestionIndex + 1;
-        if (nextIndex >= questions.length) {
-            if (game) {
+    const handleNextStep = async () => {
+        if (!game) return;
+
+        if (game.status === 'lobby') {
+            await handleLaunchQuestion(0);
+        } else if (game.status === 'active') {
+            await handleShowResults();
+        } else if (game.status === 'results') {
+            const nextIndex = currentQuestionIndex + 1;
+            if (nextIndex >= questions.length) {
                 await finishGame.mutateAsync(game.id);
-                toast.success("🏆 ¡Juego finalizado! Mostrando ranking final.");
+                toast.success("🏆 ¡Fin de la trivia!");
+            } else {
+                await handleLaunchQuestion(nextIndex);
             }
-        } else {
-            setCurrentQuestionIndex(nextIndex);
         }
     };
 
-
     const statusLabel: Record<string, { label: string; color: string }> = {
         setup: { label: 'En Preparación', color: 'text-slate-500' },
-        lobby: { label: 'Lobby Abierto', color: 'text-blue-400' },
+        lobby: { label: 'Esperando Jugadores', color: 'text-blue-400' },
         active: { label: 'Pregunta en Vivo', color: 'text-green-400 animate-pulse' },
         results: { label: 'Mostrando Resultados', color: 'text-yellow-400' },
         finished: { label: 'Finalizado', color: 'text-slate-400' },
@@ -404,19 +414,25 @@ export const TriviaGameManager = ({ eventId }: TriviaGameManagerProps) => {
                                         </div>
 
                                         <div className="flex gap-4">
-                                            {(game.status === 'lobby' || game.status === 'results') && (
-                                                <Button onClick={handleLaunchQuestion} className="flex-1 py-10 bg-green-600 hover:bg-green-700 text-2xl font-black uppercase italic shadow-lg shadow-green-500/20">
-                                                    <Play className="w-8 h-8 mr-4" /> Lanzar Ahora
+                                            {game.status === 'finished' ? (
+                                                <Button onClick={() => setSelectedGameId(null)} className="flex-1 py-10 bg-slate-800 text-2xl font-black uppercase italic">
+                                                    Volver al Inicio
                                                 </Button>
-                                            )}
-                                            {game.status === 'active' && (
-                                                <Button onClick={handleShowResults} className="flex-1 py-10 bg-yellow-500 hover:bg-yellow-600 text-2xl font-black uppercase italic text-slate-900">
-                                                    <BarChart3 className="w-8 h-8 mr-4" /> Cortar Tiempo
-                                                </Button>
-                                            )}
-                                            {game.status === 'results' && (
-                                                <Button onClick={handleNextQuestion} className="flex-1 py-10 bg-violet-600 hover:bg-violet-700 text-2xl font-black uppercase italic">
-                                                    <SkipForward className="w-8 h-8 mr-4" /> Siguiente
+                                            ) : (
+                                                <Button
+                                                    onClick={handleNextStep}
+                                                    className={`flex-1 py-10 text-2xl font-black uppercase italic shadow-lg transition-all transform active:scale-95 ${game.status === 'lobby' ? 'bg-green-600 hover:bg-green-700 shadow-green-500/20' :
+                                                        game.status === 'active' ? 'bg-yellow-500 hover:bg-yellow-600 shadow-yellow-500/20 text-slate-900' :
+                                                            'bg-violet-600 hover:bg-violet-700 shadow-violet-500/20'
+                                                        }`}
+                                                >
+                                                    {game.status === 'lobby' && <><Play className="w-8 h-8 mr-4" /> Comenzar Trivia</>}
+                                                    {game.status === 'active' && <><BarChart3 className="w-8 h-8 mr-4" /> Cortar Tiempo</>}
+                                                    {game.status === 'results' && (
+                                                        currentQuestionIndex + 1 >= questions.length
+                                                            ? <><SkipForward className="w-8 h-8 mr-4" /> Ver Ranking Final</>
+                                                            : <><Play className="w-8 h-8 mr-4" /> Lanzar Siguiente Pregunta</>
+                                                    )}
                                                 </Button>
                                             )}
                                         </div>
