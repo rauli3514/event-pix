@@ -19,6 +19,8 @@ import { useIsSuperAdmin } from "@/hooks/use-roles";
 import { ProvidersManagement } from "@/components/ProvidersManagement";
 import { ThemeSelector } from "@/components/admin/ThemeSelector";
 import { SubmissionCard } from "@/components/admin/SubmissionCard";
+import { TriviaGameManager } from "@/components/trivia/TriviaGameManager";
+import { PhotoVoteManager } from "@/components/photovote/PhotoVoteManager";
 
 const Admin = () => {
     const { event, isLoading: eventLoading } = useEvent();
@@ -1130,6 +1132,25 @@ const Admin = () => {
                         </div>
                     )
                 }
+
+                {/* ================= TRIVIA TAB ================= */}
+                {
+                    activeTab === 'trivia' && event && (
+                        <div className="max-w-6xl">
+                            <TriviaGameManager eventId={event.id} />
+                        </div>
+                    )
+                }
+
+                {/* ================= PHOTO BATTLE / VOTING TAB ================= */}
+                {
+                    activeTab === 'voting' && event && (
+                        <div className="max-w-6xl">
+                            <PhotoVoteManager eventId={event.id} />
+                        </div>
+                    )
+                }
+
 
                 {/* ================= DOWNLOADS TAB ================= */}
                 {

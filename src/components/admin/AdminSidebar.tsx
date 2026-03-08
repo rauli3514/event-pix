@@ -8,7 +8,9 @@ import {
     Settings,
     Download,
     LogOut,
-    Monitor
+    Monitor,
+    Gamepad2,
+    Heart
 } from "lucide-react";
 
 interface AdminSidebarProps {
@@ -23,11 +25,14 @@ export const AdminSidebar = ({ activeTab, onTabChange, onLogout, eventName, clas
     const mainNav = [
         { id: "dashboard", label: "Inicio", icon: LayoutDashboard },
         { id: "moderation", label: "Moderación", icon: Images },
+        { id: "trivia", label: "Trivia", icon: Gamepad2 },
+        { id: "voting", label: "Votación", icon: Heart },
         { id: "design", label: "Diseño y Temas", icon: Palette },
         { id: "display", label: "Pantalla", icon: Monitor },
         { id: "settings", label: "Ajustes", icon: Settings },
         { id: "downloads", label: "Descargas", icon: Download },
     ];
+
 
     return (
         <div className={cn("hidden md:flex w-64 flex-col bg-slate-950 border-r border-slate-800 h-screen fixed left-0 top-0 z-50", className)}>

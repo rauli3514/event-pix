@@ -1,7 +1,3 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 @import "@fontsource/playfair-display";
 @import "@fontsource/pinyon-script";
 @import "@fontsource/montserrat";
@@ -11,6 +7,11 @@
 @import "@fontsource/parisienne";
 @import "@fontsource/cinzel";
 @import "@fontsource/great-vibes";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 
 @layer base {
   :root {

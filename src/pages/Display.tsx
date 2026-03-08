@@ -3,6 +3,8 @@ import { useEventSettings } from "@/hooks/use-event-settings";
 import { GridTemplate } from "@/components/display/GridTemplate";
 import { SlideshowTemplate } from "@/components/display/SlideshowTemplate";
 import { MasonryTemplate } from "@/components/display/MasonryTemplate";
+import { PhotoVoteDisplayOverlay } from "@/components/photovote/PhotoVoteDisplayOverlay";
+import { TriviaDisplayOverlay } from "@/components/trivia/TriviaDisplayOverlay";
 
 const Display = () => {
     const { event, isLoading: eventLoading } = useEvent();
@@ -31,6 +33,10 @@ const Display = () => {
             {template === 'grid' && <GridTemplate eventId={event.id} />}
             {template === 'slideshow' && <SlideshowTemplate eventId={event.id} />}
             {template === 'masonry' && <MasonryTemplate eventId={event.id} />}
+
+            {/* Overlays para juegos dinámicos */}
+            <PhotoVoteDisplayOverlay eventId={event.id} />
+            <TriviaDisplayOverlay eventId={event.id} />
         </div>
     );
 };

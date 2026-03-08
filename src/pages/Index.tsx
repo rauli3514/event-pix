@@ -9,6 +9,8 @@ import { TermsModal } from "@/components/TermsModal";
 import { ChallengeRoulette } from "@/components/ChallengeRoulette";
 import { SplashScreen } from "@/components/SplashScreen";
 import { PhotoBoothModal } from "@/components/PhotoBoothModal";
+import { TriviaGuestView } from "@/components/trivia/TriviaGuestView";
+import { PhotoBattleView } from "@/components/photovote/PhotoBattleView";
 import { useEventSettings } from "@/hooks/use-event-settings";
 import { FaWhatsapp, FaInstagram, FaTiktok } from "react-icons/fa";
 
@@ -83,12 +85,18 @@ const Index = () => {
             <main className="flex-1 relative z-10 container px-4 flex flex-col items-center justify-center py-6">
                 <div className="w-full max-w-md mx-auto animate-fade-in-up">
                     {event.status === 'active' ? (
-                        <EventCard
-                            onUploadClick={() => setUploadOpen(true)}
-                            onMessageClick={() => setMessageOpen(true)}
-                            onAudioClick={() => setAudioOpen(true)}
-                            eventId={event.id}
-                        />
+                        <>
+                            {/* Los juegos dinámicos aparecen encima cuando están activos */}
+                            <TriviaGuestView eventId={event.id} />
+                            <PhotoBattleView eventId={event.id} />
+
+                            <EventCard
+                                onUploadClick={() => setUploadOpen(true)}
+                                onMessageClick={() => setMessageOpen(true)}
+                                onAudioClick={() => setAudioOpen(true)}
+                                eventId={event.id}
+                            />
+                        </>
                     ) : (
                         <div className="bg-white/10 backdrop-blur-md p-8 rounded-3xl text-center border border-white/10 shadow-2xl">
                             <h2 className="text-2xl font-bold text-white mb-4">Evento Finalizado</h2>
