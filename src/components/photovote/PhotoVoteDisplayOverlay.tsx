@@ -71,15 +71,15 @@ export const PhotoVoteDisplayOverlay = ({ eventId }: PhotoVoteDisplayOverlayProp
                     <div className="text-center space-y-2">
                         <div className="flex items-center justify-center gap-4">
                             <Zap className="w-12 h-12 text-pink-500 animate-pulse fill-pink-500" />
-                            <h1 className="text-5xl font-black text-white tracking-tight uppercase italic">
+                            <h1 className="text-3xl font-black text-white tracking-tight uppercase italic">
                                 ¡Batalla de Fotos!
                             </h1>
                             <Zap className="w-12 h-12 text-pink-500 animate-pulse fill-pink-500" />
                         </div>
-                        <p className="text-2xl text-pink-500 font-black uppercase tracking-[0.1em] bg-white/10 px-6 py-2 rounded-full border border-pink-500/30 animate-pulse">
+                        <p className="text-lg text-pink-500 font-black uppercase tracking-[0.1em] bg-white/10 px-4 py-1.5 rounded-full border border-pink-500/30 animate-pulse">
                             🎁 Votá en tu celular para ganar un premio 🎁
                         </p>
-                        <p className="text-lg text-slate-300 font-bold uppercase tracking-widest pt-2">
+                        <p className="text-sm text-slate-300 font-bold uppercase tracking-widest pt-1">
                             Escaneá el QR y elegí tu favorita ❤️
                         </p>
                     </div>
@@ -122,37 +122,37 @@ export const PhotoVoteDisplayOverlay = ({ eventId }: PhotoVoteDisplayOverlayProp
                         </div>
 
                         {/* Stats Side */}
-                        <div className="flex flex-col items-center justify-center space-y-8">
-                            <div className="text-center space-y-1">
-                                <div className="text-[10rem] font-black text-white leading-none drop-shadow-[0_0_50px_rgba(255,255,255,0.2)]">
+                        <div className="flex flex-col items-center justify-center space-y-4">
+                            <div className="text-center">
+                                <div className="text-[6rem] font-black text-white leading-none drop-shadow-[0_0_50px_rgba(255,255,255,0.2)]">
                                     {totalVotes}
                                 </div>
-                                <div className="text-3xl font-black text-pink-500 uppercase tracking-widest">
+                                <div className="text-2xl font-black text-pink-500 uppercase tracking-widest">
                                     Votos Totales ❤️
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
-                                <div className="bg-white/5 rounded-2xl p-6 text-center border border-white/5">
-                                    <ImageIcon className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                                    <p className="text-2xl font-black text-white">{competingPhotos.length}</p>
-                                    <p className="text-slate-400 font-bold uppercase text-xs mt-1">Fotos</p>
+                            <div className="grid grid-cols-2 gap-3 w-full max-w-xs">
+                                <div className="bg-white/5 rounded-xl p-4 text-center border border-white/5">
+                                    <ImageIcon className="w-6 h-6 text-slate-400 mx-auto mb-1" />
+                                    <p className="text-xl font-black text-white">{competingPhotos.length}</p>
+                                    <p className="text-slate-400 font-bold uppercase text-[10px] mt-1">Fotos</p>
                                 </div>
-                                <div className="bg-white/5 rounded-2xl p-6 text-center border border-white/5">
-                                    <Users className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                                    <p className="text-2xl font-black text-white">{ranking.length}</p>
-                                    <p className="text-slate-400 font-bold uppercase text-xs mt-1">Votadas</p>
+                                <div className="bg-white/5 rounded-xl p-4 text-center border border-white/5">
+                                    <Users className="w-6 h-6 text-slate-400 mx-auto mb-1" />
+                                    <p className="text-xl font-black text-white">{ranking.length}</p>
+                                    <p className="text-slate-400 font-bold uppercase text-[10px] mt-1">Votadas</p>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     {/* Footer Call to Action */}
-                    <div className="bg-pink-600/20 border-2 border-pink-500/50 rounded-[2rem] p-8 text-center animate-bounce-slow">
-                        <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter mb-2">
+                    <div className="bg-pink-600/20 border border-pink-500/50 rounded-2xl p-4 text-center animate-bounce-slow">
+                        <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter mb-1">
                             🎁 ¡PARTICIPÁ POR UN PREMIO! 🎁
                         </h2>
-                        <p className="text-xl text-pink-100 font-bold uppercase tracking-widest">
+                        <p className="text-sm text-pink-100 font-bold uppercase tracking-widest">
                             Escaneá el QR y votá la mejor foto en tu celular
                         </p>
                     </div>

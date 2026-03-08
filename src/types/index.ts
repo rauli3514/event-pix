@@ -69,7 +69,6 @@ export interface TriviaGame {
     updated_at: string;
 }
 
-
 export interface TriviaQuestion {
     id: string;
     game_id: string;
@@ -95,6 +94,7 @@ export interface TriviaPlayer {
     answers_correct: number;
     answers_total: number;
     last_answer_at: string | null;
+    is_eliminated?: boolean;
     created_at: string;
 }
 
@@ -126,7 +126,6 @@ export interface PhotoVoteSession {
     updated_at: string;
 }
 
-
 export interface PhotoVote {
     id: string;
     session_id: string;
@@ -141,4 +140,3 @@ export interface PhotoVoteRanking {
     submission_id: string;
     vote_count: number;
 }
-
