@@ -350,8 +350,24 @@ export const useActiveTrivia = (eventId?: string) => {
                 .order('updated_at', { ascending: false })
                 .limit(1)
                 .maybeSingle();
+
             if (error) throw error;
-            return data as TriviaGame | null;
+            if (!data) return null;
+
+            const game = data as TriviaGame;
+
+            // Si el juego está en 'finished', solo lo consideramos "activo"
+            // si se terminó hace menos de 2 minutos (para mostrar el ganador en el muro)
+            // Después de eso, desaparece automáticamente de las pantallas.
+            if (game.status === 'finished') {
+                const updatedAt = new Date(game.updated_at).getTime();
+                const now = Date.now();
+                if (now - updatedAt > 120000) { // 2 minutos
+                    return null;
+                }
+            }
+
+            return game;
         },
         enabled: !!eventId,
         refetchInterval: 3000,
@@ -456,21 +472,26 @@ export const useTriviaTimer = (questionStartedAt: string | null, durationSeconds
 // REALTIME HOOK (escuchar cambios del juego en tiempo real)
 // ============================================================
 
-export const useTriviaRealtime = (gameId: string | undefined, onUpdate: () => void) => {
+export const useTriviaRealtime = (eventId: string | undefined, gameId: string | undefined, onUpdate: () => void) => {
     const onUpdateRef = useRef(onUpdate);
     onUpdateRef.current = onUpdate;
 
     useEffect(() => {
-        if (!gameId) return;
+        if (!eventId) return;
 
+        // Escuchamos cambios generales de trivias para este evento
+        // Esto permite detectar cuando un juego pasa de 'setup' a 'lobby' o 'active' instantáneamente
         const channel = supabase
-            .channel(`trivia-sync-${gameId}`)
+            .channel(`trivia-sync-global-${eventId}`)
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
                 table: 'trivia_games',
-                filter: `id=eq.${gameId}`,
-            }, () => { onUpdateRef.current(); })
+                filter: `event_id=eq.${eventId}`,
+            }, () => {
+                onUpdateRef.current();
+            })
+            // También mantenemos escucha de broadcasts si hay un juego específico
             .on('broadcast', { event: 'question_launched' }, () => {
                 onUpdateRef.current();
             })
@@ -480,5 +501,5 @@ export const useTriviaRealtime = (gameId: string | undefined, onUpdate: () => vo
             .subscribe();
 
         return () => { supabase.removeChannel(channel); };
-    }, [gameId]);
+    }, [eventId, gameId]);
 };

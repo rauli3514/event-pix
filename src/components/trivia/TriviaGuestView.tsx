@@ -107,7 +107,7 @@ export const TriviaGuestView = ({ eventId }: TriviaGuestViewProps) => {
     }, [game?.current_question_id, allQuestions]);
 
     // Realtime
-    useTriviaRealtime(game?.id, () => {
+    useTriviaRealtime(eventId, game?.id, () => {
         queryClient.invalidateQueries({ queryKey: ['trivia_active', eventId] });
         queryClient.invalidateQueries({ queryKey: ['trivia_players', game?.id] });
         refetchGame();
