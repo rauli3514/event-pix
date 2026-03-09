@@ -6,9 +6,9 @@ import {
     TriviaGame, TriviaQuestion, TriviaPlayer, TriviaAnswer, TriviaOption
 } from '@/types';
 
-// ============================================================
-// ADMIN HOOKS
-// ============================================================
+/**
+ * HOOKS DE ADMINISTRACIÓN
+ */
 
 export const useTriviaGamesList = (eventId?: string) => {
     return useQuery({
@@ -41,7 +41,6 @@ export const useTriviaGame = (gameId?: string) => {
             return data as TriviaGame | null;
         },
         enabled: !!gameId,
-        refetchInterval: 5000,
     });
 };
 
@@ -80,7 +79,6 @@ export const useTriviaSortedPlayers = (gameId?: string) => {
     });
 };
 
-
 export const useTriviaAnswersForQuestion = (questionId?: string) => {
     return useQuery({
         queryKey: ['trivia_answers_q', questionId],
@@ -94,13 +92,13 @@ export const useTriviaAnswersForQuestion = (questionId?: string) => {
             return data as TriviaAnswer[];
         },
         enabled: !!questionId,
-        refetchInterval: 1000,
+        refetchInterval: 2000,
     });
 };
 
-// ============================================================
-// ADMIN MUTATIONS
-// ============================================================
+/**
+ * MUTATIONS DE ADMINISTRACIÓN
+ */
 
 export const useCreateTriviaGame = (eventId?: string) => {
     const queryClient = useQueryClient();
@@ -138,7 +136,6 @@ export const useDeleteTriviaGame = (eventId?: string) => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['trivia_games_list', eventId] });
-            queryClient.invalidateQueries({ queryKey: ['trivia_game'] });
             queryClient.invalidateQueries({ queryKey: ['trivia_active', eventId] });
         },
     });
@@ -192,8 +189,8 @@ export const useUpdateTriviaGame = (eventId?: string) => {
             if (error) throw error;
             return data as TriviaGame;
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['trivia_game'] });
+        onSuccess: (_, { gameId }) => {
+            queryClient.invalidateQueries({ queryKey: ['trivia_game', gameId] });
             queryClient.invalidateQueries({ queryKey: ['trivia_active', eventId] });
         },
     });
@@ -217,23 +214,23 @@ export const useLaunchQuestion = (eventId?: string) => {
                 .single();
             if (error) throw error;
 
-            // Broadcast opcional, pero lo más importante es el cambio en la DB
+            // Broadcast para sincronización inmediata
             const channel = supabase.channel(`trivia-sync-${eventId}`);
-            channel.subscribe((status) => {
+            channel.subscribe(async (status) => {
                 if (status === 'SUBSCRIBED') {
-                    channel.send({
+                    await channel.send({
                         type: 'broadcast',
                         event: 'question_launched',
                         payload: { gameId, questionId, startedAt: now },
                     });
-                    setTimeout(() => { supabase.removeChannel(channel); }, 500);
+                    supabase.removeChannel(channel);
                 }
             });
 
             return data as TriviaGame;
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['trivia_game'] });
+        onSuccess: (_, { gameId }) => {
+            queryClient.invalidateQueries({ queryKey: ['trivia_game', gameId] });
             queryClient.invalidateQueries({ queryKey: ['trivia_active', eventId] });
         },
     });
@@ -252,8 +249,8 @@ export const useShowResults = (eventId?: string) => {
             if (error) throw error;
             return data as TriviaGame;
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['trivia_game'] });
+        onSuccess: (_, gameId) => {
+            queryClient.invalidateQueries({ queryKey: ['trivia_game', gameId] });
             queryClient.invalidateQueries({ queryKey: ['trivia_active', eventId] });
         },
     });
@@ -272,8 +269,8 @@ export const useFinishTriviaGame = (eventId?: string) => {
             if (error) throw error;
             return data as TriviaGame;
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['trivia_game'] });
+        onSuccess: (_, gameId) => {
+            queryClient.invalidateQueries({ queryKey: ['trivia_game', gameId] });
             queryClient.invalidateQueries({ queryKey: ['trivia_active', eventId] });
         },
     });
@@ -285,53 +282,53 @@ export const useResetTriviaGame = (eventId?: string) => {
         mutationFn: async (gameId: string) => {
             if (!eventId) throw new Error('No event ID');
 
-            // Intento manual por si el RPC no está
-            const { error: errAns } = await supabase.from('trivia_answers').delete().eq('game_id', gameId);
-            if (errAns) console.error("Error clearing answers:", errAns);
+            // USAR RPC SIEMPRE QUE SEA POSIBLE PARA ATOMICIDAD Y PERMISOS
+            const { error: rpcError } = await supabase.rpc('admin_reset_trivia', { p_game_id: gameId });
 
-            const { error: errPla } = await supabase.from('trivia_players').delete().eq('game_id', gameId);
-            if (errPla) console.error("Error clearing players:", errPla);
+            if (rpcError) {
+                console.warn("RPC admin_reset_trivia failed, falling back to manual delete:", rpcError);
+                // Fallback manual
+                await supabase.from('trivia_answers').delete().eq('game_id', gameId);
+                await supabase.from('trivia_players').delete().eq('game_id', gameId);
+                const { error: updateError } = await supabase
+                    .from('trivia_games')
+                    .update({
+                        status: 'lobby',
+                        question_started_at: null,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', gameId);
+                if (updateError) throw updateError;
+            }
 
-            const { data, error } = await supabase
-                .from('trivia_games')
-                .update({
-                    status: 'lobby',
-                    question_started_at: null,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', gameId)
-                .select()
-                .single();
-
-            if (error) throw error;
-
-            // Broadcast para que los invitados limpien su pantalla
+            // Broadcast para que todos los clientes limpien estado
             const channel = supabase.channel(`trivia-sync-${eventId}`);
-            channel.subscribe((status) => {
+            channel.subscribe(async (status) => {
                 if (status === 'SUBSCRIBED') {
-                    channel.send({
+                    await channel.send({
                         type: 'broadcast',
                         event: 'game_reset',
                         payload: { gameId },
                     });
-                    setTimeout(() => { supabase.removeChannel(channel); }, 500);
+                    supabase.removeChannel(channel);
                 }
             });
 
-            return data;
+            return true;
         },
         onSuccess: (_, gameId) => {
-            queryClient.invalidateQueries({ queryKey: ['trivia_game'] });
-            queryClient.invalidateQueries({ queryKey: ['trivia_players', gameId] });
-            queryClient.invalidateQueries({ queryKey: ['trivia_active', eventId] });
             queryClient.invalidateQueries({ queryKey: ['trivia_games_list', eventId] });
+            queryClient.invalidateQueries({ queryKey: ['trivia_game', gameId] });
+            queryClient.invalidateQueries({ queryKey: ['trivia_active', eventId] });
+            queryClient.invalidateQueries({ queryKey: ['trivia_players', gameId] });
+            queryClient.invalidateQueries({ queryKey: ['trivia_answers_q'] });
         },
     });
 };
 
-// ============================================================
-// GUEST HOOKS
-// ============================================================
+/**
+ * HOOKS DE INVITADO
+ */
 
 export const useActiveTrivia = (eventId?: string) => {
     return useQuery({
@@ -355,17 +352,17 @@ export const useActiveTrivia = (eventId?: string) => {
             if (game.status === 'finished') {
                 const updatedAt = new Date(game.updated_at).getTime();
                 const now = Date.now();
-                if (now - updatedAt > 300000) return null; // 5 minutos para que desaparezca
+                if (now - updatedAt > 300000) return null; // 5 minutos de visibilidad post-finish
             }
 
             return game;
         },
         enabled: !!eventId,
-        refetchInterval: 3000,
     });
 };
 
 export const useJoinTriviaGame = () => {
+    const queryClient = useQueryClient();
     return useMutation({
         mutationFn: async ({
             gameId, eventId, playerName
@@ -378,6 +375,9 @@ export const useJoinTriviaGame = () => {
             if (error) throw error;
             return data as TriviaPlayer;
         },
+        onSuccess: (_, vars) => {
+            queryClient.invalidateQueries({ queryKey: ['trivia_players', vars.gameId] });
+        }
     });
 };
 
@@ -403,7 +403,13 @@ export const useSubmitTriviaAnswer = () => {
                 p_question_duration: questionDuration,
             });
             if (error) throw error;
-            return data as { is_correct: boolean; points_earned: number; speed_bonus: number; already_answered: boolean; is_eliminated: boolean };
+            return data as {
+                is_correct: boolean;
+                points_earned: number;
+                speed_bonus: number;
+                already_answered: boolean;
+                is_eliminated: boolean
+            };
         },
         onSuccess: (_, vars) => {
             queryClient.invalidateQueries({ queryKey: ['trivia_players', vars.gameId] });
@@ -412,9 +418,9 @@ export const useSubmitTriviaAnswer = () => {
     });
 };
 
-// ============================================================
-// TIMER HOOK
-// ============================================================
+/**
+ * TIMER HOOK
+ */
 
 export const useTriviaTimer = (questionStartedAt: string | null, durationSeconds: number) => {
     const [timeLeft, setTimeLeft] = useState(durationSeconds);
@@ -446,9 +452,9 @@ export const useTriviaTimer = (questionStartedAt: string | null, durationSeconds
     return { timeLeft, isExpired };
 };
 
-// ============================================================
-// REALTIME HOOK - UNIFICADO Y ROBUSTO
-// ============================================================
+/**
+ * REALTIME HOOK - UNIFICADO
+ */
 
 export const useTriviaRealtime = (eventId: string | undefined, callbacks: {
     onUpdate?: () => void;
@@ -462,7 +468,7 @@ export const useTriviaRealtime = (eventId: string | undefined, callbacks: {
         if (!eventId) return;
 
         const channel = supabase
-            .channel(`trivia-global-${eventId}`)
+            .channel(`trivia-sync-${eventId}`)
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
@@ -476,6 +482,7 @@ export const useTriviaRealtime = (eventId: string | undefined, callbacks: {
                 callbacksRef.current.onQuestionLaunched?.(payload);
             })
             .on('broadcast', { event: 'game_reset' }, () => {
+                // El reset es una actualización mayor
                 callbacksRef.current.onUpdate?.();
                 callbacksRef.current.onReset?.();
             })

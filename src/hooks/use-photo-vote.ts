@@ -32,7 +32,6 @@ export const useActivePhotoVoteSession = (eventId?: string) => {
             return data as PhotoVoteSession | null;
         },
         enabled: !!eventId,
-        refetchInterval: 3000,
     });
 };
 
@@ -53,7 +52,6 @@ export const usePhotoVoteSession = (eventId?: string) => {
             return data as PhotoVoteSession | null;
         },
         enabled: !!eventId,
-        refetchInterval: 3000,
     });
 };
 
@@ -90,7 +88,7 @@ export const usePhotoVoteRanking = (sessionId?: string) => {
             return data as PhotoVoteRanking[];
         },
         enabled: !!sessionId,
-        refetchInterval: 2000,
+        refetchInterval: 5000,
     });
 };
 
@@ -146,6 +144,20 @@ export const useUpdatePhotoVoteSession = (eventId?: string) => {
                 .select()
                 .single();
             if (error) throw error;
+
+            // Broadcast para sincronizar cambios de estado (activar/finalizar)
+            const channel = supabase.channel(`photo-vote-sync-${eventId}`);
+            channel.subscribe(async (status) => {
+                if (status === 'SUBSCRIBED') {
+                    await channel.send({
+                        type: 'broadcast',
+                        event: 'session_update',
+                        payload: { sessionId, updates },
+                    });
+                    supabase.removeChannel(channel);
+                }
+            });
+
             return data as PhotoVoteSession;
         },
 
@@ -210,13 +222,17 @@ export const usePhotoVoteRealtime = (eventId: string | undefined, onUpdate: () =
         if (!eventId) return;
 
         const channel = supabase
-            .channel(`photo-vote-global-${eventId}`)
+            .channel(`photo-vote-sync-${eventId}`)
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
                 table: 'photo_vote_sessions',
                 filter: `event_id=eq.${eventId}`,
             }, () => onUpdateRef.current())
+            .on('broadcast', { event: 'session_update' }, () => {
+                onUpdateRef.current();
+            })
+            // Opcional: escuchar votos en tiempo real para el ranking si se desea ultra-reactividad
             .on('postgres_changes', {
                 event: 'INSERT',
                 schema: 'public',
