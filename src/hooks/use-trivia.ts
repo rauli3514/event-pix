@@ -280,34 +280,15 @@ export const useResetTriviaGame = (eventId?: string) => {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: async (gameId: string) => {
-            // 1. Borrar respuestas
-            await supabase
-                .from('trivia_answers')
-                .delete()
-                .eq('game_id', gameId);
-
-            // 2. Borrar jugadores
-            await supabase
-                .from('trivia_players')
-                .delete()
-                .eq('game_id', gameId);
-
-            // 3. Resetear estado del juego a lobby
-            const { data, error } = await supabase
-                .from('trivia_games')
-                .update({
-                    status: 'lobby',
-                    current_question_id: null,
-                    question_started_at: null,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', gameId)
-                .select()
-                .single();
+            // Usamos RPC para borrar respuestas, inscriptos y resetear estado atómicamente
+            // Esto evita errores de integridad de base de datos y borra TODO de un tirón.
+            const { error } = await supabase.rpc('admin_reset_trivia', {
+                p_game_id: gameId
+            });
 
             if (error) throw error;
 
-            // 4. Enviar broadcast de reset
+            // Enviar broadcast de reset para limpiar celulares de invitados
             const channel = supabase.channel(`trivia-sync-${gameId}`);
             await new Promise<void>((resolve) => {
                 channel.subscribe((status) => {
@@ -322,13 +303,14 @@ export const useResetTriviaGame = (eventId?: string) => {
                 });
             });
 
-            return data as TriviaGame;
+            return true;
         },
         onSuccess: (_, gameId) => {
             queryClient.invalidateQueries({ queryKey: ['trivia_game', eventId] });
             queryClient.invalidateQueries({ queryKey: ['trivia_players', gameId] });
             queryClient.invalidateQueries({ queryKey: ['trivia_answers_q'] });
             queryClient.invalidateQueries({ queryKey: ['trivia_active', eventId] });
+            queryClient.invalidateQueries({ queryKey: ['trivia_games_list', eventId] });
         },
     });
 };
@@ -356,15 +338,10 @@ export const useActiveTrivia = (eventId?: string) => {
 
             const game = data as TriviaGame;
 
-            // Si el juego está en 'finished', solo lo consideramos "activo"
-            // si se terminó hace menos de 2 minutos (para mostrar el ganador en el muro)
-            // Después de eso, desaparece automáticamente de las pantallas.
             if (game.status === 'finished') {
                 const updatedAt = new Date(game.updated_at).getTime();
                 const now = Date.now();
-                if (now - updatedAt > 120000) { // 2 minutos
-                    return null;
-                }
+                if (now - updatedAt > 120000) return null;
             }
 
             return game;
@@ -379,16 +356,6 @@ export const useJoinTriviaGame = () => {
         mutationFn: async ({
             gameId, eventId, playerName
         }: { gameId: string; eventId: string; playerName: string }) => {
-            // Try insert, if duplicate name return existing
-            const { data: existing } = await supabase
-                .from('trivia_players')
-                .select('*')
-                .eq('game_id', gameId)
-                .eq('player_name', playerName)
-                .maybeSingle();
-
-            if (existing) return existing as TriviaPlayer;
-
             const { data, error } = await supabase
                 .from('trivia_players')
                 .insert({ game_id: gameId, event_id: eventId, player_name: playerName })
@@ -432,7 +399,7 @@ export const useSubmitTriviaAnswer = () => {
 };
 
 // ============================================================
-// TIMER HOOK (sincronizado con el servidor)
+// TIMER HOOK
 // ============================================================
 
 export const useTriviaTimer = (questionStartedAt: string | null, durationSeconds: number) => {
@@ -469,7 +436,7 @@ export const useTriviaTimer = (questionStartedAt: string | null, durationSeconds
 };
 
 // ============================================================
-// REALTIME HOOK (escuchar cambios del juego en tiempo real)
+// REALTIME HOOK
 // ============================================================
 
 export const useTriviaRealtime = (eventId: string | undefined, gameId: string | undefined, onUpdate: () => void) => {
@@ -479,8 +446,6 @@ export const useTriviaRealtime = (eventId: string | undefined, gameId: string | 
     useEffect(() => {
         if (!eventId) return;
 
-        // Escuchamos cambios generales de trivias para este evento
-        // Esto permite detectar cuando un juego pasa de 'setup' a 'lobby' o 'active' instantáneamente
         const channel = supabase
             .channel(`trivia-sync-global-${eventId}`)
             .on('postgres_changes', {
@@ -491,7 +456,6 @@ export const useTriviaRealtime = (eventId: string | undefined, gameId: string | 
             }, () => {
                 onUpdateRef.current();
             })
-            // También mantenemos escucha de broadcasts si hay un juego específico
             .on('broadcast', { event: 'question_launched' }, () => {
                 onUpdateRef.current();
             })
