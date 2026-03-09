@@ -106,27 +106,21 @@ export const TriviaGuestView = ({ eventId }: TriviaGuestViewProps) => {
         setSlotToOption({ a: shuffled[0], b: shuffled[1], c: shuffled[2], d: shuffled[3] });
     }, [game?.current_question_id, allQuestions]);
 
-    // Realtime
-    useTriviaRealtime(eventId, () => {
-        queryClient.invalidateQueries({ queryKey: ['trivia_active', eventId] });
-        queryClient.invalidateQueries({ queryKey: ['trivia_players', game?.id] });
-        refetchGame();
+    // Realtime Unificado
+    useTriviaRealtime(eventId, {
+        onUpdate: () => {
+            queryClient.invalidateQueries({ queryKey: ['trivia_active', eventId] });
+            queryClient.invalidateQueries({ queryKey: ['trivia_players', game?.id] });
+            refetchGame();
+        },
+        onReset: () => {
+            setPlayer(null);
+            setPhase('idle');
+            setSelectedAnswer(null);
+            setAnswerResult(null);
+            toast.info("El juego ha sido reiniciado");
+        }
     });
-
-    // Escuchar broadcast de reset específicamente para limpiar estado local del invitado
-    useEffect(() => {
-        if (!eventId) return;
-        const channel = supabase.channel(`trivia-sync-${eventId}`)
-            .on('broadcast', { event: 'game_reset' }, () => {
-                setPlayer(null);
-                setPhase('idle');
-                setSelectedAnswer(null);
-                setAnswerResult(null);
-                toast.info("El juego ha sido reiniciado");
-            })
-            .subscribe();
-        return () => { supabase.removeChannel(channel); };
-    }, [eventId]);
 
     useEffect(() => {
         if (!game) {

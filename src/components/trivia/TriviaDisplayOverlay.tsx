@@ -55,11 +55,18 @@ export const TriviaDisplayOverlay = ({ eventId }: TriviaDisplayOverlayProps) => 
             : undefined
     );
 
-    useTriviaRealtime(eventId, () => {
-        queryClient.invalidateQueries({ queryKey: ['trivia_game', eventId] });
-        queryClient.invalidateQueries({ queryKey: ['trivia_active', eventId] });
-        queryClient.invalidateQueries({ queryKey: ['trivia_players', game?.id] });
-        refetch();
+    useTriviaRealtime(eventId, {
+        onUpdate: () => {
+            queryClient.invalidateQueries({ queryKey: ['trivia_active', eventId] });
+            queryClient.invalidateQueries({ queryKey: ['trivia_players', game?.id] });
+            refetch();
+        },
+        onReset: () => {
+            // For TriviaDisplayOverlay, a reset means refetching game state
+            queryClient.invalidateQueries({ queryKey: ['trivia_active', eventId] });
+            queryClient.invalidateQueries({ queryKey: ['trivia_players', game?.id] });
+            refetch();
+        }
     });
 
     useEffect(() => {

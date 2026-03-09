@@ -99,7 +99,7 @@ export const useMyVotedPhotos = (sessionId?: string) => {
     return useQuery({
         queryKey: ['my_votes', sessionId],
         queryFn: async () => {
-            if (!sessionId) return new Set<string>();
+            if (!sessionId) return [];
             const token = getVoterToken();
             const { data, error } = await supabase
                 .from('photo_votes')
@@ -107,7 +107,7 @@ export const useMyVotedPhotos = (sessionId?: string) => {
                 .eq('session_id', sessionId)
                 .eq('voter_token', token);
             if (error) throw error;
-            return new Set<string>((data ?? []).map((v: any) => v.submission_id));
+            return (data ?? []).map((v: any) => v.submission_id) as string[];
         },
         enabled: !!sessionId,
     });
@@ -201,7 +201,7 @@ export const useSubmitPhotoVote = () => {
     });
 };
 
-// ── Realtime: escuchar cambios en la sesión ──
+// ── Realtime Hook para Votación ──
 export const usePhotoVoteRealtime = (eventId: string | undefined, onUpdate: () => void) => {
     const onUpdateRef = useRef(onUpdate);
     onUpdateRef.current = onUpdate;
@@ -209,9 +209,8 @@ export const usePhotoVoteRealtime = (eventId: string | undefined, onUpdate: () =
     useEffect(() => {
         if (!eventId) return;
 
-        // CHANNEL per event to catch NEW sessions too
         const channel = supabase
-            .channel(`photo-vote-sync-${eventId}`)
+            .channel(`photo-vote-global-${eventId}`)
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
