@@ -113,12 +113,33 @@ export const TriviaGuestView = ({ eventId }: TriviaGuestViewProps) => {
         refetchGame();
     });
 
-    // Sync phase con estado del juego
+    // Escuchar broadcast de reset específicamente para limpiar estado local del invitado
+    useEffect(() => {
+        if (!game?.id) return;
+        const channel = supabase.channel(`trivia-sync-${game.id}`)
+            .on('broadcast', { event: 'game_reset' }, () => {
+                setPlayer(null);
+                setPhase('idle');
+                setSelectedAnswer(null);
+                setAnswerResult(null);
+                toast.info("El juego ha sido reiniciado");
+            })
+            .subscribe();
+        return () => { supabase.removeChannel(channel); };
+    }, [game?.id]);
+
     useEffect(() => {
         if (!game) {
             if (phase !== 'idle') setPhase('idle');
             return;
         }
+
+        // Si el juego está en lobby, resetear fase a lobby si hay jugador, o idle si no hay
+        if (game.status === 'lobby') {
+            setPhase(player ? 'lobby' : 'idle');
+            return;
+        }
+
         if (game.status === 'active' && player) {
             if (phase === 'eliminated') return; // eliminado no vuelve a jugar
             setSelectedAnswer(null);

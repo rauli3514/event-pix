@@ -216,7 +216,7 @@ export const useLaunchQuestion = (eventId?: string) => {
             if (error) throw error;
 
             // Broadcast via Supabase channel for instant sync
-            const channel = supabase.channel('trivia-broadcast');
+            const channel = supabase.channel(`trivia-sync-${gameId}`);
             await new Promise<void>((resolve) => {
                 channel.subscribe((status) => {
                     if (status === 'SUBSCRIBED') {
@@ -306,6 +306,22 @@ export const useResetTriviaGame = (eventId?: string) => {
                 .single();
 
             if (error) throw error;
+
+            // 4. Enviar broadcast de reset
+            const channel = supabase.channel(`trivia-sync-${gameId}`);
+            await new Promise<void>((resolve) => {
+                channel.subscribe((status) => {
+                    if (status === 'SUBSCRIBED') {
+                        channel.send({
+                            type: 'broadcast',
+                            event: 'game_reset',
+                            payload: { gameId },
+                        });
+                        setTimeout(() => { supabase.removeChannel(channel); resolve(); }, 300);
+                    }
+                });
+            });
+
             return data as TriviaGame;
         },
         onSuccess: (_, gameId) => {
@@ -448,7 +464,7 @@ export const useTriviaRealtime = (gameId: string | undefined, onUpdate: () => vo
         if (!gameId) return;
 
         const channel = supabase
-            .channel(`trivia-realtime-${gameId}`)
+            .channel(`trivia-sync-${gameId}`)
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
