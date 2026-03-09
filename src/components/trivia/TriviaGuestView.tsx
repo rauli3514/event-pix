@@ -107,7 +107,7 @@ export const TriviaGuestView = ({ eventId }: TriviaGuestViewProps) => {
     }, [game?.current_question_id, allQuestions]);
 
     // Realtime
-    useTriviaRealtime(eventId, game?.id, () => {
+    useTriviaRealtime(eventId, () => {
         queryClient.invalidateQueries({ queryKey: ['trivia_active', eventId] });
         queryClient.invalidateQueries({ queryKey: ['trivia_players', game?.id] });
         refetchGame();
@@ -115,8 +115,8 @@ export const TriviaGuestView = ({ eventId }: TriviaGuestViewProps) => {
 
     // Escuchar broadcast de reset específicamente para limpiar estado local del invitado
     useEffect(() => {
-        if (!game?.id) return;
-        const channel = supabase.channel(`trivia-sync-${game.id}`)
+        if (!eventId) return;
+        const channel = supabase.channel(`trivia-sync-${eventId}`)
             .on('broadcast', { event: 'game_reset' }, () => {
                 setPlayer(null);
                 setPhase('idle');
@@ -126,7 +126,7 @@ export const TriviaGuestView = ({ eventId }: TriviaGuestViewProps) => {
             })
             .subscribe();
         return () => { supabase.removeChannel(channel); };
-    }, [game?.id]);
+    }, [eventId]);
 
     useEffect(() => {
         if (!game) {

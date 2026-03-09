@@ -121,6 +121,7 @@ export const useCreateTriviaGame = (eventId?: string) => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['trivia_games_list', eventId] });
+            queryClient.invalidateQueries({ queryKey: ['trivia_active', eventId] });
         },
     });
 };
@@ -136,7 +137,9 @@ export const useDeleteTriviaGame = (eventId?: string) => {
             if (error) throw error;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['trivia_game', eventId] });
+            queryClient.invalidateQueries({ queryKey: ['trivia_games_list', eventId] });
+            queryClient.invalidateQueries({ queryKey: ['trivia_game'] });
+            queryClient.invalidateQueries({ queryKey: ['trivia_active', eventId] });
             queryClient.invalidateQueries({ queryKey: ['trivia_questions'] });
             queryClient.invalidateQueries({ queryKey: ['trivia_players'] });
         },
@@ -193,6 +196,7 @@ export const useUpdateTriviaGame = (eventId?: string) => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['trivia_game', eventId] });
+            queryClient.invalidateQueries({ queryKey: ['trivia_active', eventId] });
         },
     });
 };
@@ -215,8 +219,8 @@ export const useLaunchQuestion = (eventId?: string) => {
                 .single();
             if (error) throw error;
 
-            // Broadcast via Supabase channel for instant sync
-            const channel = supabase.channel(`trivia-sync-${gameId}`);
+            // UNIFIED BROADCAST CHANNEL per event
+            const channel = supabase.channel(`trivia-sync-${eventId}`);
             await new Promise<void>((resolve) => {
                 channel.subscribe((status) => {
                     if (status === 'SUBSCRIBED') {
@@ -226,6 +230,8 @@ export const useLaunchQuestion = (eventId?: string) => {
                             payload: { gameId, questionId, startedAt: now },
                         });
                         setTimeout(() => { supabase.removeChannel(channel); resolve(); }, 300);
+                    } else if (status === 'CHANNEL_ERROR') {
+                        resolve();
                     }
                 });
             });
@@ -234,6 +240,7 @@ export const useLaunchQuestion = (eventId?: string) => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['trivia_game', eventId] });
+            queryClient.invalidateQueries({ queryKey: ['trivia_active', eventId] });
         },
     });
 };
@@ -253,6 +260,7 @@ export const useShowResults = (eventId?: string) => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['trivia_game', eventId] });
+            queryClient.invalidateQueries({ queryKey: ['trivia_active', eventId] });
         },
     });
 };
@@ -272,6 +280,7 @@ export const useFinishTriviaGame = (eventId?: string) => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['trivia_game', eventId] });
+            queryClient.invalidateQueries({ queryKey: ['trivia_active', eventId] });
         },
     });
 };
@@ -280,16 +289,16 @@ export const useResetTriviaGame = (eventId?: string) => {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: async (gameId: string) => {
+            if (!eventId) throw new Error('No event ID');
             // Usamos RPC para borrar respuestas, inscriptos y resetear estado atómicamente
-            // Esto evita errores de integridad de base de datos y borra TODO de un tirón.
             const { error } = await supabase.rpc('admin_reset_trivia', {
                 p_game_id: gameId
             });
 
             if (error) throw error;
 
-            // Enviar broadcast de reset para limpiar celulares de invitados
-            const channel = supabase.channel(`trivia-sync-${gameId}`);
+            // UNIFIED BROADCAST CHANNEL per event
+            const channel = supabase.channel(`trivia-sync-${eventId}`);
             await new Promise<void>((resolve) => {
                 channel.subscribe((status) => {
                     if (status === 'SUBSCRIBED') {
@@ -299,6 +308,8 @@ export const useResetTriviaGame = (eventId?: string) => {
                             payload: { gameId },
                         });
                         setTimeout(() => { supabase.removeChannel(channel); resolve(); }, 300);
+                    } else if (status === 'CHANNEL_ERROR') {
+                        resolve();
                     }
                 });
             });
@@ -306,7 +317,7 @@ export const useResetTriviaGame = (eventId?: string) => {
             return true;
         },
         onSuccess: (_, gameId) => {
-            queryClient.invalidateQueries({ queryKey: ['trivia_game', eventId] });
+            queryClient.invalidateQueries({ queryKey: ['trivia_game'] });
             queryClient.invalidateQueries({ queryKey: ['trivia_players', gameId] });
             queryClient.invalidateQueries({ queryKey: ['trivia_answers_q'] });
             queryClient.invalidateQueries({ queryKey: ['trivia_active', eventId] });
@@ -425,10 +436,11 @@ export const useTriviaTimer = (questionStartedAt: string | null, durationSeconds
         };
 
         tick();
-        intervalRef.current = setInterval(tick, 250);
+        const id = setInterval(tick, 250);
+        intervalRef.current = id;
 
         return () => {
-            if (intervalRef.current) clearInterval(intervalRef.current);
+            clearInterval(id);
         };
     }, [questionStartedAt, durationSeconds]);
 
@@ -439,15 +451,16 @@ export const useTriviaTimer = (questionStartedAt: string | null, durationSeconds
 // REALTIME HOOK
 // ============================================================
 
-export const useTriviaRealtime = (eventId: string | undefined, gameId: string | undefined, onUpdate: () => void) => {
+export const useTriviaRealtime = (eventId: string | undefined, onUpdate: () => void) => {
     const onUpdateRef = useRef(onUpdate);
     onUpdateRef.current = onUpdate;
 
     useEffect(() => {
         if (!eventId) return;
 
+        // CHANNEL per event for global syncing
         const channel = supabase
-            .channel(`trivia-sync-global-${eventId}`)
+            .channel(`trivia-sync-${eventId}`)
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
@@ -465,5 +478,5 @@ export const useTriviaRealtime = (eventId: string | undefined, gameId: string | 
             .subscribe();
 
         return () => { supabase.removeChannel(channel); };
-    }, [eventId, gameId]);
+    }, [eventId]);
 };

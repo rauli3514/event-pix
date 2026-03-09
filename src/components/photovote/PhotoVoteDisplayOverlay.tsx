@@ -21,7 +21,7 @@ export const PhotoVoteDisplayOverlay = ({ eventId }: PhotoVoteDisplayOverlayProp
     const { data: photos = [] } = useEventPhotos(eventId);
     const { data: ranking = [] } = usePhotoVoteRanking(session?.id);
 
-    usePhotoVoteRealtime(session?.id, () => {
+    usePhotoVoteRealtime(eventId, () => {
         queryClient.invalidateQueries({ queryKey: ['photo_vote_session', eventId] });
         queryClient.invalidateQueries({ queryKey: ['photo_vote_ranking', session?.id] });
         refetch();

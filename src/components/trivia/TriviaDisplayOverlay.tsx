@@ -55,7 +55,7 @@ export const TriviaDisplayOverlay = ({ eventId }: TriviaDisplayOverlayProps) => 
             : undefined
     );
 
-    useTriviaRealtime(eventId, game?.id, () => {
+    useTriviaRealtime(eventId, () => {
         queryClient.invalidateQueries({ queryKey: ['trivia_game', eventId] });
         queryClient.invalidateQueries({ queryKey: ['trivia_active', eventId] });
         queryClient.invalidateQueries({ queryKey: ['trivia_players', game?.id] });

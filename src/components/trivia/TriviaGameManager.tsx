@@ -151,9 +151,15 @@ export const TriviaGameManager = ({ eventId }: TriviaGameManagerProps) => {
         setConfirmDialog({
             message: '¿Estás seguro? Se borrarán TODOS los jugadores y sus respuestas. El juego volverá al Lobby.',
             onConfirm: async () => {
-                await resetTrivia.mutateAsync(game.id);
-                toast.success("♻️ Trivia reseteada por completo");
-                setConfirmDialog(null);
+                try {
+                    await resetTrivia.mutateAsync(game.id);
+                    toast.success("♻️ Trivia reseteada por completo");
+                } catch (err) {
+                    console.error(err);
+                    toast.error("Error al resetear trivia");
+                } finally {
+                    setConfirmDialog(null);
+                }
             }
         });
     };

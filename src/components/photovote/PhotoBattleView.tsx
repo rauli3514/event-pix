@@ -23,7 +23,7 @@ export const PhotoBattleView = ({ eventId }: PhotoBattleViewProps) => {
     const [votingFor, setVotingFor] = useState<string | null>(null);
     const [showFightSplash, setShowFightSplash] = useState(true);
 
-    usePhotoVoteRealtime(session?.id, () => {
+    usePhotoVoteRealtime(eventId, () => {
         queryClient.invalidateQueries({ queryKey: ['photo_vote_session', eventId] });
         refetch();
     });

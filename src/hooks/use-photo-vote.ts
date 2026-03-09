@@ -129,6 +129,7 @@ export const useCreatePhotoVoteSession = (eventId?: string) => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['photo_vote_session_admin', eventId] });
+            queryClient.invalidateQueries({ queryKey: ['photo_vote_session', eventId] });
         },
     });
 };
@@ -168,6 +169,7 @@ export const useDeletePhotoVoteSession = (eventId?: string) => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['photo_vote_session_admin', eventId] });
+            queryClient.invalidateQueries({ queryKey: ['photo_vote_session', eventId] });
         },
     });
 };
@@ -200,28 +202,30 @@ export const useSubmitPhotoVote = () => {
 };
 
 // ── Realtime: escuchar cambios en la sesión ──
-export const usePhotoVoteRealtime = (sessionId: string | undefined, onUpdate: () => void) => {
+export const usePhotoVoteRealtime = (eventId: string | undefined, onUpdate: () => void) => {
     const onUpdateRef = useRef(onUpdate);
     onUpdateRef.current = onUpdate;
 
     useEffect(() => {
-        if (!sessionId) return;
+        if (!eventId) return;
+
+        // CHANNEL per event to catch NEW sessions too
         const channel = supabase
-            .channel(`photo-vote-${sessionId}`)
+            .channel(`photo-vote-sync-${eventId}`)
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
                 table: 'photo_vote_sessions',
-                filter: `id=eq.${sessionId}`,
+                filter: `event_id=eq.${eventId}`,
             }, () => onUpdateRef.current())
             .on('postgres_changes', {
                 event: 'INSERT',
                 schema: 'public',
                 table: 'photo_votes',
-                filter: `session_id=eq.${sessionId}`,
+                filter: `event_id=eq.${eventId}`,
             }, () => onUpdateRef.current())
             .subscribe();
 
         return () => { supabase.removeChannel(channel); };
-    }, [sessionId]);
+    }, [eventId]);
 };
