@@ -52,10 +52,11 @@ export const EventProvider = ({ children }: { children: React.ReactNode }) => {
                 const { data, error } = await supabase
                     .from('events')
                     .select('*')
-                    .eq('slug', slug)
-                    .single();
+                    .ilike('slug', slug)
+                    .maybeSingle();
 
                 if (error) throw error;
+                if (!data) throw new Error('Evento no encontrado');
 
                 setEvent(data);
                 setError(null);
