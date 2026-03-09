@@ -28,10 +28,23 @@ export const useActivePhotoVoteSession = (eventId?: string) => {
                 .order('created_at', { ascending: false })
                 .limit(1)
                 .maybeSingle();
+
             if (error) throw error;
-            return data as PhotoVoteSession | null;
+            if (!data) return null;
+
+            const session = data as PhotoVoteSession;
+
+            // Si está finalizada, solo mostrarla por los primeros 5 minutos
+            if (session.status === 'finished') {
+                const updatedAt = new Date(session.updated_at).getTime();
+                const now = Date.now();
+                if (now - updatedAt > 300000) return null;
+            }
+
+            return session;
         },
         enabled: !!eventId,
+        refetchInterval: 5000,
     });
 };
 

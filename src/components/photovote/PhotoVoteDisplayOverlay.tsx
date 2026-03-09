@@ -27,13 +27,26 @@ export const PhotoVoteDisplayOverlay = ({ eventId }: PhotoVoteDisplayOverlayProp
         refetch();
     });
 
-    // Auto-dismiss winner screen
+    // Auto-dismiss winner screen (robusto ante refrescos y remounts)
     useEffect(() => {
-        if (session?.status !== 'finished') {
+        if (!session || session.status !== 'finished') {
             setDismissed(false);
             setCountdown(WINNER_DISPLAY_SECONDS);
             return;
         }
+
+        const updatedAt = new Date(session.updated_at).getTime();
+        const elapsed = Math.floor((Date.now() - updatedAt) / 1000);
+        const remaining = Math.max(0, WINNER_DISPLAY_SECONDS - elapsed);
+
+        if (remaining <= 0) {
+            setDismissed(true);
+            setCountdown(0);
+            return;
+        }
+
+        setCountdown(remaining);
+        setDismissed(false);
 
         const interval = setInterval(() => {
             setCountdown(prev => {
@@ -47,7 +60,7 @@ export const PhotoVoteDisplayOverlay = ({ eventId }: PhotoVoteDisplayOverlayProp
         }, 1000);
 
         return () => clearInterval(interval);
-    }, [session?.status, session?.id]);
+    }, [session?.status, session?.id, session?.updated_at]);
 
     // Fotos que están compitiendo en esta sesión
     const competingPhotos = session?.selected_submission_ids && session.selected_submission_ids.length > 0

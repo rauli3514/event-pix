@@ -69,12 +69,26 @@ export const TriviaDisplayOverlay = ({ eventId }: TriviaDisplayOverlayProps) => 
         }
     });
 
+    // Auto-dismiss winner screen (robusto ante refrescos y remounts)
     useEffect(() => {
-        if (game?.status !== 'finished') {
+        if (!game || game.status !== 'finished') {
             setDismissed(false);
             setCountdown(WINNER_DISPLAY_SECONDS);
             return;
         }
+
+        const updatedAt = new Date(game.updated_at).getTime();
+        const elapsed = Math.floor((Date.now() - updatedAt) / 1000);
+        const remaining = Math.max(0, WINNER_DISPLAY_SECONDS - elapsed);
+
+        if (remaining <= 0) {
+            setDismissed(true);
+            setCountdown(0);
+            return;
+        }
+
+        setCountdown(remaining);
+        setDismissed(false);
 
         const interval = setInterval(() => {
             setCountdown(prev => {
@@ -88,7 +102,7 @@ export const TriviaDisplayOverlay = ({ eventId }: TriviaDisplayOverlayProps) => 
         }, 1000);
 
         return () => clearInterval(interval);
-    }, [game?.status, game?.id]);
+    }, [game?.status, game?.id, game?.updated_at]);
 
     const currentQuestion = game?.current_question_id
         ? questions.find(q => q.id === game.current_question_id)
