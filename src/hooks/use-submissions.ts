@@ -35,7 +35,6 @@ export const useSubmissions = (eventId?: string) => {
 
             if (error) {
                 console.error('Error fetching submissions:', error);
-                toast.error('Error al cargar las submisiones');
                 throw error;
             }
 

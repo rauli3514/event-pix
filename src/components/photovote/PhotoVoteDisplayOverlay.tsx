@@ -90,10 +90,10 @@ export const PhotoVoteDisplayOverlay = ({ eventId }: PhotoVoteDisplayOverlayProp
                             <Zap className="w-12 h-12 text-pink-500 animate-pulse fill-pink-500" />
                         </div>
                         <p className="text-lg text-pink-500 font-black uppercase tracking-[0.1em] bg-white/10 px-4 py-1.5 rounded-full border border-pink-500/30 animate-pulse">
-                            🎁 Votá en tu celular para ganar un premio 🎁
+                            📸 ¡Votá la foto más divertida o canchera! 📸
                         </p>
                         <p className="text-sm text-slate-300 font-bold uppercase tracking-widest pt-1">
-                            Escaneá el QR y elegí tu favorita ❤️
+                            ¡La foto más votada ganará un premio especial! ❤️
                         </p>
                     </div>
 
@@ -163,10 +163,10 @@ export const PhotoVoteDisplayOverlay = ({ eventId }: PhotoVoteDisplayOverlayProp
                     {/* Footer Call to Action */}
                     <div className="bg-pink-600/20 border border-pink-500/50 rounded-2xl p-4 text-center animate-bounce-slow">
                         <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter mb-1">
-                            🎁 ¡PARTICIPÁ POR UN PREMIO! 🎁
+                            🔥 ¡VAMOS A JUGAR! 🔥
                         </h2>
                         <p className="text-sm text-pink-100 font-bold uppercase tracking-widest">
-                            Escaneá el QR y votá la mejor foto en tu celular
+                            Escaneá el QR y elegí la mejor foto del evento
                         </p>
                     </div>
                 </div>

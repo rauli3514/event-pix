@@ -92,7 +92,7 @@ export const useTriviaAnswersForQuestion = (questionId?: string) => {
             return data as TriviaAnswer[];
         },
         enabled: !!questionId,
-        refetchInterval: 2000,
+        refetchInterval: 1 * 1000, // Ranking ultra-rápido (1s)
     });
 };
 
@@ -358,6 +358,7 @@ export const useActiveTrivia = (eventId?: string) => {
             return game;
         },
         enabled: !!eventId,
+        refetchInterval: 3000,
     });
 };
 
