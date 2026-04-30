@@ -20,7 +20,7 @@ export const GridTemplate = ({ eventId }: GridTemplateProps) => {
     if (!photos || photos.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen p-8 text-center bg-transparent">
-                <div className="bg-white/5 backdrop-blur-xl p-12 rounded-[2rem] border border-white/10 shadow-2xl flex flex-col items-center gap-6 max-w-lg animate-fade-in-up">
+                <div className="bg-slate-900/80 backdrop-blur-xl p-12 rounded-[2rem] border border-slate-700/50 shadow-2xl flex flex-col items-center gap-6 max-w-lg animate-fade-in-up">
                     <div className="h-24 w-24 rounded-full bg-gradient-to-tr from-violet-600 to-fuchsia-600 flex items-center justify-center shadow-lg shadow-violet-900/50">
                         <ImageIcon className="h-10 w-10 text-white" />
                     </div>

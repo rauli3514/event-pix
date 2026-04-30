@@ -54,14 +54,6 @@ export const useToggleProviderStatus = () => {
 
     return useMutation({
         mutationFn: async ({ userId, isActive }: { userId: string; isActive: boolean }) => {
-            // We need to update `auth.users` to disable login? Or just a flag in `profiles`?
-            // If we just want to "disable" them from accessing the app, we can add `is_active` to `profiles`
-            // and check it in the RLS or application logic.
-            // The user asked to "disable".
-
-            // Let's check `profiles` table. It has `role`, `email`, `name`.
-            // We should add `is_active` column to `profiles`.
-
             const { data, error } = await supabase
                 .from("profiles")
                 .update({ is_active: isActive })
@@ -71,6 +63,23 @@ export const useToggleProviderStatus = () => {
 
             if (error) throw error;
             return data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["providers"] });
+        },
+    });
+};
+
+export const useDeleteProvider = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (userId: string) => {
+            const { error } = await supabase.rpc('delete_user_by_admin', {
+                target_user_id: userId
+            });
+
+            if (error) throw error;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["providers"] });

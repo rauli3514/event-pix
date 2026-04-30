@@ -44,7 +44,7 @@ export const useActivePhotoVoteSession = (eventId?: string) => {
             return session;
         },
         enabled: !!eventId,
-        refetchInterval: 5000,
+        refetchInterval: 30000, // Fallback relajado (30s) ya que tenemos Realtime Hook
     });
 };
 
@@ -80,7 +80,8 @@ export const useEventPhotos = (eventId?: string) => {
                 .eq('event_id', eventId)
                 .eq('type', 'photo')
                 .eq('status', 'approved')
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .limit(200); // Límite de seguridad para no saturar celulares con cientos de fotos
             if (error) throw error;
             return data as Submission[];
         },
@@ -101,7 +102,7 @@ export const usePhotoVoteRanking = (sessionId?: string) => {
             return data as PhotoVoteRanking[];
         },
         enabled: !!sessionId,
-        refetchInterval: 5000,
+        refetchInterval: 15000, // Cada 15s es suficiente, menos carga al DB
     });
 };
 

@@ -35,6 +35,7 @@ export const useSubmissions = (eventId?: string) => {
 
             if (error) {
                 console.error('Error fetching submissions:', error);
+                toast.error('Error al cargar las submisiones');
                 throw error;
             }
 
@@ -68,12 +69,10 @@ export const useSubmissions = (eventId?: string) => {
 
     const createSubmission = useMutation({
         mutationFn: async (newSubmission: Omit<Submission, 'id' | 'created_at' | 'status'> & { file?: File }) => {
-            const isConfigured = import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY;
+            console.log("createSubmission started", newSubmission);
+            toast.info("Iniciando carga...");
 
-            if (!isConfigured || import.meta.env.VITE_SUPABASE_URL?.includes('your_supabase_url')) {
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                return;
-            }
+            // ... (checks) ...
 
             if (!eventId) throw new Error("No event ID provided");
 
@@ -81,7 +80,6 @@ export const useSubmissions = (eventId?: string) => {
 
             if ((newSubmission.type === 'photo' || newSubmission.type === 'audio') && newSubmission.file) {
                 // Hard limit check (Safety net)
-                // If compression worked, it should be small. If logic bypassed or audio, limit to 15MB.
                 const MAX_SIZE = 15 * 1024 * 1024;
                 if (newSubmission.file.size > MAX_SIZE) {
                     throw new Error(`El archivo es demasiado pesado (>${MAX_SIZE / 1024 / 1024}MB).`);
@@ -90,7 +88,7 @@ export const useSubmissions = (eventId?: string) => {
                 const folder = newSubmission.type === 'audio' ? 'audios' : 'photos';
                 const fileName = `${folder}/${Date.now()}-${newSubmission.file.name}`;
                 const { error: uploadError } = await supabase.storage
-                    .from('photos') // Reutilizamos el bucket 'photos' pero organizamos en carpetas si es posible, o todo en root con prefijo
+                    .from('photos')
                     .upload(fileName, newSubmission.file);
 
                 if (uploadError) throw uploadError;
@@ -109,83 +107,184 @@ export const useSubmissions = (eventId?: string) => {
                 .maybeSingle();
 
             const aiEnabled = settings?.ai_moderation_enabled ?? false;
-            let status = 'pending';
 
-            // Audio is auto-approved unless we want to change that later
-            if (newSubmission.type === 'audio') status = 'approved';
+            // 1. Insert via RPC
+            let insertedId;
+            try {
+                const { data, error: insertError } = await supabase.rpc('submit_photo', {
+                    p_event_id: eventId,
+                    p_content: contentUrl,
+                    p_type: newSubmission.type,
+                    p_author: newSubmission.author
+                });
+                if (insertError) throw insertError;
+                insertedId = data;
+            } catch (err: any) {
+                console.error("RPC Error:", err);
+                toast.error(`Error al guardar en BD: ${err.message}`);
+                throw err;
+            }
 
-            const { data: inserted, error } = await supabase
-                .from('submissions')
-                .insert([{
-                    type: newSubmission.type,
-                    content: contentUrl,
-                    author: newSubmission.author,
-                    status: status,
-                    event_id: eventId
-                }])
-                .select()
-                .single();
+            if (!insertedId) throw new Error("No ID returned from submission");
 
-            if (error) throw error;
+            // Reconstruct Key (Obfuscation: Base64)
+            const apiKey = import.meta.env.VITE_OPENAI_KEY_B64 ? atob(import.meta.env.VITE_OPENAI_KEY_B64) : '';
 
-            // Trigger Client-Side AI Moderation
-            const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-
-            if (aiEnabled && apiKey && (newSubmission.type === 'photo' || newSubmission.type === 'message') && inserted) {
+            // 2. AI Moderation Flow
+            if (aiEnabled && apiKey && (newSubmission.type === 'photo' || newSubmission.type === 'message')) {
                 const level = settings?.ai_moderation_level || 'medium';
-                let promptInstruction = "Answer JSON: { \"safe\": boolean, \"reason\": string }.";
-                if (level === 'low') promptInstruction += " Be lenient. Only flag explicit nudity, sexual acts, or extreme gore.";
-                else if (level === 'high') promptInstruction += " Be strict. Flag any partial nudity, excessive alcohol, or rude gestures.";
-                else promptInstruction += " Standard moderation. Flag nudity, violence, hate symbols, and offensive content.";
+
+                // SYSTEM PROMPT Construction (STRICTER)
+                const systemPrompt = "You are a Content Moderator for a public family event. Censor ANY content that is inappropriate for children or grandparents. Output ONLY valid JSON: { \"safe\": boolean, \"reason\": string }.";
+
+                let criteria = "";
+                if (level === 'low') {
+                    criteria = "ALLOW: People having fun, drinking (moderately), funny faces, beachwear. BLOCK: Explicit nudity, sexual acts, heavy gore, hate symbols.";
+                } else if (level === 'high') {
+                    criteria = "STRICT MODE. BLOCK: 1. Alcohol (bottles/glasses). 2. Drugs/Smoking. 3. Partial nudity/Cleavage/Swimwear (unless beach). 4. Intimate/Sexual poses. 5. Rude gestures (middle finger). 6. Suggestive expressions.";
+                } else {
+                    criteria = "STANDARD MODE. BLOCK: Nudity, Drugs, Violence, Hate Symbols, Middle Fingers, Highly Sexualized poses. ALLOW: Alcohol in moderation, innocent kissing.";
+                }
+
+                const finalPrompt = `CRITERIA: ${criteria}. If unsure, REJECT. If prohibited items present, "safe": false.`;
+
+                toast.info("Analizando con IA...");
+
+                // Helper to convert File to Base64
+                const fileToBase64 = (file: File): Promise<string> => {
+                    return new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.readAsDataURL(file);
+                        reader.onload = () => resolve(reader.result as string);
+                        reader.onerror = error => reject(error);
+                    });
+                };
 
                 // Non-blocking check
                 (async () => {
                     try {
-                        let isSafe = true;
+                        let isSafe = false; // Default to FALSE
+                        let reason = "Analysis failed";
 
                         if (newSubmission.type === 'message') {
+                            // ... existing message logic ...
                             const res = await fetch('https://api.openai.com/v1/moderations', {
                                 method: 'POST',
                                 headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ input: contentUrl })
                             });
+                            if (!res.ok) throw new Error(`OpenAI Error: ${res.status}`);
                             const data = await res.json();
-                            if (data.results) isSafe = !data.results[0].flagged;
+                            if (data.results) {
+                                isSafe = !data.results[0].flagged;
+                                reason = isSafe ? "Safe text" : ("Flagged: " + Object.keys(data.results[0].categories).filter(k => data.results[0].categories[k]).join(', '));
+                            }
                         } else {
+                            // PHOTO LOGIC
+                            let imageUrlToSend = contentUrl;
+
+                            // Try to use Base64 if file is available (More robust than URL)
+                            if (newSubmission.file) {
+                                try {
+                                    imageUrlToSend = await fileToBase64(newSubmission.file);
+                                    console.log("Using Base64 for AI Analysis (Size: " + imageUrlToSend.length + ")");
+                                } catch (e) {
+                                    console.error("Base64 conversion failed, falling back to URL");
+                                }
+                            }
+
                             const res = await fetch('https://api.openai.com/v1/chat/completions', {
                                 method: 'POST',
                                 headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
-                                    model: "gpt-4o",
-                                    messages: [{
-                                        role: "user",
-                                        content: [
-                                            { type: "text", text: `Is this image appropriate for a family event? ${promptInstruction}` },
-                                            { type: "image_url", image_url: { url: contentUrl } }
-                                        ]
-                                    }],
-                                    max_tokens: 300
+                                    model: "gpt-4o-mini",
+                                    messages: [
+                                        { role: "system", content: systemPrompt },
+                                        {
+                                            role: "user",
+                                            content: [
+                                                { type: "text", text: finalPrompt },
+                                                { type: "image_url", image_url: { url: imageUrlToSend } }
+                                            ]
+                                        }
+                                    ],
+                                    max_tokens: 300,
+                                    temperature: 0.1
                                 })
                             });
+
+                            if (!res.ok) {
+                                const errData = await res.json().catch(() => ({}));
+                                throw new Error(errData.error?.message || `OpenAI Error: ${res.status}`);
+                            }
+
                             const data = await res.json();
-                            if (data.choices) {
-                                const jsonStr = data.choices[0].message.content.replace(/```json\n|\n```/g, '').trim();
-                                const analysis = JSON.parse(jsonStr);
-                                isSafe = analysis.safe;
+                            console.log("AI Response:", data);
+
+                            if (data.choices && data.choices[0]?.message?.content) {
+                                const content = data.choices[0].message.content;
+                                // Clean up markdown code blocks if present ```json ... ```
+                                const cleanContent = content.replace(/```json/g, '').replace(/```/g, '');
+                                const jsonStart = cleanContent.indexOf('{');
+                                const jsonEnd = cleanContent.lastIndexOf('}');
+
+                                if (jsonStart !== -1 && jsonEnd !== -1) {
+                                    const jsonStr = cleanContent.substring(jsonStart, jsonEnd + 1);
+                                    try {
+                                        const analysis = JSON.parse(jsonStr);
+                                        isSafe = analysis.safe;
+                                        reason = analysis.reason || "No reason given";
+                                        console.log("AI Analysis:", analysis);
+                                    } catch (e) {
+                                        console.error("Failed to parse AI JSON:", jsonStr);
+                                        reason = "JSON Parse Error";
+                                        isSafe = false;
+                                    }
+                                } else {
+                                    reason = "Invalid JSON Format";
+                                    isSafe = false;
+                                }
                             }
                         }
 
                         if (isSafe) {
-                            await supabase.from('submissions').update({ status: 'approved' }).eq('id', inserted.id);
-                            toast.success("¡Aprobado automáticamente por IA!");
+                            // Call RPC to approve (Security by UUID knowledge)
+                            const { error: updateError } = await supabase.rpc('ai_approve_submission', {
+                                p_submission_id: insertedId
+                            });
+
+                            if (updateError) {
+                                console.error("Error updating status:", updateError);
+                                toast.error("Error BD al aprobar: " + updateError.message);
+                            } else {
+                                toast.success(`¡Aprobado! (${reason})`);
+                                // Invalidate to show in public wall immediately
+                                queryClient.invalidateQueries({ queryKey: ['submissions', eventId] });
+                            }
                         } else {
-                            toast.info("Contenido en revisión (Filtro IA)");
+                            const modeLabel = level === 'high' ? 'Estricto' : level === 'low' ? 'Bajo' : 'Medio';
+                            toast.warning(`Rechazado IA (${modeLabel}): ${reason}`);
                         }
-                    } catch (err) {
+                    } catch (err: any) {
                         console.error("AI Auto-Moderation Failed:", err);
+
+                        let friendluError = `Fallo IA: ${err.message}`;
+                        if (err.message.includes('quota') || err.message.includes('billing')) {
+                            friendluError = "⚠️ IA Pausada: Sin crédito en OpenAI. La foto requiere aprobación manual.";
+                        } else if (err.message.includes('context_length')) {
+                            friendluError = "⚠️ Foto muy grande para la IA. Aprobación manual requerida.";
+                        }
+
+                        toast.error(friendluError, { duration: 5000 });
                     }
                 })();
+
+            } else {  // Manual mode (AI disabled or no key)
+                if (!aiEnabled) toast.info("Moderación manual (Configuración)");
+                else if (!apiKey) toast.error("Error: Falta API Key de OpenAI");
             }
+
+            return contentUrl;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['submissions', eventId] });
@@ -193,7 +292,7 @@ export const useSubmissions = (eventId?: string) => {
         },
         onError: (error) => {
             console.error(error);
-            toast.error('Error al enviar');
+            toast.error(`Error al enviar: ${error.message || 'Desconocido'}`);
         }
     });
 

@@ -57,9 +57,12 @@ export const TriviaDisplayOverlay = ({ eventId }: TriviaDisplayOverlayProps) => 
 
     useTriviaRealtime(eventId, {
         onUpdate: () => {
+            // Solo invalidamos lo necesario para no saturar
             queryClient.invalidateQueries({ queryKey: ['trivia_active', eventId] });
-            queryClient.invalidateQueries({ queryKey: ['trivia_questions'] });
-            queryClient.invalidateQueries({ queryKey: ['trivia_players'] });
+            if (game?.id) {
+                queryClient.invalidateQueries({ queryKey: ['trivia_players', game.id] });
+                queryClient.invalidateQueries({ queryKey: ['trivia_answers_q'] });
+            }
             refetch();
         },
         onReset: () => {
@@ -111,10 +114,19 @@ export const TriviaDisplayOverlay = ({ eventId }: TriviaDisplayOverlayProps) => 
 
     const qIndex = currentQuestion ? questions.findIndex(q => q.id === currentQuestion.id) : -1;
     const answeredCount = answers.length;
-    const timerPercent = (timeLeft / (game?.question_duration_seconds ?? 10)) * 100;
+    const timerPercent = Math.max(0, Math.min(100, (timeLeft / (game?.question_duration_seconds ?? 10)) * 100));
     const timerColor = timerPercent > 50 ? '#22c55e' : timerPercent > 25 ? '#eab308' : '#ef4444';
 
     if (!game || dismissed) return null;
+
+    // Si el juego está activo pero aún no tenemos los datos de la pregunta, mostramos un pequeño loading
+    if ((game.status === 'active' || game.status === 'results') && !currentQuestion) {
+        return (
+            <div className="fixed inset-0 z-50 bg-slate-950 flex items-center justify-center">
+                <div className="text-violet-400 animate-pulse text-xl font-bold">Sincronizando pregunta...</div>
+            </div>
+        );
+    }
 
     if (game.status === 'lobby') {
         return (

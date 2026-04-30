@@ -37,9 +37,6 @@ export const UploadModal = ({ open, onOpenChange, eventId, onSuccess }: UploadMo
                 return;
             }
 
-            try {
-                setIsCompressing(true);
-
                 // Opciones de compresión optimizadas para eventos
                 const options = {
                     maxSizeMB: 1,              // Máximo 1MB (suficiente para pantallas)
@@ -48,6 +45,9 @@ export const UploadModal = ({ open, onOpenChange, eventId, onSuccess }: UploadMo
                     initialQuality: 0.8,       // 80% calidad
                     fileType: 'image/jpeg'     // Convertir todo a JPG
                 };
+
+            try {
+                setIsCompressing(true);
 
                 const compressedFile = await imageCompression(originalFile, options);
 
@@ -63,25 +63,42 @@ export const UploadModal = ({ open, onOpenChange, eventId, onSuccess }: UploadMo
                 reader.readAsDataURL(compressedFile);
 
             } catch (error) {
-                console.error("Error al comprimir imagen:", error);
+                console.warn("Error con WebWorker, reintentando sin él...", error);
 
-                // Si falla la compresión, verificamos si el original cumple los requisitos
-                const MAX_SIZE_MB = 5;
-                if (originalFile.size > MAX_SIZE_MB * 1024 * 1024) {
-                    toast.error(`La imagen es muy pesada (>${MAX_SIZE_MB}MB) y no se pudo comprimir automáticamente. Por favor intenta con una más ligera.`);
-                    setIsCompressing(false);
-                    if (fileInputRef.current) fileInputRef.current.value = '';
-                    return;
+                try {
+                    // Re-intentar sin WebWorker por problemas en iOS / in-app browsers
+                    const newOptions = { ...options, useWebWorker: false };
+                    const compressedFile = await imageCompression(originalFile, newOptions);
+                    
+                    setFile(compressedFile);
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        setPreview(reader.result as string);
+                        setIsCompressing(false);
+                    };
+                    reader.readAsDataURL(compressedFile);
+
+                } catch (retryError) {
+                    console.error("Error definitivo de compresión:", retryError);
+
+                    // Si falla la compresión, verificamos si el original cumple los requisitos
+                    const MAX_SIZE_MB = 20; // Permite subir fotos pesadas (limite backend 20MB)
+                    if (originalFile.size > MAX_SIZE_MB * 1024 * 1024) {
+                        toast.error(`La imagen es muy pesada (>${MAX_SIZE_MB}MB) y no se pudo comprimir automáticamente. Por favor intenta con una más ligera.`);
+                        setIsCompressing(false);
+                        if (fileInputRef.current) fileInputRef.current.value = '';
+                        return;
+                    }
+
+                    // Fallback: usar original si es < 20MB
+                    setFile(originalFile);
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        setPreview(reader.result as string);
+                        setIsCompressing(false);
+                    };
+                    reader.readAsDataURL(originalFile);
                 }
-
-                // Fallback: usar original si es < 5MB
-                setFile(originalFile);
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    setPreview(reader.result as string);
-                    setIsCompressing(false);
-                };
-                reader.readAsDataURL(originalFile);
             }
         }
     };
@@ -98,12 +115,12 @@ export const UploadModal = ({ open, onOpenChange, eventId, onSuccess }: UploadMo
             file: file || undefined,
             author: 'Invitado'
         }, {
-            onSuccess: () => {
+            onSuccess: (data) => {
                 setShowSuccess(true);
 
-                // Llamar al callback de éxito
+                // Llamar al callback de éxito con la URL pública si existe
                 if (onSuccess) {
-                    onSuccess(uploadedPhotoUrl);
+                    onSuccess(data || uploadedPhotoUrl);
                 }
 
                 setTimeout(() => {
@@ -112,6 +129,10 @@ export const UploadModal = ({ open, onOpenChange, eventId, onSuccess }: UploadMo
                     setFile(null);
                     onOpenChange(false);
                 }, 2500);
+            },
+            onError: (err: any) => {
+                console.error("Failed to submit photo", err);
+                toast.error(err.message || 'Error al enviar foto. Intenta otra vez o con otra foto.');
             }
         });
     };

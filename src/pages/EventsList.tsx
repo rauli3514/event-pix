@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Calendar, ExternalLink, Settings, LogOut, Trash2, Lock, Unlock, Users, Shield } from 'lucide-react';
+import { Plus, Calendar, ExternalLink, Settings, LogOut, Trash2, Lock, Unlock, Users, Shield, Sparkles } from 'lucide-react';
 
 type Event = {
     id: string;
@@ -77,16 +77,24 @@ const EventsList = () => {
             if (eventError) throw eventError;
 
             // 2. Create Default Settings for this event
+            // Usamos upsert por si un trigger de la base de datos ya creó la configuración (evita duplicate key event_settings_event_id_unique)
             const { error: settingsError } = await supabase
                 .from('event_settings')
-                .insert([{
+                .upsert({
                     event_id: event.id,
                     title: event.name,
                     description: '¡Bienvenidos a nuestra fiesta!',
                     display_template: 'slideshow'
-                }]);
+                }, { onConflict: 'event_id' });
 
-            if (settingsError) throw settingsError;
+            if (settingsError) {
+                // FALLBACK: Si falla la creación de la config, mostramos el error exacto
+                alert("BASE DE DATOS DIO EL SIGUIENTE ERROR AL CREAR LA CONFIGURACIÓN:\n\n" + JSON.stringify(settingsError, null, 2));
+
+                // Borramos el evento recién creado para que NO quede trabado y su slug siga libre.
+                await supabase.from('events').delete().eq('id', event.id);
+                throw new Error("Faltan permisos o base de datos reportó: " + (settingsError.message || settingsError.code));
+            }
 
             return event;
         },
@@ -155,12 +163,28 @@ const EventsList = () => {
     // Auto-generate slug from name
     const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const name = e.target.value;
-        const slug = name.toLowerCase()
+        const newSlug = name.toLowerCase()
             .replace(/[^\w\s-]/g, '') // remove non-word chars
+            .trim()
             .replace(/\s+/g, '-') // replace spaces with dashes
             .replace(/--+/g, '-'); // replace multiple dashes
 
-        setNewEvent(prev => ({ ...prev, name, slug: prev.slug ? prev.slug : slug }));
+        setNewEvent(prev => {
+            // Reconstruct the slug that would have been generated from the old name
+            const prevGeneratedSlug = prev.name.toLowerCase()
+                .replace(/[^\w\s-]/g, '')
+                .trim()
+                .replace(/\s+/g, '-')
+                .replace(/--+/g, '-');
+
+            // If the current slug matches the auto-generated version of the previous name,
+            // or if it's currently empty, it means the user hasn't manually altered it yet.
+            if (!prev.slug || prev.slug === prevGeneratedSlug) {
+                return { ...prev, name, slug: newSlug };
+            }
+            // Otherwise, they edited the slug manually, so we leave it alone.
+            return { ...prev, name };
+        });
     };
 
     if (isLoading) return (
@@ -208,11 +232,18 @@ const EventsList = () => {
                         </Button>
                     )}
                     {isSuperAdmin && (
-                        <Button asChild variant="outline" className="bg-transparent border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">
-                            <Link to="/admin/providers">
-                                <Users className="w-4 h-4 mr-2" /> Usuarios
-                            </Link>
-                        </Button>
+                        <>
+                            <Button asChild variant="outline" className="bg-transparent border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">
+                                <Link to="/admin/providers">
+                                    <Users className="w-4 h-4 mr-2" /> Usuarios
+                                </Link>
+                            </Button>
+                            <Button asChild className="bg-violet-600 hover:bg-violet-700 text-white shadow-[0_0_20px_rgba(139,92,246,0.3)] border border-violet-500/50">
+                                <Link to="/admin/kiosco-manager">
+                                    <Sparkles className="w-4 h-4 mr-2" /> Kiosco IA Global
+                                </Link>
+                            </Button>
+                        </>
                     )}
                     {isSuperAdmin && (
                         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>

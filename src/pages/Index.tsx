@@ -13,6 +13,7 @@ import { TriviaGuestView } from "@/components/trivia/TriviaGuestView";
 import { PhotoBattleView } from "@/components/photovote/PhotoBattleView";
 import { useEventSettings } from "@/hooks/use-event-settings";
 import { FaWhatsapp, FaInstagram, FaTiktok } from "react-icons/fa";
+import { Button } from "@/components/ui/button";
 
 const Index = () => {
     const [uploadOpen, setUploadOpen] = useState(false);
@@ -46,16 +47,30 @@ const Index = () => {
                     <p className="text-slate-300 mb-4">
                         No pudimos encontrar el evento: <span className="font-mono bg-white/10 px-2 py-1 rounded">{params.slug || '(sin slug)'}</span>
                     </p>
-                    <p className="text-sm text-slate-400">
+                    <p className="text-sm text-slate-400 mb-6">
                         Verifica que la URL sea correcta o contacta al administrador del evento.
                     </p>
+                    <Button 
+                        onClick={() => {
+                            const w = window as any;
+                            if (w.caches) {
+                                w.caches.keys().then((names: string[]) => Promise.all(names.map((name: string) => w.caches.delete(name))))
+                                .then(() => window.location.reload());
+                            } else {
+                                window.location.reload();
+                            }
+                        }}
+                        className="w-full bg-violet-600 hover:bg-violet-700 text-white font-bold h-12"
+                    >
+                        Limpiar Caché y Recargar App
+                    </Button>
                 </div>
             </div>
         );
     }
 
     const handleUploadSuccess = (photoUrl: string) => {
-        // Solo abrir Photo Booth si está habilitado (ahora usa temas por defecto si no ha marco)
+        // Solo abrir Photo Booth si está habilitado en los ajustes
         if (settings?.photo_booth_enabled) {
             setUploadedPhotoUrl(photoUrl);
             // Pequeño delay para que la transición del modal de éxito sea suave
@@ -172,6 +187,7 @@ const Index = () => {
                             frameUrl={settings?.photobooth_frame_url}
                             themeBackgroundUrl={settings?.background_image_url}
                             eventName={event.name}
+                            aiGenerationEnabled={settings?.ai_generation_enabled ?? false}
                         />
                     )}
                 </>

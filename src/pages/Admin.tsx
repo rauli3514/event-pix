@@ -5,7 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { ArrowLeft, QrCode, Download, Images, MessageSquare, Monitor, Palette, Trash2, Zap, BarChart2, CheckCircle2, Music } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { 
+    ArrowLeft, QrCode, Download, Images, MessageSquare, Monitor, Palette, Trash2, Zap, BarChart2, CheckCircle2, Music, Menu, ExternalLink, Users, Image as ImageIcon, Settings, Layout, Share2, Camera, MonitorPlay, Save, Smartphone, Shield, Video, Sparkles, UploadCloud 
+} from "lucide-react";
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area } from 'recharts';
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { useSubmissions } from "@/hooks/use-submissions";
@@ -30,8 +33,22 @@ const Admin = () => {
     const uploadImage = useUploadEventImage();
     const isSuperAdmin = useIsSuperAdmin();
 
+    const [isSaving, setIsSaving] = useState(false);
+    
+    // AI Themes State
+    const [aiThemes, setAiThemes] = useState<any[]>([]);
+    const [isUploadingTheme, setIsUploadingTheme] = useState(false);
+    const [newTheme, setNewTheme] = useState({
+        name: '',
+        category: '',
+        prompt: '',
+        negative_prompt: ''
+    });
+    const [themeFile, setThemeFile] = useState<File | null>(null);
+
     const [activeTab, setActiveTab] = useState("dashboard");
     const [moderationFilter, setModerationFilter] = useState<'pending' | 'approved' | 'rejected'>('pending');
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     const [formData, setFormData] = useState({
         title: "",
@@ -54,11 +71,9 @@ const Admin = () => {
                 carousel_interval_ms: settings.carousel_interval_ms ?? 5000,
                 wall_show_controls: settings.wall_show_controls ?? true,
             });
+            fetchAiThemes();
         }
     }, [settings]);
-
-    // Initialize form data when event loads
-    // useEffect(() => { ... }) logic should be here or handled in Settings tab logic
 
     // Filtrar contenido
     const approvedMessages = submissions?.filter(s => s.type === 'message' && s.status === 'approved') || [];
@@ -361,7 +376,81 @@ const Admin = () => {
         }
     };
 
+    const fetchAiThemes = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('ai_themes')
+                .select('*')
+                .order('created_at', { ascending: false });
+            
+            if (error) throw error;
+            setAiThemes(data || []);
+        } catch (error) {
+            console.error('Error fetching themes:', error);
+        }
+    };
 
+    const handleCreateTheme = async () => {
+        if (!newTheme.name || !newTheme.category || !newTheme.prompt || !themeFile) {
+            toast.error("Por favor completa el nombre, categoría, prompt y la imagen de portada.");
+            return;
+        }
+
+        setIsUploadingTheme(true);
+        try {
+            const fileExt = themeFile.name.split('.').pop();
+            const fileName = `theme_${Date.now()}.${fileExt}`;
+            const { error: uploadError } = await supabase.storage
+                .from('photos')
+                .upload(`ai_themes/${fileName}`, themeFile);
+
+            if (uploadError) throw uploadError;
+
+            const { data: { publicUrl } } = supabase.storage
+                .from('photos')
+                .getPublicUrl(`ai_themes/${fileName}`);
+
+            const { error: dbError } = await supabase
+                .from('ai_themes')
+                .insert([{
+                    name: newTheme.name,
+                    category: newTheme.category,
+                    prompt: newTheme.prompt,
+                    negative_prompt: newTheme.negative_prompt,
+                    cover_image_url: publicUrl
+                }]);
+
+            if (dbError) throw dbError;
+
+            toast.success("¡Temática creada con éxito!");
+            setNewTheme({ name: '', category: '', prompt: '', negative_prompt: '' });
+            setThemeFile(null);
+            fetchAiThemes();
+
+        } catch (error: any) {
+            console.error("Error creating theme:", error);
+            toast.error("Error al crear la temática: " + error.message);
+        } finally {
+            setIsUploadingTheme(false);
+        }
+    };
+
+    const handleDeleteTheme = async (id: string) => {
+        if (!confirm("¿Seguro que quieres eliminar esta temática?")) return;
+        
+        try {
+            const { error } = await supabase
+                .from('ai_themes')
+                .delete()
+                .eq('id', id);
+                
+            if (error) throw error;
+            toast.success("Temática eliminada");
+            fetchAiThemes();
+        } catch (error: any) {
+            toast.error("Error al eliminar: " + error.message);
+        }
+    };
 
     const handleClearApproved = () => {
         if (confirm("¿Estás seguro de ELIMINAR todo el contenido aprobado? Asegúrate de haberlo descargado primero.")) {
@@ -542,36 +631,70 @@ const Admin = () => {
         <div className="min-h-screen bg-slate-950 flex font-sans text-slate-100">
             <AdminSidebar
                 activeTab={activeTab}
-                onTabChange={setActiveTab}
+                onTabChange={(id) => {
+                    setActiveTab(id);
+                    setIsMobileMenuOpen(false);
+                }}
                 onLogout={handleLogout}
                 eventName={event.name}
+                isMobileOpen={isMobileMenuOpen}
+                onMobileClose={() => setIsMobileMenuOpen(false)}
             />
 
-            <main className="flex-1 md:ml-64 p-8 overflow-y-auto h-screen">
-                <header className="mb-8 flex justify-between items-center bg-slate-900/50 p-6 rounded-2xl border border-white/5 backdrop-blur-xl">
-                    <div>
-                        <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
-                            {activeTab === 'dashboard' && 'Panel de Control'}
-                            {activeTab === 'moderation' && 'Moderación de Contenido'}
-                            {activeTab === 'design' && 'Diseño y Apariencia'}
-                            {activeTab === 'settings' && 'Ajustes del Evento'}
-                            {activeTab === 'display' && 'Control de Pantalla'}
-                            {activeTab === 'downloads' && 'Descargas y Reportes'}
-                        </h1>
-                        <p className="text-slate-400 text-sm mt-1">Gestionando: <span className="text-white font-medium">{event.name}</span></p>
+            <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto h-screen">
+                <header className="mb-6 md:mb-8 flex flex-col md:flex-row md:justify-between items-start md:items-center bg-slate-900/50 p-4 md:p-6 rounded-2xl border border-white/5 backdrop-blur-xl gap-4 md:gap-0">
+                    <div className="flex items-center gap-4 w-full md:w-auto">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setIsMobileMenuOpen(true)}
+                            className="md:hidden flex-shrink-0 text-slate-300 hover:text-white"
+                        >
+                            <Menu className="w-6 h-6" />
+                        </Button>
+                        <div>
+                            <h1 className="text-2xl md:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
+                                {(() => {
+                                    switch (activeTab) {
+                                        case 'dashboard': return 'Panel de Control';
+                                        case 'moderation': return 'Moderación';
+                                        case 'trivia': return 'Control de Trivia';
+                                        case 'voting': return 'Votación';
+                                        case 'design': return 'Diseño';
+                                        case 'settings': return 'Ajustes';
+                                        case 'display': return 'Pantalla';
+                                        case 'downloads': return 'Descargas';
+                                        default: return 'Admin';
+                                    }
+                                })()}
+                            </h1>
+                            <p className="text-slate-400 text-sm mt-1">Gestionando: <span className="text-white font-medium">{event.name}</span></p>
+                        </div>
                     </div>
 
-                    <div className="flex gap-3">
-                        <a href={`/${event.slug}`} target="_blank" rel="noopener noreferrer">
-                            <Button className="bg-slate-800 text-white border border-slate-700 hover:bg-slate-700 hover:text-white transition-colors">
-                                <span className="mr-2">📱</span> Ver Invitado
+                    <div className="flex flex-wrap items-center gap-2 md:gap-4 w-full md:w-auto">
+                        {activeTab !== 'dashboard' && (
+                            <Button
+                                variant="outline"
+                                onClick={() => setActiveTab('dashboard')}
+                                className="flex-1 md:flex-none justify-center items-center gap-2 text-slate-300 border-slate-700 hover:text-white hover:bg-slate-800"
+                            >
+                                <ArrowLeft className="w-4 h-4" />
+                                <span>Salir al Inicio</span>
                             </Button>
-                        </a>
-                        <a href={`/${event.slug}/display`} target="_blank" rel="noopener noreferrer">
-                            <Button className="bg-violet-600 hover:bg-violet-700">
-                                <span className="mr-2">🖥️</span> Ver Pantalla
-                            </Button>
-                        </a >
+                        )}
+                        <div className="flex gap-2 w-full md:w-auto">
+                            <a href={`/${event.slug}`} target="_blank" rel="noopener noreferrer" className="flex-1 md:flex-none">
+                                <Button className="w-full bg-slate-800 text-white border border-slate-700 hover:bg-slate-700 hover:text-white transition-colors">
+                                    <span className="mr-2 hidden sm:inline">📱</span> Invitado
+                                </Button>
+                            </a>
+                            <a href={`/${event.slug}/display`} target="_blank" rel="noopener noreferrer" className="flex-1 md:flex-none">
+                                <Button className="w-full bg-violet-600 hover:bg-violet-700">
+                                    <span className="mr-2 hidden sm:inline">🖥️</span> Pantalla
+                                </Button>
+                            </a>
+                        </div>
                     </div >
                 </header >
 
@@ -769,6 +892,15 @@ const Admin = () => {
                                                 <p className="text-[10px] text-yellow-200/60 leading-tight">
                                                     <strong>Descargo de responsabilidad:</strong> EventPix no se hace responsable por errores en la moderación automática ni por el contenido que pudiera aprobarse indebidamente. La responsabilidad final del contenido mostrado es del organizador.
                                                 </p>
+                                            </div>
+                                            
+                                            <div className="pt-2">
+                                                <a href="https://platform.openai.com/usage" target="_blank" rel="noopener noreferrer">
+                                                    <Button variant="outline" size="sm" className="w-full justify-between border-slate-700 hover:bg-slate-800 text-slate-300">
+                                                        <span>Ver Créditos de Uso (Panel IA)</span>
+                                                        <ExternalLink className="w-4 h-4 ml-2" />
+                                                    </Button>
+                                                </a>
                                             </div>
                                         </div>
                                     )}
@@ -977,9 +1109,19 @@ const Admin = () => {
                             {/* Message Settings */}
                             <div className="space-y-4">
                                 <h3 className="text-xl font-semibold text-violet-400 flex items-center gap-2">
-                                    <MessageSquare className="w-5 h-5" /> Configuración de Mensajes
+                                    <MessageSquare className="w-5 h-5" /> Configuración de Interacción
                                 </h3>
                                 <div className="bg-slate-900/50 p-6 rounded-2xl border border-white/5 space-y-4">
+                                    <div className="flex items-center justify-between p-4 bg-slate-950 rounded-lg border border-slate-800">
+                                        <div className="space-y-0.5">
+                                            <label className="text-base font-medium text-slate-200">Álbum de Fotos para Invitados</label>
+                                            <p className="text-xs text-slate-500">Permitir que los invitados puedan ver el álbum de fotos online.</p>
+                                        </div>
+                                        <Switch
+                                            checked={settings?.public_gallery_enabled ?? true}
+                                            onCheckedChange={(c) => updateSettings.mutate({ id: settings?.id, public_gallery_enabled: c } as any)}
+                                        />
+                                    </div>
                                     <div className="flex items-center justify-between p-4 bg-slate-950 rounded-lg border border-slate-800">
                                         <div className="space-y-0.5">
                                             <label className="text-base font-medium text-slate-200">Mensajes de Texto</label>
@@ -1137,7 +1279,10 @@ const Admin = () => {
                 {
                     activeTab === 'trivia' && event && (
                         <div className="max-w-6xl">
-                            <TriviaGameManager eventId={event.id} />
+                            <TriviaGameManager
+                                eventId={event.id}
+                                onBackToDashboard={() => setActiveTab('dashboard')}
+                            />
                         </div>
                     )
                 }

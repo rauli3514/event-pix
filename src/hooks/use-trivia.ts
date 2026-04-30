@@ -24,9 +24,9 @@ export const useTriviaGamesList = (eventId?: string) => {
             return data as TriviaGame[];
         },
         enabled: !!eventId,
+        staleTime: 60000, // Los juegos no cambian tan seguido
     });
 };
-
 export const useTriviaGame = (gameId?: string) => {
     return useQuery({
         queryKey: ['trivia_game', gameId],
@@ -41,6 +41,7 @@ export const useTriviaGame = (gameId?: string) => {
             return data as TriviaGame | null;
         },
         enabled: !!gameId,
+        staleTime: 10000,
     });
 };
 
@@ -58,6 +59,7 @@ export const useTriviaQuestions = (gameId?: string) => {
             return data as TriviaQuestion[];
         },
         enabled: !!gameId,
+        staleTime: 60000,
     });
 };
 
@@ -75,7 +77,7 @@ export const useTriviaSortedPlayers = (gameId?: string) => {
             return data as TriviaPlayer[];
         },
         enabled: !!gameId,
-        refetchInterval: 2000,
+        refetchInterval: 5000, // Menos agresivo, confiamos más en Realtime
     });
 };
 
@@ -92,7 +94,7 @@ export const useTriviaAnswersForQuestion = (questionId?: string) => {
             return data as TriviaAnswer[];
         },
         enabled: !!questionId,
-        refetchInterval: 1 * 1000, // Ranking ultra-rápido (1s)
+        refetchInterval: 3000, // Reducido de 1s a 3s para bajar carga
     });
 };
 
@@ -358,7 +360,7 @@ export const useActiveTrivia = (eventId?: string) => {
             return game;
         },
         enabled: !!eventId,
-        refetchInterval: 3000,
+        refetchInterval: 10000, // Mucho menos agresivo, Realtime es primario
     });
 };
 
@@ -462,6 +464,7 @@ export const useTriviaRealtime = (eventId: string | undefined, callbacks: {
     onReset?: () => void;
     onQuestionLaunched?: (payload: any) => void;
 }) => {
+    const queryClient = useQueryClient();
     const callbacksRef = useRef(callbacks);
     callbacksRef.current = callbacks;
 
@@ -475,10 +478,18 @@ export const useTriviaRealtime = (eventId: string | undefined, callbacks: {
                 schema: 'public',
                 table: 'trivia_games',
                 filter: `event_id=eq.${eventId}`,
-            }, () => {
+            }, (payload) => {
+                // Actualiza el cache si tenemos la data nueva
+                if (payload.new) {
+                    queryClient.setQueryData(['trivia_active', eventId], payload.new);
+                    queryClient.setQueryData(['trivia_game', (payload.new as any).id], payload.new);
+                }
                 callbacksRef.current.onUpdate?.();
             })
             .on('broadcast', { event: 'question_launched' }, ({ payload }) => {
+                // Invalida inmediatamente para forzar recarga
+                queryClient.invalidateQueries({ queryKey: ['trivia_active', eventId] });
+                queryClient.invalidateQueries({ queryKey: ['trivia_game'] });
                 callbacksRef.current.onUpdate?.();
                 callbacksRef.current.onQuestionLaunched?.(payload);
             })

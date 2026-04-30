@@ -67,10 +67,10 @@ export const THEME_CATEGORIES: ThemeCategory[] = [
                 fontName: 'Playfair Display',
                 frameUrl: 'https://png.pngtree.com/png-clipart/20221223/original/pngtree-rose-gold-stardust-light-effect-transparent-background-png-image_8797931.png',
                 variants: [
-                    { id: '15_1', imageUrl: '/themes/15 años/a-l-ya631mqQ7Ng-unsplash.jpg' },
-                    { id: '15_2', imageUrl: '/themes/15 años/adam-kring-1pMRoKhF84k-unsplash.jpg' },
-                    { id: '15_3', imageUrl: '/themes/15 años/aditya-chinchure-ZhQCZjr9fHo-unsplash.jpg' },
-                    { id: '15_4', imageUrl: '/themes/15 años/alexander-grey-W7cPLHOa0eQ-unsplash.jpg' },
+                    { id: '15_1', imageUrl: '/themes/quince/a-l-ya631mqQ7Ng-unsplash.jpg' },
+                    { id: '15_2', imageUrl: '/themes/quince/adam-kring-1pMRoKhF84k-unsplash.jpg' },
+                    { id: '15_3', imageUrl: '/themes/quince/aditya-chinchure-ZhQCZjr9fHo-unsplash.jpg' },
+                    { id: '15_4', imageUrl: '/themes/quince/alexander-grey-W7cPLHOa0eQ-unsplash.jpg' },
                 ]
             },
             {
@@ -81,11 +81,11 @@ export const THEME_CATEGORIES: ThemeCategory[] = [
                 fontName: 'Montserrat',
                 frameUrl: 'https://png.pngtree.com/png-clipart/20230131/original/pngtree-geometric-frame-design-png-image_8941088.png',
                 variants: [
-                    { id: '15_5', imageUrl: '/themes/15 años/benjamin-wong-WoViiJWKLik-unsplash.jpg' },
-                    { id: '15_6', imageUrl: '/themes/15 años/danny-howe-bn-D2bCvpik-unsplash.jpg' },
-                    { id: '15_7', imageUrl: '/themes/15 años/ddp-uwH8zpibUVc-unsplash.jpg' },
-                    { id: '15_8', imageUrl: '/themes/15 años/deep-boda-tqe1jIgyhhs-unsplash.jpg' },
-                    { id: '15_9', imageUrl: '/themes/15 años/designecologist-W2REjHflRU4-unsplash.jpg' },
+                    { id: '15_5', imageUrl: '/themes/quince/benjamin-wong-WoViiJWKLik-unsplash.jpg' },
+                    { id: '15_6', imageUrl: '/themes/quince/danny-howe-bn-D2bCvpik-unsplash.jpg' },
+                    { id: '15_7', imageUrl: '/themes/quince/ddp-uwH8zpibUVc-unsplash.jpg' },
+                    { id: '15_8', imageUrl: '/themes/quince/deep-boda-tqe1jIgyhhs-unsplash.jpg' },
+                    { id: '15_9', imageUrl: '/themes/quince/designecologist-W2REjHflRU4-unsplash.jpg' },
                 ]
             }
         ]
@@ -173,6 +173,40 @@ export const THEME_CATEGORIES: ThemeCategory[] = [
                     { id: 'tecno_3', imageUrl: '/themes/tecno /aleksandr-popov-Eq5wbIf59vo-unsplash.jpg' },
                     { id: 'tecno_4', imageUrl: '/themes/tecno /andrew-knechel-gG6yehL64fo-unsplash.jpg' },
                     { id: 'tecno_5', imageUrl: '/themes/tecno /carl-raw-m3hn2Kn5Bns-unsplash.jpg' },
+                ]
+            }
+        ]
+    },
+    {
+        id: 'gradients',
+        name: 'Abstracto & Minimalista',
+        themes: [
+            {
+                id: 'soft_gradients',
+                name: 'Soft Auras',
+                description: 'Gradientes modernos y relajantes.',
+                font: 'font-modern', // Montserrat
+                fontName: 'Montserrat',
+                frameUrl: '',
+                variants: [
+                    { id: 'gradient_1', imageUrl: 'https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=2029&auto=format&fit=crop' }, // Blue/Purple
+                    { id: 'gradient_2', imageUrl: 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?q=80&w=2070&auto=format&fit=crop' }, // Multi color
+                    { id: 'gradient_3', imageUrl: 'https://images.unsplash.com/photo-1557682250-33bd709cbe85?q=80&w=2029&auto=format&fit=crop' }, // Violet
+                    { id: 'gradient_4', imageUrl: 'https://images.unsplash.com/photo-1508615039623-a25605d2b022?q=80&w=2070&auto=format&fit=crop' }, // Teal
+                    { id: 'gradient_5', imageUrl: 'https://images.unsplash.com/photo-1614850523060-8da1d56ae167?q=80&w=2070&auto=format&fit=crop' }  // Liquid
+                ]
+            },
+            {
+                id: 'dark_minimal',
+                name: 'Dark Elegance',
+                description: 'Fondos oscuros para resaltar las fotos.',
+                font: 'font-sans',
+                fontName: 'Inter',
+                frameUrl: '',
+                variants: [
+                    { id: 'dark_1', imageUrl: 'https://images.unsplash.com/photo-1478760329108-5c3ed9d495a0?q=80&w=2074&auto=format&fit=crop' }, // Dark texture
+                    { id: 'dark_2', imageUrl: 'https://images.unsplash.com/photo-1533035353717-3f6a989fe8d9?q=80&w=2070&auto=format&fit=crop' }, // Deep Blue
+                    { id: 'dark_3', imageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop' } // Abstract Dark
                 ]
             }
         ]

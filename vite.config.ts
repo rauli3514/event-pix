@@ -5,6 +5,15 @@ import path from 'path'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  server: {
+    proxy: {
+      '/api/replicate': {
+        target: 'https://api.replicate.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/replicate/, '')
+      }
+    }
+  },
   plugins: [
     react(),
     VitePWA({
@@ -15,7 +24,7 @@ export default defineConfig({
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
         name: 'EventPix',
-        short_name: 'EventPix',
+        short_name: 'EventPix v1.1',
         description: 'Comparte tus fotos del evento en tiempo real',
         theme_color: '#ffffff',
         background_color: '#ffffff',

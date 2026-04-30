@@ -215,7 +215,7 @@ export const TriviaGuestView = ({ eventId }: TriviaGuestViewProps) => {
     // ===================== JOIN =====================
     if ((game.status === 'lobby' || game.status === 'active') && !player) {
         return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
                 <div className="bg-gradient-to-br from-violet-900 via-slate-900 to-fuchsia-900 rounded-3xl p-8 max-w-sm w-full border border-violet-500/40 shadow-2xl text-center space-y-6">
                     <div className="text-6xl animate-bounce">🎮</div>
                     <div>
@@ -252,7 +252,7 @@ export const TriviaGuestView = ({ eventId }: TriviaGuestViewProps) => {
     if (phase === 'lobby' && player) {
         const activePlayers = sortedPlayers.filter(p => !(p as any).is_eliminated);
         return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 backdrop-blur-md p-4">
                 <div className="bg-gradient-to-br from-slate-900 to-violet-900/50 rounded-3xl p-8 max-w-sm w-full border border-violet-500/30 text-center space-y-6">
                     <div className="text-5xl animate-pulse">⏳</div>
                     <div>
@@ -286,7 +286,7 @@ export const TriviaGuestView = ({ eventId }: TriviaGuestViewProps) => {
         const myPos = sortedPlayers.findIndex(p => p.id === player.id) + 1;
         const activePlayers = sortedPlayers.filter(p => !(p as any).is_eliminated);
         return (
-            <div className="fixed inset-0 z-50 bg-gradient-to-br from-slate-950 via-red-950/30 to-slate-950 flex flex-col items-center justify-center p-6 text-center space-y-6">
+            <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-slate-950 via-red-950/30 to-slate-950 flex flex-col items-center justify-center p-6 text-center space-y-6">
                 <div className="text-8xl animate-bounce">💀</div>
                 <div>
                     <h2 className="text-4xl font-black text-red-400">¡Eliminado!</h2>
@@ -319,7 +319,7 @@ export const TriviaGuestView = ({ eventId }: TriviaGuestViewProps) => {
         );
 
         return (
-            <div className="fixed inset-0 z-50 flex flex-col bg-slate-950">
+            <div className="fixed inset-0 z-[9999] flex flex-col bg-slate-950 pb-16">
                 {/* Timer bar */}
                 <div className="h-1.5 bg-slate-800 flex-shrink-0">
                     <div className="h-full transition-all duration-300" style={{ width: `${timerPct}%`, backgroundColor: timerColor }} />
@@ -432,7 +432,7 @@ export const TriviaGuestView = ({ eventId }: TriviaGuestViewProps) => {
         const activePlayers = sortedPlayers.filter(p => !(p as any).is_eliminated);
         const myPos = sortedPlayers.findIndex(p => p.id === player.id) + 1;
         return (
-            <div className="fixed inset-0 z-50 bg-gradient-to-br from-slate-950 to-violet-950/50 flex flex-col overflow-auto">
+            <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-slate-950 to-violet-950/50 flex flex-col overflow-auto">
                 <div className="flex-1 p-4 space-y-4">
                     <div className="flex gap-2 text-center">
                         <div className="flex-1 bg-violet-500/20 border border-violet-500/30 rounded-2xl p-3">
@@ -487,7 +487,7 @@ export const TriviaGuestView = ({ eventId }: TriviaGuestViewProps) => {
         const myPos = player ? (sortedPlayers.findIndex(p => p.id === player?.id) + 1) : null;
 
         return (
-            <div className="fixed inset-0 z-50 bg-gradient-to-br from-slate-950 via-yellow-950/20 to-slate-950 flex flex-col overflow-auto">
+            <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-slate-950 via-yellow-950/20 to-slate-950 flex flex-col overflow-auto">
                 <div className="flex-1 p-5 space-y-5 flex flex-col items-center justify-start pt-10">
                     <div className="text-8xl animate-bounce">🏆</div>
                     <div className="text-center">

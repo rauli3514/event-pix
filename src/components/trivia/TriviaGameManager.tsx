@@ -7,14 +7,14 @@ import { Input } from "@/components/ui/input";
 import {
     Plus, Trash2, Play, SkipForward, Users,
     Gamepad2, ClipboardList, BarChart3,
-    ChevronLeft, Settings2, LayoutList
+    ChevronLeft, Settings2, LayoutList, LayoutDashboard, Loader2
 } from "lucide-react";
 import {
     useTriviaGame, useTriviaQuestions, useTriviaSortedPlayers,
     useTriviaAnswersForQuestion, useCreateTriviaGame, useDeleteTriviaGame,
     useAddTriviaQuestion, useDeleteTriviaQuestion, useUpdateTriviaGame,
     useLaunchQuestion, useShowResults, useFinishTriviaGame,
-    useResetTriviaGame, useTriviaGamesList
+    useResetTriviaGame, useTriviaGamesList, useTriviaTimer
 } from "@/hooks/use-trivia";
 import { TriviaOption } from "@/types";
 
@@ -38,9 +38,10 @@ const EMPTY_QUESTION = {
 
 interface TriviaGameManagerProps {
     eventId: string;
+    onBackToDashboard?: () => void;
 }
 
-export const TriviaGameManager = ({ eventId }: TriviaGameManagerProps) => {
+export const TriviaGameManager = ({ eventId, onBackToDashboard }: TriviaGameManagerProps) => {
     const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
     const [view, setView] = useState<'setup' | 'live'>('setup');
     const [isCreating, setIsCreating] = useState(false);
@@ -61,6 +62,11 @@ export const TriviaGameManager = ({ eventId }: TriviaGameManagerProps) => {
         game?.status === 'active' ? game?.current_question_id ?? undefined : undefined
     );
 
+    const { timeLeft } = useTriviaTimer(
+        game?.status === 'active' ? (game?.question_started_at ?? null) : null,
+        game?.question_duration_seconds ?? 10
+    );
+
     // Mutations
     const createGame = useCreateTriviaGame(eventId);
     const deleteGame = useDeleteTriviaGame(eventId);
@@ -72,8 +78,8 @@ export const TriviaGameManager = ({ eventId }: TriviaGameManagerProps) => {
     const finishGame = useFinishTriviaGame(eventId);
     const resetTrivia = useResetTriviaGame(eventId);
 
-    const currentQuestionIndex = game?.current_question_id
-        ? questions.findIndex(q => q.id === game.current_question_id)
+    const currentQuestionIndex = (game?.current_question_id && questions.length > 0)
+        ? Math.max(0, questions.findIndex(q => q.id === game.current_question_id))
         : 0;
 
     const currentQuestion = questions[currentQuestionIndex] ?? null;
@@ -124,11 +130,18 @@ export const TriviaGameManager = ({ eventId }: TriviaGameManagerProps) => {
         toast.success("✅ Pregunta agregada");
     };
 
+    const [isProcessing, setIsProcessing] = useState(false);
+
     const handleOpenLobby = async () => {
-        if (!game) return;
-        await updateGame.mutateAsync({ gameId: game.id, updates: { status: 'lobby', current_question_id: questions[0]?.id || null } });
-        toast.success("🏠 Lobby abierto — los invitados ya pueden unirse");
-        setView('live');
+        if (!game || isProcessing) return;
+        setIsProcessing(true);
+        try {
+            await updateGame.mutateAsync({ gameId: game.id, updates: { status: 'lobby', current_question_id: questions[0]?.id || null } });
+            toast.success("🏠 Lobby abierto");
+            setView('live');
+        } finally {
+            setIsProcessing(false);
+        }
     };
 
     const handleLaunchQuestion = async (index?: number) => {
@@ -165,20 +178,27 @@ export const TriviaGameManager = ({ eventId }: TriviaGameManagerProps) => {
     };
 
     const handleNextStep = async () => {
-        if (!game) return;
-
-        if (game.status === 'lobby') {
-            await handleLaunchQuestion(0);
-        } else if (game.status === 'active') {
-            await handleShowResults();
-        } else if (game.status === 'results') {
-            const nextIndex = currentQuestionIndex + 1;
-            if (nextIndex >= questions.length) {
-                await finishGame.mutateAsync(game.id);
-                toast.success("🏆 ¡Fin de la trivia!");
-            } else {
-                await handleLaunchQuestion(nextIndex);
+        if (!game || isProcessing) return;
+        setIsProcessing(true);
+        try {
+            if (game.status === 'lobby') {
+                await handleLaunchQuestion(0);
+            } else if (game.status === 'active') {
+                await handleShowResults();
+            } else if (game.status === 'results') {
+                const nextIndex = currentQuestionIndex + 1;
+                if (nextIndex >= questions.length) {
+                    await finishGame.mutateAsync(game.id);
+                    toast.success("🏆 ¡Fin de la trivia!");
+                } else {
+                    await handleLaunchQuestion(nextIndex);
+                }
             }
+        } catch (e) {
+            console.error("Error in next step:", e);
+            toast.error("Error al avanzar");
+        } finally {
+            setIsProcessing(false);
         }
     };
 
@@ -218,6 +238,30 @@ export const TriviaGameManager = ({ eventId }: TriviaGameManagerProps) => {
                         <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">Series de preguntas en vivo</p>
                     </div>
                 </div>
+
+                {onBackToDashboard && (
+                    <Button
+                        variant="outline"
+                        onClick={async () => {
+                            // Si hay un juego activo (lobby, active, results), lo finalizamos para "liberar" las pantallas
+                            if (game && ['lobby', 'active', 'results'].includes(game.status)) {
+                                try {
+                                    await updateGame.mutateAsync({
+                                        gameId: game.id,
+                                        updates: { status: 'finished', updated_at: new Date().toISOString() }
+                                    });
+                                } catch (e) {
+                                    console.error("Error finalizing game on exit:", e);
+                                }
+                            }
+                            onBackToDashboard();
+                        }}
+                        className="text-slate-400 hover:text-white border-slate-700 bg-slate-900/50"
+                    >
+                        <LayoutDashboard className="w-4 h-4 mr-2" />
+                        <span>Salir al Inicio</span>
+                    </Button>
+                )}
             </div>
 
             {/* 1. VISTA: LISTA DE TRIVIAS (Si no hay seleccionada) */}
@@ -292,9 +336,22 @@ export const TriviaGameManager = ({ eventId }: TriviaGameManagerProps) => {
                 <div className="space-y-6">
                     {/* Barra de navegación de la trivia */}
                     <div className="flex items-center justify-between bg-slate-900/50 p-4 rounded-2xl border border-slate-800">
-                        <Button variant="ghost" onClick={() => setSelectedGameId(null)} className="text-slate-400 hover:text-white px-0">
-                            <ChevronLeft className="w-4 h-4 mr-1" /> Volver a la lista
-                        </Button>
+                        <div className="flex items-center gap-4">
+                            <Button variant="ghost" onClick={() => setSelectedGameId(null)} className="text-slate-400 hover:text-white px-0">
+                                <ChevronLeft className="w-4 h-4 mr-1" /> Volver a la lista
+                            </Button>
+
+                            {onBackToDashboard && (
+                                <Button
+                                    variant="ghost"
+                                    onClick={onBackToDashboard}
+                                    className="flex items-center text-[10px] font-bold uppercase tracking-widest text-slate-500 hover:text-white"
+                                >
+                                    <LayoutDashboard className="w-3 h-3 mr-1" />
+                                    <span>Salir</span>
+                                </Button>
+                            )}
+                        </div>
                         <div className="text-center">
                             <h3 className="text-white font-black italic uppercase tracking-tighter text-xl">{game.title}</h3>
                             <div className={`text-[10px] font-black uppercase tracking-widest ${statusLabel[game.status].color}`}>
@@ -440,17 +497,24 @@ export const TriviaGameManager = ({ eventId }: TriviaGameManagerProps) => {
                                             ) : (
                                                 <Button
                                                     onClick={handleNextStep}
-                                                    className={`flex-1 py-10 text-2xl font-black uppercase italic shadow-lg transition-all transform active:scale-95 ${game.status === 'lobby' ? 'bg-green-600 hover:bg-green-700 shadow-green-500/20' :
+                                                    disabled={isProcessing || (game.status === 'active' && timeLeft > 0)}
+                                                    className={`flex-1 py-10 text-2xl font-black uppercase italic shadow-lg transition-all transform active:scale-95 text-white ${game.status === 'lobby' ? 'bg-green-600 hover:bg-green-700 shadow-green-500/20' :
                                                         game.status === 'active' ? 'bg-yellow-500 hover:bg-yellow-600 shadow-yellow-500/20 text-slate-900' :
                                                             'bg-violet-600 hover:bg-violet-700 shadow-violet-500/20'
                                                         }`}
                                                 >
-                                                    {game.status === 'lobby' && <><Play className="w-8 h-8 mr-4" /> Comenzar Trivia</>}
-                                                    {game.status === 'active' && <><BarChart3 className="w-8 h-8 mr-4" /> Cortar Tiempo</>}
-                                                    {game.status === 'results' && (
-                                                        currentQuestionIndex + 1 >= questions.length
-                                                            ? <><SkipForward className="w-8 h-8 mr-4" /> Ver Ranking Final</>
-                                                            : <><Play className="w-8 h-8 mr-4" /> Lanzar Siguiente Pregunta</>
+                                                    {isProcessing ? (
+                                                        <Loader2 className="w-8 h-8 animate-spin" />
+                                                    ) : (
+                                                        <div className="flex items-center justify-center">
+                                                            {game.status === 'lobby' && <><Play className="w-8 h-8 mr-4" /> COMENZAR TRIVIA</>}
+                                                            {game.status === 'active' && <><BarChart3 className="w-8 h-8 mr-4" /> MOSTRAR RESPUESTA</>}
+                                                            {game.status === 'results' && (
+                                                                (currentQuestionIndex + 1 >= questions.length || !questions[currentQuestionIndex + 1])
+                                                                    ? <><SkipForward className="w-8 h-8 mr-4" /> FINALIZAR JUEGO</>
+                                                                    : <><Play className="w-8 h-8 mr-4" /> PRÓXIMA PREGUNTA</>
+                                                            )}
+                                                        </div>
                                                     )}
                                                 </Button>
                                             )}
