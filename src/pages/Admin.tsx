@@ -5,9 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { 
-    ArrowLeft, QrCode, Download, Images, MessageSquare, Monitor, Palette, Trash2, Zap, BarChart2, CheckCircle2, Music, Menu, ExternalLink, Users, Image as ImageIcon, Settings, Layout, Share2, Camera, MonitorPlay, Save, Smartphone, Shield, Video, Sparkles, UploadCloud 
+    ArrowLeft, QrCode, Download, Images, MessageSquare, Monitor, Palette, Trash2, Zap, BarChart2, CheckCircle2, Music, Menu, ExternalLink
 } from "lucide-react";
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, AreaChart, Area } from 'recharts';
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
@@ -33,18 +32,9 @@ const Admin = () => {
     const uploadImage = useUploadEventImage();
     const isSuperAdmin = useIsSuperAdmin();
 
-    const [isSaving, setIsSaving] = useState(false);
+
     
-    // AI Themes State
-    const [aiThemes, setAiThemes] = useState<any[]>([]);
-    const [isUploadingTheme, setIsUploadingTheme] = useState(false);
-    const [newTheme, setNewTheme] = useState({
-        name: '',
-        category: '',
-        prompt: '',
-        negative_prompt: ''
-    });
-    const [themeFile, setThemeFile] = useState<File | null>(null);
+
 
     const [activeTab, setActiveTab] = useState("dashboard");
     const [moderationFilter, setModerationFilter] = useState<'pending' | 'approved' | 'rejected'>('pending');
@@ -71,7 +61,6 @@ const Admin = () => {
                 carousel_interval_ms: settings.carousel_interval_ms ?? 5000,
                 wall_show_controls: settings.wall_show_controls ?? true,
             });
-            fetchAiThemes();
         }
     }, [settings]);
 
@@ -376,81 +365,7 @@ const Admin = () => {
         }
     };
 
-    const fetchAiThemes = async () => {
-        try {
-            const { data, error } = await supabase
-                .from('ai_themes')
-                .select('*')
-                .order('created_at', { ascending: false });
-            
-            if (error) throw error;
-            setAiThemes(data || []);
-        } catch (error) {
-            console.error('Error fetching themes:', error);
-        }
-    };
 
-    const handleCreateTheme = async () => {
-        if (!newTheme.name || !newTheme.category || !newTheme.prompt || !themeFile) {
-            toast.error("Por favor completa el nombre, categoría, prompt y la imagen de portada.");
-            return;
-        }
-
-        setIsUploadingTheme(true);
-        try {
-            const fileExt = themeFile.name.split('.').pop();
-            const fileName = `theme_${Date.now()}.${fileExt}`;
-            const { error: uploadError } = await supabase.storage
-                .from('photos')
-                .upload(`ai_themes/${fileName}`, themeFile);
-
-            if (uploadError) throw uploadError;
-
-            const { data: { publicUrl } } = supabase.storage
-                .from('photos')
-                .getPublicUrl(`ai_themes/${fileName}`);
-
-            const { error: dbError } = await supabase
-                .from('ai_themes')
-                .insert([{
-                    name: newTheme.name,
-                    category: newTheme.category,
-                    prompt: newTheme.prompt,
-                    negative_prompt: newTheme.negative_prompt,
-                    cover_image_url: publicUrl
-                }]);
-
-            if (dbError) throw dbError;
-
-            toast.success("¡Temática creada con éxito!");
-            setNewTheme({ name: '', category: '', prompt: '', negative_prompt: '' });
-            setThemeFile(null);
-            fetchAiThemes();
-
-        } catch (error: any) {
-            console.error("Error creating theme:", error);
-            toast.error("Error al crear la temática: " + error.message);
-        } finally {
-            setIsUploadingTheme(false);
-        }
-    };
-
-    const handleDeleteTheme = async (id: string) => {
-        if (!confirm("¿Seguro que quieres eliminar esta temática?")) return;
-        
-        try {
-            const { error } = await supabase
-                .from('ai_themes')
-                .delete()
-                .eq('id', id);
-                
-            if (error) throw error;
-            toast.success("Temática eliminada");
-            fetchAiThemes();
-        } catch (error: any) {
-            toast.error("Error al eliminar: " + error.message);
-        }
-    };
 
     const handleClearApproved = () => {
         if (confirm("¿Estás seguro de ELIMINAR todo el contenido aprobado? Asegúrate de haberlo descargado primero.")) {

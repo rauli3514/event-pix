@@ -7,14 +7,14 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from 'sonner';
 import {
-    Sparkles, ArrowLeft, Image as ImageIcon, Trash2, Save,
+    Sparkles, ArrowLeft, Trash2, Save,
     Monitor, Download, Printer, Settings, ExternalLink, Camera, Instagram, Users,
-    FolderOpen, Plus, Calendar, Edit2, RefreshCw, AlertCircle, ChevronLeft, ChevronRight
+    FolderOpen, Plus, RefreshCw, AlertCircle
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 // Simple Modal Component
-const Modal = ({ isOpen, onClose, title, children }: any) => {
+const Modal = ({ isOpen, title, children }: any) => {
     if (!isOpen) return null;
     return (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
@@ -46,7 +46,6 @@ const KioskManager = () => {
     const [frameFile, setFrameFile] = useState<File | null>(null);
     const [isSavingDesign, setIsSavingDesign] = useState(false);
     const [selectedFrame, setSelectedFrame] = useState(() => localStorage.getItem('kiosk_frame_url') || 'none');
-    const [currentFrameUrl, setCurrentFrameUrl] = useState<string | null>(null);
 
     // Camera Settings State
     const [cameraSettings, setCameraSettings] = useState(() => {
@@ -86,7 +85,7 @@ const KioskManager = () => {
     });
     const [availablePrinters, setAvailablePrinters] = useState<string[]>([]);
     const [isLoadingPrinters, setIsLoadingPrinters] = useState(false);
-    const [printTestImage, setPrintTestImage] = useState<string | null>(null);
+
 
     // Persist printer settings
     useEffect(() => {
@@ -114,54 +113,8 @@ const KioskManager = () => {
         }
     };
 
-    const handleTestPrint = () => {
-        if (!printTestImage) {
-            toast.info('Sube una imagen de prueba para imprimir.');
-            return;
-        }
-        triggerPrint(printTestImage);
-    };
 
-    const triggerPrint = (imageUrl: string) => {
-        const printWindow = window.open('', '_blank', 'width=800,height=600');
-        if (!printWindow) { toast.error('Activa las ventanas emergentes para imprimir.'); return; }
 
-        const orientationCss = printerSettings.orientation === 'landscape'
-            ? 'landscape' : 'portrait';
-        const objectFitCss = printerSettings.imageAdjust === 'cover' ? 'cover' : 'contain';
-        const rotateCss = printerSettings.rotation !== 0 ? `rotate(${printerSettings.rotation}deg)` : 'none';
-
-        let sizeCSS = 'A4';
-        if (printerSettings.paperSize === '4x6') sizeCSS = '4in 6in';
-        if (printerSettings.paperSize === '5x7') sizeCSS = '5in 7in';
-        if (printerSettings.paperSize === 'Letter') sizeCSS = 'letter';
-
-        printWindow.document.write(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <style>
-                    @page { size: ${sizeCSS} ${orientationCss}; margin: ${printerSettings.borderless ? '0' : '10mm'}; }
-                    * { margin: 0; padding: 0; box-sizing: border-box; }
-                    body { width: 100%; height: 100vh; display: flex; align-items: center; justify-content: center; background: white; }
-                    img { width: 100%; height: 100%; object-fit: ${objectFitCss}; transform: ${rotateCss}; }
-                </style>
-            </head>
-            <body>
-                <img src="${imageUrl}" onload="window.print(); window.close();" />
-            </body>
-            </html>
-        `);
-        printWindow.document.close();
-    };
-
-    const PAPER_SIZES = [
-        { value: 'A4', label: 'A4 — 210 x 297 mm' },
-        { value: 'Letter', label: 'Carta — 216 x 279 mm' },
-        { value: '4x6', label: '4" x 6" — Photo' },
-        { value: '5x7', label: '5" x 7" — Photo' },
-        { value: '6x8', label: '6" x 8" — Photo' },
-    ];
 
     const IMAGE_ADJUSTMENTS = [
         { value: 'contain', label: 'Contain — Ajusta completa, sin recortar' },
@@ -373,7 +326,7 @@ const KioskManager = () => {
                 const videoInputs = devices.filter(device => device.kind === 'videoinput');
                 setAvailableCameras(videoInputs);
                 if (!cameraSettings.deviceId && videoInputs.length > 0) {
-                    setCameraSettings(prev => ({ ...prev, deviceId: videoInputs[0].deviceId }));
+                    setCameraSettings((prev: any) => ({ ...prev, deviceId: videoInputs[0].deviceId }));
                 }
             } catch (err) {
                 console.error("Error accessing cameras:", err);
@@ -429,8 +382,7 @@ const KioskManager = () => {
                 .getPublicUrl('kiosk_frame.png');
 
             if (frameData && frameData.publicUrl) {
-                // Add timestamp to bypass cache
-                setCurrentFrameUrl(`${frameData.publicUrl}?t=${Date.now()}`);
+                // Frame URL is managed via selectedFrame state
             }
         } catch (error) {
             console.error('Error fetching themes:', error);
@@ -1375,6 +1327,7 @@ const KioskManager = () => {
                                 </CardContent>
                             </Card>
                         </TabsContent>
+
 
                     </div>
                     </Tabs>

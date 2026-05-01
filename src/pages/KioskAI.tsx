@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Camera, Download, Printer, Users, Sparkles, Trophy, QrCode, Instagram } from 'lucide-react';
+import { Camera, Printer, Users, Sparkles, Trophy, QrCode, Instagram } from 'lucide-react';
 import { toast } from 'sonner';
 
 // ---- Types ----
@@ -134,10 +134,10 @@ export default function KioskAI() {
   const [mundialPosition, setMundialPosition] = useState('');
   const [showQrModal, setShowQrModal] = useState(false);
   const [showKeyboard, setShowKeyboard] = useState(false);
-  const [selectedTheme, setSelectedTheme] = useState<any>(null);
+  const [_selectedTheme, setSelectedTheme] = useState<any>(null);
   const [themes, setThemes] = useState<any[]>([]);
   const [frameUrl, setFrameUrl] = useState<string | null>(null);
-  const [hasCameraError, setHasCameraError] = useState(false);
+  const [_hasCameraError, setHasCameraError] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);

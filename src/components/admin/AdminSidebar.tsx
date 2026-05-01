@@ -10,8 +10,7 @@ import {
     Monitor,
     Gamepad2,
     Heart,
-    X,
-    Sparkles
+    X
 } from "lucide-react";
 
 interface AdminSidebarProps {

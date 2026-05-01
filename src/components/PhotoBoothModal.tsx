@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Download, Share2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { saveAs } from "file-saver";
-import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { Sparkles, Loader2 } from "lucide-react";
 

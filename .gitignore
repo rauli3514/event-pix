@@ -23,3 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 .env
+kiosco de fotos/
+build_errors.txt
+scripts/
+

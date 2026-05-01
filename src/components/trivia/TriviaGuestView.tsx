@@ -187,7 +187,7 @@ export const TriviaGuestView = ({ eventId }: TriviaGuestViewProps) => {
                 playerId: player.id,
                 selectedOption: actualOption,
                 questionStartedAt: game.question_started_at,
-                questionDuration: game.question_duration_seconds,
+                questionDuration: game.question_duration_seconds || 10,
             });
 
             setAnswerResult({
