@@ -21,6 +21,11 @@ jobs:
         run: npm ci
       - name: Build
         run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_REPLICATE_API_TOKEN: ${{ secrets.VITE_REPLICATE_API_TOKEN }}
+          VITE_OPENAI_KEY_B64: ${{ secrets.VITE_OPENAI_KEY_B64 }}
       - name: Create 404.html for SPA routing
         run: cp dist/index.html dist/404.html
       - name: Deploy

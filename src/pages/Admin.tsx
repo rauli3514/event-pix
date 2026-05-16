@@ -309,7 +309,7 @@ const Admin = () => {
                     const response = await fetch(photo.content);
                     const blob = await response.blob();
                     const extension = photo.content.split('.').pop()?.split('?')[0] || 'jpg';
-                    folder?.file(`foto - ${index + 1}.${extension} `, blob);
+                    folder?.file(`foto-${index + 1}.${extension}`, blob);
                 } catch (e) {
                     console.error("Error downloading photo", e);
                 }

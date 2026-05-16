@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { saveAs } from "file-saver";
 import { toast } from "sonner";
 import { Sparkles, Loader2 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 interface PhotoBoothModalProps {
     isOpen: boolean;
@@ -349,65 +350,19 @@ export const PhotoBoothModal = ({ isOpen, onClose, photoUrl, frameUrl, themeBack
         try {
             const prompt = "ultra realistic portrait of a professional football player, wearing Argentina national team jersey, standing in a stadium at night with bright lights, centered composition, looking directly at the camera, sharp focus, highly detailed face, natural skin texture, cinematic lighting, 85mm lens, shallow depth of field, high detail, professional sports photography, FIFA ultimate team card style, symmetrical framing, clean background separation, realistic proportions, no text, no watermark --no deformed face, distorted eyes, extra eyes, extra fingers, blurry, low quality, cartoon, anime, unrealistic skin, bad anatomy, mutated face, duplicate face, disfigured, oversharpen, noise, artifacts";
             
-            const replicateToken = import.meta.env.VITE_REPLICATE_API_TOKEN;
-            if (!replicateToken) {
-                throw new Error("Falta el token de Replicate en las variables de entorno (.env).");
-            }
-
-            // 1. Iniciar la predicción usando el proxy local de Vite
-            const createRes = await fetch('/api/replicate/v1/predictions', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${replicateToken}`,
-                    'Content-Type': 'application/json',
-                    'Prefer': 'wait'
-                },
-                body: JSON.stringify({
-                    version: "8baa7ef2255075b46f4d91cd238c21d31181b3e6a864463f967960bb0112525b",
-                    input: {
-                        prompt: prompt,
-                        main_face_image: currentPhotoUrl,
-                        num_steps: 20,
-                        start_step: 4,
-                        id_weight: 1,
-                        guidance_scale: 4,
-                        true_cfg: 1,
-                        max_sequence_length: 128,
-                        width: 896,
-                        height: 1152,
-                        output_format: "webp",
-                        output_quality: 80,
-                        negative_prompt: "bad quality, worst quality, text, signature, watermark, extra limbs"
-                    }
-                }),
+            // Usar la Edge Function de Supabase en lugar del proxy local
+            const { data, error: functionError } = await supabase.functions.invoke('generate-ai-photo', {
+                body: { 
+                    imageUrl: currentPhotoUrl,
+                    prompt: prompt
+                }
             });
 
-            const resText = await createRes.text();
-            if (!createRes.ok) {
-                console.error("Detalle del error Replicate:", createRes.status, resText);
-                throw new Error(`Error API (${createRes.status}): ${resText.substring(0, 60)}...`);
-            }
-            let prediction = JSON.parse(resText);
-
-            // 2. Polling si no terminó inmediatamente
-            let attempts = 0;
-            while (
-                prediction.status !== 'succeeded' &&
-                prediction.status !== 'failed' &&
-                prediction.status !== 'canceled' &&
-                attempts < 30
-            ) {
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                const pollRes = await fetch(`/api/replicate/v1/predictions/${prediction.id}`, {
-                    headers: { 'Authorization': `Bearer ${replicateToken}` }
-                });
-                prediction = await pollRes.json();
-                attempts++;
+            if (functionError || !data?.success) {
+                throw new Error(functionError?.message || data?.error || "Error en la generación de IA");
             }
 
-            if (prediction.status !== 'succeeded') throw new Error("La generación falló o tardó demasiado.");
-            
-            const outputUrl = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
+            const outputUrl = data.outputUrl;
             
             if (outputUrl) {
                 // Fetch de la imagen para evitar problemas de CORS en el Canvas

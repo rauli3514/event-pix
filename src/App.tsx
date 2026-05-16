@@ -12,6 +12,7 @@ import Display from "./pages/Display";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
+import { StickerEditor } from "./components/stickers/StickerEditor";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { EventProvider } from "./context/EventContext";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -28,6 +29,7 @@ const App = () => (
           <Route path="/register" element={<Register />} />
 
           <Route path="/kiosco" element={<KioskAI />} />
+          <Route path="/sticker-test" element={<div className="min-h-screen bg-zinc-950 pt-10"><StickerEditor userPhotoUrl="/placeholder-user.jpg" onSave={(url) => console.log(url)} onCancel={() => console.log("cancel")} /></div>} />
 
           <Route element={<EventProvider><Outlet /></EventProvider>}>
             <Route element={<ProtectedRoute />}>

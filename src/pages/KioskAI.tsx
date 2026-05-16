@@ -1,7 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react'; // Kiosk AI Optimized Flow
 import { useSearchParams } from 'react-router-dom';
-import { Camera, Printer, Users, Sparkles, Trophy, QrCode, Instagram } from 'lucide-react';
+import { Printer, Users, Sparkles, Trophy, QrCode, Instagram, Palette, Sticker } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabase';
+import { StickerEditor } from '@/components/stickers/StickerEditor';
 
 // ---- Types ----
 type Step =
@@ -16,9 +18,10 @@ type Step =
   | 'mundialCountry'
   | 'mundialInfo'
   | 'processing'
+  | 'stickerEditor'
   | 'result';
 
-type Mode = 'selfie' | 'retrato' | 'mundial' | null;
+type Mode = 'selfie' | 'retrato' | 'mundial' | 'caricatura' | 'figuritas' | null;
 
 // ---- Mundial Data ----
 const COUNTRIES = [
@@ -36,6 +39,16 @@ const COUNTRIES = [
   { id: 'marruecos', name: 'Marruecos', flag: '/flags/marruecos.png', jersey: 'red Puma Morocco FRMF national team jersey' },
   { id: 'croacia',   name: 'Croacia',   flag: '/flags/croacia.png',   jersey: 'white with red checkered pattern Nike Croatia HNS national team jersey' },
   { id: 'gana',      name: 'Ghana',     flag: '/flags/gana.png',      jersey: 'white Nike Ghana GFA national team jersey' },
+];
+
+const FIGURITAS_COUNTRIES = [
+  { id: 'argentina', name: 'Argentina', flag: '/flags/argentina.png' },
+  { id: 'canada', name: 'Canadá', flag: '🇨🇦' },
+  { id: 'corea del sur', name: 'Corea del Sur', flag: '/flags/corea.png' },
+  { id: 'estados unidos', name: 'Estados Unidos', flag: '/flags/estados-unidos.png' },
+  { id: 'mexico', name: 'México', flag: '/flags/mexico.png' },
+  { id: 'sudafrica', name: 'Sudáfrica', flag: '🇿🇦' },
+  { id: 'otros', name: 'Otros', flag: '🌍' }
 ];
 
 const POSITIONS = [
@@ -132,12 +145,14 @@ export default function KioskAI() {
   const [mundialCountry, setMundialCountry] = useState<any>(null);
   const [mundialName, setMundialName] = useState('');
   const [mundialPosition, setMundialPosition] = useState('');
+  const [mundialGender, setMundialGender] = useState<'M' | 'F'>('M');
   const [showQrModal, setShowQrModal] = useState(false);
   const [showKeyboard, setShowKeyboard] = useState(false);
-  const [_selectedTheme, setSelectedTheme] = useState<any>(null);
   const [themes, setThemes] = useState<any[]>([]);
   const [frameUrl, setFrameUrl] = useState<string | null>(null);
-  const [_hasCameraError, setHasCameraError] = useState(false);
+  const [selectedAITheme, setSelectedAITheme] = useState<any>(null);
+
+
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -189,8 +204,7 @@ export default function KioskAI() {
       } else {
         // Fallback to legacy Supabase frame if nothing in localStorage
         (async () => {
-          const { supabase } = await import('@/lib/supabase');
-          const { data: fd } = supabase.storage.from('photos').getPublicUrl('kiosk_frame.png');
+              const { data: fd } = supabase.storage.from('photos').getPublicUrl('kiosk_frame.png');
           if (fd?.publicUrl) setFrameUrl(fd.publicUrl);
         })();
       }
@@ -203,7 +217,6 @@ export default function KioskAI() {
     });
 
     (async () => {
-      const { supabase } = await import('@/lib/supabase');
       const { data } = await supabase.from('ai_themes').select('*').order('created_at', { ascending: false });
       if (data) setThemes(data);
     })();
@@ -217,9 +230,15 @@ export default function KioskAI() {
   const startCamera = async () => {
     try {
       const constraints: MediaStreamConstraints = {
-        video: cameraSettings.deviceId && cameraSettings.deviceId !== 'default'
-          ? { deviceId: { exact: cameraSettings.deviceId } }
-          : { facingMode: 'user' },
+        video: {
+          deviceId: cameraSettings.deviceId && cameraSettings.deviceId !== 'default'
+            ? { exact: cameraSettings.deviceId }
+            : undefined,
+          width: { ideal: 1920, min: 1280 },
+          height: { ideal: 1080, min: 720 },
+          aspectRatio: { ideal: 1.7777777778 }, // Forzamos 16:9 si es posible para mejor calidad
+          frameRate: { ideal: 30 }
+        },
         audio: false,
       };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -234,7 +253,7 @@ export default function KioskAI() {
         };
       }
     } catch {
-      setHasCameraError(true);
+      console.error('Camera access failed');
     }
   };
 
@@ -249,6 +268,14 @@ export default function KioskAI() {
     return () => stopCamera();
   }, [step]);
 
+  // Temporizador automático para pasar de "Mirá a la cámara" a "Cuenta regresiva"
+  useEffect(() => {
+    if (step === 'lookCamera') {
+      const t = setTimeout(() => startCountdown(), 2500);
+      return () => clearTimeout(t);
+    }
+  }, [step]);
+
   // Go to mode after splash
   const handleSplashTap = () => {
     if (generalSettings.autoFullscreen && !document.fullscreenElement) {
@@ -259,8 +286,21 @@ export default function KioskAI() {
 
   const handleModeSelect = (m: Mode) => {
     setMode(m);
-    setStep('getReady');
-    setTimeout(() => setStep('lookCamera'), 2500);
+    if (m === 'mundial' || m === 'figuritas') {
+      setStep('mundialCountry');
+    } else {
+      setStep('getReady');
+      setTimeout(() => setStep('lookCamera'), 2500);
+    }
+  };
+  
+  const handleThemeConfirm = () => {
+    if (selectedAITheme && capturedImage) {
+      if (generalSettings.autoFullscreen && !document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      }
+      runAI(capturedImage, selectedAITheme);
+    }
   };
 
   // Countdown + capture
@@ -313,7 +353,6 @@ export default function KioskAI() {
   const savePhotoToAlbum = async (dataUrl: string): Promise<string | null> => {
     if (!kioskEventId) return null;
     try {
-      const { supabase } = await import('@/lib/supabase');
       const blob = await (await fetch(dataUrl)).blob();
       const fileName = `kiosk_sessions/${kioskEventId}/${Date.now()}.jpg`;
       await supabase.storage.from('photos').upload(fileName, blob, { contentType: 'image/jpeg' });
@@ -331,74 +370,110 @@ export default function KioskAI() {
     setIsAIGenerating(true);
     setStep('processing');
     try {
-      const { supabase } = await import('@/lib/supabase');
+      // 1. Subir a Storage para tener un link (necesario para este modelo de IA)
       const blob = await (await fetch(imageDataUrl)).blob();
       const fileName = `kiosk_raw/${Date.now()}.jpg`;
-      await supabase.storage.from('photos').upload(fileName, blob, { contentType: 'image/jpeg' });
-      const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(fileName);
+      const { error: uploadError } = await supabase.storage.from('photos').upload(fileName, blob, { contentType: 'image/jpeg' });
+      if (uploadError) throw new Error('Error subiendo foto base');
+
+      // 2. Generar un link "VIP" (Signed URL) para que la IA pueda entrar aunque el balde sea privado
+      const { data: signedData, error: signedError } = await supabase.storage.from('photos').createSignedUrl(fileName, 300);
+      if (signedError) throw new Error('Error generando link para IA');
+
+      const publicUrl = signedData.signedUrl;
 
       // Build prompt based on mode
       let prompt = theme?.prompt || '';
-      if (mode === 'mundial' && mundialCountry) {
-        prompt = `Photorealistic official FIFA World Cup 2026 player portrait photograph. \
-The subject is wearing a ${mundialCountry.jersey}. \
-Dramatic professional stadium lighting with bright floodlights bokeh in background. \
-Upper body shot, subject looking directly into camera with confident serious athlete expression. \
-Professional sports photography, ultra sharp, 4K, cinematic, no text, no watermark.`;
-      }
-
-      const token = import.meta.env.VITE_REPLICATE_API_TOKEN;
-      let createRes;
-      let retries = 0;
-      const maxRetries = 2;
-
-      while (retries <= maxRetries) {
-        createRes = await fetch('/api/replicate/v1/predictions', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            version: '8baa7ef2255075b46f4d91cd238c21d31181b3e6a864463f967960bb0112525b',
-            input: { 
-              prompt, 
-              main_face_image: publicUrl, 
-              num_steps: 20, 
-              start_step: 0, 
-              id_weight: 1, 
-              guidance_scale: 4, 
-              true_cfg: 1, 
-              max_sequence_length: 128, 
-              width: 896, 
-              height: 1152, 
-              output_format: 'webp', 
-              output_quality: 80, 
-              negative_prompt: 'bad quality, text, watermark, extra limbs' 
-            }
-          }),
-        });
-
-        if (createRes.status === 429 && retries < maxRetries) {
-          console.warn(`Rate limit hit (429). Retrying in 3s... (Attempt ${retries + 1}/${maxRetries})`);
-          await new Promise(r => setTimeout(r, 3000));
-          retries++;
-          continue;
-        }
-        break;
-      }
       
-      if (createRes?.status === 429) {
-        throw new Error('El servidor de IA está recibiendo muchas peticiones. Por favor, intenta de nuevo en unos segundos.');
+      // Si es modo mundial, generamos un retrato profesional del jugador (sin Messi)
+      if (mode === 'mundial' && mundialCountry) {
+        const isCaricature = theme?.name?.toLowerCase().includes('caricatura') || prompt.toLowerCase().includes('caricatura');
+        const genderLabel = mundialGender === 'F' ? 'female' : 'male';
+        const playerLabel = mundialGender === 'F' ? 'football player' : 'football star';
+
+        if (isCaricature) {
+          prompt = `3D digital illustration, Pixar style caricature of the subject as a professional ${genderLabel} ${playerLabel}. \
+The subject is wearing the ${mundialCountry.name} official jersey. \
+Smiling at the camera in a professional football stadium at night. \
+Ultra detailed facial features, volumetric lighting, cinematic composition. \
+The subject must perfectly match the facial features and gender of the reference image.`;
+        } else {
+          prompt = `Photorealistic official FIFA World Cup 2026 player portrait of the subject as a ${genderLabel} ${playerLabel}. \
+The subject is wearing the ${mundialCountry.name} official jersey. \
+Dramatic professional stadium lighting with bright floodlights bokeh in background. \
+High-end sports photography, 8k, cinematic, extremely detailed face, looking at camera. \
+The subject must perfectly match the facial features and gender of the reference image.`;
+        }
       }
-      if (!createRes?.ok) throw new Error('Error al conectar con el servidor de IA.');
-      let prediction = await createRes.json();
+
+      // WORKAROUND DE RED: Si es figuritas, llamamos directo a Replicate con un proxy CORS para saltarnos la Edge Function desactualizada
+      if (mode === 'figuritas') {
+        const token = import.meta.env.VITE_REPLICATE_TOKEN_B64 ? atob(import.meta.env.VITE_REPLICATE_TOKEN_B64) : (import.meta.env.VITE_REPLICATE_API_TOKEN || '');
+        if (!token) throw new Error("Falta el token de Replicate en las variables de entorno");
+        
+        const repRes = await fetch('https://corsproxy.io/?' + encodeURIComponent('https://api.replicate.com/v1/predictions'), {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            version: "fb8af171cfa1616ddcf1242c093f9c46bcada5ad4cf6f2fbe8b81b330ec5c003", // cjwbw/rembg
+            input: { image: publicUrl }
+          })
+        });
+        
+        if (!repRes.ok) throw new Error("Error iniciando proxy Replicate");
+        let pred = await repRes.json();
+        
+        let attempts = 0;
+        while (pred.status !== 'succeeded' && pred.status !== 'failed' && attempts < 60) {
+          await new Promise(r => setTimeout(r, 2000));
+          const pollRes = await fetch('https://corsproxy.io/?' + encodeURIComponent(pred.urls.get), {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          pred = await pollRes.json();
+          attempts++;
+        }
+        
+        if (pred.status === 'succeeded') {
+          const finalUrl = Array.isArray(pred.output) ? pred.output[0] : pred.output;
+          setCapturedImage(finalUrl);
+          setStep('stickerEditor');
+          setIsAIGenerating(false);
+          return;
+        } else {
+          throw new Error("La IA no pudo quitar el fondo");
+        }
+      }
+
+      // Flujo normal para los otros modos
+      const { data, error: functionError } = await supabase.functions.invoke('generate-ai-photo', {
+        body: { imageUrl: publicUrl, prompt: prompt }
+      });
+
+      if (functionError || !data?.success) throw new Error(functionError?.message || data?.error || 'Error iniciando IA');
+
+      let currentPrediction = data.prediction;
+      
+      // 2. Polling desde el frontend (infalible contra timeouts, aumentado a 150s)
       let attempts = 0;
-      while (prediction.status !== 'succeeded' && prediction.status !== 'failed' && attempts < 30) {
-        await new Promise(r => setTimeout(r, 2000));
-        const poll = await fetch(`/api/replicate/v1/predictions/${prediction.id}`, { headers: { 'Authorization': `Bearer ${token}` } });
-        prediction = await poll.json();
+      while (currentPrediction.status !== 'succeeded' && currentPrediction.status !== 'failed' && attempts < 60) {
+        await new Promise(r => setTimeout(r, 2500));
+        const { data: pollData } = await supabase.functions.invoke('generate-ai-photo', {
+          body: { predictionId: currentPrediction.id }
+        });
+        if (pollData?.success) {
+          currentPrediction = pollData.prediction;
+        }
         attempts++;
       }
-      if (prediction.status !== 'succeeded') throw new Error('Falló la generación IA.');
-      const outputUrl = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
+
+      if (currentPrediction.status !== 'succeeded') {
+        throw new Error('La IA no pudo completar la imagen a tiempo.');
+      }
+
+      const outputUrl = Array.isArray(currentPrediction.output) ? currentPrediction.output[0] : currentPrediction.output;
 
       let finalImage: string;
       if (mode === 'mundial') {
@@ -424,13 +499,39 @@ Professional sports photography, ultra sharp, 4K, cinematic, no text, no waterma
     new Promise((resolve, reject) => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d')!;
+      canvas.width = 1200;
+      canvas.height = 1800;
+
       const img = new Image(); img.crossOrigin = 'anonymous';
       img.onload = () => {
-        canvas.width = img.width || 896; canvas.height = img.height || 1152;
-        ctx.drawImage(img, 0, 0);
+        const imgAspect = img.width / img.height;
+        const canvasAspect = canvas.width / canvas.height;
+        let sx, sy, sw, sh;
+
+        if (imgAspect > canvasAspect) {
+          sw = img.height * canvasAspect;
+          sh = img.height;
+          sx = (img.width - sw) / 2;
+          sy = 0;
+        } else {
+          sw = img.width;
+          sh = img.width / canvasAspect;
+          sx = 0;
+          sy = (img.height - sh) / 2;
+        }
+
+        // Aplicamos un pequeño "zoom out" artificial si es posible para no quedar tan cerca
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0,0, canvas.width, canvas.height);
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+        
         if (!frame) return resolve(canvas.toDataURL('image/jpeg', 0.95));
+        
         const fi = new Image(); fi.crossOrigin = 'anonymous';
-        fi.onload = () => { ctx.drawImage(fi, 0, 0, canvas.width, canvas.height); resolve(canvas.toDataURL('image/jpeg', 0.95)); };
+        fi.onload = () => { 
+          ctx.drawImage(fi, 0, 0, canvas.width, canvas.height); 
+          resolve(canvas.toDataURL('image/jpeg', 0.95)); 
+        };
         fi.onerror = () => resolve(canvas.toDataURL('image/jpeg', 0.95));
         fi.src = frame;
       };
@@ -451,9 +552,25 @@ Professional sports photography, ultra sharp, 4K, cinematic, no text, no waterma
         // 1 — Portrait fills FULL canvas using cover-crop logic
         const pA = portrait.width / portrait.height;
         const cA = W / H;
-        let sx = 0, sy = 0, sw = portrait.width, sh = portrait.height;
-        if (pA > cA) { sw = portrait.height * cA; sx = (portrait.width - sw) / 2; }
-        else { sh = portrait.width / cA; sy = (portrait.height - sh) / 4; }
+        let sx, sy, sw, sh;
+
+        if (pA > cA) {
+          // La foto es más ancha que el marco (recortamos los lados)
+          sw = portrait.height * cA;
+          sh = portrait.height;
+          sx = (portrait.width - sw) / 2;
+          sy = 0;
+        } else {
+          // La foto es más alta que el marco (recortamos arriba/abajo)
+          sw = portrait.width;
+          sh = portrait.width / cA;
+          sx = 0;
+          sy = (portrait.height - sh) / 6; // Menos recorte arriba para ver más ambiente
+        }
+        
+        // Dibujamos con un margen interno sutil para "zoom out"
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0,0,W,H);
         ctx.drawImage(portrait, sx, sy, sw, sh, 0, 0, W, H);
 
         // 2 — Frame overlay (marco3mundial) at full canvas size
@@ -525,27 +642,43 @@ Professional sports photography, ultra sharp, 4K, cinematic, no text, no waterma
       portrait.src = portraitUrl;
     });
 
-  const triggerPrint = (imageUrl: string) => {
+  const triggerPrint = async (imageUrl: string) => {
     const cfg = (() => {
       try { return JSON.parse(localStorage.getItem('kiosk_print_settings') || '{}'); }
       catch { return {}; }
     })();
 
+    // 1. INTENTAR IMPRESIÓN SILENCIOSA (Local Server)
+    if (cfg.selectedPrinter && cfg.selectedPrinter !== 'Impresora del Sistema (diálogo del navegador)') {
+      try {
+        const res = await fetch('http://localhost:3001/print', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageUrl: imageUrl,
+            printerName: cfg.selectedPrinter,
+            copies: cfg.copies || 1
+          })
+        });
+        
+        if (res.ok) {
+          toast.success("Impresión enviada correctamente");
+          return; // Éxito, no necesitamos abrir el diálogo del navegador
+        }
+      } catch (err) {
+        console.warn("Servidor de impresión local no disponible, usando diálogo del navegador.");
+      }
+    }
+
+    // 2. FALLBACK: DIÁLOGO DEL NAVEGADOR (Si el servidor no está o falla)
     const pw = window.open('', '_blank', 'width=800,height=600');
     if (!pw) {
       toast.error("Por favor, permite las ventanas emergentes para imprimir");
       return;
     }
 
-    let sz = 'A4';
-    if (cfg.paperSize === '4x6') sz = '4in 6in';
-    else if (cfg.paperSize === '5x7') sz = '5in 7in';
-    else if (cfg.paperSize === '10x15') sz = '100mm 150mm';
-    else if (cfg.paperSize === '13x18') sz = '130mm 180mm';
-    else if (cfg.paperSize === '15x20') sz = '150mm 200mm';
 
     const rotation = cfg.rotation || 0;
-    const objectFit = cfg.imageAdjust || 'contain';
     const orientation = cfg.orientation || 'portrait';
 
     pw.document.write(`
@@ -555,33 +688,29 @@ Professional sports photography, ultra sharp, 4K, cinematic, no text, no waterma
           <title>Imprimir Foto - Kiosco</title>
           <style>
             @page {
-              size: ${sz} ${orientation};
+              size: 4in 6in ${orientation};
               margin: 0;
             }
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body {
-              width: 100%;
-              height: 100vh;
-              display: flex;
-              align-items: center;
-              justify-content: center;
+              width: 4in;
+              height: 6in;
               background: white;
               overflow: hidden;
             }
             .print-container {
-              width: 100%;
-              height: 100%;
+              width: 4in;
+              height: 6in;
               display: flex;
               align-items: center;
               justify-content: center;
-              transform: rotate(${rotation}deg);
+              ${rotation !== 0 ? `transform: rotate(${rotation}deg); transform-origin: center;` : ''}
             }
             img {
-              max-width: 100%;
-              max-height: 100%;
               width: 100%;
               height: 100%;
-              object-fit: ${objectFit};
+              object-fit: cover;
+              image-rendering: -webkit-optimize-contrast;
             }
           </style>
         </head>
@@ -599,10 +728,10 @@ Professional sports photography, ultra sharp, 4K, cinematic, no text, no waterma
     setStep('splash');
     setMode(null);
     setCapturedImage(null);
-    setSelectedTheme(null);
     setMundialCountry(null);
     setMundialName('');
     setMundialPosition('');
+    setSelectedAITheme(null);
   };
 
   // ─── SCREENS ────────────────────────────────────────────────
@@ -630,31 +759,54 @@ Professional sports photography, ultra sharp, 4K, cinematic, no text, no waterma
       <div className="absolute inset-0 bg-[#0a0a1a]" />
       <Corners />
       <div className="relative z-10 flex flex-col items-center justify-center h-full gap-12 px-8">
-        <h2 className="carlmarx-bold text-[clamp(2rem,5vw,4rem)] text-white">¿Cómo querés tu foto?</h2>
-        <div className="grid grid-cols-3 gap-6 w-full max-w-5xl">
+        <h2 className="carlmarx-bold text-[clamp(2rem,5vw,4rem)] text-white text-center">¿Cómo querés tu foto?</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl overflow-y-auto max-h-[70vh] p-4">
 
           {/* SELFIE GRUPAL */}
-          <button onClick={() => handleModeSelect('selfie')}
-            className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-cyan-400 bg-black/40 backdrop-blur hover:bg-cyan-400/10 transition-all">
-            <Users className="w-16 h-16 text-cyan-400" />
-            <span className="carlmarx-bold text-cyan-400 text-2xl uppercase tracking-wider">Selfie Grupal</span>
-            <p className="text-white/70 text-sm text-center">Una foto con amigos o familia.<br />Podés ponerle un marco decorativo.</p>
-          </button>
+          {(generalSettings.enableSelfie !== false) && (
+            <button onClick={() => handleModeSelect('selfie')}
+              className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-cyan-400 bg-black/40 backdrop-blur hover:bg-cyan-400/10 transition-all">
+              <Users className="w-16 h-16 text-cyan-400" />
+              <span className="carlmarx-bold text-cyan-400 text-2xl uppercase tracking-wider">Selfie Grupal</span>
+              <p className="text-white/70 text-sm text-center">Una foto con amigos o familia.<br />Podés ponerle un marco decorativo.</p>
+            </button>
+          )}
 
           {/* RETRATO MÁGICO */}
-          <button onClick={() => handleModeSelect('retrato')}
-            className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-violet-400 bg-black/40 backdrop-blur hover:bg-violet-400/10 transition-all">
-            <Sparkles className="w-16 h-16 text-violet-400" />
-            <span className="carlmarx-bold text-violet-400 text-2xl uppercase tracking-wider">Retrato Mágico</span>
-            <p className="text-white/70 text-sm text-center">Una foto de vos solo.<br />Elegí entre muchos estilos de retrato.</p>
-          </button>
+          {(generalSettings.enableAI !== false) && (
+            <button onClick={() => handleModeSelect('retrato')}
+              className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-violet-400 bg-black/40 backdrop-blur hover:bg-violet-400/10 transition-all">
+              <Sparkles className="w-16 h-16 text-violet-400" />
+              <span className="carlmarx-bold text-violet-400 text-2xl uppercase tracking-wider">Retrato Mágico</span>
+              <p className="text-white/70 text-sm text-center">Una foto de vos solo.<br />Elegí entre muchos estilos de retrato.</p>
+            </button>
+          )}
 
           {/* MUNDIAL */}
-          <button onClick={() => handleModeSelect('mundial')}
-            className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-green-400 bg-black/40 backdrop-blur hover:bg-green-400/10 transition-all">
-            <Trophy className="w-16 h-16 text-green-400" />
-            <span className="carlmarx-bold text-green-400 text-2xl uppercase tracking-wider">Mundial 2026</span>
-            <p className="text-white/70 text-sm text-center">¡Convertite en una estrella del fútbol!<br />Tu carta de jugador con nombre y posición.</p>
+          {(generalSettings.enableMundial !== false) && (
+            <button onClick={() => handleModeSelect('mundial')}
+              className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-green-400 bg-black/40 backdrop-blur hover:bg-green-400/10 transition-all">
+              <Trophy className="w-16 h-16 text-green-400" />
+              <span className="carlmarx-bold text-green-400 text-2xl uppercase tracking-wider">Mundial 2026</span>
+              <p className="text-white/70 text-sm text-center">¡Convertite en una estrella del fútbol!<br />Tu carta de jugador con nombre y posición.</p>
+            </button>
+          )}
+          {/* CARICATURA MUNDIAL */}
+          {(generalSettings.enableCaricatura !== false) && (
+            <button onClick={() => handleModeSelect('caricatura')}
+              className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-orange-400 bg-black/40 backdrop-blur hover:bg-orange-400/10 transition-all">
+              <Palette className="w-16 h-16 text-orange-400" />
+              <span className="carlmarx-bold text-orange-400 text-2xl uppercase tracking-wider">Caricatura Mundial</span>
+              <p className="text-white/70 text-sm text-center">¡Tu caricatura del Mundial!<br />Transformate en dibujo con tu nombre.</p>
+            </button>
+          )}
+
+          {/* FIGURITAS */}
+          <button onClick={() => handleModeSelect('figuritas')}
+            className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-teal-400 bg-black/40 backdrop-blur hover:bg-teal-400/10 transition-all">
+            <Sticker className="w-16 h-16 text-teal-400" />
+            <span className="carlmarx-bold text-teal-400 text-2xl uppercase tracking-wider">Hacer Figurita</span>
+            <p className="text-white/70 text-sm text-center">¡Crea tu propia carta oficial!<br />Quita el fondo y personalízala.</p>
           </button>
         </div>
       </div>
@@ -673,25 +825,24 @@ Professional sports photography, ultra sharp, 4K, cinematic, no text, no waterma
     </div>
   );
 
-  if (step === 'lookCamera') return (
-    <div className="kiosk-root" onClick={startCountdown} style={{ cursor: 'pointer' }}>
-      <div className="absolute inset-0 bg-[#0a0a1a]" />
-      <Corners />
-      <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover opacity-20" />
-      <div className="relative z-10 flex flex-col items-center justify-center h-full gap-8">
-        <p className="carlmarx-regular text-white/60 text-2xl uppercase tracking-widest">
-          {mode === 'selfie' ? '📸 Selfie Grupal' : mode === 'retrato' ? '✨ Retrato Mágico' : '⚽ Mundial 2026'}
-        </p>
-        <h1 className="carlmarx-bold text-[clamp(4rem,10vw,8rem)] text-white text-center">
-          ¡Estamos prendiendo<br />los focos!
-        </h1>
-        <p className="carlmarx-regular text-white/80 text-3xl mt-4 animate-pulse">
-          Toca para empezar el conteo
-        </p>
-        <Camera className="w-16 h-16 text-white/60 mt-4" />
+  if (step === 'lookCamera') {
+    return (
+      <div className="kiosk-root">
+        <div className="absolute inset-0 bg-[#0a0a1a]" />
+        <Corners />
+        <video ref={videoRef} autoPlay playsInline muted className={`absolute inset-0 w-full h-full object-cover ${cameraSettings.mirror ? 'scale-x-[-1]' : ''}`} />
+        <div className="absolute inset-0 bg-black/40 z-0" />
+        <div className="relative z-10 flex flex-col items-center justify-center h-full gap-8">
+          <p className="carlmarx-regular text-white/60 text-2xl uppercase tracking-widest">
+            {mode === 'selfie' ? '📸 Selfie Grupal' : mode === 'retrato' ? '✨ Retrato Mágico' : '⚽ Mundial 2026'}
+          </p>
+          <h1 className="carlmarx-bold text-7xl text-white text-center uppercase tracking-widest">
+            ¡Mirá a la<br /><span className="text-violet-400">Cámara! 📸</span>
+          </h1>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
 
   if (step === 'countdown') return (
     <div className="kiosk-root">
@@ -711,6 +862,18 @@ Professional sports photography, ultra sharp, 4K, cinematic, no text, no waterma
   // ── PHOTO PREVIEW — approve or retake ───────────────────────
   if (step === 'photoPreview') {
     const goNext = async () => {
+      if (!capturedImage) return;
+      
+      // Si es caricatura mundialista, lanzamos la IA directamente con el prompt especial
+      if (mode === 'caricatura') {
+        const specialTheme = {
+          name: 'Caricatura Mundialista',
+          prompt: 'A professional digital caricature of the person standing next to Lionel Messi, both wearing Argentina national team jerseys, celebrating a goal in a crowded stadium, gold confetti in the air, joyful expression, vibrant colors, artistic caricature style'
+        };
+        runAI(capturedImage, specialTheme);
+        return;
+      }
+
       if (mode === 'selfie') {
         setStep('processing'); // Show a brief processing state while merging
         const phrase = SELFIE_PHRASES[Math.floor(Math.random() * SELFIE_PHRASES.length)];
@@ -720,6 +883,10 @@ Professional sports photography, ultra sharp, 4K, cinematic, no text, no waterma
         let finalImage = capturedImage!;
         if (frameUrl) {
           try {
+            const replicateToken = import.meta.env.VITE_REPLICATE_TOKEN_B64 ? atob(import.meta.env.VITE_REPLICATE_TOKEN_B64) : (import.meta.env.VITE_REPLICATE_API_TOKEN || '');
+            if (!replicateToken) {
+                throw new Error("Falta el token de Replicate (B64 o plano) en las variables de entorno.");
+            }
             finalImage = await mergeImages(capturedImage!, frameUrl);
           } catch (e) {
             console.error("Error applying frame to selfie:", e);
@@ -733,6 +900,8 @@ Professional sports photography, ultra sharp, 4K, cinematic, no text, no waterma
         setStep('themeSelect');
       } else if (mode === 'mundial') {
         setStep('mundialCountry');
+      } else if (mode === 'figuritas') {
+        runAI(capturedImage, null);
       }
     };
     return (
@@ -776,29 +945,45 @@ Professional sports photography, ultra sharp, 4K, cinematic, no text, no waterma
       </div>
     </div>
   );
-
-  // ── MUNDIAL: Country Selection ──────────────────────────────
-  if (step === 'mundialCountry') return (
-    <div className="kiosk-root">
-      <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg,#040c1a 0%,#0a1628 100%)' }} />
-      <Corners />
-      <div className="relative z-10 flex flex-col items-center h-full py-10 px-8 gap-6 overflow-auto">
-        <div>
-          <p className="carlmarx-regular text-green-400 text-center text-xl tracking-widest uppercase">⚽ Mundial 2026</p>
-          <h2 className="carlmarx-bold text-white text-center text-[clamp(2rem,4vw,3.5rem)]">¿De qué país jugás?</h2>
-        </div>
-        <div className="grid grid-cols-4 md:grid-cols-7 gap-4 w-full max-w-5xl">
-          {COUNTRIES.map(c => (
-            <button key={c.id} onClick={() => { setMundialCountry(c); setStep('mundialInfo'); }}
-              className="flex flex-col items-center gap-2 p-3 rounded-2xl border-2 border-white/10 bg-white/5 hover:border-green-400 hover:bg-green-400/10 transition-all group">
-              <img src={c.flag} alt={c.name} className="w-14 h-10 object-cover rounded shadow-lg group-hover:scale-110 transition-transform" />
-              <span className="carlmarx-regular text-white text-xs text-center leading-tight">{c.name}</span>
-            </button>
-          ))}
+  // ── MUNDIAL / FIGURITAS: Country Selection ──────────────────────────────
+  if (step === 'mundialCountry') {
+    const listToRender = mode === 'figuritas' ? FIGURITAS_COUNTRIES : COUNTRIES;
+    return (
+      <div className="kiosk-root">
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg,#040c1a 0%,#0a1628 100%)' }} />
+        <Corners />
+        <div className="relative z-10 flex flex-col items-center h-full py-10 px-8 gap-6 overflow-auto">
+          <div>
+            <p className="carlmarx-regular text-green-400 text-center text-xl tracking-widest uppercase">
+              {mode === 'figuritas' ? '🌍 Tus Figuritas' : '⚽ Mundial 2026'}
+            </p>
+            <h2 className="carlmarx-bold text-white text-center text-[clamp(2rem,4vw,3.5rem)]">¿De qué país jugás?</h2>
+          </div>
+          <div className="grid grid-cols-4 md:grid-cols-7 gap-4 w-full max-w-5xl">
+            {listToRender.map(c => (
+              <button key={c.id} onClick={() => { 
+                  setMundialCountry(c as any); 
+                  if (mode === 'figuritas') setStep('lookCamera');
+                  else setStep('mundialInfo'); 
+                }}
+                className="flex flex-col items-center gap-2 p-3 rounded-2xl border-2 border-white/10 bg-white/5 hover:border-green-400 hover:bg-green-400/10 transition-all group">
+                {c.flag.startsWith('/') ? (
+                  <img src={c.flag} alt={c.name} className="w-14 h-10 object-cover rounded shadow-lg group-hover:scale-110 transition-transform" />
+                ) : (
+                  <span className="text-4xl group-hover:scale-110 transition-transform">{c.flag}</span>
+                )}
+                <span className="carlmarx-regular text-white text-xs text-center leading-tight">{c.name}</span>
+              </button>
+            ))}
+          </div>
+          <button onClick={resetKiosk}
+            className="mt-auto px-8 py-4 rounded-xl border border-white/20 bg-white/5 hover:bg-white/10 text-white font-bold tracking-widest transition-all">
+            VOLVER
+          </button>
         </div>
       </div>
-    </div>
-  );
+    );
+  }
 
   // ── MUNDIAL: Player Name + Position ─────────────────────────
   if (step === 'mundialInfo') return (
@@ -835,6 +1020,21 @@ Professional sports photography, ultra sharp, 4K, cinematic, no text, no waterma
           />
         )}
 
+        {/* Gender selector */}
+        <div className="w-full space-y-2">
+          <label className="carlmarx-regular text-white/60 text-lg uppercase tracking-widest">Género</label>
+          <div className="grid grid-cols-2 gap-4">
+            <button onClick={() => setMundialGender('M')}
+              className={`py-4 rounded-xl border-2 carlmarx-bold text-xl uppercase transition-all flex items-center justify-center gap-3 ${mundialGender === 'M' ? 'border-blue-400 bg-blue-400/20 text-blue-300' : 'border-white/20 bg-white/5 text-white'}`}>
+              <span>👨</span> Jugador
+            </button>
+            <button onClick={() => setMundialGender('F')}
+              className={`py-4 rounded-xl border-2 carlmarx-bold text-xl uppercase transition-all flex items-center justify-center gap-3 ${mundialGender === 'F' ? 'border-pink-400 bg-pink-400/20 text-pink-300' : 'border-white/20 bg-white/5 text-white'}`}>
+              <span>👩</span> Jugadora
+            </button>
+          </div>
+        </div>
+
         {/* Position selector */}
         <div className="w-full space-y-2">
           <label className="carlmarx-regular text-white/60 text-lg uppercase tracking-widest">Tu posición</label>
@@ -852,7 +1052,12 @@ Professional sports photography, ultra sharp, 4K, cinematic, no text, no waterma
           onClick={() => {
             if (!mundialName.trim()) { toast.error('Ingresá tu nombre'); return; }
             if (!mundialPosition) { toast.error('Elegí tu posición'); return; }
-            runAI(capturedImage!, null);
+            
+            const mundialTheme = {
+              name: 'Carta Mundialista',
+              prompt: `Professional digital caricature of ${mundialName} as a football player for ${mundialCountry?.name || 'Argentina'}, in the position of ${mundialPosition}, standing next to Lionel Messi in a World Cup celebration, vibrant stadium background, 8k resolution`
+            };
+            runAI(capturedImage!, mundialTheme);
           }}
           className="w-full py-6 rounded-2xl carlmarx-bold text-2xl text-white transition-all"
           style={{ background: 'linear-gradient(135deg,#16a34a,#15803d)', boxShadow: '0 0 40px rgba(22,163,74,0.4)' }}
@@ -902,16 +1107,10 @@ Professional sports photography, ultra sharp, 4K, cinematic, no text, no waterma
                 </p>
                 <div className="grid grid-cols-3 md:grid-cols-4 gap-4">
                   {(items as any[]).map((t: any) => (
-                    <button key={t.id}
-                      disabled={isAIGenerating}
-                      onClick={() => { 
-                        if (generalSettings.autoFullscreen && !document.fullscreenElement) {
-                          document.documentElement.requestFullscreen().catch(() => {});
-                        }
-                        setSelectedTheme(t); 
-                        runAI(capturedImage!, t); 
-                      }}
-                      className={`relative rounded-2xl overflow-hidden border-2 transition-all group bg-slate-900 ${isAIGenerating ? 'opacity-50 cursor-not-allowed' : 'border-violet-800/40 hover:border-violet-400 hover:scale-[1.03]'}`}
+                    <button
+                      key={t.id}
+                      onClick={() => setSelectedAITheme(t)}
+                      className={`relative rounded-2xl overflow-hidden border-2 transition-all group bg-slate-900 ${isAIGenerating ? 'opacity-50 cursor-not-allowed' : (selectedAITheme?.id === t.id ? 'border-violet-400 scale-[1.03] ring-4 ring-violet-500/20' : 'border-violet-800/40 hover:border-violet-400')}`}
                       style={{ aspectRatio: '3/4' }}
                     >
                       {t.preview_url
@@ -934,6 +1133,24 @@ Professional sports photography, ultra sharp, 4K, cinematic, no text, no waterma
             ))}
           </div>
         </div>
+        
+        {/* BOTÓN DE CONFIRMACIÓN FLOTANTE */}
+        {selectedAITheme && !isAIGenerating && (
+          <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-8 duration-300">
+            <button 
+              onClick={handleThemeConfirm}
+              className="bg-gradient-to-r from-violet-600 to-pink-600 text-white px-12 py-6 rounded-3xl carlmarx-bold text-3xl shadow-[0_10px_50px_rgba(139,92,246,0.6)] hover:scale-105 active:scale-95 transition-all flex items-center gap-4"
+            >
+              ¡Elegir {selectedAITheme.name}! <Sparkles className="w-8 h-8" />
+            </button>
+            <button 
+              onClick={() => setSelectedAITheme(null)}
+              className="absolute -top-4 -right-4 bg-white text-black w-10 h-10 rounded-full flex items-center justify-center shadow-lg carlmarx-bold border-2 border-slate-200"
+            >
+              ✕
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -972,18 +1189,17 @@ Professional sports photography, ultra sharp, 4K, cinematic, no text, no waterma
         <div className="absolute inset-0 bg-[#0a0a1a]" />
         <Corners />
         
-        <div className="relative z-10 flex h-full items-center justify-center gap-12 p-8 animate-in fade-in zoom-in duration-500">
-          {/* Photo Preview */}
-          <div className="relative flex-shrink-0 h-full max-h-[85vh] aspect-[7/9] rounded-[2rem] overflow-hidden shadow-[0_0_100px_rgba(139,92,246,0.4)] border border-violet-500/30 group">
+        <div className="relative z-10 flex flex-col md:flex-row h-full items-center justify-center gap-6 md:gap-12 p-6 animate-in fade-in zoom-in duration-500 overflow-y-auto">
+          {/* Photo Preview - ACHICADO PARA QUE ENTREN BOTONES */}
+          <div className="relative flex-shrink-0 h-[45vh] md:h-[70vh] aspect-[2/3] rounded-[2rem] overflow-hidden shadow-[0_0_80px_rgba(139,92,246,0.3)] border border-violet-500/30 group">
             {capturedImage && <img src={capturedImage} alt="result" className="w-full h-full object-cover" />}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
 
           {/* Actions Column */}
-          <div className="flex flex-col gap-6 w-72">
-            <div className="space-y-1 mb-4">
+          <div className="flex flex-col gap-3 md:gap-6 w-full max-w-sm">
+            <div className="space-y-1 mb-2 text-center md:text-left">
               <p className="carlmarx-regular text-violet-400 text-lg uppercase tracking-[0.2em]">¡Listo!</p>
-              <h2 className="carlmarx-bold text-white text-4xl">Llevate tu recuerdo</h2>
+              <h2 className="carlmarx-bold text-white text-3xl md:text-4xl leading-none">Llevate tu recuerdo</h2>
             </div>
 
             <button onClick={resetKiosk}
@@ -1048,6 +1264,25 @@ Professional sports photography, ultra sharp, 4K, cinematic, no text, no waterma
             </div>
           </div>
         )}
+      </div>
+    );
+  }
+
+  if (step === 'stickerEditor') {
+    return (
+      <div className="kiosk-root overflow-auto bg-black pt-[5vh]">
+        <StickerEditor 
+          userPhotoUrl={capturedImage} 
+          countryFolder={mundialCountry?.id || 'argentina'}
+          onSave={async (url) => {
+             setStep('processing');
+             const publicUrl = await savePhotoToAlbum(url);
+             setLastPublicUrl(publicUrl);
+             setCapturedImage(url);
+             setStep('result');
+          }} 
+          onCancel={resetKiosk} 
+        />
       </div>
     );
   }

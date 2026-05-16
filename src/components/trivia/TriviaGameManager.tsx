@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import {
     Plus, Trash2, Play, SkipForward, Users,
     Gamepad2, ClipboardList, BarChart3,
-    ChevronLeft, Settings2, LayoutList, LayoutDashboard, Loader2
+    ChevronLeft, Settings2, LayoutList, LayoutDashboard, Loader2,
+    Clock
 } from "lucide-react";
 import {
     useTriviaGame, useTriviaQuestions, useTriviaSortedPlayers,
@@ -33,6 +34,7 @@ const EMPTY_QUESTION = {
     option_d: '',
     correct_option: 'a' as TriviaOption,
     points: 1000,
+    duration_seconds: 10,
     order_index: 0,
 };
 
@@ -150,8 +152,16 @@ export const TriviaGameManager = ({ eventId, onBackToDashboard }: TriviaGameMana
         const targetQ = questions[targetIndex];
         if (!targetQ) return;
 
+        // Actualizamos la duración del juego antes de lanzar para que coincida con la pregunta
+        const qDuration = (targetQ as any).duration_seconds || 10;
+        
+        await updateGame.mutateAsync({ 
+            gameId: game.id, 
+            updates: { question_duration_seconds: qDuration } 
+        });
+
         await launchQuestion.mutateAsync({ gameId: game.id, questionId: targetQ.id });
-        toast.success(`🚀 Lanzada Pregunta #${targetIndex + 1}`);
+        toast.success(`🚀 Lanzada Pregunta #${targetIndex + 1} (${qDuration}s)`);
     };
 
     const handleShowResults = async () => {
@@ -420,7 +430,27 @@ export const TriviaGameManager = ({ eventId, onBackToDashboard }: TriviaGameMana
                                                     );
                                                 })}
                                             </div>
-                                            <div className="flex gap-2 justify-end">
+
+                                            {/* Selector de Tiempo */}
+                                            <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700 flex items-center justify-between">
+                                                <div className="flex items-center gap-2 text-slate-400">
+                                                    <Clock className="w-4 h-4" />
+                                                    <span className="text-xs font-bold uppercase tracking-widest">Tiempo de respuesta</span>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    {[10, 20, 30].map(sec => (
+                                                        <button
+                                                            key={sec}
+                                                            onClick={() => setEditingQuestion({ ...editingQuestion, duration_seconds: sec })}
+                                                            className={`px-4 py-1.5 rounded-lg text-sm font-black transition-all ${editingQuestion.duration_seconds === sec ? 'bg-violet-600 text-white shadow-lg' : 'bg-slate-800 text-slate-500 hover:text-slate-300'}`}
+                                                        >
+                                                            {sec}s
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div className="flex gap-2 justify-end pt-2">
                                                 <Button variant="ghost" onClick={() => setEditingQuestion(null)} className="text-slate-500">Cancelar</Button>
                                                 <Button onClick={handleAddQuestion} className="bg-green-600 hover:bg-green-700 font-bold px-8">Guardar Pregunta</Button>
                                             </div>
@@ -435,6 +465,9 @@ export const TriviaGameManager = ({ eventId, onBackToDashboard }: TriviaGameMana
                                                     <p className="text-white font-medium truncate max-w-[300px]">{q.question_text}</p>
                                                 </div>
                                                 <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] bg-slate-700 text-slate-300 px-2 py-0.5 rounded-full font-bold uppercase tracking-widest flex items-center gap-1">
+                                                        <Clock className="w-2.5 h-2.5" /> {(q as any).duration_seconds || 10}s
+                                                    </span>
                                                     <span className="text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-widest">OK</span>
                                                     <Button variant="ghost" size="icon" onClick={() => deleteQuestion.mutate(q.id)} className="text-slate-600 hover:text-red-400"><Trash2 className="w-4 h-4" /></Button>
                                                 </div>

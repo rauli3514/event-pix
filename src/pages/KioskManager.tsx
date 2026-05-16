@@ -1290,6 +1290,27 @@ const KioskManager = () => {
 
                                         <div className="flex items-center justify-between p-4 bg-slate-950 rounded-xl border border-slate-800">
                                             <div>
+                                                <h4 className="text-white font-medium">Modos de Captura Activos</h4>
+                                                <p className="text-slate-500 text-sm">Habilita o deshabilita los diferentes tipos de foto</p>
+                                            </div>
+                                            <div className="flex gap-4">
+                                                <div className="flex flex-col items-center gap-1">
+                                                    <span className="text-[10px] text-slate-400 uppercase font-bold">Selfie</span>
+                                                    <input type="checkbox" checked={generalSettings.enableSelfie !== false} onChange={(e) => setGeneralSettings({...generalSettings, enableSelfie: e.target.checked})} className="w-5 h-5 accent-cyan-500" />
+                                                </div>
+                                                <div className="flex flex-col items-center gap-1">
+                                                    <span className="text-[10px] text-slate-400 uppercase font-bold">IA</span>
+                                                    <input type="checkbox" checked={generalSettings.enableAI !== false} onChange={(e) => setGeneralSettings({...generalSettings, enableAI: e.target.checked})} className="w-5 h-5 accent-violet-500" />
+                                                </div>
+                                                <div className="flex flex-col items-center gap-1">
+                                                    <span className="text-[10px] text-slate-400 uppercase font-bold">Mundial</span>
+                                                    <input type="checkbox" checked={generalSettings.enableMundial !== false} onChange={(e) => setGeneralSettings({...generalSettings, enableMundial: e.target.checked})} className="w-5 h-5 accent-green-500" />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between p-4 bg-slate-950 rounded-xl border border-slate-800">
+                                            <div>
                                                 <h4 className="text-white font-medium">Modo de Bloqueo de Kiosco</h4>
                                                 <p className="text-slate-500 text-sm">Evita que se cierre la aplicación sin el PIN</p>
                                             </div>
