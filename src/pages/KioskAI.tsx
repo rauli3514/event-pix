@@ -405,51 +405,16 @@ High-end sports photography, 8k, cinematic, extremely detailed face, looking at 
 The subject must perfectly match the facial features and gender of the reference image.`;
         }
       }
-
-      // WORKAROUND DE RED: Si es figuritas, llamamos directo a Replicate con un proxy CORS para saltarnos la Edge Function desactualizada
+      // Llamada unificada a la Edge Function
+      const requestBody: any = { imageUrl: publicUrl };
       if (mode === 'figuritas') {
-        const token = import.meta.env.VITE_REPLICATE_TOKEN_B64 ? atob(import.meta.env.VITE_REPLICATE_TOKEN_B64) : (import.meta.env.VITE_REPLICATE_API_TOKEN || '');
-        if (!token) throw new Error("Falta el token de Replicate en las variables de entorno");
-        
-        const repRes = await fetch('https://corsproxy.io/?' + encodeURIComponent('https://api.replicate.com/v1/predictions'), {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            version: "fb8af171cfa1616ddcf1242c093f9c46bcada5ad4cf6f2fbe8b81b330ec5c003", // cjwbw/rembg
-            input: { image: publicUrl }
-          })
-        });
-        
-        if (!repRes.ok) throw new Error("Error iniciando proxy Replicate");
-        let pred = await repRes.json();
-        
-        let attempts = 0;
-        while (pred.status !== 'succeeded' && pred.status !== 'failed' && attempts < 60) {
-          await new Promise(r => setTimeout(r, 2000));
-          const pollRes = await fetch('https://corsproxy.io/?' + encodeURIComponent(pred.urls.get), {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          pred = await pollRes.json();
-          attempts++;
-        }
-        
-        if (pred.status === 'succeeded') {
-          const finalUrl = Array.isArray(pred.output) ? pred.output[0] : pred.output;
-          setCapturedImage(finalUrl);
-          setStep('stickerEditor');
-          setIsAIGenerating(false);
-          return;
-        } else {
-          throw new Error("La IA no pudo quitar el fondo");
-        }
+        requestBody.action = 'remove_bg';
+      } else {
+        requestBody.prompt = prompt;
       }
 
-      // Flujo normal para los otros modos
       const { data, error: functionError } = await supabase.functions.invoke('generate-ai-photo', {
-        body: { imageUrl: publicUrl, prompt: prompt }
+        body: requestBody
       });
 
       if (functionError || !data?.success) throw new Error(functionError?.message || data?.error || 'Error iniciando IA');
@@ -475,6 +440,13 @@ The subject must perfectly match the facial features and gender of the reference
 
       const outputUrl = Array.isArray(currentPrediction.output) ? currentPrediction.output[0] : currentPrediction.output;
 
+      if (mode === 'figuritas') {
+        setCapturedImage(outputUrl);
+        setStep('stickerEditor');
+        setIsAIGenerating(false);
+        return;
+      }
+
       let finalImage: string;
       if (mode === 'mundial') {
         finalImage = await buildMundialCard(outputUrl);
@@ -489,7 +461,11 @@ The subject must perfectly match the facial features and gender of the reference
     } catch (e: any) {
       console.error(e);
       toast.error(e.message || 'Error al procesar la foto');
-      setStep(mode === 'mundial' ? 'mundialInfo' : 'themeSelect');
+      if (mode === 'figuritas') {
+        setStep('modeSelect'); // Volver al inicio si falla la figurita
+      } else {
+        setStep(mode === 'mundial' ? 'mundialInfo' : 'themeSelect');
+      }
     } finally {
       setIsAIGenerating(false);
     }
