@@ -1,0 +1,198 @@
+import { useState, useEffect, useRef } from 'react';
+import { useParams } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
+import { CampaignItem } from '@/types/display';
+import { PlayerRenderer } from '@/components/display/PlayerRenderer';
+import { MonitorPlay, WifiOff } from 'lucide-react';
+
+const TvPlayer = () => {
+    const { deviceCode } = useParams<{ deviceCode: string }>();
+    
+    const [items, setItems] = useState<CampaignItem[]>([]);
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [status, setStatus] = useState<'loading' | 'playing' | 'offline_playing' | 'no_content' | 'error'>('loading');
+    
+    // Referencias para limpiar timeouts e intervalos
+    const rotationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+    // 1. Fetching and Caching Logic
+    const fetchCampaign = async () => {
+        if (!deviceCode) return;
+
+        try {
+            // Buscar el dispositivo y su campaña asignada
+            const { data: device, error: deviceError } = await supabase
+                .from('display_devices')
+                .select(`
+                    id,
+                    pairing_status,
+                    assignment:display_assignments(
+                        campaign:display_campaigns(items_json)
+                    )
+                `)
+                .eq('device_id', deviceCode)
+                .single();
+
+            if (deviceError) throw deviceError;
+
+            if (device.pairing_status !== 'linked' || !device.assignment || !device.assignment.campaign) {
+                setStatus('no_content');
+                return;
+            }
+
+            const campaignItems = device.assignment.campaign.items_json as CampaignItem[];
+            
+            // Si hay items, los guardamos en caché y los cargamos
+            if (campaignItems && campaignItems.length > 0) {
+                localStorage.setItem(`tv_cache_${deviceCode}`, JSON.stringify(campaignItems));
+                setItems(campaignItems);
+                setStatus('playing');
+            } else {
+                setStatus('no_content');
+            }
+
+        } catch (error) {
+            console.error('Error fetching campaign from Supabase:', error);
+            // MODO OFFLINE: Intentar recuperar de la caché local
+            const cachedData = localStorage.getItem(`tv_cache_${deviceCode}`);
+            if (cachedData) {
+                try {
+                    const parsedItems = JSON.parse(cachedData) as CampaignItem[];
+                    if (parsedItems.length > 0) {
+                        setItems(parsedItems);
+                        setStatus('offline_playing');
+                        return;
+                    }
+                } catch (e) {
+                    // JSON parse error
+                }
+            }
+            setStatus('error');
+        }
+    };
+
+    // 2. Heartbeat Logic (Ping to Supabase)
+    const sendHeartbeat = async () => {
+        if (!deviceCode) return;
+        try {
+            const { data: device } = await supabase
+                .from('display_devices')
+                .select('id')
+                .eq('device_id', deviceCode)
+                .single();
+                
+            if (device) {
+                // Actualizamos el last_seen del device (o insertamos en heartbeats)
+                await supabase
+                    .from('display_devices')
+                    .update({ last_seen: new Date().toISOString() })
+                    .eq('id', device.id);
+            }
+        } catch (error) {
+            // Silently fail if offline, the player should keep running
+        }
+    };
+
+    // Initialization
+    useEffect(() => {
+        // Primera carga
+        fetchCampaign();
+        sendHeartbeat();
+
+        // Sincronización periódica (cada 5 minutos) por si cambiaron la campaña en la web
+        syncIntervalRef.current = setInterval(() => {
+            fetchCampaign();
+        }, 5 * 60 * 1000);
+
+        // Heartbeat (cada 60 segundos)
+        heartbeatIntervalRef.current = setInterval(() => {
+            sendHeartbeat();
+        }, 60 * 1000);
+
+        return () => {
+            if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
+            if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
+        };
+    }, [deviceCode]);
+
+    // 3. Rotation Logic
+    useEffect(() => {
+        if (items.length === 0 || (status !== 'playing' && status !== 'offline_playing')) return;
+
+        // Limpiar el timeout anterior si existe
+        if (rotationTimeoutRef.current) clearTimeout(rotationTimeoutRef.current);
+
+        const currentItem = items[currentIndex];
+        // Si la duración es inválida, usar 10 segundos por defecto
+        const durationMs = (currentItem.duration && currentItem.duration > 0 ? currentItem.duration : 10) * 1000;
+
+        rotationTimeoutRef.current = setTimeout(() => {
+            setCurrentIndex((prevIndex) => (prevIndex + 1) % items.length);
+        }, durationMs);
+
+        return () => {
+            if (rotationTimeoutRef.current) clearTimeout(rotationTimeoutRef.current);
+        };
+    }, [currentIndex, items, status]);
+
+
+    // -- Renders --
+
+    if (status === 'loading') {
+        return (
+            <div className="w-screen h-screen bg-black flex flex-col items-center justify-center text-white">
+                <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4" />
+                <h1 className="text-2xl font-mono text-slate-400">Iniciando EventPix Player...</h1>
+            </div>
+        );
+    }
+
+    if (status === 'no_content') {
+        return (
+            <div className="w-screen h-screen bg-black flex flex-col items-center justify-center text-white p-10 text-center">
+                <MonitorPlay className="w-32 h-32 text-indigo-600 mb-8 animate-pulse" />
+                <h1 className="text-6xl font-bold font-mono tracking-widest mb-4">{deviceCode}</h1>
+                <p className="text-2xl text-slate-400 max-w-2xl">
+                    Esta pantalla está encendida pero no tiene contenido asignado. <br/><br/>
+                    Ingresa a tu panel de EventPix y asígnale una campaña a este código.
+                </p>
+            </div>
+        );
+    }
+
+    if (status === 'error') {
+        return (
+            <div className="w-screen h-screen bg-black flex flex-col items-center justify-center text-white p-10 text-center">
+                <WifiOff className="w-32 h-32 text-rose-600 mb-8" />
+                <h1 className="text-5xl font-bold mb-4">Sin Conexión</h1>
+                <p className="text-2xl text-slate-400 max-w-2xl">
+                    La pantalla no tiene acceso a Internet y no posee contenido guardado en caché para reproducir sin conexión.
+                </p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="w-screen h-screen bg-black overflow-hidden relative">
+            {/* Indicador de modo offline invisible a simple vista, pero útil para debugear */}
+            {status === 'offline_playing' && (
+                <div className="absolute top-2 right-2 z-50 bg-rose-600 text-white text-[10px] px-2 py-1 rounded opacity-30">
+                    Modo Offline
+                </div>
+            )}
+
+            {/* Renderizamos todos los iframes/imagenes, pero solo hacemos visible el "activo" */}
+            {items.map((item, index) => (
+                <PlayerRenderer 
+                    key={`${item.id}-${index}`} 
+                    item={item} 
+                    isActive={index === currentIndex} 
+                />
+            ))}
+        </div>
+    );
+};
+
+export default TvPlayer;

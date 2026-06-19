@@ -12,6 +12,12 @@ import Display from "./pages/Display";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
+import DisplayHubMain from "./pages/display-hub/DisplayHubMain";
+import DisplayHubList from "./pages/display-hub/DisplayHubList";
+import DisplayDeviceDetail from "./pages/display-hub/DisplayDeviceDetail";
+import DisplayCampaigns from "./pages/display-hub/DisplayCampaigns";
+import DisplayCampaignBuilder from "./pages/display-hub/DisplayCampaignBuilder";
+import TvPlayer from "./pages/display-hub/TvPlayer";
 import { StickerEditor } from "./components/stickers/StickerEditor";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { EventProvider } from "./context/EventContext";
@@ -36,6 +42,11 @@ const App = () => (
               <Route path="/admin" element={<EventsList />} />
               <Route path="/admin/providers" element={<ProvidersList />} />
               <Route path="/admin/kiosco-manager" element={<KioskManager />} />
+              <Route path="/admin/display" element={<DisplayHubMain />} />
+              <Route path="/admin/display/commerce/:commerceId" element={<DisplayHubList />} />
+              <Route path="/admin/display/commerce/:commerceId/campaigns" element={<DisplayCampaigns />} />
+              <Route path="/admin/display/commerce/:commerceId/campaigns/:campaignId" element={<DisplayCampaignBuilder />} />
+              <Route path="/admin/display/:id" element={<DisplayDeviceDetail />} />
               <Route path="/admin/:slug" element={
                 <ErrorBoundary>
                   <Admin />
@@ -45,6 +56,9 @@ const App = () => (
 
             <Route path="/:slug" element={<Index />} />
             <Route path="/:slug/display" element={<Display />} />
+            
+            {/* TV Player Route (No Layout, Fullscreen) */}
+            <Route path="/tv/:deviceCode" element={<TvPlayer />} />
           </Route>
 
           <Route path="/" element={<Navigate to="/login" replace />} />

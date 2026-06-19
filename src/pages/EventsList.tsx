@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Calendar, ExternalLink, Settings, LogOut, Trash2, Lock, Unlock, Users, Shield, Sparkles } from 'lucide-react';
+import { Plus, Calendar, ExternalLink, Settings, LogOut, Trash2, Lock, Unlock, Users, Shield, Sparkles, Monitor } from 'lucide-react';
 
 type Event = {
     id: string;
@@ -241,6 +241,11 @@ const EventsList = () => {
                             <Button asChild className="bg-violet-600 hover:bg-violet-700 text-white shadow-[0_0_20px_rgba(139,92,246,0.3)] border border-violet-500/50">
                                 <Link to="/admin/kiosco-manager">
                                     <Sparkles className="w-4 h-4 mr-2" /> Kiosco IA Global
+                                </Link>
+                            </Button>
+                            <Button asChild className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-[0_0_20px_rgba(79,70,229,0.3)] border border-indigo-500/50">
+                                <Link to="/admin/display">
+                                    <Monitor className="w-4 h-4 mr-2" /> Display Hub
                                 </Link>
                             </Button>
                         </>
