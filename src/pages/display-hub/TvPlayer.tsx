@@ -37,12 +37,15 @@ const TvPlayer = () => {
 
             if (deviceError) throw deviceError;
 
-            if (device.pairing_status !== 'linked' || !device.assignment || !device.assignment.campaign) {
+            const assignment: any = Array.isArray(device.assignment) ? device.assignment[0] : device.assignment;
+            const campaign: any = assignment ? (Array.isArray(assignment.campaign) ? assignment.campaign[0] : assignment.campaign) : null;
+
+            if (device.pairing_status !== 'linked' || !assignment || !campaign) {
                 setStatus('no_content');
                 return;
             }
 
-            const campaignItems = device.assignment.campaign.items_json as CampaignItem[];
+            const campaignItems = campaign.items_json as CampaignItem[];
             
             // Si hay items, los guardamos en caché y los cargamos
             if (campaignItems && campaignItems.length > 0) {
