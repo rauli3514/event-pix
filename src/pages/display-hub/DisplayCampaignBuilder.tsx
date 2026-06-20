@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { useIsSuperAdmin } from "@/hooks/use-roles";
 import { useDisplayCampaigns, useUpdateCampaign } from "@/hooks/use-display-hub";
@@ -26,7 +26,7 @@ const migrateToV2 = (data: any): DisplayCampaignV2 => {
     if (data?.version === '2.0') return data as DisplayCampaignV2;
 
     const items = Array.isArray(data) ? data : [];
-    const playlist: UniversalElement[] = items.map((item: any, index: number) => {
+    const playlist: UniversalElement[] = items.map((item: any) => {
         let type: UniversalElementType = 'url';
         if (item.type === 'image_ad') type = 'image';
         if (item.type === 'video') type = 'video';
@@ -326,7 +326,7 @@ const DisplayCampaignBuilder = () => {
                                         onClick={() => setActiveZoneIndex(idx)}
                                         className="cursor-pointer transition-colors"
                                     >
-                                        <Text className={`font-bold ${activeZoneIndex === idx ? 'text-indigo-400' : 'text-slate-600'}`}>Zona {idx + 1}</Text>
+                                        <span className={`font-bold ${activeZoneIndex === idx ? 'text-indigo-400' : 'text-slate-600'}`}>Zona {idx + 1}</span>
                                     </div>
                                 ))}
                             </div>
@@ -442,7 +442,7 @@ const DisplayCampaignBuilder = () => {
                                                 onChange={(e) => setNewContent(e.target.value)}
                                                 placeholder="Ej: Promo de Verano"
                                                 className="bg-slate-950 border-slate-700 text-white"
-                                                required={newType !== 'text'}
+                                                required
                                             />
                                         </div>
                                     )}

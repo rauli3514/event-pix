@@ -145,8 +145,18 @@ const DisplayCampaigns = () => {
                 {/* Campaigns List */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-4">
                     {campaigns?.map(campaign => {
-                        const totalDuration = campaign.items_json?.reduce((acc: number, item: any) => acc + (item.duration || 0), 0) || 0;
-                        const itemsCount = campaign.items_json?.length || 0;
+                        let totalDuration = 0;
+                        let itemsCount = 0;
+
+                        if (Array.isArray(campaign.items_json)) {
+                            itemsCount = campaign.items_json.length;
+                            totalDuration = campaign.items_json.reduce((acc: number, item: any) => acc + (item.duration || 0), 0);
+                        } else if (campaign.items_json?.version === '2.0') {
+                            const v2 = campaign.items_json as any;
+                            const playlist = v2.zones?.[0]?.playlist || [];
+                            itemsCount = playlist.length;
+                            totalDuration = playlist.reduce((acc: number, item: any) => acc + (item.duration || 0), 0);
+                        }
                         
                         return (
                             <div key={campaign.id} className="group bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl p-6 hover:border-indigo-500/50 transition-all duration-300 flex flex-col">
