@@ -49,8 +49,17 @@ const TvPlayer = () => {
             
             // Si hay items, los guardamos en caché y los cargamos
             if (campaignItems && campaignItems.length > 0) {
-                localStorage.setItem(`tv_cache_${deviceCode}`, JSON.stringify(campaignItems));
-                setItems(campaignItems);
+                const newItemsString = JSON.stringify(campaignItems);
+                localStorage.setItem(`tv_cache_${deviceCode}`, newItemsString);
+                
+                // Solo actualizar el estado si realmente cambiaron los items para no reiniciar el timer de rotación
+                setItems((prevItems) => {
+                    if (JSON.stringify(prevItems) === newItemsString) {
+                        return prevItems;
+                    }
+                    return campaignItems;
+                });
+                
                 setStatus('playing');
             } else {
                 setStatus('no_content');
@@ -104,10 +113,11 @@ const TvPlayer = () => {
         fetchCampaign();
         sendHeartbeat();
 
-        // Sincronización periódica (cada 5 minutos) por si cambiaron la campaña en la web
+        // Sincronización periódica (cada 30 segundos)
         syncIntervalRef.current = setInterval(() => {
+            console.log('Syncing TV campaign...', new Date().toISOString());
             fetchCampaign();
-        }, 5 * 60 * 1000);
+        }, 30 * 1000);
 
         // Heartbeat (cada 60 segundos)
         heartbeatIntervalRef.current = setInterval(() => {
@@ -145,7 +155,7 @@ const TvPlayer = () => {
 
     if (status === 'loading') {
         return (
-            <div className="w-screen h-screen bg-black flex flex-col items-center justify-center text-white">
+            <div className="fixed inset-0 w-full h-full bg-black flex flex-col items-center justify-center text-white">
                 <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4" />
                 <h1 className="text-2xl font-mono text-slate-400">Iniciando EventPix Player...</h1>
             </div>
@@ -154,7 +164,7 @@ const TvPlayer = () => {
 
     if (status === 'no_content') {
         return (
-            <div className="w-screen h-screen bg-black flex flex-col items-center justify-center text-white p-10 text-center">
+            <div className="fixed inset-0 w-full h-full bg-black flex flex-col items-center justify-center text-white p-10 text-center">
                 <MonitorPlay className="w-32 h-32 text-indigo-600 mb-8 animate-pulse" />
                 <h1 className="text-6xl font-bold font-mono tracking-widest mb-4">{deviceCode}</h1>
                 <p className="text-2xl text-slate-400 max-w-2xl">
@@ -167,18 +177,27 @@ const TvPlayer = () => {
 
     if (status === 'error') {
         return (
-            <div className="w-screen h-screen bg-black flex flex-col items-center justify-center text-white p-10 text-center">
+            <div className="fixed inset-0 w-full h-full bg-black flex flex-col items-center justify-center text-white p-10 text-center">
                 <WifiOff className="w-32 h-32 text-rose-600 mb-8" />
-                <h1 className="text-5xl font-bold mb-4">Sin Conexión</h1>
-                <p className="text-2xl text-slate-400 max-w-2xl">
-                    La pantalla no tiene acceso a Internet y no posee contenido guardado en caché para reproducir sin conexión.
+                <h1 className="text-5xl font-bold mb-4">Sin Conexión o Error</h1>
+                <p className="text-2xl text-slate-400 max-w-2xl mb-8">
+                    La pantalla no pudo comunicarse con el servidor. Es posible que la TV se esté conectando al WiFi recién ahora.
                 </p>
+                <button 
+                    onClick={() => {
+                        setStatus('loading');
+                        fetchCampaign();
+                    }}
+                    className="px-8 py-4 bg-rose-600 hover:bg-rose-700 rounded-xl text-2xl font-bold transition-all"
+                >
+                    Reintentar Conexión
+                </button>
             </div>
         );
     }
 
     return (
-        <div className="w-screen h-screen bg-black overflow-hidden relative">
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: '#000', overflow: 'hidden' }}>
             {/* Indicador de modo offline invisible a simple vista, pero útil para debugear */}
             {status === 'offline_playing' && (
                 <div className="absolute top-2 right-2 z-50 bg-rose-600 text-white text-[10px] px-2 py-1 rounded opacity-30">

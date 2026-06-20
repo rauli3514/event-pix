@@ -22,36 +22,56 @@ export const PlayerRenderer = ({ item, isActive }: PlayerRendererProps) => {
 
     switch (item.type) {
         case 'external_url':
+            const isImageUrl = item.url && /\.(jpeg|jpg|gif|png|webp)($|\?)/i.test(item.url);
+            
+            if (isImageUrl) {
+                return (
+                    <div style={{ position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: '#000' }} className={`transition-opacity duration-1000 flex items-center justify-center ${visibilityClass}`}>
+                        <img 
+                            src={item.url} 
+                            alt={item.title}
+                            style={{ width: '100vw', height: '100vh', objectFit: 'contain' }}
+                            loading="lazy"
+                        />
+                    </div>
+                );
+            }
+
+            let normalizedUrl = item.url;
+            if (normalizedUrl && !/^https?:\/\//i.test(normalizedUrl)) {
+                normalizedUrl = 'https://' + normalizedUrl;
+            }
+
             return (
-                <div className={`absolute inset-0 transition-opacity duration-1000 bg-black ${visibilityClass}`}>
-                    {item.url ? (
+                <div style={{ position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: '#000' }} className={`transition-opacity duration-1000 ${visibilityClass}`}>
+                    {isActive && normalizedUrl ? (
                         <iframe 
                             ref={iframeRef}
-                            src={item.url} 
-                            className="w-full h-full border-0"
-                            sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
+                            src={normalizedUrl} 
+                            style={{ width: '100%', height: '100%', border: 0 }}
+                            allow="autoplay; fullscreen"
                             title={item.title}
                         />
-                    ) : (
-                        <div className="w-full h-full flex items-center justify-center text-white text-2xl">
+                    ) : isActive && !normalizedUrl ? (
+                        <div style={{ width: '100vw', height: '100vh' }} className="flex items-center justify-center text-white text-2xl">
                             URL Externa no configurada
                         </div>
-                    )}
+                    ) : null}
                 </div>
             );
         
         case 'image_ad':
             return (
-                <div className={`absolute inset-0 transition-opacity duration-1000 bg-black flex items-center justify-center ${visibilityClass}`}>
+                <div style={{ position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: '#000' }} className={`transition-opacity duration-1000 flex items-center justify-center ${visibilityClass}`}>
                     {item.imageUrl ? (
                         <img 
                             src={item.imageUrl} 
                             alt={item.title}
-                            className="w-full h-full object-cover" // object-contain si no queremos recortar
+                            style={{ width: '100vw', height: '100vh', objectFit: 'contain' }}
                             loading="lazy"
                         />
                     ) : (
-                        <div className="w-full h-full flex items-center justify-center text-white text-2xl">
+                        <div style={{ width: '100vw', height: '100vh' }} className="flex items-center justify-center text-white text-2xl">
                             Imagen no configurada
                         </div>
                     )}

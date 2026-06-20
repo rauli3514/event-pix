@@ -13,8 +13,9 @@ const Display = () => {
 
     if (eventLoading || settingsLoading) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-background">
-                <div className="text-muted-foreground">Cargando...</div>
+            <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center bg-slate-950 text-white">
+                <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4" />
+                <div className="text-slate-400">Cargando evento...</div>
             </div>
         );
     }
@@ -45,7 +46,7 @@ const Display = () => {
     const template = settings?.display_template || 'slideshow';
 
     return (
-        <div className="min-h-screen bg-background">
+        <div className="absolute inset-0 w-full h-full bg-slate-950 text-white overflow-hidden">
             {template === 'grid' && <GridTemplate eventId={event.id} />}
             {template === 'slideshow' && <SlideshowTemplate eventId={event.id} />}
             {template === 'masonry' && <MasonryTemplate eventId={event.id} />}

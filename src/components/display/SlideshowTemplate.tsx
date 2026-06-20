@@ -315,7 +315,7 @@ export const SlideshowTemplate = ({ eventId }: SlideshowTemplateProps) => {
     const DEFAULT_BACKGROUND_IMAGE = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop";
 
     return (
-        <div className={`relative h-screen w-screen bg-black text-white overflow-hidden ${settings?.font_family || 'font-sans'}`}>
+        <div className={`absolute inset-0 w-full h-full bg-black text-white overflow-hidden ${settings?.font_family || 'font-sans'}`}>
             {/* Header Flotante Minimalista */}
             <header className="absolute top-0 left-0 z-50 p-6 w-full flex justify-between items-start bg-gradient-to-b from-black/80 to-transparent">
                 <div>
