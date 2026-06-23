@@ -107,7 +107,7 @@ const DisplayHubMain = () => {
                             return (
                                 <Link 
                                     key={commerce.id}
-                                    to={`/admin/display/commerce/${commerce.id}`}
+                                    to={`/admin/display/commerce/${commerce.id}/workspace`}
                                     className="group bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl p-6 hover:bg-slate-800/80 hover:border-indigo-500/50 transition-all duration-300 block"
                                 >
                                     <div className="flex justify-between items-start mb-4">
