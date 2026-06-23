@@ -16,6 +16,7 @@ const Login = () => {
         e.preventDefault();
         setLoading(true);
 
+        // @ts-ignore
         if (supabase.supabaseUrl?.includes('placeholder')) {
             toast.success("Modo Mock: Acceso concedido");
             navigate("/admin/display");
