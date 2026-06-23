@@ -1,8 +1,12 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { useParams } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Image as ImageIcon, Folder, PlaySquare, Settings2, Plus, LayoutGrid, List } from 'lucide-react';
+import { Search, Image as ImageIcon, Folder, PlaySquare, Settings2, Plus, LayoutGrid, List, Globe } from 'lucide-react';
+import { useDisplayMedia } from '@/hooks/use-display-media';
+import { getIconForType } from '@/pages/display-hub/WorkspaceMedia';
+import { DisplayMedia } from '@/types/display';
 
 interface AssetSelectorModalProps {
     isOpen: boolean;
@@ -10,23 +14,24 @@ interface AssetSelectorModalProps {
     onSelect: (asset: any) => void;
 }
 
-// Mock data based on the screenshot
-const MOCK_ASSETS = [
-    { id: '1', name: 'images.jpg', type: 'image', url: 'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=500&q=80', folder: 'Home' },
-    { id: '2', name: 'images (1).jpg', type: 'image', url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=500&q=80', folder: 'Home' },
-    { id: '3', name: 'clima 1', type: 'widget', url: 'https://images.unsplash.com/photo-1534088568595-a066f410bcda?w=500&q=80', folder: 'Home' },
-    { id: '4', name: 'eventpix', type: 'image', url: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=500&q=80', folder: 'Home' },
-    { id: '5', name: 'eventpix logo', type: 'image', url: 'https://images.unsplash.com/photo-1563986768609-322da13575f3?w=500&q=80', folder: 'Home' },
-    { id: '6', name: 'Did You Know?', type: 'video', url: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=500&q=80', folder: 'Home' },
-    { id: '7', name: 'Nutrition Facts Quiz', type: 'video', url: 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=500&q=80', folder: 'Home' },
-    { id: '8', name: 'Seasonal Promo', type: 'playlist', url: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=500&q=80', folder: 'Home' },
-];
-
 export const AssetSelectorModal = ({ isOpen, onClose, onSelect }: AssetSelectorModalProps) => {
+    const { commerceId } = useParams<{ commerceId: string }>();
     const [search, setSearch] = useState('');
-    const [selectedAsset, setSelectedAsset] = useState<any>(null);
+    const [selectedAsset, setSelectedAsset] = useState<DisplayMedia | null>(null);
 
-    const filteredAssets = MOCK_ASSETS.filter(a => a.name.toLowerCase().includes(search.toLowerCase()));
+    const { data: mediaFiles = [], isLoading } = useDisplayMedia(commerceId);
+
+    const filteredAssets = useMemo(() => {
+        return mediaFiles.filter(a => a.name.toLowerCase().includes(search.toLowerCase()));
+    }, [mediaFiles, search]);
+
+    const formatBytes = (bytes: number) => {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    };
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -86,28 +91,39 @@ export const AssetSelectorModal = ({ isOpen, onClose, onSelect }: AssetSelectorM
                                 Archivos / Recursos ({filteredAssets.length})
                             </div>
 
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                {filteredAssets.map(asset => (
-                                    <div 
-                                        key={asset.id} 
-                                        onClick={() => setSelectedAsset(asset)}
-                                        className={`bg-white rounded-xl border ${selectedAsset?.id === asset.id ? 'border-emerald-500 ring-1 ring-emerald-500 shadow-md' : 'border-slate-200 hover:border-emerald-300 hover:shadow-sm'} overflow-hidden cursor-pointer transition-all flex flex-col group`}
-                                    >
-                                        <div className="aspect-video bg-slate-100 relative overflow-hidden">
-                                            <img src={asset.url} alt={asset.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                                            {asset.type === 'video' && (
-                                                <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
-                                                    <PlaySquare className="w-8 h-8 text-white opacity-80" />
-                                                </div>
-                                            )}
+                            {isLoading ? (
+                                <div className="flex justify-center items-center h-32 text-slate-500">Cargando recursos...</div>
+                            ) : (
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                    {filteredAssets.map(asset => {
+                                        const FileIcon = getIconForType(asset.type);
+                                        return (
+                                        <div 
+                                            key={asset.id} 
+                                            onClick={() => setSelectedAsset(asset)}
+                                            className={`bg-white rounded-xl border ${selectedAsset?.id === asset.id ? 'border-emerald-500 ring-1 ring-emerald-500 shadow-md' : 'border-slate-200 hover:border-emerald-300 hover:shadow-sm'} overflow-hidden cursor-pointer transition-all flex flex-col group`}
+                                        >
+                                            <div className="aspect-video bg-slate-100 relative overflow-hidden flex items-center justify-center">
+                                                {asset.type === 'image' && asset.url ? (
+                                                    <img src={asset.url} alt={asset.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                                                ) : (
+                                                    <FileIcon className="w-10 h-10 text-slate-300" />
+                                                )}
+                                                
+                                                {asset.type === 'video' && (
+                                                    <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                                                        <PlaySquare className="w-8 h-8 text-white opacity-80" />
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="p-3 flex items-center gap-2">
+                                                <FileIcon className="w-3.5 h-3.5 text-slate-400" />
+                                                <span className="text-sm font-medium text-slate-700 truncate" title={asset.name}>{asset.name}</span>
+                                            </div>
                                         </div>
-                                        <div className="p-3 flex items-center gap-2">
-                                            <ImageIcon className="w-3.5 h-3.5 text-slate-400" />
-                                            <span className="text-sm font-medium text-slate-700 truncate">{asset.name}</span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+                                    )})}
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -116,14 +132,23 @@ export const AssetSelectorModal = ({ isOpen, onClose, onSelect }: AssetSelectorM
                         {selectedAsset ? (
                             <div className="flex flex-col h-full">
                                 <div className="p-4 border-b border-slate-100">
-                                    <h3 className="font-bold text-slate-800 text-lg truncate">{selectedAsset.name}</h3>
+                                    <h3 className="font-bold text-slate-800 text-lg truncate" title={selectedAsset.name}>{selectedAsset.name}</h3>
                                     <p className="text-sm text-slate-500 flex items-center gap-1 mt-1">
-                                        <Folder className="w-3.5 h-3.5" /> {selectedAsset.folder}
+                                        <Folder className="w-3.5 h-3.5" /> Medios
                                     </p>
                                 </div>
                                 <div className="p-6 flex-1 flex flex-col items-center">
-                                    <div className="w-full aspect-video rounded-lg overflow-hidden bg-slate-100 border border-slate-200 shadow-sm mb-6">
-                                        <img src={selectedAsset.url} alt={selectedAsset.name} className="w-full h-full object-cover" />
+                                    <div className="w-full aspect-video rounded-lg overflow-hidden bg-slate-100 border border-slate-200 shadow-sm mb-6 flex justify-center items-center">
+                                        {selectedAsset.type === 'image' && selectedAsset.url ? (
+                                            <img src={selectedAsset.url} alt={selectedAsset.name} className="w-full h-full object-contain" />
+                                        ) : selectedAsset.type === 'video' && selectedAsset.url ? (
+                                            <video src={selectedAsset.url} className="w-full h-full object-contain bg-black" controls />
+                                        ) : (
+                                            <div className="text-slate-400 flex flex-col items-center">
+                                                <Globe className="w-12 h-12 mb-2" />
+                                                <span className="text-sm">Vista no disponible</span>
+                                            </div>
+                                        )}
                                     </div>
                                     
                                     <div className="w-full space-y-4">
@@ -131,11 +156,13 @@ export const AssetSelectorModal = ({ isOpen, onClose, onSelect }: AssetSelectorM
                                             <div className="text-slate-500">Tipo</div>
                                             <div className="font-medium text-slate-800 capitalize">{selectedAsset.type}</div>
                                             
-                                            <div className="text-slate-500">Resolución</div>
-                                            <div className="font-medium text-slate-800">1920x1080</div>
+                                            <div className="text-slate-500">Añadido</div>
+                                            <div className="font-medium text-slate-800">
+                                                {new Date(selectedAsset.created_at).toLocaleDateString('es-ES')}
+                                            </div>
                                             
                                             <div className="text-slate-500">Tamaño</div>
-                                            <div className="font-medium text-slate-800">2.4 MB</div>
+                                            <div className="font-medium text-slate-800">{formatBytes(selectedAsset.size_bytes)}</div>
                                         </div>
                                     </div>
                                 </div>
@@ -154,7 +181,12 @@ export const AssetSelectorModal = ({ isOpen, onClose, onSelect }: AssetSelectorM
                             <Button 
                                 onClick={() => {
                                     if (selectedAsset) {
-                                        onSelect(selectedAsset);
+                                        onSelect({
+                                            id: selectedAsset.id,
+                                            type: selectedAsset.type,
+                                            content: selectedAsset.url,
+                                            name: selectedAsset.name
+                                        });
                                         onClose();
                                     }
                                 }}

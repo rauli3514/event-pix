@@ -2,13 +2,13 @@ import { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, FolderPlus, Upload, LayoutGrid, List as ListIcon, Image as ImageIcon, Video, FileAudio, FileText, Globe, Box, ListVideo, ArrowRightCircle, Tag, HardDrive, Trash2 } from 'lucide-react';
+import { Search, FolderPlus, Upload, LayoutGrid, List as ListIcon, Image as ImageIcon, Video, FileAudio, FileText, Globe, ArrowRightCircle, Tag, HardDrive, Trash2 } from 'lucide-react';
 import { UploadMediaModal } from '@/components/display/UploadMediaModal';
 import { useDisplayMedia, useUploadDisplayMedia, useDeleteDisplayMedia } from '@/hooks/use-display-media';
 import { toast } from 'sonner';
 import { DisplayMedia } from '@/types/display';
 
-type CategoryId = 'all' | 'images' | 'videos' | 'audio' | 'docs' | 'web' | 'apps' | 'playlists';
+export type CategoryId = 'all' | 'images' | 'videos' | 'audio' | 'docs' | 'web';
 
 const CATEGORY_MAP: Record<CategoryId, { title: string, icon: any }> = {
     all: { title: 'Todos los artículos', icon: HardDrive },
@@ -16,16 +16,14 @@ const CATEGORY_MAP: Record<CategoryId, { title: string, icon: any }> = {
     videos: { title: 'Vídeos', icon: Video },
     audio: { title: 'Audio', icon: FileAudio },
     docs: { title: 'Documentos', icon: FileText },
-    web: { title: 'Páginas web', icon: Globe },
-    apps: { title: 'Aplicaciones', icon: Box },
-    playlists: { title: 'Listas de reproducción', icon: ListVideo }
+    web: { title: 'Páginas web', icon: Globe }
 };
 
 export function WorkspaceMedia() {
     const { commerceId } = useParams<{ commerceId: string }>();
-    const [viewMode, setViewMode] = useState<'list'|'grid'>('list');
+    const [viewMode, setViewMode] = useState<'list'|'grid'>('grid');
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-    const [activeCategory, setActiveCategory] = useState<CategoryId>('all');
+    const [activeCategory, setActiveCategory] = useState<CategoryId>('images');
     const [search, setSearch] = useState('');
 
     const { data: mediaFiles = [], isLoading } = useDisplayMedia(commerceId);
@@ -71,6 +69,19 @@ export function WorkspaceMedia() {
             toast.error(`Se subieron ${successCount} archivos, pero fallaron ${failCount}.`, { id: toastId });
         } else {
             toast.success(`Se subieron ${successCount} archivo(s) correctamente.`, { id: toastId });
+            setIsUploadModalOpen(false);
+        }
+    };
+
+    const handleAddWebLink = async (url: string, name: string) => {
+        if (!commerceId) return;
+        const toastId = toast.loading("Agregando enlace...");
+        try {
+            await uploadMedia({ commerceId, webUrl: url, webName: name });
+            toast.success("Enlace agregado correctamente.", { id: toastId });
+        } catch (error) {
+            console.error("Web link error:", error);
+            toast.error("Error al agregar el enlace.", { id: toastId });
         }
     };
 
@@ -105,7 +116,7 @@ export function WorkspaceMedia() {
                 <div className="flex items-center gap-3">
                     <Button variant="outline" className="bg-white text-slate-600 border-slate-200 shadow-sm" onClick={() => setIsUploadModalOpen(true)}>
                         <Upload className="w-4 h-4 mr-2" />
-                        Subir Archivos
+                        {activeCategory === 'web' ? 'Agregar Enlace' : 'Subir Archivos'}
                     </Button>
                     <Button className="bg-orange-500 hover:bg-orange-600 text-white shadow-md">
                         Enviar a las pantallas
@@ -146,14 +157,6 @@ export function WorkspaceMedia() {
                                     icon={Globe} label="Páginas web" active={activeCategory === 'web'} 
                                     onClick={() => setActiveCategory('web')} 
                                 />
-                            </div>
-                        </div>
-
-                        {/* Other sections */}
-                        <div className="border-t border-slate-100 pt-6">
-                            <div className="space-y-1">
-                                <CategoryButton icon={Box} label="Aplicaciones" active={activeCategory === 'apps'} onClick={() => setActiveCategory('apps')} />
-                                <CategoryButton icon={ListVideo} label="Listas de reproducción" active={activeCategory === 'playlists'} onClick={() => setActiveCategory('playlists')} />
                             </div>
                         </div>
                     </div>
@@ -218,9 +221,9 @@ export function WorkspaceMedia() {
                             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 flex flex-col items-center justify-center text-slate-500">
                                 <currentCategory.icon className="w-12 h-12 mb-4 text-slate-300" />
                                 <p className="text-lg font-medium text-slate-600">No hay archivos para mostrar</p>
-                                <p className="text-sm">Sube nuevos recursos usando el botón de la esquina superior.</p>
+                                <p className="text-sm text-slate-400">Agrega nuevos recursos usando el botón superior.</p>
                                 <Button className="mt-6 bg-orange-500 hover:bg-orange-600 text-white" onClick={() => setIsUploadModalOpen(true)}>
-                                    <Upload className="w-4 h-4 mr-2" /> Subir Archivos
+                                    <Upload className="w-4 h-4 mr-2" /> {activeCategory === 'web' ? 'Agregar Enlace' : 'Subir Archivos'}
                                 </Button>
                             </div>
                         ) : viewMode === 'list' ? (
@@ -249,7 +252,7 @@ export function WorkspaceMedia() {
                                                                 <FileIcon className="w-5 h-5 text-slate-400" />
                                                             )}
                                                         </div>
-                                                        <span className="font-medium text-slate-700">{file.name}</span>
+                                                        <span className="font-medium text-slate-700 truncate max-w-sm" title={file.name}>{file.name}</span>
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-4 text-sm text-slate-500">{formatDate(file.created_at)}</td>
@@ -285,7 +288,7 @@ export function WorkspaceMedia() {
                                             )}
                                         </div>
                                         <div className="p-3 border-t border-slate-100">
-                                            <h4 className="font-medium text-slate-700 text-sm truncate">{file.name}</h4>
+                                            <h4 className="font-medium text-slate-700 text-sm truncate" title={file.name}>{file.name}</h4>
                                             <p className="text-xs text-slate-400 mt-1">{formatDate(file.created_at).split(',')[0]}</p>
                                         </div>
                                     </div>
@@ -300,6 +303,8 @@ export function WorkspaceMedia() {
                 isOpen={isUploadModalOpen} 
                 onClose={() => setIsUploadModalOpen(false)} 
                 onUpload={handleUploadFiles}
+                onAddWebLink={handleAddWebLink}
+                activeCategory={activeCategory}
             />
         </div>
     );
@@ -318,7 +323,7 @@ function CategoryButton({ icon: Icon, label, active, onClick, color }: any) {
     );
 }
 
-function getIconForType(type: string) {
+export function getIconForType(type: string) {
     switch (type) {
         case 'image': return ImageIcon;
         case 'video': return Video;

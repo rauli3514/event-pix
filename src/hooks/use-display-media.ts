@@ -26,50 +26,62 @@ export const useUploadDisplayMedia = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ commerceId, file }: { commerceId: string; file: File }) => {
-            // 1. Determine file type classification
+        mutationFn: async ({ commerceId, file, webUrl, webName }: { commerceId: string; file?: File; webUrl?: string; webName?: string }) => {
             let type = 'docs';
-            if (file.type.startsWith('image/')) type = 'image';
-            else if (file.type.startsWith('video/')) type = 'video';
-            else if (file.type.startsWith('audio/')) type = 'audio';
+            let publicUrl = '';
+            let storagePath = 'web_link';
+            let name = webName || '';
+            let size = 0;
 
-            // 2. Generate unique storage path
-            const fileExt = file.name.split('.').pop();
-            const uniqueFilename = `${crypto.randomUUID()}.${fileExt}`;
-            const storagePath = `${commerceId}/${uniqueFilename}`;
+            if (file) {
+                if (file.type.startsWith('image/')) type = 'image';
+                else if (file.type.startsWith('video/')) type = 'video';
+                else if (file.type.startsWith('audio/')) type = 'audio';
 
-            // 3. Upload to Supabase Storage bucket 'display-media'
-            const { error: uploadError } = await supabase.storage
-                .from('display-media')
-                .upload(storagePath, file, {
-                    cacheControl: '3600',
-                    upsert: false
-                });
+                const fileExt = file.name.split('.').pop();
+                const uniqueFilename = `${crypto.randomUUID()}.${fileExt}`;
+                storagePath = `${commerceId}/${uniqueFilename}`;
+                name = file.name;
+                size = file.size;
 
-            if (uploadError) throw uploadError;
+                const { error: uploadError } = await supabase.storage
+                    .from('display-media')
+                    .upload(storagePath, file, {
+                        cacheControl: '3600',
+                        upsert: false
+                    });
 
-            // 4. Get public URL
-            const { data: { publicUrl } } = supabase.storage
-                .from('display-media')
-                .getPublicUrl(storagePath);
+                if (uploadError) throw uploadError;
 
-            // 5. Insert metadata record into display_media table
+                const { data } = supabase.storage
+                    .from('display-media')
+                    .getPublicUrl(storagePath);
+                
+                publicUrl = data.publicUrl;
+            } else if (webUrl) {
+                type = 'web';
+                publicUrl = webUrl;
+            } else {
+                throw new Error("No file or web URL provided");
+            }
+
             const { data: mediaRecord, error: dbError } = await supabase
                 .from('display_media')
                 .insert({
                     commerce_id: commerceId,
-                    name: file.name,
+                    name: name,
                     type: type,
                     url: publicUrl,
                     storage_path: storagePath,
-                    size_bytes: file.size
+                    size_bytes: size
                 })
                 .select()
                 .single();
 
             if (dbError) {
-                // Rollback upload if db insert fails
-                await supabase.storage.from('display-media').remove([storagePath]);
+                if (file) {
+                    await supabase.storage.from('display-media').remove([storagePath]);
+                }
                 throw dbError;
             }
 
