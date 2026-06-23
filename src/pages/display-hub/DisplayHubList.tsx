@@ -381,11 +381,15 @@ const DisplayHubList = () => {
                 onClose={() => setEditModalOpen(false)} 
                 device={selectedDevice}
                 linkGroups={linkGroups || []}
-                onSave={(id, updates, assetId) => {
+                onSave={(id, updates, asset) => {
                     updateDevice.mutate({ id, updates }, {
                         onSuccess: () => {
-                            if (assetId !== undefined) {
-                                assignContent.mutate({ deviceId: id, mediaId: assetId }, {
+                            if (asset) {
+                                const payload = asset.type === 'campaign' 
+                                    ? { deviceId: id, campaignId: asset.id, mediaId: null }
+                                    : { deviceId: id, mediaId: asset.id, campaignId: null };
+
+                                assignContent.mutate(payload, {
                                     onSuccess: () => {
                                         toast.success('Pantalla y contenido actualizados');
                                         setEditModalOpen(false);

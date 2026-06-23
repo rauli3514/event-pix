@@ -14,7 +14,7 @@ interface EditScreenModalProps {
     onClose: () => void;
     device: DisplayDeviceWithStatus | null;
     linkGroups: any[];
-    onSave: (deviceId: string, updates: any, assetId: string | null) => void;
+    onSave: (deviceId: string, updates: any, asset: any | null) => void;
 }
 
 export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, onSave }: EditScreenModalProps) => {
@@ -56,7 +56,7 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, onSave }:
         onSave(device.id, {
             name,
             group_id: groupId === 'none' ? null : groupId,
-        }, selectedAsset ? selectedAsset.id : null);
+        }, selectedAsset);
     };
 
     if (!device) return null;

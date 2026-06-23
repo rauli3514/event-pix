@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search, Image as ImageIcon, Folder, PlaySquare, Settings2, Plus, LayoutGrid, List, Globe } from 'lucide-react';
 import { useDisplayMedia } from '@/hooks/use-display-media';
+import { useDisplayCampaigns } from '@/hooks/use-display-hub';
 import { getIconForType } from '@/pages/display-hub/WorkspaceMedia';
 import { DisplayMedia } from '@/types/display';
 
@@ -17,13 +18,26 @@ interface AssetSelectorModalProps {
 export const AssetSelectorModal = ({ isOpen, onClose, onSelect }: AssetSelectorModalProps) => {
     const { commerceId } = useParams<{ commerceId: string }>();
     const [search, setSearch] = useState('');
-    const [selectedAsset, setSelectedAsset] = useState<DisplayMedia | null>(null);
+    const [activeTab, setActiveTab] = useState<'archivos' | 'listas'>('archivos');
+    const [selectedAsset, setSelectedAsset] = useState<any>(null);
 
-    const { data: mediaFiles = [], isLoading } = useDisplayMedia(commerceId);
+    const { data: mediaFiles = [], isLoading: isLoadingMedia } = useDisplayMedia(commerceId);
+    const { data: campaigns = [], isLoading: isLoadingCampaigns } = useDisplayCampaigns(commerceId);
+    
+    const isLoading = activeTab === 'archivos' ? isLoadingMedia : isLoadingCampaigns;
 
     const filteredAssets = useMemo(() => {
-        return mediaFiles.filter(a => a.name.toLowerCase().includes(search.toLowerCase()));
-    }, [mediaFiles, search]);
+        if (activeTab === 'archivos') {
+            return mediaFiles.filter(a => a.name.toLowerCase().includes(search.toLowerCase()));
+        } else {
+            return campaigns.filter(c => c.name.toLowerCase().includes(search.toLowerCase())).map(c => ({
+                ...c,
+                type: 'campaign',
+                url: null,
+                size_bytes: 0
+            }));
+        }
+    }, [mediaFiles, campaigns, search, activeTab]);
 
     const formatBytes = (bytes: number) => {
         if (bytes === 0) return '0 Bytes';
@@ -52,8 +66,8 @@ export const AssetSelectorModal = ({ isOpen, onClose, onSelect }: AssetSelectorM
                         {/* Toolbar */}
                         <div className="p-4 flex gap-3 items-center border-b border-slate-100 bg-white">
                             <div className="flex bg-slate-100 p-1 rounded-md">
-                                <Button variant="ghost" size="sm" className="h-8 bg-white shadow-sm px-4">Archivos</Button>
-                                <Button variant="ghost" size="sm" className="h-8 px-4 text-slate-500 hover:text-slate-700">Engage</Button>
+                                <Button variant="ghost" size="sm" className={`h-8 px-4 ${activeTab === 'archivos' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`} onClick={() => { setActiveTab('archivos'); setSelectedAsset(null); }}>Archivos</Button>
+                                <Button variant="ghost" size="sm" className={`h-8 px-4 ${activeTab === 'listas' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`} onClick={() => { setActiveTab('listas'); setSelectedAsset(null); }}>Listas de Reproducción</Button>
                             </div>
                             
                             <div className="flex-1 relative">
@@ -88,7 +102,7 @@ export const AssetSelectorModal = ({ isOpen, onClose, onSelect }: AssetSelectorM
                             
                             <div className="mb-4 flex items-center text-xs font-semibold text-slate-500 gap-1">
                                 <ChevronDownIcon className="w-4 h-4" />
-                                Archivos / Recursos ({filteredAssets.length})
+                                {activeTab === 'archivos' ? 'Archivos / Recursos' : 'Listas de Reproducción'} ({filteredAssets.length})
                             </div>
 
                             {isLoading ? (
@@ -143,6 +157,11 @@ export const AssetSelectorModal = ({ isOpen, onClose, onSelect }: AssetSelectorM
                                             <img src={selectedAsset.url} alt={selectedAsset.name} className="w-full h-full object-contain" />
                                         ) : selectedAsset.type === 'video' && selectedAsset.url ? (
                                             <video src={selectedAsset.url} className="w-full h-full object-contain bg-black" controls />
+                                        ) : selectedAsset.type === 'campaign' ? (
+                                            <div className="text-emerald-500 flex flex-col items-center">
+                                                <PlaySquare className="w-16 h-16 mb-2" />
+                                                <span className="text-sm font-medium">Lista de Reproducción</span>
+                                            </div>
                                         ) : (
                                             <div className="text-slate-400 flex flex-col items-center">
                                                 <Globe className="w-12 h-12 mb-2" />
@@ -154,15 +173,19 @@ export const AssetSelectorModal = ({ isOpen, onClose, onSelect }: AssetSelectorM
                                     <div className="w-full space-y-4">
                                         <div className="grid grid-cols-2 gap-y-3 text-sm">
                                             <div className="text-slate-500">Tipo</div>
-                                            <div className="font-medium text-slate-800 capitalize">{selectedAsset.type}</div>
+                                            <div className="font-medium text-slate-800 capitalize">{selectedAsset.type === 'campaign' ? 'Lista de Rep.' : selectedAsset.type}</div>
                                             
                                             <div className="text-slate-500">Añadido</div>
                                             <div className="font-medium text-slate-800">
                                                 {new Date(selectedAsset.created_at).toLocaleDateString('es-ES')}
                                             </div>
                                             
-                                            <div className="text-slate-500">Tamaño</div>
-                                            <div className="font-medium text-slate-800">{formatBytes(selectedAsset.size_bytes)}</div>
+                                            <div className="text-slate-500">Tamaño/Duración</div>
+                                            <div className="font-medium text-slate-800">
+                                                {selectedAsset.type === 'campaign' ? 
+                                                    `${selectedAsset.items_json?.length || 0} items` : 
+                                                    formatBytes(selectedAsset.size_bytes)}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
