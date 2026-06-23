@@ -1,19 +1,12 @@
 import { useState, useMemo } from 'react';
+import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, FolderPlus, Upload, LayoutGrid, List as ListIcon, Image as ImageIcon, Video, FileAudio, FileText, Globe, Box, ListVideo, ArrowRightCircle, Tag, MoreVertical, HardDrive } from 'lucide-react';
+import { Search, FolderPlus, Upload, LayoutGrid, List as ListIcon, Image as ImageIcon, Video, FileAudio, FileText, Globe, Box, ListVideo, ArrowRightCircle, Tag, HardDrive, Trash2 } from 'lucide-react';
 import { UploadMediaModal } from '@/components/display/UploadMediaModal';
+import { useDisplayMedia, useUploadDisplayMedia, useDeleteDisplayMedia } from '@/hooks/use-display-media';
 import { toast } from 'sonner';
-
-// Mock data (we will replace this with real Supabase data later)
-const MOCK_FILES = [
-    { id: '1', name: 'Festival de fans de imágenes', date: '23 de junio de 2026 - 04:11', type: 'image', url: 'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=500&q=80' },
-    { id: '2', name: 'Promo Verano', date: '22 de junio de 2026 - 15:30', type: 'video', url: '' },
-    { id: '3', name: 'Menú Digital Base', date: '20 de junio de 2026 - 10:15', type: 'image', url: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=500&q=80' },
-    { id: '4', name: 'Audio de bienvenida', date: '19 de junio de 2026 - 09:00', type: 'audio', url: '' },
-    { id: '5', name: 'Menú PDF', date: '18 de junio de 2026 - 11:20', type: 'docs', url: '' },
-    { id: '6', name: 'Google Noticias', date: '17 de junio de 2026 - 14:00', type: 'web', url: '' }
-];
+import { DisplayMedia } from '@/types/display';
 
 type CategoryId = 'all' | 'images' | 'videos' | 'audio' | 'docs' | 'web' | 'apps' | 'playlists';
 
@@ -29,15 +22,20 @@ const CATEGORY_MAP: Record<CategoryId, { title: string, icon: any }> = {
 };
 
 export function WorkspaceMedia() {
+    const { commerceId } = useParams<{ commerceId: string }>();
     const [viewMode, setViewMode] = useState<'list'|'grid'>('list');
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const [activeCategory, setActiveCategory] = useState<CategoryId>('all');
     const [search, setSearch] = useState('');
 
+    const { data: mediaFiles = [], isLoading } = useDisplayMedia(commerceId);
+    const { mutateAsync: uploadMedia } = useUploadDisplayMedia();
+    const { mutateAsync: deleteMedia } = useDeleteDisplayMedia();
+
     const currentCategory = CATEGORY_MAP[activeCategory];
 
     const filteredFiles = useMemo(() => {
-        return MOCK_FILES.filter(file => {
+        return mediaFiles.filter(file => {
             // Text Search
             if (search && !file.name.toLowerCase().includes(search.toLowerCase())) return false;
             // Category Filter
@@ -49,12 +47,48 @@ export function WorkspaceMedia() {
             if (activeCategory === 'web' && file.type === 'web') return true;
             return false;
         });
-    }, [activeCategory, search]);
+    }, [activeCategory, search, mediaFiles]);
 
-    const handleUploadFiles = (files: FileList | null) => {
-        if (!files) return;
-        // Mock upload logic
-        toast.success(`Se agregaron ${files.length} archivos a la cola de subida.`);
+    const handleUploadFiles = async (files: FileList | null) => {
+        if (!files || !commerceId) return;
+        
+        let successCount = 0;
+        let failCount = 0;
+        
+        const toastId = toast.loading(`Subiendo ${files.length} archivo(s)...`);
+
+        for (let i = 0; i < files.length; i++) {
+            try {
+                await uploadMedia({ commerceId, file: files[i] });
+                successCount++;
+            } catch (error) {
+                console.error("Upload error:", error);
+                failCount++;
+            }
+        }
+
+        if (failCount > 0) {
+            toast.error(`Se subieron ${successCount} archivos, pero fallaron ${failCount}.`, { id: toastId });
+        } else {
+            toast.success(`Se subieron ${successCount} archivo(s) correctamente.`, { id: toastId });
+        }
+    };
+
+    const handleDelete = async (file: DisplayMedia) => {
+        if (!confirm(`¿Estás seguro de que deseas eliminar "${file.name}"?`)) return;
+        
+        try {
+            await deleteMedia(file);
+            toast.success(`Archivo eliminado: ${file.name}`);
+        } catch (error) {
+            console.error("Error deleting:", error);
+            toast.error("Ocurrió un error al eliminar el archivo.");
+        }
+    };
+
+    const formatDate = (dateString: string) => {
+        const d = new Date(dateString);
+        return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     };
 
     return (
@@ -172,11 +206,15 @@ export function WorkspaceMedia() {
                         {/* List Header */}
                         <div className="mb-4">
                             <h2 className="text-xl font-bold text-slate-800">{currentCategory.title}</h2>
-                            <p className="text-sm text-slate-500 mt-1">{filteredFiles.length} artículo(s) encontrados</p>
+                            <p className="text-sm text-slate-500 mt-1">{isLoading ? 'Cargando...' : `${filteredFiles.length} artículo(s) encontrados`}</p>
                         </div>
 
                         {/* Data View */}
-                        {filteredFiles.length === 0 ? (
+                        {isLoading ? (
+                             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 flex flex-col items-center justify-center text-slate-500">
+                                <p className="text-lg font-medium text-slate-600">Cargando archivos...</p>
+                             </div>
+                        ) : filteredFiles.length === 0 ? (
                             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 flex flex-col items-center justify-center text-slate-500">
                                 <currentCategory.icon className="w-12 h-12 mb-4 text-slate-300" />
                                 <p className="text-lg font-medium text-slate-600">No hay archivos para mostrar</p>
@@ -214,10 +252,10 @@ export function WorkspaceMedia() {
                                                         <span className="font-medium text-slate-700">{file.name}</span>
                                                     </div>
                                                 </td>
-                                                <td className="px-4 py-4 text-sm text-slate-500">{file.date}</td>
+                                                <td className="px-4 py-4 text-sm text-slate-500">{formatDate(file.created_at)}</td>
                                                 <td className="px-4 py-4 text-right">
-                                                    <Button variant="ghost" size="icon" className="text-slate-400 hover:text-slate-600">
-                                                        <MoreVertical className="w-4 h-4" />
+                                                    <Button variant="ghost" size="icon" className="text-red-400 hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete(file)}>
+                                                        <Trash2 className="w-4 h-4" />
                                                     </Button>
                                                 </td>
                                             </tr>
@@ -234,6 +272,11 @@ export function WorkspaceMedia() {
                                         <div className="absolute top-2 left-2 z-10">
                                             <input type="checkbox" className="rounded border-slate-300 text-orange-500 focus:ring-orange-500/20 shadow-sm" />
                                         </div>
+                                        <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 bg-white/80 text-red-500 hover:bg-red-50 hover:text-red-600 rounded-full shadow-sm" onClick={(e) => { e.stopPropagation(); handleDelete(file); }}>
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </Button>
+                                        </div>
                                         <div className="aspect-video bg-slate-100 relative overflow-hidden flex items-center justify-center">
                                             {file.type === 'image' && file.url ? (
                                                 <img src={file.url} alt={file.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
@@ -243,7 +286,7 @@ export function WorkspaceMedia() {
                                         </div>
                                         <div className="p-3 border-t border-slate-100">
                                             <h4 className="font-medium text-slate-700 text-sm truncate">{file.name}</h4>
-                                            <p className="text-xs text-slate-400 mt-1">{file.date.split(' - ')[0]}</p>
+                                            <p className="text-xs text-slate-400 mt-1">{formatDate(file.created_at).split(',')[0]}</p>
                                         </div>
                                     </div>
                                 )})}

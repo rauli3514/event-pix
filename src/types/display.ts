@@ -1,4 +1,17 @@
+
+export interface DisplayMedia {
+    id: string;
+    commerce_id: string;
+    name: string;
+    type: string;
+    url: string;
+    storage_path: string;
+    size_bytes: number;
+    created_at: string;
+}
+
 export interface DisplayDevice {
+
     id: string;
     device_id: string;
     commerce_id: string | null;
