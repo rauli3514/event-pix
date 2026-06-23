@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Monitor, Activity, Tv, ServerCrash, Layers, Plus, Hash, FolderOpen, PlaySquare, Settings, RotateCcw, Calendar, Play } from 'lucide-react';
+import { Monitor, Activity, Tv, Plus, Hash, FolderOpen, PlaySquare, Settings, RotateCcw, Calendar, Play, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -263,7 +263,7 @@ const DisplayHubList = () => {
                                         <span className="text-slate-500 text-xs">Playlist Actual</span>
                                     </div>
                                     <div className="font-medium text-white line-clamp-1">
-                                        {device.current_campaign ? 'Campaña Asignada' : 'No hay contenido asignado'}
+                                        No hay contenido asignado
                                     </div>
                                 </div>
 
