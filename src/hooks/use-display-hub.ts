@@ -129,14 +129,14 @@ export const useDisplayCampaigns = (commerceId?: string) => {
 export const useCreateCampaign = () => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: async ({ commerceId, name, description }: { commerceId: string; name: string; description?: string }) => {
+        mutationFn: async ({ commerceId, name, description, items_json }: { commerceId: string; name: string; description?: string; items_json?: any[] }) => {
             const { data, error } = await supabase
                 .from("display_campaigns")
                 .insert({
                     commerce_id: commerceId,
                     name,
                     description,
-                    items_json: []
+                    items_json: items_json || []
                 })
                 .select()
                 .single();

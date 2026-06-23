@@ -42,6 +42,7 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, onSave }:
                 setSelectedAsset(device.assignment.media);
                 setContentType('asset');
             } else if (device.assignment?.campaign) {
+                setSelectedAsset(device.assignment.campaign);
                 setContentType('playlist');
             } else {
                 setSelectedAsset(null);

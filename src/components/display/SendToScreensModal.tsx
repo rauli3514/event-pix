@@ -38,23 +38,23 @@ export const SendToScreensModal = ({ isOpen, onClose, selectedAssets, commerceId
         try {
             if (isMultiple) {
                 // Crear campaña automáticamente
-                const campaignName = `Lista Generada ${new Date().toLocaleDateString()}`;
+                const campaignName = `Lista Rápida ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+                
+                // Mapear archivos a items de la lista
+                const items_json = selectedAssets.map(asset => ({
+                    id: crypto.randomUUID(),
+                    media_id: asset.id,
+                    duration: asset.type?.startsWith('video/') ? 15 : 10 // defaults (el reproductor usa el real para videos)
+                }));
+
                 const campaign = await createCampaign.mutateAsync({
                     commerceId,
                     name: campaignName,
-                    description: 'Generada desde la biblioteca de medios'
+                    description: 'Generada desde la biblioteca de medios',
+                    items_json
                 });
                 
-                // Actualizar la campaña con los items (aquí asumimos que el backend lo soporta, o usaríamos useUpdateCampaign)
-                // Para simplificar, si no tenemos hook para items, lo dejamos pendiente, 
-                // pero lo ideal sería que useCreateCampaign reciba los items.
-                // Como el plan era simple, vamos a suponer que tenemos un hook o hacemos una llamada directa
-                
                 campaignIdToAssign = campaign.id;
-                toast.error('La creación de listas automáticas con múltiples archivos requiere una actualización del backend para guardar el items_json.');
-                setIsSubmitting(false);
-                return;
-                
             } else {
                 mediaIdToAssign = selectedAssets[0].id;
             }
