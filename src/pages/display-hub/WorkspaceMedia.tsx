@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, FolderPlus, Upload, LayoutGrid, List as ListIcon, Image as ImageIcon, Video, FileAudio, FileText, Globe, ArrowRightCircle, Tag, HardDrive, Trash2 } from 'lucide-react';
+import { SendToScreensModal } from '@/components/display/SendToScreensModal';
 import { UploadMediaModal } from '@/components/display/UploadMediaModal';
 import { useDisplayMedia, useUploadDisplayMedia, useDeleteDisplayMedia } from '@/hooks/use-display-media';
 import { toast } from 'sonner';
@@ -25,6 +26,8 @@ export function WorkspaceMedia() {
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const [activeCategory, setActiveCategory] = useState<CategoryId>('images');
     const [search, setSearch] = useState('');
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [isSendModalOpen, setIsSendModalOpen] = useState(false);
 
     const { data: mediaFiles = [], isLoading } = useDisplayMedia(commerceId);
     const { mutateAsync: uploadMedia } = useUploadDisplayMedia();
@@ -102,6 +105,18 @@ export function WorkspaceMedia() {
         return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     };
 
+    const handleToggleSelect = (id: string) => {
+        setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+    };
+
+    const handleSelectAll = () => {
+        if (selectedIds.length === filteredFiles.length) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(filteredFiles.map(f => f.id));
+        }
+    };
+
     return (
         <div className="h-full flex flex-col bg-slate-50 text-slate-900">
             {/* Top Bar for sending to screens */}
@@ -118,7 +133,11 @@ export function WorkspaceMedia() {
                         <Upload className="w-4 h-4 mr-2" />
                         {activeCategory === 'web' ? 'Agregar Enlace' : 'Subir Archivos'}
                     </Button>
-                    <Button className="bg-orange-500 hover:bg-orange-600 text-white shadow-md">
+                    <Button 
+                        className="bg-orange-500 hover:bg-orange-600 text-white shadow-md"
+                        disabled={selectedIds.length === 0}
+                        onClick={() => setIsSendModalOpen(true)}
+                    >
                         Enviar a las pantallas
                         <ArrowRightCircle className="w-4 h-4 ml-2" />
                     </Button>
@@ -231,7 +250,14 @@ export function WorkspaceMedia() {
                                 <table className="w-full text-left border-collapse">
                                     <thead>
                                         <tr className="bg-slate-50/80 border-b border-slate-200">
-                                            <th className="px-4 py-3 w-12"><input type="checkbox" className="rounded border-slate-300 text-orange-500 focus:ring-orange-500/20" /></th>
+                                            <th className="px-4 py-3 w-12">
+                                                <input 
+                                                    type="checkbox" 
+                                                    className="rounded border-slate-300 text-orange-500 focus:ring-orange-500/20" 
+                                                    checked={selectedIds.length === filteredFiles.length && filteredFiles.length > 0}
+                                                    onChange={handleSelectAll}
+                                                />
+                                            </th>
                                             <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Nombre</th>
                                             <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Modificado</th>
                                             <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
@@ -242,8 +268,15 @@ export function WorkspaceMedia() {
                                             const FileIcon = getIconForType(file.type);
                                             return (
                                             <tr key={file.id} className="hover:bg-slate-50/50 transition-colors group">
-                                                <td className="px-4 py-4"><input type="checkbox" className="rounded border-slate-300 text-orange-500 focus:ring-orange-500/20" /></td>
                                                 <td className="px-4 py-4">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        className="rounded border-slate-300 text-orange-500 focus:ring-orange-500/20" 
+                                                        checked={selectedIds.includes(file.id)}
+                                                        onChange={() => handleToggleSelect(file.id)}
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-4 cursor-pointer" onClick={() => handleToggleSelect(file.id)}>
                                                     <div className="flex items-center gap-3">
                                                         <div className="w-10 h-10 rounded bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden">
                                                             {file.type === 'image' && file.url ? (
@@ -305,6 +338,13 @@ export function WorkspaceMedia() {
                 onUpload={handleUploadFiles}
                 onAddWebLink={handleAddWebLink}
                 activeCategory={activeCategory}
+            />
+            <SendToScreensModal
+                isOpen={isSendModalOpen}
+                onClose={() => setIsSendModalOpen(false)}
+                selectedAssets={mediaFiles.filter(f => selectedIds.includes(f.id))}
+                commerceId={commerceId || ''}
+                onSuccess={() => setSelectedIds([])}
             />
         </div>
     );

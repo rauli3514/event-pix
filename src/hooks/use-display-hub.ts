@@ -65,6 +65,46 @@ export const useCreateDisplayGroup = () => {
     });
 };
 
+export const useUpdateDisplayGroup = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ id, updates }: { id: string; updates: Partial<DisplayGroup> }) => {
+            const { data, error } = await supabase
+                .from("display_groups")
+                .update(updates)
+                .eq("id", id)
+                .select()
+                .single();
+            if (error) throw error;
+            return data as DisplayGroup;
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ["display_groups", data.commerce_id] });
+            queryClient.invalidateQueries({ queryKey: ["display_groups"] });
+            queryClient.invalidateQueries({ queryKey: ["display_devices"] });
+        }
+    });
+};
+
+export const useDeleteDisplayGroup = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ id }: { id: string }) => {
+            const { data: group } = await supabase.from("display_groups").select("commerce_id").eq("id", id).single();
+            const { error } = await supabase.from("display_groups").delete().eq("id", id);
+            if (error) throw error;
+            return group;
+        },
+        onSuccess: (data) => {
+            if (data?.commerce_id) {
+                queryClient.invalidateQueries({ queryKey: ["display_groups", data.commerce_id] });
+                queryClient.invalidateQueries({ queryKey: ["display_groups"] });
+                queryClient.invalidateQueries({ queryKey: ["display_devices"] });
+            }
+        }
+    });
+};
+
 // ------------------------------------
 // CAMPAIGNS (PLAYLISTS)
 // ------------------------------------
@@ -324,6 +364,7 @@ export const useAssignContentToDevice = () => {
         },
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: ["display_device", variables.deviceId] });
+            queryClient.invalidateQueries({ queryKey: ["display_devices"] });
         },
     });
 };

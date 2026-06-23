@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Monitor, Activity, Tv, Plus, Hash, FolderOpen, PlaySquare, Eye, ChevronDown, MoreVertical, Edit2, Info, Move, Trash2, Power } from 'lucide-react';
+import { Monitor, Activity, Tv, Plus, Hash, FolderOpen, PlaySquare, Eye, ChevronDown, MoreVertical, Edit2, Info, Move, Trash2, Power, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { EditScreenModal } from "@/components/display/EditScreenModal";
+import { ZoneManagerModal } from "@/components/display/ZoneManagerModal";
 
 import { toast } from 'sonner';
 
@@ -43,6 +44,9 @@ const DisplayHubList = () => {
     // Preview state
     const [previewModalOpen, setPreviewModalOpen] = useState(false);
     const [previewDevice, setPreviewDevice] = useState<any>(null);
+
+    // Zone Manager state
+    const [zoneManagerOpen, setZoneManagerOpen] = useState(false);
 
     const linkedDevices = devices?.filter(d => d.derived_status !== 'pending') || [];
     const activeCampaignsCount = campaigns?.length || 0; // Using total campaigns for now
@@ -113,12 +117,21 @@ const DisplayHubList = () => {
             {/* Header: Resumen General */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-6">
                 <div>
-                    <h1 className="text-2xl font-bold text-white mb-2">Tus Pantallas</h1>
-                    <p className="text-slate-400 text-sm">Administra los dispositivos y el contenido que reproducen.</p>
+                    <h1 className="text-2xl font-bold text-white tracking-tight">Tus Pantallas</h1>
+                    <p className="text-sm text-slate-400 mt-1">Administra los dispositivos y el contenido que reproducen.</p>
                 </div>
-                <Button onClick={() => setIsLinkModalOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-[0_0_20px_rgba(79,70,229,0.3)]">
-                    <Plus className="w-4 h-4 mr-2" /> Agregar Pantalla
-                </Button>
+                <div className="flex gap-3">
+                    <Button 
+                        variant="outline" 
+                        className="bg-slate-900 border-slate-700 text-slate-200 hover:text-white"
+                        onClick={() => setZoneManagerOpen(true)}
+                    >
+                        <Layers className="w-4 h-4 mr-2" /> Gestionar Zonas
+                    </Button>
+                    <Button className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/20" onClick={() => setIsLinkModalOpen(true)}>
+                        <Plus className="w-4 h-4 mr-2" /> Agregar Pantalla
+                    </Button>
+                </div>
             </div>
 
             {/* Metrics Top Bar */}
@@ -427,6 +440,13 @@ const DisplayHubList = () => {
                     </div>
                 </DialogContent>
             </Dialog>
+
+            <ZoneManagerModal 
+                isOpen={zoneManagerOpen} 
+                onClose={() => setZoneManagerOpen(false)} 
+                zones={linkGroups || []} 
+                commerceId={effectiveCommerceId || ''} 
+            />
         </div>
     );
 };
