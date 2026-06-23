@@ -19,6 +19,7 @@ const DisplayHubList = () => {
     
     // States for filtering
     const [filter, setFilter] = useState<'all' | 'online' | 'offline'>('all');
+    const [groupFilter, setGroupFilter] = useState<string>('all');
     const [search, setSearch] = useState('');
 
     const effectiveCommerceId = commerceId || 'unknown';
@@ -59,13 +60,14 @@ const DisplayHubList = () => {
     };
 
     const filteredLinkedDevices = linkedDevices.filter(device => {
-        const matchesFilter = filter === 'all' 
+        const matchesStatus = filter === 'all' 
             ? true 
             : filter === 'online' ? device.derived_status === 'online' : device.derived_status === 'offline';
+        const matchesGroup = groupFilter === 'all' ? true : device.group_id === groupFilter;
         const searchLower = search.toLowerCase();
         const matchesSearch = (device.name?.toLowerCase().includes(searchLower)) || 
                               (device.device_id.toLowerCase().includes(searchLower));
-        return matchesFilter && matchesSearch;
+        return matchesStatus && matchesGroup && matchesSearch;
     });
 
     const onlineCount = linkedDevices.filter(d => d.derived_status === 'online').length;
@@ -199,17 +201,34 @@ const DisplayHubList = () => {
 
             {/* Filters & Search */}
             <div className="flex flex-col sm:flex-row gap-4 items-center justify-between mt-8">
-                <div className="flex bg-slate-900 border border-slate-800 rounded-lg p-1 w-full sm:w-auto">
-                    <button onClick={() => setFilter('all')} className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filter === 'all' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'}`}>Todas</button>
-                    <button onClick={() => setFilter('online')} className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filter === 'online' ? 'bg-emerald-900/40 text-emerald-400' : 'text-slate-400 hover:text-emerald-400'}`}>Online</button>
-                    <button onClick={() => setFilter('offline')} className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filter === 'offline' ? 'bg-rose-900/40 text-rose-400' : 'text-slate-400 hover:text-rose-400'}`}>Offline</button>
+                <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                    <div className="flex bg-slate-900 border border-slate-800 rounded-lg p-1 w-full sm:w-auto">
+                        <button onClick={() => setFilter('all')} className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filter === 'all' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'}`}>Todas</button>
+                        <button onClick={() => setFilter('online')} className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filter === 'online' ? 'bg-emerald-900/40 text-emerald-400' : 'text-slate-400 hover:text-emerald-400'}`}>Online</button>
+                        <button onClick={() => setFilter('offline')} className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filter === 'offline' ? 'bg-rose-900/40 text-rose-400' : 'text-slate-400 hover:text-rose-400'}`}>Offline</button>
+                    </div>
+
+                    <div className="w-full sm:w-48">
+                        <Select value={groupFilter} onValueChange={setGroupFilter}>
+                            <SelectTrigger className="w-full bg-slate-900 border-slate-800 text-white h-10">
+                                <SelectValue placeholder="Filtrar por Zona..." />
+                            </SelectTrigger>
+                            <SelectContent className="bg-slate-900 border-slate-800 text-white">
+                                <SelectItem value="all">Todas las Zonas</SelectItem>
+                                {linkGroups?.map(g => (
+                                    <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
+                
                 <div className="w-full sm:w-72">
                     <Input 
                         placeholder="Buscar pantalla..." 
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="bg-slate-900 border-slate-800 text-white w-full"
+                        className="bg-slate-900 border-slate-800 text-white w-full h-10"
                     />
                 </div>
             </div>

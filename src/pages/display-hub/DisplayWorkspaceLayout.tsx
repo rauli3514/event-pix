@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { useCommerces } from '@/hooks/use-display-hub';
 
 const MENU_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: 'dashboard' },
@@ -27,6 +28,9 @@ const MENU_ITEMS = [
 export default function DisplayWorkspaceLayout() {
   const location = useLocation();
   const { commerceId } = useParams();
+  const { data: commerces } = useCommerces();
+  
+  const currentCommerce = commerces?.find(c => c.id === commerceId);
   
   // Base path for workspace
   const basePath = `/admin/display/commerce/${commerceId}/workspace`;
@@ -41,8 +45,13 @@ export default function DisplayWorkspaceLayout() {
               <ArrowLeft className="w-4 h-4" />
             </Link>
           </Button>
-          <div className="font-bold text-lg font-[Orbitron] text-white">
-            Display <span className="text-indigo-400">Hub</span>
+          <div className="flex flex-col">
+            <div className="font-bold text-lg font-[Orbitron] text-white leading-tight">
+              Display <span className="text-indigo-400">Hub</span>
+            </div>
+            <div className="text-xs text-slate-400 truncate max-w-[130px]" title={currentCommerce?.name || ''}>
+              {currentCommerce?.name || 'Cargando...'}
+            </div>
           </div>
         </div>
 
