@@ -256,15 +256,23 @@ export const useDisplayDevice = (id?: string) => {
 
             if (deviceError) throw deviceError;
 
-            const { data: assignment } = await supabase
+            let orQuery = `device_id.eq.${id}`;
+            if (device.group_id) {
+                orQuery += `,group_id.eq.${device.group_id}`;
+            }
+
+            const { data: assignments } = await supabase
                 .from("display_assignments")
                 .select(`
                     *,
                     campaign:display_campaigns(*),
                     media:display_media(*)
                 `)
-                .eq("device_id", id)
-                .maybeSingle();
+                .or(orQuery)
+                .order('created_at', { ascending: false })
+                .limit(1);
+
+            const assignment = assignments && assignments.length > 0 ? assignments[0] : null;
 
             const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
             let status: DeviceDerivedStatus = 'offline';
