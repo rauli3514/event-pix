@@ -11,7 +11,9 @@ import { EditScreenModal } from "@/components/display/EditScreenModal";
 
 import { toast } from 'sonner';
 
-import { useDisplayDevices, useLinkDevice, useDisplayGroups, useDisplayCampaigns } from "@/hooks/use-display-hub";
+import { useDisplayDevices, useLinkDevice, useDisplayGroups, useDisplayCampaigns, useUpdateDisplayDevice, useAssignContentToDevice } from "@/hooks/use-display-hub";
+import { supabase } from '@/lib/supabase';
+import { useQueryClient } from '@tanstack/react-query';
 
 const DisplayHubList = () => {
     const { commerceId } = useParams<{ commerceId: string }>();
@@ -34,6 +36,13 @@ const DisplayHubList = () => {
     const { data: linkGroups } = useDisplayGroups(effectiveCommerceId);
     const { data: campaigns } = useDisplayCampaigns(effectiveCommerceId);
     const linkDevice = useLinkDevice();
+    const updateDevice = useUpdateDisplayDevice();
+    const assignContent = useAssignContentToDevice();
+    const queryClient = useQueryClient();
+
+    // Preview state
+    const [previewModalOpen, setPreviewModalOpen] = useState(false);
+    const [previewDevice, setPreviewDevice] = useState<any>(null);
 
     const linkedDevices = devices?.filter(d => d.derived_status !== 'pending') || [];
     const activeCampaignsCount = campaigns?.length || 0; // Using total campaigns for now
@@ -62,6 +71,17 @@ const DisplayHubList = () => {
                 toast.error(error.message || 'Error al vincular pantalla');
             }
         });
+    };
+
+    const handleDeleteDevice = async (deviceId: string) => {
+        if (!confirm('¿Estás seguro de que deseas eliminar esta pantalla?')) return;
+        const { error } = await supabase.from('display_devices').delete().eq('id', deviceId);
+        if (error) {
+            toast.error('Error al eliminar pantalla');
+        } else {
+            toast.success('Pantalla eliminada');
+            queryClient.invalidateQueries({ queryKey: ["display_devices"] });
+        }
     };
 
     const filteredLinkedDevices = linkedDevices.filter(device => {
@@ -273,7 +293,9 @@ const DisplayHubList = () => {
                                                     {device.name}
                                                 </h4>
                                                 <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
-                                                    Recurso: <span className="text-slate-400">Sin asignar</span>
+                                                    Recurso: <span className="text-slate-400">
+                                                        {device.assignment?.media?.name || device.assignment?.campaign?.name || 'Sin asignar'}
+                                                    </span>
                                                     <ChevronDown className="w-3 h-3" />
                                                 </p>
                                             </div>
@@ -281,7 +303,12 @@ const DisplayHubList = () => {
 
                                         {/* Derecha: Botones de Acción */}
                                         <div className="flex items-center gap-2 opacity-50 group-hover:opacity-100 transition-opacity w-full sm:w-auto justify-end">
-                                            <Button variant="outline" size="sm" className="h-8 bg-slate-950 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800">
+                                            <Button 
+                                                variant="outline" 
+                                                size="sm" 
+                                                className="h-8 bg-slate-950 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800"
+                                                onClick={() => { setPreviewDevice(device); setPreviewModalOpen(true); }}
+                                            >
                                                 <Eye className="w-3.5 h-3.5 mr-1.5" /> Avance
                                             </Button>
                                             <Button 
@@ -300,7 +327,7 @@ const DisplayHubList = () => {
                                                     </Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end" className="w-56 bg-white text-slate-800 border-0 shadow-xl rounded-xl">
-                                                    <DropdownMenuItem className="cursor-pointer py-2 focus:bg-slate-100">
+                                                    <DropdownMenuItem className="cursor-pointer py-2 focus:bg-slate-100" onClick={() => { setSelectedDevice(device); setEditModalOpen(true); }}>
                                                         <Info className="w-4 h-4 mr-2 text-slate-500" /> Ver información del dispositivo
                                                     </DropdownMenuItem>
                                                     <DropdownMenuItem className="cursor-pointer py-2 focus:bg-slate-100">
@@ -314,7 +341,7 @@ const DisplayHubList = () => {
                                                         <Power className="w-4 h-4 mr-2 text-slate-500" /> Trasladar a espera
                                                     </DropdownMenuItem>
                                                     <DropdownMenuSeparator className="bg-slate-100" />
-                                                    <DropdownMenuItem className="cursor-pointer py-2 text-rose-600 focus:bg-rose-50 focus:text-rose-700">
+                                                    <DropdownMenuItem className="cursor-pointer py-2 text-rose-600 focus:bg-rose-50 focus:text-rose-700" onClick={() => handleDeleteDevice(device.id)}>
                                                         <Trash2 className="w-4 h-4 mr-2" /> Eliminar
                                                     </DropdownMenuItem>
                                                 </DropdownMenuContent>
@@ -341,13 +368,66 @@ const DisplayHubList = () => {
                 onClose={() => setEditModalOpen(false)} 
                 device={selectedDevice}
                 linkGroups={linkGroups || []}
-                onSave={(id, updates) => {
-                    console.log('Save', id, updates);
-                    setEditModalOpen(false);
-                    toast.success('Pantalla actualizada');
+                onSave={(id, updates, assetId) => {
+                    updateDevice.mutate({ id, updates }, {
+                        onSuccess: () => {
+                            if (assetId !== undefined) {
+                                assignContent.mutate({ deviceId: id, mediaId: assetId }, {
+                                    onSuccess: () => {
+                                        toast.success('Pantalla y contenido actualizados');
+                                        setEditModalOpen(false);
+                                    }
+                                });
+                            } else {
+                                toast.success('Pantalla actualizada');
+                                setEditModalOpen(false);
+                            }
+                        }
+                    });
                 }}
             />
-</div>
+
+            <Dialog open={previewModalOpen} onOpenChange={setPreviewModalOpen}>
+                <DialogContent className="bg-slate-950 border-slate-800 text-white shadow-2xl max-w-4xl p-0 overflow-hidden sm:rounded-2xl h-[80vh] flex flex-col">
+                    <DialogHeader className="px-6 py-4 border-b border-slate-800 bg-slate-900 flex flex-row items-center justify-between shrink-0">
+                        <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+                            <Eye className="w-5 h-5 text-indigo-400" />
+                            Vista Previa: {previewDevice?.name}
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="flex-1 bg-black flex items-center justify-center relative overflow-hidden">
+                        {previewDevice?.assignment?.media ? (
+                            previewDevice.assignment.media.type.startsWith('video/') ? (
+                                <video 
+                                    src={previewDevice.assignment.media.url} 
+                                    controls 
+                                    autoPlay 
+                                    loop 
+                                    className="max-w-full max-h-full object-contain"
+                                />
+                            ) : (
+                                <img 
+                                    src={previewDevice.assignment.media.url} 
+                                    alt="Preview" 
+                                    className="max-w-full max-h-full object-contain"
+                                />
+                            )
+                        ) : previewDevice?.assignment?.campaign ? (
+                            <div className="text-slate-400 text-center">
+                                <Monitor className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                                <p className="text-lg">Reproduciendo Lista: {previewDevice.assignment.campaign.name}</p>
+                                <p className="text-sm mt-2 opacity-70">La vista previa de listas completas estará disponible pronto.</p>
+                            </div>
+                        ) : (
+                            <div className="text-slate-500 text-center">
+                                <Monitor className="w-16 h-16 mx-auto mb-4 opacity-30" />
+                                <p>Esta pantalla no tiene ningún recurso asignado.</p>
+                            </div>
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
+        </div>
     );
 };
 

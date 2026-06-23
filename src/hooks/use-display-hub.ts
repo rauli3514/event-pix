@@ -4,11 +4,12 @@ import { DisplayDevice, DisplayAssignment, DisplayGroup, DisplayCampaign } from 
 
 export type DeviceDerivedStatus = 'pending' | 'online' | 'offline';
 
-export interface DisplayDeviceWithStatus extends DisplayDevice {
+export type DisplayDeviceWithStatus = DisplayDevice & { 
     derived_status: DeviceDerivedStatus;
     commerce?: { name: string; email: string };
     group?: DisplayGroup;
-}
+    assignment?: DisplayAssignment;
+};
 
 // ------------------------------------
 // COMMERCES & GROUPS (MULTI-TENANT)
@@ -158,7 +159,8 @@ export const useDisplayDevices = (commerceId?: string | null) => {
                 .select(`
                     *,
                     commerce:profiles(name, email),
-                    group:display_groups(*)
+                    group:display_groups(*),
+                    assignment:display_assignments(*, campaign:display_campaigns(*), media:display_media(*))
                 `)
                 .order("created_at", { ascending: false });
 
@@ -185,7 +187,11 @@ export const useDisplayDevices = (commerceId?: string | null) => {
                     }
                 }
 
-                return { ...device, derived_status: status } as DisplayDeviceWithStatus;
+                return { 
+                    ...device, 
+                    derived_status: status,
+                    assignment: device.assignment && device.assignment.length > 0 ? device.assignment[0] : null
+                } as DisplayDeviceWithStatus & { assignment: DisplayAssignment | null };
             });
         },
         refetchInterval: 30000,
@@ -214,7 +220,8 @@ export const useDisplayDevice = (id?: string) => {
                 .from("display_assignments")
                 .select(`
                     *,
-                    campaign:display_campaigns(*)
+                    campaign:display_campaigns(*),
+                    media:display_media(*)
                 `)
                 .eq("device_id", id)
                 .maybeSingle();
@@ -301,12 +308,13 @@ export const useAssignContentToDevice = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ deviceId, campaignId }: { deviceId: string; campaignId: string }) => {
+        mutationFn: async ({ deviceId, campaignId, mediaId }: { deviceId: string; campaignId?: string | null; mediaId?: string | null }) => {
             const { data, error } = await supabase
                 .from("display_assignments")
                 .upsert({
                     device_id: deviceId,
-                    campaign_id: campaignId
+                    campaign_id: campaignId || null,
+                    media_id: mediaId || null
                 }, { onConflict: 'device_id' })
                 .select()
                 .single();

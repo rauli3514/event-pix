@@ -14,7 +14,7 @@ interface EditScreenModalProps {
     onClose: () => void;
     device: DisplayDeviceWithStatus | null;
     linkGroups: any[];
-    onSave: (deviceId: string, updates: any) => void;
+    onSave: (deviceId: string, updates: any, assetId: string | null) => void;
 }
 
 export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, onSave }: EditScreenModalProps) => {
@@ -37,7 +37,15 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, onSave }:
         if (device) {
             setName(device.name || '');
             setGroupId(device.group_id || 'none');
-            // reset UI mocks
+            // Check if there is an assigned media
+            if (device.assignment?.media) {
+                setSelectedAsset(device.assignment.media);
+                setContentType('asset');
+            } else if (device.assignment?.campaign) {
+                setContentType('playlist');
+            } else {
+                setSelectedAsset(null);
+            }
             setShowAdvanced(false);
         }
     }, [device]);
@@ -47,8 +55,7 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, onSave }:
         onSave(device.id, {
             name,
             group_id: groupId === 'none' ? null : groupId,
-            // future pro fields can be packed into metadata here
-        });
+        }, selectedAsset ? selectedAsset.id : null);
     };
 
     if (!device) return null;
@@ -129,7 +136,7 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, onSave }:
                         <Label className="text-right text-slate-500 font-medium">Contenido Seleccionado <span className="text-rose-500">*</span></Label>
                         <div className="flex gap-2">
                             <Input 
-                                value={selectedAsset ? selectedAsset.name : "Promo Verano 2026"} 
+                                value={selectedAsset ? selectedAsset.name : "Sin asignar"} 
                                 readOnly 
                                 className="shadow-sm bg-slate-50 text-slate-600" 
                             />

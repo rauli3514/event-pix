@@ -144,8 +144,12 @@ export interface DisplayAssignment {
     device_id: string | null;
     group_id: string | null;
     campaign_id: string | null;
+    media_id: string | null;
     created_at: string;
+    
+    // Relations
     campaign?: DisplayCampaign;
+    media?: DisplayMedia;
 }
 
 export interface DisplayHeartbeat {
