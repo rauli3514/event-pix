@@ -21,12 +21,12 @@ import TvPlayer from "./pages/display-hub/TvPlayer";
 import DisplayWorkspaceLayout from "./pages/display-hub/DisplayWorkspaceLayout";
 import { 
   WorkspaceDashboard, 
-  WorkspaceLibrary, 
   WorkspaceWidgets, 
   WorkspaceSchedule, 
   WorkspaceAnalytics, 
   WorkspaceSettings 
 } from "./pages/display-hub/WorkspacePlaceholders";
+import { WorkspaceMedia } from "./pages/display-hub/WorkspaceMedia";
 import { StickerEditor } from "./components/stickers/StickerEditor";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { EventProvider } from "./context/EventContext";
@@ -58,7 +58,7 @@ const App = () => (
                 <Route index element={<Navigate to="screens" replace />} />
                 <Route path="dashboard" element={<WorkspaceDashboard />} />
                 <Route path="screens" element={<DisplayHubList />} />
-                <Route path="library" element={<WorkspaceLibrary />} />
+                <Route path="library" element={<WorkspaceMedia />} />
                 <Route path="playlists" element={<DisplayCampaigns />} />
                 <Route path="widgets" element={<WorkspaceWidgets />} />
                 <Route path="schedule" element={<WorkspaceSchedule />} />

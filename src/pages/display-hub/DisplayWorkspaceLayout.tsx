@@ -17,7 +17,7 @@ import { useCommerces } from '@/hooks/use-display-hub';
 const MENU_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: 'dashboard' },
   { id: 'screens', label: 'Pantallas', icon: Monitor, path: 'screens' },
-  { id: 'library', label: 'Biblioteca', icon: FolderOpen, path: 'library' },
+  { id: 'library', label: 'Medios', icon: FolderOpen, path: 'library' },
   { id: 'playlists', label: 'Playlists', icon: ListVideo, path: 'playlists' },
   { id: 'widgets', label: 'Widgets', icon: Puzzle, path: 'widgets' },
   { id: 'schedule', label: 'Programación', icon: Calendar, path: 'schedule' },
