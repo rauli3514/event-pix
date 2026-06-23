@@ -16,10 +16,9 @@ const Login = () => {
         e.preventDefault();
         setLoading(true);
 
-        // @ts-ignore
         if (supabase.supabaseUrl?.includes('placeholder')) {
             toast.success("Modo Mock: Acceso concedido");
-            navigate("/admin");
+            navigate("/admin/display");
             setLoading(false);
             return;
         }
@@ -33,7 +32,7 @@ const Login = () => {
             toast.error(error.message);
         } else {
             toast.success("Bienvenido de nuevo");
-            navigate("/admin");
+            navigate("/admin/display");
         }
         setLoading(false);
     };
