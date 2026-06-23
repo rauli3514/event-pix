@@ -1,11 +1,14 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { Monitor, Activity, Tv, Plus, Hash, FolderOpen, PlaySquare, Settings, RotateCcw, Calendar, Play, Eye } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import { Monitor, Activity, Tv, Plus, Hash, FolderOpen, PlaySquare, Eye, ChevronDown, MoreVertical, Edit2, Info, Move, Trash2, Power } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { EditScreenModal } from "@/components/display/EditScreenModal";
+
 import { toast } from 'sonner';
 
 import { useDisplayDevices, useLinkDevice, useDisplayGroups, useDisplayCampaigns } from "@/hooks/use-display-hub";
@@ -21,6 +24,8 @@ const DisplayHubList = () => {
     const [filter, setFilter] = useState<'all' | 'online' | 'offline'>('all');
     const [groupFilter, setGroupFilter] = useState<string>('all');
     const [search, setSearch] = useState('');
+    const [editModalOpen, setEditModalOpen] = useState(false);
+    const [selectedDevice, setSelectedDevice] = useState<any>(null);
 
     const effectiveCommerceId = commerceId || 'unknown';
 
@@ -233,96 +238,116 @@ const DisplayHubList = () => {
                 </div>
             </div>
 
-            {/* Tarjetas de Pantallas */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pt-2">
-                {filteredLinkedDevices.map(device => {
-                    const isOnline = device.derived_status === 'online';
-                    
-                    return (
-                        <div key={device.id} className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl overflow-hidden flex flex-col transition-all group">
-                            
-                            {/* Card Header (Preview Mockup) */}
-                            <div className="h-32 bg-slate-950 relative border-b border-slate-800/50 flex items-center justify-center overflow-hidden">
-                                <div className="absolute top-3 left-3 flex items-center gap-2">
-                                    <div className={`px-2 py-1 rounded text-xs font-bold flex items-center gap-1.5 ${isOnline ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'}`}>
-                                        <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
-                                        {isOnline ? 'ONLINE' : 'OFFLINE'}
-                                    </div>
-                                </div>
-                                <div className="absolute top-3 right-3">
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-white bg-slate-900/50 backdrop-blur-sm" title="Vista Previa">
-                                        <Eye className="w-4 h-4" />
-                                    </Button>
-                                </div>
-                                {/* Thumbnail Placeholder */}
-                                <div className="flex flex-col items-center opacity-50 group-hover:opacity-100 transition-opacity">
-                                    <PlaySquare className="w-10 h-10 text-slate-600" />
-                                    <span className="text-xs text-slate-500 mt-2 font-medium">Contenido Actual</span>
-                                </div>
-                            </div>
+            {/* Lista de Pantallas */}
+            <div className="mt-8 space-y-8">
+                {Object.entries(
+                    filteredLinkedDevices.reduce((acc, device) => {
+                        const groupName = device.group?.name || 'Sin Zona Asignada';
+                        if (!acc[groupName]) acc[groupName] = [];
+                        acc[groupName].push(device);
+                        return acc;
+                    }, {} as Record<string, typeof filteredLinkedDevices>)
+                ).map(([groupName, groupDevices]) => (
+                    <div key={groupName} className="space-y-3">
+                        <div className="flex items-center gap-2 text-slate-300 font-semibold px-2">
+                            <ChevronDown className="w-4 h-4" />
+                            {groupName} <span className="text-slate-500 font-normal text-sm ml-1">({groupDevices.length})</span>
+                        </div>
+                        
+                        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden divide-y divide-slate-800/50">
+                            {groupDevices.map(device => {
+                                const isOnline = device.derived_status === 'online';
+                                return (
+                                    <div key={device.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 hover:bg-slate-800/30 transition-colors group gap-4 sm:gap-0">
+                                        {/* Izquierda: Checkbox, Estado y Nombre */}
+                                        <div className="flex items-center gap-4">
+                                            <input type="checkbox" className="w-4.5 h-4.5 rounded border-slate-700 bg-slate-950 text-emerald-500 focus:ring-emerald-500/20" />
+                                            
+                                            <div className={`px-2 py-0.5 rounded-full text-[11px] font-bold flex items-center gap-1.5 w-[110px] justify-center ${isOnline ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-800 text-slate-400 border border-slate-700'}`}>
+                                                {isOnline && <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}
+                                                {isOnline ? 'En línea' : 'Desconectado'}
+                                            </div>
+                                            
+                                            <div>
+                                                <h4 className="font-semibold text-slate-200 cursor-pointer hover:text-indigo-400 transition-colors" onClick={() => { setSelectedDevice(device); setEditModalOpen(true); }}>
+                                                    {device.name}
+                                                </h4>
+                                                <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
+                                                    Recurso: <span className="text-slate-400">Sin asignar</span>
+                                                    <ChevronDown className="w-3 h-3" />
+                                                </p>
+                                            </div>
+                                        </div>
 
-                            {/* Card Body */}
-                            <div className="p-5 flex-1 flex flex-col">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div>
-                                        <h3 className="font-bold text-lg text-white group-hover:text-indigo-400 transition-colors line-clamp-1">{device.name}</h3>
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <span className="text-xs text-slate-500 font-mono">ID: {device.device_id}</span>
-                                            {device.group && (
-                                                <span className="text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded">
-                                                    {device.group.name}
-                                                </span>
-                                            )}
+                                        {/* Derecha: Botones de Acción */}
+                                        <div className="flex items-center gap-2 opacity-50 group-hover:opacity-100 transition-opacity w-full sm:w-auto justify-end">
+                                            <Button variant="outline" size="sm" className="h-8 bg-slate-950 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800">
+                                                <Eye className="w-3.5 h-3.5 mr-1.5" /> Avance
+                                            </Button>
+                                            <Button 
+                                                variant="outline" 
+                                                size="sm" 
+                                                className="h-8 bg-slate-950 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800"
+                                                onClick={() => { setSelectedDevice(device); setEditModalOpen(true); }}
+                                            >
+                                                <Edit2 className="w-3.5 h-3.5 mr-1.5" /> Editar
+                                            </Button>
+                                            
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-white">
+                                                        <MoreVertical className="w-4 h-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end" className="w-56 bg-white text-slate-800 border-0 shadow-xl rounded-xl">
+                                                    <DropdownMenuItem className="cursor-pointer py-2 focus:bg-slate-100">
+                                                        <Info className="w-4 h-4 mr-2 text-slate-500" /> Ver información del dispositivo
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem className="cursor-pointer py-2 focus:bg-slate-100">
+                                                        <Monitor className="w-4 h-4 mr-2 text-slate-500" /> Pantalla de identificación
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuSeparator className="bg-slate-100" />
+                                                    <DropdownMenuItem className="cursor-pointer py-2 focus:bg-slate-100">
+                                                        <Move className="w-4 h-4 mr-2 text-slate-500" /> Mover
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem className="cursor-pointer py-2 focus:bg-slate-100">
+                                                        <Power className="w-4 h-4 mr-2 text-slate-500" /> Trasladar a espera
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuSeparator className="bg-slate-100" />
+                                                    <DropdownMenuItem className="cursor-pointer py-2 text-rose-600 focus:bg-rose-50 focus:text-rose-700">
+                                                        <Trash2 className="w-4 h-4 mr-2" /> Eliminar
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                         </div>
                                     </div>
-                                </div>
-
-                                <div className="text-sm text-slate-400 mb-4 bg-slate-950/50 rounded-lg p-3 border border-slate-800/50">
-                                    <div className="flex justify-between items-center mb-1">
-                                        <span className="text-slate-500 text-xs">Playlist Actual</span>
-                                    </div>
-                                    <div className="font-medium text-white line-clamp-1">
-                                        No hay contenido asignado
-                                    </div>
-                                </div>
-
-                                <div className="mt-auto pt-2 grid grid-cols-2 gap-2">
-                                    <Button variant="secondary" size="sm" className="w-full bg-slate-800 hover:bg-slate-700 text-white border-none" onClick={() => toast.info('Función en desarrollo: Cambiar Playlist')}>
-                                        <Play className="w-3.5 h-3.5 mr-2" /> Asignar
-                                    </Button>
-                                    <Button variant="secondary" size="sm" className="w-full bg-slate-800 hover:bg-slate-700 text-white border-none" onClick={() => toast.info('Función en desarrollo: Programar Horarios')}>
-                                        <Calendar className="w-3.5 h-3.5 mr-2" /> Horarios
-                                    </Button>
-                                    <Button variant="secondary" size="sm" className="w-full bg-slate-800 hover:bg-slate-700 text-white border-none" onClick={() => toast.info('Función en desarrollo: Reiniciar Reproductor')}>
-                                        <RotateCcw className="w-3.5 h-3.5 mr-2" /> Reiniciar
-                                    </Button>
-                                    <Button asChild variant="secondary" size="sm" className="w-full bg-slate-800 hover:bg-slate-700 text-white border-none">
-                                        <Link to={`/admin/display/${device.id}`}>
-                                            <Settings className="w-3.5 h-3.5 mr-2" /> Ajustes
-                                        </Link>
-                                    </Button>
-                                </div>
-                            </div>
-
+                                );
+                            })}
                         </div>
-                    );
-                })}
-
+                    </div>
+                ))}
+                
                 {filteredLinkedDevices.length === 0 && (
-                    <div className="col-span-full flex flex-col items-center justify-center py-20 bg-slate-900/50 rounded-2xl border border-dashed border-slate-800">
-                        <Monitor className="w-16 h-16 text-slate-700 mb-4" />
-                        <h3 className="text-xl font-bold text-white mb-2">No tienes pantallas conectadas</h3>
-                        <p className="text-slate-400 text-center max-w-md mb-6">
-                            Descarga la aplicación EventPix en tu TV, anota el código de 6 dígitos y presiona "Agregar Pantalla" para comenzar.
-                        </p>
-                        <Button onClick={() => setIsLinkModalOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                            <Plus className="w-4 h-4 mr-2" /> Agregar Pantalla
-                        </Button>
+                    <div className="py-12 text-center border-2 border-dashed border-slate-800 rounded-2xl">
+                        <Monitor className="w-12 h-12 text-slate-700 mx-auto mb-4" />
+                        <h3 className="text-lg font-bold text-white">No se encontraron pantallas</h3>
+                        <p className="text-slate-400 text-sm mt-2">Prueba cambiando los filtros o agrega una nueva pantalla.</p>
                     </div>
                 )}
             </div>
 
-        </div>
+            <EditScreenModal 
+                isOpen={editModalOpen} 
+                onClose={() => setEditModalOpen(false)} 
+                device={selectedDevice}
+                linkGroups={linkGroups || []}
+                onSave={(id, updates) => {
+                    console.log('Save', id, updates);
+                    setEditModalOpen(false);
+                    toast.success('Pantalla actualizada');
+                }}
+            />
+</div>
     );
 };
 
