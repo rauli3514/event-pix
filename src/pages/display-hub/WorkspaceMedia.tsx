@@ -304,9 +304,14 @@ export function WorkspaceMedia() {
                                 {filteredFiles.map(file => {
                                     const FileIcon = getIconForType(file.type);
                                     return (
-                                    <div key={file.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden group hover:border-orange-300 transition-colors cursor-pointer flex flex-col relative">
+                                    <div key={file.id} onClick={() => handleToggleSelect(file.id)} className={`bg-white rounded-xl shadow-sm border overflow-hidden group hover:border-orange-300 transition-colors cursor-pointer flex flex-col relative ${selectedIds.includes(file.id) ? 'border-orange-400 ring-2 ring-orange-400/20' : 'border-slate-200'}`}>
                                         <div className="absolute top-2 left-2 z-10">
-                                            <input type="checkbox" className="rounded border-slate-300 text-orange-500 focus:ring-orange-500/20 shadow-sm" />
+                                            <input 
+                                                type="checkbox" 
+                                                className="rounded border-slate-300 text-orange-500 focus:ring-orange-500/20 shadow-sm" 
+                                                checked={selectedIds.includes(file.id)}
+                                                onChange={(e) => { e.stopPropagation(); handleToggleSelect(file.id); }}
+                                            />
                                         </div>
                                         <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <Button variant="ghost" size="icon" className="h-7 w-7 bg-white/80 text-red-500 hover:bg-red-50 hover:text-red-600 rounded-full shadow-sm" onClick={(e) => { e.stopPropagation(); handleDelete(file); }}>
