@@ -18,6 +18,15 @@ import DisplayDeviceDetail from "./pages/display-hub/DisplayDeviceDetail";
 import DisplayCampaigns from "./pages/display-hub/DisplayCampaigns";
 import DisplayCampaignBuilder from "./pages/display-hub/DisplayCampaignBuilder";
 import TvPlayer from "./pages/display-hub/TvPlayer";
+import DisplayWorkspaceLayout from "./pages/display-hub/DisplayWorkspaceLayout";
+import { 
+  WorkspaceDashboard, 
+  WorkspaceLibrary, 
+  WorkspaceWidgets, 
+  WorkspaceSchedule, 
+  WorkspaceAnalytics, 
+  WorkspaceSettings 
+} from "./pages/display-hub/WorkspacePlaceholders";
 import { StickerEditor } from "./components/stickers/StickerEditor";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { EventProvider } from "./context/EventContext";
@@ -43,10 +52,23 @@ const App = () => (
               <Route path="/admin/providers" element={<ProvidersList />} />
               <Route path="/admin/kiosco-manager" element={<KioskManager />} />
               <Route path="/admin/display" element={<DisplayHubMain />} />
-              <Route path="/admin/display/commerce/:commerceId" element={<DisplayHubList />} />
-              <Route path="/admin/display/commerce/:commerceId/campaigns" element={<DisplayCampaigns />} />
+              
+              {/* Rutas del Display Workspace */}
+              <Route path="/admin/display/commerce/:commerceId/workspace" element={<DisplayWorkspaceLayout />}>
+                <Route index element={<Navigate to="screens" replace />} />
+                <Route path="dashboard" element={<WorkspaceDashboard />} />
+                <Route path="screens" element={<DisplayHubList />} />
+                <Route path="library" element={<WorkspaceLibrary />} />
+                <Route path="playlists" element={<DisplayCampaigns />} />
+                <Route path="widgets" element={<WorkspaceWidgets />} />
+                <Route path="schedule" element={<WorkspaceSchedule />} />
+                <Route path="analytics" element={<WorkspaceAnalytics />} />
+                <Route path="settings" element={<WorkspaceSettings />} />
+              </Route>
+              
               <Route path="/admin/display/commerce/:commerceId/campaigns/:campaignId" element={<DisplayCampaignBuilder />} />
               <Route path="/admin/display/:id" element={<DisplayDeviceDetail />} />
+              
               <Route path="/admin/:slug" element={
                 <ErrorBoundary>
                   <Admin />
