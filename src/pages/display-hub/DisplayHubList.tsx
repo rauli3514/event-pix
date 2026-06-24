@@ -408,7 +408,6 @@ const DisplayHubList = () => {
                             console.error("Update device failed:", err);
                             toast.error(`Error al actualizar pantalla: ${err.message || "Error desconocido"}`);
                         }
-                        }
                     });
                 }}
             />
