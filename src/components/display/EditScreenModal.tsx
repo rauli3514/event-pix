@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { ChevronDown, ChevronUp, MapPin, MonitorPlay, Check } from 'lucide-react';
 import { DisplayDeviceWithStatus } from '@/hooks/use-display-hub';
 import { AssetSelectorModal } from './AssetSelectorModal';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 
 interface EditScreenModalProps {
     isOpen: boolean;
