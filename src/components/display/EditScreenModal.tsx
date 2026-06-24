@@ -53,9 +53,16 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, onSave }:
 
     const handleSave = () => {
         if (!device) return;
+        if (!selectedAsset) {
+            toast.error("Por favor, selecciona un contenido pulsando el botón 'Cambiar'");
+            return;
+        }
+        
         onSave(device.id, {
             name,
             group_id: groupId === 'none' ? null : groupId,
+            scale,
+            orientation
         }, selectedAsset);
     };
 
@@ -150,10 +157,10 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, onSave }:
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-[160px_1fr] items-center gap-4 opacity-60">
-                        <Label className="text-right text-slate-500 font-medium">Escala <span className="text-xs text-slate-400 block">(Próximamente)</span></Label>
-                        <Select value={scale} onValueChange={setScale} disabled>
-                            <SelectTrigger className="w-full shadow-sm bg-slate-50 cursor-not-allowed">
+                    <div className="grid grid-cols-[160px_1fr] items-center gap-4">
+                        <Label className="text-right text-slate-500 font-medium">Escala</Label>
+                        <Select value={scale} onValueChange={setScale}>
+                            <SelectTrigger className="w-full shadow-sm bg-white">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -164,10 +171,10 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, onSave }:
                         </Select>
                     </div>
 
-                    <div className="grid grid-cols-[160px_1fr] items-center gap-4 opacity-60">
-                        <Label className="text-right text-slate-500 font-medium">Orientación <span className="text-xs text-slate-400 block">(Próximamente)</span></Label>
-                        <Select value={orientation} onValueChange={setOrientation} disabled>
-                            <SelectTrigger className="w-full shadow-sm bg-slate-50 cursor-not-allowed">
+                    <div className="grid grid-cols-[160px_1fr] items-center gap-4">
+                        <Label className="text-right text-slate-500 font-medium">Orientación</Label>
+                        <Select value={orientation} onValueChange={setOrientation}>
+                            <SelectTrigger className="w-full shadow-sm bg-white">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>

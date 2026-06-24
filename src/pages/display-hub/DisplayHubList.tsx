@@ -393,12 +393,21 @@ const DisplayHubList = () => {
                                     onSuccess: () => {
                                         toast.success('Pantalla y contenido actualizados');
                                         setEditModalOpen(false);
+                                    },
+                                    onError: (err: any) => {
+                                        console.error("Assign content failed:", err);
+                                        toast.error(`Error al asignar: ${err.message || "Error desconocido"}`);
                                     }
                                 });
                             } else {
                                 toast.success('Pantalla actualizada');
                                 setEditModalOpen(false);
                             }
+                        },
+                        onError: (err: any) => {
+                            console.error("Update device failed:", err);
+                            toast.error(`Error al actualizar pantalla: ${err.message || "Error desconocido"}`);
+                        }
                         }
                     });
                 }}

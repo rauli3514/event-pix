@@ -21,6 +21,8 @@ export interface DisplayDevice {
     device_model: string | null;
     app_version: string | null;
     android_version: string | null;
+    scale: string;
+    orientation: string;
     pairing_status: 'pending' | 'linked';
     last_seen: string | null;
     created_at: string;
