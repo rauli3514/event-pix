@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, FolderPlus, Upload, LayoutGrid, List as ListIcon, Image as ImageIcon, Video, FileAudio, FileText, Globe, ArrowRightCircle, Tag, HardDrive, Trash2 } from 'lucide-react';
+import { Search, FolderPlus, Upload, LayoutGrid, List as ListIcon, Image as ImageIcon, Video, FileAudio, FileText, Globe, ArrowRightCircle, Tag, HardDrive, Trash2, Folder } from 'lucide-react';
 import { SendToScreensModal } from '@/components/display/SendToScreensModal';
 import { UploadMediaModal } from '@/components/display/UploadMediaModal';
 import { useDisplayMedia, useUploadDisplayMedia, useDeleteDisplayMedia } from '@/hooks/use-display-media';
@@ -28,6 +28,7 @@ export function WorkspaceMedia() {
     const [search, setSearch] = useState('');
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isSendModalOpen, setIsSendModalOpen] = useState(false);
+    const [currentFolder, setCurrentFolder] = useState<string>('/');
 
     const { data: mediaFiles = [], isLoading } = useDisplayMedia(commerceId);
     const { mutateAsync: uploadMedia } = useUploadDisplayMedia();
@@ -37,8 +38,13 @@ export function WorkspaceMedia() {
 
     const filteredFiles = useMemo(() => {
         return mediaFiles.filter(file => {
-            // Text Search
-            if (search && !file.name.toLowerCase().includes(search.toLowerCase())) return false;
+            // Text Search overrides folder filtering
+            if (search) {
+                if (!file.name.toLowerCase().includes(search.toLowerCase())) return false;
+            } else {
+                // Folder Filter
+                if ((file.folder_path || '/') !== currentFolder) return false;
+            }
             // Category Filter
             if (activeCategory === 'all') return true;
             if (activeCategory === 'images' && file.type === 'image') return true;
@@ -48,7 +54,7 @@ export function WorkspaceMedia() {
             if (activeCategory === 'web' && file.type === 'web') return true;
             return false;
         });
-    }, [activeCategory, search, mediaFiles]);
+    }, [activeCategory, search, mediaFiles, currentFolder]);
 
     const handleUploadFiles = async (files: FileList | null) => {
         if (!files || !commerceId) return;
@@ -60,7 +66,7 @@ export function WorkspaceMedia() {
 
         for (let i = 0; i < files.length; i++) {
             try {
-                await uploadMedia({ commerceId, file: files[i] });
+                await uploadMedia({ commerceId, file: files[i], folderPath: currentFolder });
                 successCount++;
             } catch (error) {
                 console.error("Upload error:", error);
@@ -80,11 +86,24 @@ export function WorkspaceMedia() {
         if (!commerceId) return;
         const toastId = toast.loading("Agregando enlace...");
         try {
-            await uploadMedia({ commerceId, webUrl: url, webName: name });
+            await uploadMedia({ commerceId, webUrl: url, webName: name, folderPath: currentFolder });
             toast.success("Enlace agregado correctamente.", { id: toastId });
         } catch (error) {
             console.error("Web link error:", error);
             toast.error("Error al agregar el enlace.", { id: toastId });
+        }
+    };
+
+    const handleAddFolder = async () => {
+        const name = prompt("Nombre de la nueva carpeta:");
+        if (!name || !commerceId) return;
+        const toastId = toast.loading("Creando carpeta...");
+        try {
+            await uploadMedia({ commerceId, webName: name, folderPath: currentFolder, isFolder: true });
+            toast.success("Carpeta creada correctamente.", { id: toastId });
+        } catch (error) {
+            console.error("Folder error:", error);
+            toast.error("Error al crear carpeta.", { id: toastId });
         }
     };
 
@@ -202,7 +221,7 @@ export function WorkspaceMedia() {
                             </div>
 
                             <div className="flex items-center gap-3">
-                                <Button variant="outline" className="bg-white shadow-sm border-slate-200 text-slate-700">
+                                <Button variant="outline" className="bg-white shadow-sm border-slate-200 text-slate-700" onClick={handleAddFolder}>
                                     <FolderPlus className="w-4 h-4 mr-2" />
                                     Agregar carpeta
                                 </Button>
@@ -225,10 +244,23 @@ export function WorkspaceMedia() {
                             </div>
                         </div>
 
-                        {/* List Header */}
-                        <div className="mb-4">
-                            <h2 className="text-xl font-bold text-slate-800">{currentCategory.title}</h2>
-                            <p className="text-sm text-slate-500 mt-1">{isLoading ? 'Cargando...' : `${filteredFiles.length} artículo(s) encontrados`}</p>
+                        {/* List Header & Breadcrumb */}
+                        <div className="mb-4 flex items-center justify-between">
+                            <div>
+                                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                                    {currentFolder !== '/' && (
+                                        <Button variant="ghost" size="sm" className="h-8 px-2 -ml-2 text-slate-500 hover:text-slate-900" onClick={() => {
+                                            const parts = currentFolder.split('/');
+                                            parts.pop();
+                                            setCurrentFolder(parts.length === 1 ? '/' : parts.join('/'));
+                                        }}>
+                                            ←
+                                        </Button>
+                                    )}
+                                    {currentCategory.title} {currentFolder !== '/' && <span className="text-slate-400 text-base font-normal">/ {currentFolder.split('/').pop()}</span>}
+                                </h2>
+                                <p className="text-sm text-slate-500 mt-1">{isLoading ? 'Cargando...' : `${filteredFiles.length} artículo(s) encontrados`}</p>
+                            </div>
                         </div>
 
                         {/* Data View */}
@@ -266,6 +298,7 @@ export function WorkspaceMedia() {
                                     <tbody className="divide-y divide-slate-100">
                                         {filteredFiles.map(file => {
                                             const FileIcon = getIconForType(file.type);
+                                            const isFolder = file.type === 'folder';
                                             return (
                                             <tr key={file.id} className="hover:bg-slate-50/50 transition-colors group">
                                                 <td className="px-4 py-4">
@@ -276,7 +309,13 @@ export function WorkspaceMedia() {
                                                         onChange={() => handleToggleSelect(file.id)}
                                                     />
                                                 </td>
-                                                <td className="px-4 py-4 cursor-pointer" onClick={() => handleToggleSelect(file.id)}>
+                                                <td className="px-4 py-4 cursor-pointer" onClick={() => {
+                                                    if (isFolder) {
+                                                        setCurrentFolder(currentFolder === '/' ? `/${file.name}` : `${currentFolder}/${file.name}`);
+                                                    } else {
+                                                        handleToggleSelect(file.id);
+                                                    }
+                                                }}>
                                                     <div className="flex items-center gap-3">
                                                         <div className="w-10 h-10 rounded bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden">
                                                             {file.type === 'image' && file.url ? (
@@ -303,8 +342,19 @@ export function WorkspaceMedia() {
                             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
                                 {filteredFiles.map(file => {
                                     const FileIcon = getIconForType(file.type);
+                                    const isFolder = file.type === 'folder';
                                     return (
-                                    <div key={file.id} onClick={() => handleToggleSelect(file.id)} className={`bg-white rounded-xl shadow-sm border overflow-hidden group hover:border-orange-300 transition-colors cursor-pointer flex flex-col relative ${selectedIds.includes(file.id) ? 'border-orange-400 ring-2 ring-orange-400/20' : 'border-slate-200'}`}>
+                                    <div 
+                                        key={file.id} 
+                                        onClick={() => {
+                                            if (isFolder) {
+                                                setCurrentFolder(currentFolder === '/' ? `/${file.name}` : `${currentFolder}/${file.name}`);
+                                            } else {
+                                                handleToggleSelect(file.id);
+                                            }
+                                        }} 
+                                        className={`bg-white rounded-xl shadow-sm border overflow-hidden group hover:border-orange-300 transition-colors cursor-pointer flex flex-col relative ${selectedIds.includes(file.id) ? 'border-orange-400 ring-2 ring-orange-400/20' : 'border-slate-200'}`}
+                                    >
                                         <div className="absolute top-2 left-2 z-10">
                                             <input 
                                                 type="checkbox" 
@@ -370,6 +420,7 @@ function CategoryButton({ icon: Icon, label, active, onClick, color }: any) {
 
 export function getIconForType(type: string) {
     switch (type) {
+        case 'folder': return Folder;
         case 'image': return ImageIcon;
         case 'video': return Video;
         case 'audio': return FileAudio;

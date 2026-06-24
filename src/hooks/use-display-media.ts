@@ -26,14 +26,17 @@ export const useUploadDisplayMedia = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ commerceId, file, webUrl, webName }: { commerceId: string; file?: File; webUrl?: string; webName?: string }) => {
+        mutationFn: async ({ commerceId, file, webUrl, webName, folderPath = '/', isFolder = false }: { commerceId: string; file?: File; webUrl?: string; webName?: string; folderPath?: string; isFolder?: boolean }) => {
             let type = 'docs';
             let publicUrl = '';
             let storagePath = 'web_link';
             let name = webName || '';
             let size = 0;
 
-            if (file) {
+            if (isFolder) {
+                type = 'folder';
+                name = webName || 'Nueva Carpeta';
+            } else if (file) {
                 if (file.type.startsWith('image/')) type = 'image';
                 else if (file.type.startsWith('video/')) type = 'video';
                 else if (file.type.startsWith('audio/')) type = 'audio';
@@ -73,7 +76,8 @@ export const useUploadDisplayMedia = () => {
                     type: type,
                     url: publicUrl,
                     storage_path: storagePath,
-                    size_bytes: size
+                    size_bytes: size,
+                    folder_path: folderPath
                 })
                 .select()
                 .single();

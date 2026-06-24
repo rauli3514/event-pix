@@ -7,6 +7,7 @@ export interface DisplayMedia {
     url: string;
     storage_path: string;
     size_bytes: number;
+    folder_path: string;
     created_at: string;
 }
 
@@ -119,6 +120,9 @@ export interface DisplaySettings {
         type: DisplayBackgroundType;
         value: string;
     };
+    shuffle?: boolean;
+    transition?: DisplayTransition;
+    defaultDuration?: number;
 }
 
 export interface DisplayCampaignV2 {
@@ -137,6 +141,7 @@ export interface DisplayCampaign {
     commerce_id: string;
     name: string;
     description: string | null;
+    folder_path: string;
     items_json: CampaignDataPayload;
     created_at: string;
 }
