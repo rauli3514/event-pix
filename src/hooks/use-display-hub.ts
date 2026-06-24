@@ -397,7 +397,7 @@ export const useDeleteAssignment = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ id, deviceId }: { id: string, deviceId: string }) => {
+        mutationFn: async ({ id }: { id: string, deviceId: string }) => {
             const { error } = await supabase.from("display_assignments").delete().eq("id", id);
             if (error) throw error;
             return id;

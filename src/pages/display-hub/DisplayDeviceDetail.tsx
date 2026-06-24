@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Monitor, Save, HardDrive, Clock, Smartphone, Activity, Cpu, PlaySquare } from 'lucide-react';
+import { ArrowLeft, Monitor, Save, HardDrive, Clock, Smartphone, Activity, Cpu, PlaySquare, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
