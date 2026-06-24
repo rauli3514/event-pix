@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useIsSuperAdmin } from "@/hooks/use-roles";
 import { useDisplayDevice, useAssignContentToDevice, useUpdateDisplayDevice, useDisplayCampaigns, useDeleteAssignment } from "@/hooks/use-display-hub";
 import { useDisplayMedia } from "@/hooks/use-display-media";
+import { supabase } from "@/lib/supabase";
 
 const DisplayDeviceDetail = () => {
     const { id } = useParams<{ id: string }>();
@@ -33,6 +34,8 @@ const DisplayDeviceDetail = () => {
     const [isScheduled, setIsScheduled] = useState(false);
     const [startTime, setStartTime] = useState('');
     const [endTime, setEndTime] = useState('');
+    const [name, setName] = useState('');
+    const [desc, setDesc] = useState('');
 
     if (isSuperAdmin === false) {
         navigate('/admin', { replace: true });
@@ -43,10 +46,14 @@ const DisplayDeviceDetail = () => {
         if (deviceData) {
             setName(deviceData.name || '');
             setDesc(deviceData.description || '');
-            if (deviceData.assignment?.campaign_id) {
+        }
+        if (deviceData?.assignment) {
+            if (deviceData.assignment.media_id) {
+                setContentType('media');
+                setMediaId(deviceData.assignment.media_id);
+            } else if (deviceData.assignment.campaign_id) {
+                setContentType('campaign');
                 setCampaignId(deviceData.assignment.campaign_id);
-            } else {
-                setCampaignId('none');
             }
         }
     }, [deviceData]);
@@ -118,7 +125,7 @@ const DisplayDeviceDetail = () => {
 
     const handleSaveInfo = () => {
         if (!id) return;
-        updateDevice.mutate({ id, updates: { name, description: desc } }, {
+        updateDevice.mutate({ id, updates: { name: name || null, description: desc || null } }, {
             onSuccess: () => toast.success('Información actualizada'),
             onError: () => toast.error('Error al actualizar la información')
         });
@@ -300,7 +307,6 @@ const DisplayDeviceDetail = () => {
                                     </Button>
                                 </div>
                             </div>
-                        </div>
 
                         {/* Scheduled Campaigns List */}
                         {deviceData.allAssignments && deviceData.allAssignments.filter(a => a.start_time).length > 0 && (
