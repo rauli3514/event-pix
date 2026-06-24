@@ -22,52 +22,90 @@ const TvPlayer = () => {
         if (!deviceCode) return;
 
         try {
-            // Buscar el dispositivo y su campaña asignada
+            // 1. Obtener UUID del dispositivo
             const { data: device, error: deviceError } = await supabase
                 .from('display_devices')
-                .select(`
-                    id,
-                    pairing_status,
-                    assignment:display_assignments(
-                        campaign:display_campaigns(items_json)
-                    )
-                `)
+                .select('id, group_id, pairing_status')
                 .eq('device_id', deviceCode)
                 .single();
 
-            if (deviceError) throw deviceError;
+            if (deviceError || !device) throw deviceError || new Error("Device not found");
 
-            const assignment: any = Array.isArray(device.assignment) ? device.assignment[0] : device.assignment;
-            const campaign: any = assignment ? (Array.isArray(assignment.campaign) ? assignment.campaign[0] : assignment.campaign) : null;
-
-            if (device.pairing_status !== 'linked' || !assignment || !campaign) {
+            if (device.pairing_status !== 'linked') {
                 setStatus('no_content');
                 return;
             }
 
-            const campaignItems = campaign.items_json as CampaignItem[];
-            
-            // Si hay items, los guardamos en caché y los cargamos
-            if (campaignItems && campaignItems.length > 0) {
-                const newItemsString = JSON.stringify(campaignItems);
-                localStorage.setItem(`tv_cache_${deviceCode}`, newItemsString);
-                
-                // Solo actualizar el estado si realmente cambiaron los items para no reiniciar el timer de rotación
-                setItems((prevItems) => {
-                    if (JSON.stringify(prevItems) === newItemsString) {
-                        return prevItems;
-                    }
-                    return campaignItems;
-                });
-                
-                setStatus('playing');
-            } else {
-                setStatus('no_content');
+            // 2. Buscar asignaciones para el dispositivo o su zona
+            let orQuery = `device_id.eq.${device.id}`;
+            if (device.group_id) {
+                orQuery += `,group_id.eq.${device.group_id}`;
             }
+
+            const { data: assignments } = await supabase
+                .from('display_assignments')
+                .select(`
+                  *,
+                  media:display_media(*),
+                  campaign:display_campaigns(*)
+                `)
+                .or(orQuery)
+                .order('created_at', { ascending: false })
+                .limit(1);
+
+            if (assignments && assignments.length > 0) {
+                const assignment = assignments[0];
+                let compiledItems: any[] = [];
+
+                if (assignment.campaign && assignment.campaign.items_json) {
+                    const mediaIds = assignment.campaign.items_json.map((i: any) => i.media_id);
+                    if (mediaIds.length > 0) {
+                        const { data: mediaRows } = await supabase
+                            .from('display_media')
+                            .select('*')
+                            .in('id', mediaIds);
+
+                        if (mediaRows) {
+                            compiledItems = assignment.campaign.items_json.map((item: any) => {
+                                const media = mediaRows.find((m: any) => m.id === item.media_id);
+                                if (!media) return null;
+                                return {
+                                    id: item.id,
+                                    media_id: item.media_id,
+                                    type: media.type.split('/')[0],
+                                    url: media.url,
+                                    duration: item.duration || 10
+                                };
+                            }).filter(Boolean);
+                        }
+                    }
+                } else if (assignment.media) {
+                    compiledItems = [{
+                        id: assignment.media.id,
+                        media_id: assignment.media.id,
+                        type: assignment.media.type.split('/')[0],
+                        url: assignment.media.url,
+                        duration: 10
+                    }];
+                }
+
+                if (compiledItems.length > 0) {
+                    const newItemsString = JSON.stringify(compiledItems);
+                    localStorage.setItem(`tv_cache_${deviceCode}`, newItemsString);
+                    setItems((prevItems) => {
+                        if (JSON.stringify(prevItems) === newItemsString) return prevItems;
+                        return compiledItems;
+                    });
+                    setStatus('playing');
+                    return;
+                }
+            }
+
+            // Si llega aquí, no hay contenido válido
+            setStatus('no_content');
 
         } catch (error) {
             console.error('Error fetching campaign from Supabase:', error);
-            // MODO OFFLINE: Intentar recuperar de la caché local
             const cachedData = localStorage.getItem(`tv_cache_${deviceCode}`);
             if (cachedData) {
                 try {
@@ -77,9 +115,7 @@ const TvPlayer = () => {
                         setStatus('offline_playing');
                         return;
                     }
-                } catch (e) {
-                    // JSON parse error
-                }
+                } catch (e) { }
             }
             setStatus('error');
         }
