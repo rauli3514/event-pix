@@ -7,7 +7,6 @@ import { Search, Image as ImageIcon, Folder, PlaySquare, Settings2, Plus, Layout
 import { useDisplayMedia } from '@/hooks/use-display-media';
 import { useDisplayCampaigns } from '@/hooks/use-display-hub';
 import { getIconForType } from '@/pages/display-hub/WorkspaceMedia';
-import { DisplayMedia } from '@/types/display';
 
 interface AssetSelectorModalProps {
     isOpen: boolean;
