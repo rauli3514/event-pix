@@ -423,7 +423,7 @@ const DisplayHubList = () => {
                     <div className="flex-1 bg-black flex items-center justify-center relative overflow-hidden">
                         {previewDevice ? (
                             <iframe 
-                                src={`/display/tv/${previewDevice.device_id}`}
+                                src={`/tv/${previewDevice.device_id}`}
                                 className="w-full h-full border-0"
                                 title="Vista Previa TV"
                                 allow="autoplay; fullscreen"
