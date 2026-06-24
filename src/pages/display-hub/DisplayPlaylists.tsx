@@ -12,7 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useIsSuperAdmin } from "@/hooks/use-roles";
 import { useCommerces, useDisplayCampaigns, useCreateCampaign, useDeleteCampaign } from "@/hooks/use-display-hub";
 
-const DisplayCampaigns = () => {
+const DisplayPlaylists = () => {
     const navigate = useNavigate();
     const { commerceId } = useParams<{ commerceId: string }>();
     const isSuperAdmin = useIsSuperAdmin();
@@ -53,16 +53,16 @@ const DisplayCampaigns = () => {
                 setNewCampaignData({ name: '', description: '' });
                 toast.success('Campaña creada');
                 // Redirect to builder
-                navigate(`/admin/display/commerce/${effectiveCommerceId}/campaigns/${newCampaign.id}`);
+                navigate(`/admin/display/commerce/${effectiveCommerceId}/playlists/${newCampaign.id}`);
             },
             onError: () => toast.error('Error al crear campaña')
         });
     };
 
     const handleDelete = (id: string, name: string) => {
-        if (confirm(`¿Estás seguro de eliminar la campaña "${name}"? Esto detendrá la reproducción en todas las pantallas asignadas a ella.`)) {
+        if (confirm(`¿Estás seguro de eliminar la playlist "${name}"? Esto detendrá la reproducción en todas las pantallas asignadas a ella.`)) {
             deleteCampaign.mutate({ id }, {
-                onSuccess: () => toast.success('Campaña eliminada'),
+                onSuccess: () => toast.success('Playlist eliminada'),
                 onError: () => toast.error('Error al eliminar')
             });
         }
@@ -93,7 +93,7 @@ const DisplayCampaigns = () => {
                             </div>
                             <div>
                                 <h1 className="text-3xl font-bold text-white">
-                                    Campañas Publicitarias
+                                    Playlists
                                 </h1>
                                 <p className="text-slate-400 text-sm">Crea listas de reproducción para {commerceProfile?.name}</p>
                             </div>
@@ -101,21 +101,21 @@ const DisplayCampaigns = () => {
                     </div>
 
                     <Button onClick={() => setIsCreateModalOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-[0_0_20px_rgba(79,70,229,0.3)]">
-                        <Plus className="w-4 h-4 mr-2" /> Crear Campaña
+                        <Plus className="w-4 h-4 mr-2" /> Crear Playlist
                     </Button>
                 </header>
 
                 <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
                     <DialogContent className="bg-slate-900 border-slate-800 text-white">
                         <DialogHeader>
-                            <DialogTitle className="text-xl">Nueva Campaña</DialogTitle>
+                            <DialogTitle className="text-xl">Nueva Playlist</DialogTitle>
                             <DialogDescription className="text-slate-400">
-                                Una campaña es una lista de reproducción (PlayList) de diferentes contenidos (fotos, rankings, publicidad).
+                                Una playlist es una lista de reproducción secuencial de diferentes contenidos.
                             </DialogDescription>
                         </DialogHeader>
                         <form onSubmit={handleCreateSubmit} className="space-y-4 mt-2">
                             <div className="space-y-2">
-                                <Label htmlFor="name" className="text-slate-300">Nombre de la Campaña *</Label>
+                                <Label htmlFor="name" className="text-slate-300">Nombre de la Playlist *</Label>
                                 <Input
                                     id="name"
                                     value={newCampaignData.name}
@@ -174,12 +174,12 @@ const DisplayCampaigns = () => {
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end" className="bg-slate-900 border-slate-700 text-white">
                                             <DropdownMenuItem asChild className="cursor-pointer hover:bg-slate-800">
-                                                <Link to={`/admin/display/commerce/${effectiveCommerceId}/campaigns/${campaign.id}`}>
+                                                <Link to={`/admin/display/commerce/${effectiveCommerceId}/playlists/${campaign.id}`}>
                                                     <Edit className="w-4 h-4 mr-2" /> Editar Slides
                                                 </Link>
                                             </DropdownMenuItem>
                                             <DropdownMenuItem onClick={() => handleDelete(campaign.id, campaign.name)} className="cursor-pointer text-rose-400 hover:bg-rose-900/20 hover:text-rose-300">
-                                                <Trash2 className="w-4 h-4 mr-2" /> Eliminar Campaña
+                                                <Trash2 className="w-4 h-4 mr-2" /> Eliminar Playlist
                                             </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
@@ -200,7 +200,7 @@ const DisplayCampaigns = () => {
                                 </div>
                                 
                                 <Button asChild className="w-full mt-4 bg-slate-800 hover:bg-indigo-600 text-white border-0 transition-colors">
-                                    <Link to={`/admin/display/commerce/${effectiveCommerceId}/campaigns/${campaign.id}`}>
+                                    <Link to={`/admin/display/commerce/${effectiveCommerceId}/playlists/${campaign.id}`}>
                                         Editar Contenido
                                     </Link>
                                 </Button>
@@ -211,9 +211,9 @@ const DisplayCampaigns = () => {
                     {campaigns?.length === 0 && (
                         <div className="col-span-full flex flex-col items-center justify-center py-20 bg-slate-900/30 rounded-2xl border border-dashed border-slate-800">
                             <PlaySquare className="w-12 h-12 text-slate-600 mb-4" />
-                            <h3 className="text-xl font-bold text-white">No hay campañas</h3>
+                            <h3 className="text-xl font-bold text-white">No hay playlists</h3>
                             <p className="text-slate-400 mt-2 text-center max-w-sm">
-                                Crea tu primera campaña para armar la lista de reproducción que se mostrará en los televisores de este comercio.
+                                Crea tu primera playlist para armar la lista de reproducción que se mostrará en los televisores de este comercio.
                             </p>
                         </div>
                     )}
@@ -224,4 +224,4 @@ const DisplayCampaigns = () => {
     );
 };
 
-export default DisplayCampaigns;
+export default DisplayPlaylists;

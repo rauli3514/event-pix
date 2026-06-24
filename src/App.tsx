@@ -15,8 +15,8 @@ import NotFound from "./pages/NotFound";
 import DisplayHubMain from "./pages/display-hub/DisplayHubMain";
 import DisplayHubList from "./pages/display-hub/DisplayHubList";
 import DisplayDeviceDetail from "./pages/display-hub/DisplayDeviceDetail";
-import DisplayCampaigns from "./pages/display-hub/DisplayCampaigns";
-import DisplayCampaignBuilder from "./pages/display-hub/DisplayCampaignBuilder";
+import DisplayPlaylists from "./pages/display-hub/DisplayPlaylists";
+import PlaylistBuilder from "./pages/display-hub/PlaylistBuilder";
 import TvPlayer from "./pages/display-hub/TvPlayer";
 import TvBootScreen from "./pages/display-hub/TvBootScreen";
 import DisplayWorkspaceLayout from "./pages/display-hub/DisplayWorkspaceLayout";
@@ -60,14 +60,14 @@ const App = () => (
                 <Route path="dashboard" element={<WorkspaceDashboard />} />
                 <Route path="screens" element={<DisplayHubList />} />
                 <Route path="library" element={<WorkspaceMedia />} />
-                <Route path="playlists" element={<DisplayCampaigns />} />
+                <Route path="playlists" element={<DisplayPlaylists />} />
                 <Route path="widgets" element={<WorkspaceWidgets />} />
                 <Route path="schedule" element={<WorkspaceSchedule />} />
                 <Route path="analytics" element={<WorkspaceAnalytics />} />
                 <Route path="settings" element={<WorkspaceSettings />} />
               </Route>
               
-              <Route path="/admin/display/commerce/:commerceId/campaigns/:campaignId" element={<DisplayCampaignBuilder />} />
+              <Route path="/admin/display/commerce/:commerceId/playlists/:playlistId" element={<PlaylistBuilder />} />
               <Route path="/admin/display/:id" element={<DisplayDeviceDetail />} />
               
               <Route path="/admin/:slug" element={

@@ -71,6 +71,11 @@ const TvPlayer = () => {
                     if (rawItems.version === '2.0' && Array.isArray(rawItems.zones) && rawItems.zones.length > 0) {
                         // Extraer playlist de la primera zona (por simplicidad en la TV temporalmente)
                         compiledItems = rawItems.zones[0].playlist || [];
+                        
+                        // Aplicar Shuffle si está activado en settings
+                        if (rawItems.settings?.shuffle) {
+                            compiledItems = [...compiledItems].sort(() => Math.random() - 0.5);
+                        }
                     } 
                     // Si es V1 (Array directo)
                     else if (Array.isArray(rawItems)) {

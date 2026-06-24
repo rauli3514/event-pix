@@ -17,8 +17,37 @@ export const PlayerRenderer = ({ item, isActive, deviceScale = 'fit' }: PlayerRe
         }
     }, [isActive, item]);
 
-    // Usar display:none en lugar de opacity para TV Boxes antiguas con bugs de renderizado
-    const displayStyle: React.CSSProperties = isActive ? { display: 'flex' } : { display: 'none' };
+    // Implementamos transiciones CSS (Fade, Slide, etc.)
+    const getTransitionStyle = (): React.CSSProperties => {
+        const base: React.CSSProperties = {
+            position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+            opacity: isActive ? 1 : 0,
+            pointerEvents: isActive ? 'auto' : 'none',
+            zIndex: isActive ? 10 : 1,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            willChange: 'opacity, transform'
+        };
+
+        if (item.transition === 'none') {
+            return { ...base, transition: 'none', display: isActive ? 'flex' : 'none' };
+        }
+        
+        if (item.transition === 'slide') {
+            return {
+                ...base,
+                transition: 'transform 0.8s ease-in-out, opacity 0.8s ease-in-out',
+                transform: isActive ? 'translateX(0)' : 'translateX(100%)'
+            };
+        }
+
+        // Default: Fade
+        return {
+            ...base,
+            transition: 'opacity 1s ease-in-out'
+        };
+    };
+
+    const displayStyle = getTransitionStyle();
 
     // Determinar object-fit basado en la escala del dispositivo o del item
     let objectFitValue: any = 'contain'; // Default fit
