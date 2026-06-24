@@ -77,12 +77,12 @@ const App = () => (
               } />
             </Route>
 
-            <Route path="/:slug" element={<Index />} />
-            <Route path="/:slug/display" element={<Display />} />
-            
             {/* TV Player Route (No Layout, Fullscreen) */}
             <Route path="/tv-boot" element={<TvBootScreen />} />
             <Route path="/tv/:deviceCode" element={<TvPlayer />} />
+
+            <Route path="/:slug" element={<Index />} />
+            <Route path="/:slug/display" element={<Display />} />
           </Route>
 
           <Route path="/" element={<Navigate to="/login" replace />} />
