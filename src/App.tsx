@@ -18,6 +18,7 @@ import DisplayDeviceDetail from "./pages/display-hub/DisplayDeviceDetail";
 import DisplayCampaigns from "./pages/display-hub/DisplayCampaigns";
 import DisplayCampaignBuilder from "./pages/display-hub/DisplayCampaignBuilder";
 import TvPlayer from "./pages/display-hub/TvPlayer";
+import TvBootScreen from "./pages/display-hub/TvBootScreen";
 import DisplayWorkspaceLayout from "./pages/display-hub/DisplayWorkspaceLayout";
 import { 
   WorkspaceDashboard, 
@@ -80,6 +81,7 @@ const App = () => (
             <Route path="/:slug/display" element={<Display />} />
             
             {/* TV Player Route (No Layout, Fullscreen) */}
+            <Route path="/tv-boot" element={<TvBootScreen />} />
             <Route path="/tv/:deviceCode" element={<TvPlayer />} />
           </Route>
 
