@@ -16,8 +16,8 @@ export const PlayerRenderer = ({ item, isActive }: PlayerRendererProps) => {
         }
     }, [isActive, item]);
 
-    // Ocultar si no está activo, pero mantenerlo montado para no perder tiempo de carga
-    const visibilityClass = isActive ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none";
+    // Usar display:none en lugar de opacity para TV Boxes antiguas con bugs de renderizado
+    const displayStyle: React.CSSProperties = isActive ? { display: 'flex' } : { display: 'none' };
 
     switch (item.type) {
         case 'url':
@@ -26,7 +26,7 @@ export const PlayerRenderer = ({ item, isActive }: PlayerRendererProps) => {
             
             if (isImageUrl) {
                 return (
-                    <div style={{ position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: '#000' }} className={`transition-opacity duration-1000 flex items-center justify-center ${visibilityClass}`}>
+                    <div style={{ position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: '#000', alignItems: 'center', justifyContent: 'center', ...displayStyle }}>
                         <img 
                             src={item.url} 
                             alt={item.title || item.content}
@@ -43,7 +43,7 @@ export const PlayerRenderer = ({ item, isActive }: PlayerRendererProps) => {
             }
 
             return (
-                <div style={{ position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: '#000' }} className={`transition-opacity duration-1000 ${visibilityClass}`}>
+                <div style={{ position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: '#000', ...displayStyle }}>
                     {isActive && normalizedUrl ? (
                         <iframe 
                             ref={iframeRef}
@@ -53,7 +53,7 @@ export const PlayerRenderer = ({ item, isActive }: PlayerRendererProps) => {
                             title={item.title || item.content}
                         />
                     ) : isActive && !normalizedUrl ? (
-                        <div style={{ width: '100vw', height: '100vh' }} className="flex items-center justify-center text-white text-2xl">
+                        <div style={{ width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '1.5rem' }}>
                             URL Externa no configurada
                         </div>
                     ) : null}
@@ -63,7 +63,7 @@ export const PlayerRenderer = ({ item, isActive }: PlayerRendererProps) => {
         case 'image':
         case 'image_ad':
             return (
-                <div style={{ position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: '#000' }} className={`transition-opacity duration-1000 flex items-center justify-center ${visibilityClass}`}>
+                <div style={{ position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: '#000', alignItems: 'center', justifyContent: 'center', ...displayStyle }}>
                     {item.imageUrl || item.url ? (
                         <img 
                             src={item.imageUrl || item.url} 
@@ -72,7 +72,7 @@ export const PlayerRenderer = ({ item, isActive }: PlayerRendererProps) => {
                             loading="lazy"
                         />
                     ) : (
-                        <div style={{ width: '100vw', height: '100vh' }} className="flex items-center justify-center text-white text-2xl">
+                        <div style={{ width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '1.5rem' }}>
                             Imagen no configurada
                         </div>
                     )}
@@ -82,7 +82,7 @@ export const PlayerRenderer = ({ item, isActive }: PlayerRendererProps) => {
         case 'video':
         case 'video_ad':
             return (
-                <div style={{ position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: '#000' }} className={`transition-opacity duration-1000 flex items-center justify-center ${visibilityClass}`}>
+                <div style={{ position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: '#000', alignItems: 'center', justifyContent: 'center', ...displayStyle }}>
                     {item.url ? (
                         <video 
                             src={item.url} 
@@ -93,7 +93,7 @@ export const PlayerRenderer = ({ item, isActive }: PlayerRendererProps) => {
                             playsInline
                         />
                     ) : (
-                        <div style={{ width: '100vw', height: '100vh' }} className="flex items-center justify-center text-white text-2xl">
+                        <div style={{ width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '1.5rem' }}>
                             Video no configurado
                         </div>
                     )}
@@ -103,8 +103,7 @@ export const PlayerRenderer = ({ item, isActive }: PlayerRendererProps) => {
         case 'text':
             return (
                 <div 
-                    style={{ position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: item.backgroundColor || '#000' }} 
-                    className={`transition-opacity duration-1000 flex items-center justify-center ${visibilityClass}`}
+                    style={{ position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: item.backgroundColor || '#000', alignItems: 'center', justifyContent: 'center', ...displayStyle }} 
                 >
                     <p style={{ color: item.color || '#fff', fontSize: '5rem', fontWeight: 'bold', textAlign: 'center', padding: '2rem' }}>
                         {item.content}
@@ -114,7 +113,7 @@ export const PlayerRenderer = ({ item, isActive }: PlayerRendererProps) => {
 
         case 'event_photos':
             return (
-                <div className={`absolute inset-0 transition-opacity duration-1000 bg-zinc-950 flex flex-col items-center justify-center ${visibilityClass}`}>
+                <div style={{ position: 'absolute', inset: 0, backgroundColor: '#09090b', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', ...displayStyle }}>
                     <h1 className="text-4xl text-white font-bold mb-4">Galería de EventPix</h1>
                     <p className="text-zinc-400">Próximamente: Integración automática de fotos del evento {item.eventId}</p>
                 </div>
@@ -122,7 +121,7 @@ export const PlayerRenderer = ({ item, isActive }: PlayerRendererProps) => {
 
         default:
             return (
-                <div className={`absolute inset-0 transition-opacity duration-1000 bg-zinc-950 flex items-center justify-center ${visibilityClass}`}>
+                <div style={{ position: 'absolute', inset: 0, backgroundColor: '#09090b', alignItems: 'center', justifyContent: 'center', ...displayStyle }}>
                     <p className="text-white text-2xl">Tipo de contenido desconocido</p>
                 </div>
             );
