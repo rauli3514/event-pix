@@ -53,7 +53,8 @@ const TvPlayer = () => {
                 .from('display_assignments')
                 .select(`
                   *,
-                  campaign:display_campaigns(*)
+                  campaign:display_campaigns(*),
+                  media:display_media(*)
                 `)
                 .or(orQuery)
                 .order('created_at', { ascending: false })
@@ -75,6 +76,14 @@ const TvPlayer = () => {
                     else if (Array.isArray(rawItems)) {
                         compiledItems = rawItems;
                     }
+                } else if (assignment.media) {
+                    compiledItems = [{
+                        id: assignment.media.id,
+                        type: assignment.media.type || 'image',
+                        url: assignment.media.url,
+                        duration: 0, // 0 = infinito / loop
+                        title: assignment.media.name
+                    }];
                 }
 
                 if (compiledItems.length > 0) {
