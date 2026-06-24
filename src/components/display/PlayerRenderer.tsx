@@ -21,6 +21,7 @@ export const PlayerRenderer = ({ item, isActive }: PlayerRendererProps) => {
     const visibilityClass = isActive ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none";
 
     switch (item.type) {
+        case 'url':
         case 'external_url':
             const isImageUrl = item.url && /\.(jpeg|jpg|gif|png|webp)($|\?)/i.test(item.url);
             
@@ -29,8 +30,8 @@ export const PlayerRenderer = ({ item, isActive }: PlayerRendererProps) => {
                     <div style={{ position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: '#000' }} className={`transition-opacity duration-1000 flex items-center justify-center ${visibilityClass}`}>
                         <img 
                             src={item.url} 
-                            alt={item.title}
-                            style={{ width: '100vw', height: '100vh', objectFit: 'contain' }}
+                            alt={item.title || item.content}
+                            style={{ width: '100vw', height: '100vh', objectFit: item.fitMode || 'contain' }}
                             loading="lazy"
                         />
                     </div>
@@ -50,7 +51,7 @@ export const PlayerRenderer = ({ item, isActive }: PlayerRendererProps) => {
                             src={normalizedUrl} 
                             style={{ width: '100%', height: '100%', border: 0 }}
                             allow="autoplay; fullscreen"
-                            title={item.title}
+                            title={item.title || item.content}
                         />
                     ) : isActive && !normalizedUrl ? (
                         <div style={{ width: '100vw', height: '100vh' }} className="flex items-center justify-center text-white text-2xl">
@@ -60,14 +61,15 @@ export const PlayerRenderer = ({ item, isActive }: PlayerRendererProps) => {
                 </div>
             );
         
+        case 'image':
         case 'image_ad':
             return (
                 <div style={{ position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: '#000' }} className={`transition-opacity duration-1000 flex items-center justify-center ${visibilityClass}`}>
-                    {item.imageUrl ? (
+                    {item.imageUrl || item.url ? (
                         <img 
-                            src={item.imageUrl} 
-                            alt={item.title}
-                            style={{ width: '100vw', height: '100vh', objectFit: 'contain' }}
+                            src={item.imageUrl || item.url} 
+                            alt={item.title || item.content}
+                            style={{ width: '100vw', height: '100vh', objectFit: item.fitMode || 'contain' }}
                             loading="lazy"
                         />
                     ) : (
@@ -75,6 +77,39 @@ export const PlayerRenderer = ({ item, isActive }: PlayerRendererProps) => {
                             Imagen no configurada
                         </div>
                     )}
+                </div>
+            );
+
+        case 'video':
+        case 'video_ad':
+            return (
+                <div style={{ position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: '#000' }} className={`transition-opacity duration-1000 flex items-center justify-center ${visibilityClass}`}>
+                    {item.url ? (
+                        <video 
+                            src={item.url} 
+                            style={{ width: '100vw', height: '100vh', objectFit: item.fitMode || 'contain' }}
+                            autoPlay={isActive}
+                            muted={item.mute !== false}
+                            loop={item.loop !== false}
+                            playsInline
+                        />
+                    ) : (
+                        <div style={{ width: '100vw', height: '100vh' }} className="flex items-center justify-center text-white text-2xl">
+                            Video no configurado
+                        </div>
+                    )}
+                </div>
+            );
+
+        case 'text':
+            return (
+                <div 
+                    style={{ position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: item.backgroundColor || '#000' }} 
+                    className={`transition-opacity duration-1000 flex items-center justify-center ${visibilityClass}`}
+                >
+                    <p style={{ color: item.color || '#fff', fontSize: '5rem', fontWeight: 'bold', textAlign: 'center', padding: '2rem' }}>
+                        {item.content}
+                    </p>
                 </div>
             );
 

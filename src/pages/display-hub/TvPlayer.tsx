@@ -57,7 +57,17 @@ const TvPlayer = () => {
                 let compiledItems: any[] = [];
 
                 if (assignment.campaign && assignment.campaign.items_json) {
-                    compiledItems = assignment.campaign.items_json;
+                    const rawItems = assignment.campaign.items_json;
+                    
+                    // Si es V2 (Objeto con version 2.0 y zones)
+                    if (rawItems.version === '2.0' && Array.isArray(rawItems.zones) && rawItems.zones.length > 0) {
+                        // Extraer playlist de la primera zona (por simplicidad en la TV temporalmente)
+                        compiledItems = rawItems.zones[0].playlist || [];
+                    } 
+                    // Si es V1 (Array directo)
+                    else if (Array.isArray(rawItems)) {
+                        compiledItems = rawItems;
+                    }
                 }
 
                 if (compiledItems.length > 0) {
