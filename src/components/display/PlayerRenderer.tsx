@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { CampaignItem } from '@/types/display';
 
 interface PlayerRendererProps {
-    item: CampaignItem;
+    item: any; // Using any to support both CampaignItem (V1) and UniversalElement (V2)
     isActive: boolean;
 }
 
