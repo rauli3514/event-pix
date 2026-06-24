@@ -46,7 +46,6 @@ const TvPlayer = () => {
                 .from('display_assignments')
                 .select(`
                   *,
-                  media:display_media(*),
                   campaign:display_campaigns(*)
                 `)
                 .or(orQuery)
@@ -58,35 +57,7 @@ const TvPlayer = () => {
                 let compiledItems: any[] = [];
 
                 if (assignment.campaign && assignment.campaign.items_json) {
-                    const mediaIds = assignment.campaign.items_json.map((i: any) => i.media_id);
-                    if (mediaIds.length > 0) {
-                        const { data: mediaRows } = await supabase
-                            .from('display_media')
-                            .select('*')
-                            .in('id', mediaIds);
-
-                        if (mediaRows) {
-                            compiledItems = assignment.campaign.items_json.map((item: any) => {
-                                const media = mediaRows.find((m: any) => m.id === item.media_id);
-                                if (!media) return null;
-                                return {
-                                    id: item.id,
-                                    media_id: item.media_id,
-                                    type: media.type.split('/')[0],
-                                    url: media.url,
-                                    duration: item.duration || 10
-                                };
-                            }).filter(Boolean);
-                        }
-                    }
-                } else if (assignment.media) {
-                    compiledItems = [{
-                        id: assignment.media.id,
-                        media_id: assignment.media.id,
-                        type: assignment.media.type.split('/')[0],
-                        url: assignment.media.url,
-                        duration: 10
-                    }];
+                    compiledItems = assignment.campaign.items_json;
                 }
 
                 if (compiledItems.length > 0) {
