@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useIsSuperAdmin } from "@/hooks/use-roles";
-import { useDisplayDevice, useAssignContentToDevice, useUpdateDisplayDevice, useDisplayCampaigns } from "@/hooks/use-display-hub";
+import { useDisplayDevice, useAssignContentToDevice, useUpdateDisplayDevice, useDisplayCampaigns, useDeleteAssignment } from "@/hooks/use-display-hub";
 
 const DisplayDeviceDetail = () => {
     const { id } = useParams<{ id: string }>();
@@ -20,10 +20,14 @@ const DisplayDeviceDetail = () => {
     const updateDevice = useUpdateDisplayDevice();
 
     const { data: campaigns, isLoading: isLoadingCampaigns } = useDisplayCampaigns(deviceData?.commerce_id || undefined);
+    const deleteAssignment = useDeleteAssignment();
 
     const [campaignId, setCampaignId] = useState<string>('none');
     const [name, setName] = useState('');
     const [desc, setDesc] = useState('');
+    const [isScheduled, setIsScheduled] = useState(false);
+    const [startTime, setStartTime] = useState('');
+    const [endTime, setEndTime] = useState('');
 
     if (isSuperAdmin === false) {
         navigate('/admin', { replace: true });
@@ -48,10 +52,33 @@ const DisplayDeviceDetail = () => {
             toast.error('Selecciona una campaña primero');
             return;
         }
+
+        if (isScheduled && (!startTime || !endTime)) {
+            toast.error('Debes seleccionar fecha de inicio y fin para programar.');
+            return;
+        }
         
-        assignContent.mutate({ deviceId: id, campaignId }, {
-            onSuccess: () => toast.success('Campaña asignada correctamente. La pantalla se actualizará en breve.'),
+        assignContent.mutate({ 
+            deviceId: id, 
+            campaignId,
+            startTime: isScheduled ? new Date(startTime).toISOString() : null,
+            endTime: isScheduled ? new Date(endTime).toISOString() : null
+        }, {
+            onSuccess: () => {
+                toast.success('Campaña asignada correctamente.');
+                setIsScheduled(false);
+                setStartTime('');
+                setEndTime('');
+            },
             onError: () => toast.error('Error al asignar la campaña')
+        });
+    };
+
+    const handleDeleteAssignment = (assignmentId: string) => {
+        if (!id) return;
+        deleteAssignment.mutate({ id: assignmentId, deviceId: id }, {
+            onSuccess: () => toast.success('Programación eliminada'),
+            onError: () => toast.error('Error al eliminar')
         });
     };
 
@@ -131,15 +158,50 @@ const DisplayDeviceDetail = () => {
                                                 <SelectValue placeholder="Seleccionar campaña..." />
                                             </SelectTrigger>
                                             <SelectContent className="bg-slate-900 border-slate-700 text-white">
-                                                <SelectItem value="none">-- Sin Contenido (Pantalla en negro) --</SelectItem>
+                                                <SelectItem value="none">-- Sin Contenido --</SelectItem>
                                                 {campaigns?.map(c => (
                                                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                                                 ))}
                                             </SelectContent>
                                         </Select>
                                     )}
-                                    <p className="text-xs text-slate-500">
-                                        Si la pantalla está online, el cambio de campaña se reflejará en la TV en menos de 30 segundos.
+
+                                    <div className="flex items-center gap-2 mt-4 mb-2">
+                                        <input 
+                                            type="checkbox" 
+                                            id="isScheduled" 
+                                            checked={isScheduled} 
+                                            onChange={(e) => setIsScheduled(e.target.checked)}
+                                            className="rounded border-slate-700 bg-slate-950 text-indigo-600"
+                                        />
+                                        <Label htmlFor="isScheduled" className="text-slate-300">Programar para una fecha específica</Label>
+                                    </div>
+
+                                    {isScheduled && (
+                                        <div className="grid grid-cols-2 gap-4 mt-2 p-4 bg-slate-950/50 rounded-lg border border-slate-800">
+                                            <div className="space-y-2">
+                                                <Label className="text-slate-400 text-xs">Fecha de Inicio</Label>
+                                                <Input 
+                                                    type="datetime-local" 
+                                                    value={startTime}
+                                                    onChange={e => setStartTime(e.target.value)}
+                                                    className="bg-slate-900 border-slate-700 text-white text-sm" 
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-slate-400 text-xs">Fecha de Fin</Label>
+                                                <Input 
+                                                    type="datetime-local" 
+                                                    value={endTime}
+                                                    onChange={e => setEndTime(e.target.value)}
+                                                    className="bg-slate-900 border-slate-700 text-white text-sm" 
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <p className="text-xs text-slate-500 mt-2">
+                                        Si la pantalla está online, el cambio se reflejará en la TV en menos de 30 segundos.
                                     </p>
                                 </div>
                                 <div className="flex justify-between items-center pt-2">
@@ -154,6 +216,30 @@ const DisplayDeviceDetail = () => {
                                 </div>
                             </div>
                         </div>
+
+                        {/* Scheduled Campaigns List */}
+                        {deviceData.allAssignments && deviceData.allAssignments.filter(a => a.start_time).length > 0 && (
+                            <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl p-6">
+                                <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                                    <Clock className="w-4 h-4 text-indigo-400" /> Programaciones Vigentes
+                                </h2>
+                                <div className="space-y-3">
+                                    {deviceData.allAssignments.filter(a => a.start_time).map(assignment => (
+                                        <div key={assignment.id} className="flex justify-between items-center bg-slate-950 p-3 rounded-lg border border-slate-800">
+                                            <div>
+                                                <p className="text-sm font-medium text-white">{assignment.campaign?.name || 'Campaña Desconocida'}</p>
+                                                <p className="text-xs text-slate-400">
+                                                    Del {new Date(assignment.start_time!).toLocaleString('es-AR')} al {new Date(assignment.end_time!).toLocaleString('es-AR')}
+                                                </p>
+                                            </div>
+                                            <Button variant="ghost" size="sm" onClick={() => handleDeleteAssignment(assignment.id)} className="text-rose-400 hover:text-rose-300 hover:bg-rose-400/10 h-8 w-8 p-0">
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {/* General Info */}
                         <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl p-6">

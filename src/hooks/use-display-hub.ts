@@ -282,10 +282,10 @@ export const useDisplayDevice = (id?: string) => {
                     media:display_media(*)
                 `)
                 .or(orQuery)
-                .order('created_at', { ascending: false })
-                .limit(1);
+                .order('created_at', { ascending: false });
 
-            const assignment = assignments && assignments.length > 0 ? assignments[0] : null;
+            // assignment will be the default one (no start_time), but we can also attach the full array
+            const defaultAssignment = assignments?.find(a => !a.start_time) || (assignments && assignments.length > 0 ? assignments[0] : null);
 
             const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
             let status: DeviceDerivedStatus = 'offline';
@@ -295,8 +295,9 @@ export const useDisplayDevice = (id?: string) => {
             return {
                 ...device,
                 derived_status: status,
-                assignment: assignment as DisplayAssignment | null
-            } as DisplayDeviceWithStatus & { assignment: DisplayAssignment | null };
+                assignment: defaultAssignment as DisplayAssignment | null,
+                allAssignments: assignments as DisplayAssignment[] | null
+            } as DisplayDeviceWithStatus & { assignment: DisplayAssignment | null; allAssignments: DisplayAssignment[] | null };
         },
         enabled: !!id,
         refetchInterval: 30000,
@@ -369,14 +370,16 @@ export const useAssignContentToDevice = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ deviceId, campaignId, mediaId }: { deviceId: string; campaignId?: string | null; mediaId?: string | null }) => {
+        mutationFn: async ({ deviceId, campaignId, mediaId, startTime, endTime }: { deviceId: string; campaignId?: string | null; mediaId?: string | null; startTime?: string | null; endTime?: string | null }) => {
             const { data, error } = await supabase
                 .from("display_assignments")
-                .upsert({
+                .insert({
                     device_id: deviceId,
                     campaign_id: campaignId || null,
-                    media_id: mediaId || null
-                }, { onConflict: 'device_id' })
+                    media_id: mediaId || null,
+                    start_time: startTime || null,
+                    end_time: endTime || null
+                })
                 .select()
                 .single();
 
@@ -387,6 +390,22 @@ export const useAssignContentToDevice = () => {
             queryClient.invalidateQueries({ queryKey: ["display_device", variables.deviceId] });
             queryClient.invalidateQueries({ queryKey: ["display_devices"] });
         },
+    });
+};
+
+export const useDeleteAssignment = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ id, deviceId }: { id: string, deviceId: string }) => {
+            const { error } = await supabase.from("display_assignments").delete().eq("id", id);
+            if (error) throw error;
+            return id;
+        },
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ["display_device", variables.deviceId] });
+            queryClient.invalidateQueries({ queryKey: ["display_devices"] });
+        }
     });
 };
 

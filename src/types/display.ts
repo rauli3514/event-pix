@@ -152,6 +152,8 @@ export interface DisplayAssignment {
     group_id: string | null;
     campaign_id: string | null;
     media_id: string | null;
+    start_time: string | null;
+    end_time: string | null;
     created_at: string;
     
     // Relations

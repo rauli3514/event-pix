@@ -57,12 +57,28 @@ const TvPlayer = () => {
                   media:display_media(*)
                 `)
                 .or(orQuery)
-                .order('created_at', { ascending: false })
-                .limit(1);
+                .order('created_at', { ascending: false });
 
             if (assignments && assignments.length > 0) {
-                const assignment = assignments[0];
-                let compiledItems: any[] = [];
+                const now = new Date();
+                
+                // 1. Buscar una programación vigente (start_time y end_time definidos y dentro del rango)
+                const scheduledAssignment = assignments.find(a => {
+                    if (a.start_time && a.end_time) {
+                        const start = new Date(a.start_time);
+                        const end = new Date(a.end_time);
+                        return now >= start && now <= end;
+                    }
+                    return false;
+                });
+
+                // 2. Si no hay programación vigente, buscar la asignación por defecto (sin start_time)
+                const defaultAssignment = assignments.find(a => !a.start_time);
+
+                const assignment = scheduledAssignment || defaultAssignment;
+
+                if (assignment) {
+                    let compiledItems: any[] = [];
 
                 if (assignment.campaign && assignment.campaign.items_json) {
                     const rawItems = assignment.campaign.items_json;
@@ -100,6 +116,7 @@ const TvPlayer = () => {
                     });
                     setStatus('playing');
                     return;
+                }
                 }
             }
 
