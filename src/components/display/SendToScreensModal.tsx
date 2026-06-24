@@ -37,15 +37,33 @@ export const SendToScreensModal = ({ isOpen, onClose, selectedAssets, commerceId
 
         try {
             if (isMultiple) {
-                // Crear campaña automáticamente
+                // Crear campaña automáticamente en formato V2
                 const campaignName = `Lista Rápida ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
                 
-                // Mapear archivos a items de la lista
-                const items_json = selectedAssets.map(asset => ({
+                const playlist = selectedAssets.map(asset => ({
                     id: crypto.randomUUID(),
-                    media_id: asset.id,
-                    duration: asset.type?.startsWith('video/') ? 15 : 10 // defaults (el reproductor usa el real para videos)
+                    type: asset.type === 'web' ? 'url' : asset.type,
+                    url: asset.url,
+                    content: asset.name,
+                    duration: asset.type === 'video' ? 15 : 10,
+                    transition: 'fade',
+                    fitMode: 'contain'
                 }));
+
+                const items_json = {
+                    version: '2.0',
+                    settings: {
+                        orientation: 'landscape',
+                        background: { type: 'color', value: '#000000' },
+                        shuffle: false,
+                        transition: 'fade',
+                        defaultDuration: 10
+                    },
+                    zones: [{
+                        id: 'main',
+                        playlist
+                    }]
+                };
 
                 const campaign = await createCampaign.mutateAsync({
                     commerceId,

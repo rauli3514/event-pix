@@ -100,7 +100,7 @@ const TvPlayer = () => {
                 } else if (assignment.media) {
                     compiledItems = [{
                         id: assignment.media.id,
-                        type: assignment.media.type || 'image',
+                        type: assignment.media.type === 'web' ? 'url' : (assignment.media.type || 'image'),
                         url: assignment.media.url,
                         duration: 0, // 0 = infinito / loop
                         title: assignment.media.name
@@ -219,9 +219,19 @@ const TvPlayer = () => {
 
     if (status === 'loading') {
         return (
-            <div className="fixed inset-0 w-full h-full bg-black flex flex-col items-center justify-center text-white">
-                <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4" />
-                <h1 className="text-2xl font-mono text-slate-400">Iniciando EventPix Player...</h1>
+            <div className="fixed inset-0 w-full h-full bg-[#050505] flex flex-col items-center justify-center text-white">
+                <div className="relative">
+                    <div className="w-24 h-24 border-4 border-slate-800 rounded-full"></div>
+                    <div className="w-24 h-24 border-4 border-orange-500 border-t-transparent rounded-full animate-spin absolute top-0 left-0"></div>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        <MonitorPlay className="w-8 h-8 text-orange-500" />
+                    </div>
+                </div>
+                <h1 className="text-3xl font-bold mt-8 mb-2 tracking-wide text-white">Descargando Contenido</h1>
+                <p className="text-slate-400 text-lg">Por favor espere mientras recibimos los nuevos datos...</p>
+                <div className="w-64 h-2 bg-slate-800 rounded-full mt-6 overflow-hidden">
+                    <div className="h-full bg-orange-500 rounded-full animate-pulse w-full"></div>
+                </div>
                 <TvSettingsMenu deviceCode={deviceCode!} onRefresh={() => fetchCampaign()} />
             </div>
         );
@@ -229,13 +239,32 @@ const TvPlayer = () => {
 
     if (status === 'no_content') {
         return (
-            <div className="fixed inset-0 w-full h-full bg-black flex flex-col items-center justify-center text-white p-10 text-center">
-                <MonitorPlay className="w-32 h-32 text-indigo-600 mb-8 animate-pulse" />
-                <h1 className="text-6xl font-bold font-mono tracking-widest mb-4">{deviceCode}</h1>
-                <p className="text-2xl text-slate-400 max-w-2xl">
-                    Esta pantalla está encendida pero no tiene contenido asignado. <br/><br/>
-                    Ingresa a tu panel de EventPix y asígnale una campaña a este código.
-                </p>
+            <div className="fixed inset-0 w-full h-full bg-[#050505] flex flex-col items-center justify-center text-white p-10 text-center overflow-hidden">
+                {/* Background decorative elements */}
+                <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl animate-pulse"></div>
+                <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
+                
+                <div className="relative z-10 flex flex-col items-center">
+                    <div className="relative w-40 h-40 mb-10 flex items-center justify-center">
+                        <div className="absolute inset-0 bg-slate-800/50 rounded-3xl animate-ping opacity-20"></div>
+                        <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl relative z-10">
+                            <MonitorPlay className="w-20 h-20 text-orange-500" />
+                        </div>
+                    </div>
+                    
+                    <h1 className="text-6xl font-black tracking-tight mb-4 bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">Event-Pix Display</h1>
+                    
+                    <div className="flex items-center gap-3 mt-4 mb-12 bg-slate-900/50 border border-slate-800 px-6 py-3 rounded-full backdrop-blur-md">
+                        <div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse"></div>
+                        <span className="text-emerald-400 font-medium">Vinculado y Listo</span>
+                    </div>
+
+                    <p className="text-2xl text-slate-400 max-w-2xl font-light">
+                        Esta pantalla está conectada a la red.
+                        <br/>
+                        Envía contenido desde tu panel de control para comenzar la reproducción.
+                    </p>
+                </div>
                 <TvSettingsMenu deviceCode={deviceCode!} onRefresh={() => fetchCampaign()} />
             </div>
         );
@@ -243,18 +272,22 @@ const TvPlayer = () => {
 
     if (status === 'error') {
         return (
-            <div className="fixed inset-0 w-full h-full bg-black flex flex-col items-center justify-center text-white p-10 text-center">
-                <WifiOff className="w-32 h-32 text-rose-600 mb-8" />
-                <h1 className="text-5xl font-bold mb-4">Sin Conexión o Error</h1>
-                <p className="text-2xl text-slate-400 max-w-2xl mb-8">
-                    La pantalla no pudo comunicarse con el servidor. Es posible que la TV se esté conectando al WiFi recién ahora.
+            <div className="fixed inset-0 w-full h-full bg-[#050505] flex flex-col items-center justify-center text-white p-10 text-center">
+                <div className="relative mb-8">
+                    <WifiOff className="w-32 h-32 text-rose-600 relative z-10 animate-pulse" />
+                    <div className="absolute inset-0 bg-rose-600/20 blur-2xl rounded-full"></div>
+                </div>
+                <h1 className="text-5xl font-black mb-4">Sin Conexión</h1>
+                <p className="text-2xl text-slate-400 max-w-2xl mb-8 font-light">
+                    La pantalla no tiene conexión a Internet o no puede alcanzar los servidores.
+                    Revisa tu conexión WiFi o cable de red.
                 </p>
                 <button 
                     onClick={() => {
                         setStatus('loading');
                         fetchCampaign();
                     }}
-                    className="px-8 py-4 bg-rose-600 hover:bg-rose-700 rounded-xl text-2xl font-bold transition-all"
+                    className="px-8 py-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-full text-xl font-medium transition-all shadow-xl"
                 >
                     Reintentar Conexión
                 </button>

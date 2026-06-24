@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useIsSuperAdmin } from "@/hooks/use-roles";
 import { useDisplayDevice, useAssignContentToDevice, useUpdateDisplayDevice, useDisplayCampaigns, useDeleteAssignment } from "@/hooks/use-display-hub";
+import { useDisplayMedia } from "@/hooks/use-display-media";
 
 const DisplayDeviceDetail = () => {
     const { id } = useParams<{ id: string }>();
@@ -18,13 +19,17 @@ const DisplayDeviceDetail = () => {
     const { data: deviceData, isLoading } = useDisplayDevice(id);
     const assignContent = useAssignContentToDevice();
     const updateDevice = useUpdateDisplayDevice();
-
-    const { data: campaigns, isLoading: isLoadingCampaigns } = useDisplayCampaigns(deviceData?.commerce_id || undefined);
     const deleteAssignment = useDeleteAssignment();
 
+    const commerceId = deviceData?.commerce_id || undefined;
+    const { data: campaigns, isLoading: isLoadingCampaigns } = useDisplayCampaigns(commerceId);
+    const { data: mediaFiles, isLoading: isLoadingMedia } = useDisplayMedia(commerceId);
+
+    const [activeTab, setActiveTab] = useState<'assignment' | 'setup'>('assignment');
+    
+    const [contentType, setContentType] = useState<'campaign' | 'media'>('campaign');
     const [campaignId, setCampaignId] = useState<string>('none');
-    const [name, setName] = useState('');
-    const [desc, setDesc] = useState('');
+    const [mediaId, setMediaId] = useState<string>('none');
     const [isScheduled, setIsScheduled] = useState(false);
     const [startTime, setStartTime] = useState('');
     const [endTime, setEndTime] = useState('');
@@ -48,8 +53,14 @@ const DisplayDeviceDetail = () => {
 
     const handleSaveAssignment = () => {
         if (!id) return;
-        if (campaignId === 'none') {
+        
+        if (contentType === 'campaign' && campaignId === 'none') {
             toast.error('Selecciona una campaña primero');
+            return;
+        }
+
+        if (contentType === 'media' && mediaId === 'none') {
+            toast.error('Selecciona un archivo multimedia primero');
             return;
         }
 
@@ -60,9 +71,10 @@ const DisplayDeviceDetail = () => {
         
         assignContent.mutate({ 
             deviceId: id, 
-            campaignId,
-            startTime: isScheduled ? new Date(startTime).toISOString() : null,
-            endTime: isScheduled ? new Date(endTime).toISOString() : null
+            campaignId: contentType === 'campaign' ? campaignId : null,
+            mediaId: contentType === 'media' ? mediaId : null,
+            startTime: isScheduled && startTime ? new Date(startTime).toISOString() : null,
+            endTime: isScheduled && endTime ? new Date(endTime).toISOString() : null
         }, {
             onSuccess: () => {
                 toast.success('Campaña asignada correctamente.');
@@ -80,6 +92,28 @@ const DisplayDeviceDetail = () => {
             onSuccess: () => toast.success('Programación eliminada'),
             onError: () => toast.error('Error al eliminar')
         });
+    };
+
+    const handleForceReload = async () => {
+        if (!deviceData?.device_id) return;
+        const channel = supabase.channel(`device:${deviceData.device_id}`);
+        await channel.send({
+            type: 'broadcast',
+            event: 'command',
+            payload: { action: 'reload' },
+        });
+        toast.success("Comando de recarga enviado a la pantalla");
+    };
+
+    const handleClearCache = async () => {
+        if (!deviceData?.device_id) return;
+        const channel = supabase.channel(`device:${deviceData.device_id}`);
+        await channel.send({
+            type: 'broadcast',
+            event: 'command',
+            payload: { action: 'clear_cache' },
+        });
+        toast.success("Comando de limpieza de caché enviado a la pantalla");
     };
 
     const handleSaveInfo = () => {
@@ -134,12 +168,29 @@ const DisplayDeviceDetail = () => {
                     </div>
                 </header>
 
+                <div className="flex border-b border-slate-800 mb-6">
+                    <button 
+                        className={`px-6 py-3 font-medium text-sm transition-all border-b-2 ${activeTab === 'assignment' ? 'border-orange-500 text-orange-500' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
+                        onClick={() => setActiveTab('assignment')}
+                    >
+                        Contenido y Asignación
+                    </button>
+                    <button 
+                        className={`px-6 py-3 font-medium text-sm transition-all border-b-2 flex items-center gap-2 ${activeTab === 'setup' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
+                        onClick={() => setActiveTab('setup')}
+                    >
+                        <Cpu className="w-4 h-4" /> Setup Screen
+                    </button>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     
-                    {/* Left Col: Setup & Assignment */}
+                    {/* Left Col */}
                     <div className="md:col-span-2 space-y-6">
                         
-                        {/* Campaign Assignment */}
+                        {activeTab === 'assignment' && (
+                            <>
+                            {/* Campaign Assignment */}
                         <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl p-6">
                             <div className="flex items-center gap-2 mb-6">
                                 <PlaySquare className="w-5 h-5 text-indigo-400" />
@@ -147,24 +198,58 @@ const DisplayDeviceDetail = () => {
                             </div>
                             
                             <div className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label className="text-slate-300">Seleccionar Campaña / Playlist</Label>
-                                    
-                                    {isLoadingCampaigns ? (
-                                        <div className="h-10 bg-slate-800 animate-pulse rounded-md"></div>
-                                    ) : (
-                                        <Select value={campaignId} onValueChange={setCampaignId}>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label className="text-slate-300">Tipo de Contenido *</Label>
+                                        <Select value={contentType} onValueChange={(v: 'campaign' | 'media') => setContentType(v)}>
                                             <SelectTrigger className="w-full bg-slate-950 border-slate-700 text-white">
-                                                <SelectValue placeholder="Seleccionar campaña..." />
+                                                <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent className="bg-slate-900 border-slate-700 text-white">
-                                                <SelectItem value="none">-- Sin Contenido --</SelectItem>
-                                                {campaigns?.map(c => (
-                                                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                                                ))}
+                                                <SelectItem value="campaign">Playlist (Campaña)</SelectItem>
+                                                <SelectItem value="media">Archivo Directo (Media)</SelectItem>
                                             </SelectContent>
                                         </Select>
-                                    )}
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label className="text-slate-300">Contenido Seleccionado *</Label>
+                                        
+                                        {contentType === 'campaign' ? (
+                                            isLoadingCampaigns ? (
+                                                <div className="h-10 bg-slate-800 animate-pulse rounded-md"></div>
+                                            ) : (
+                                                <Select value={campaignId} onValueChange={setCampaignId}>
+                                                    <SelectTrigger className="w-full bg-slate-950 border-slate-700 text-white">
+                                                        <SelectValue placeholder="Seleccionar campaña..." />
+                                                    </SelectTrigger>
+                                                    <SelectContent className="bg-slate-900 border-slate-700 text-white">
+                                                        <SelectItem value="none">-- Sin Asignar --</SelectItem>
+                                                        {campaigns?.map(c => (
+                                                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            )
+                                        ) : (
+                                            isLoadingMedia ? (
+                                                <div className="h-10 bg-slate-800 animate-pulse rounded-md"></div>
+                                            ) : (
+                                                <Select value={mediaId} onValueChange={setMediaId}>
+                                                    <SelectTrigger className="w-full bg-slate-950 border-slate-700 text-white">
+                                                        <SelectValue placeholder="Seleccionar archivo..." />
+                                                    </SelectTrigger>
+                                                    <SelectContent className="bg-slate-900 border-slate-700 text-white">
+                                                        <SelectItem value="none">-- Sin Asignar --</SelectItem>
+                                                        {mediaFiles?.filter(m => m.type !== 'folder').map(m => (
+                                                            <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            )
+                                        )}
+                                    </div>
+                                </div>
 
                                     <div className="flex items-center gap-2 mt-4 mb-2">
                                         <input 
@@ -210,8 +295,8 @@ const DisplayDeviceDetail = () => {
                                             Ir al Gestor de Campañas
                                         </Link>
                                     </Button>
-                                    <Button onClick={handleSaveAssignment} disabled={assignContent.isPending || campaignId === 'none' && !deviceData.assignment?.campaign_id} className="bg-indigo-600 hover:bg-indigo-700">
-                                        <Save className="w-4 h-4 mr-2" /> {assignContent.isPending ? 'Guardando...' : 'Asignar a TV'}
+                                    <Button onClick={handleSaveAssignment} disabled={assignContent.isPending || (contentType === 'campaign' && campaignId === 'none') || (contentType === 'media' && mediaId === 'none')} className="bg-emerald-500 hover:bg-emerald-600">
+                                        <Save className="w-4 h-4 mr-2" /> {assignContent.isPending ? 'Enviando...' : 'Enviar a TV'}
                                     </Button>
                                 </div>
                             </div>
@@ -272,6 +357,61 @@ const DisplayDeviceDetail = () => {
                                 </div>
                             </div>
                         </div>
+                        </>
+                        )}
+
+                        {activeTab === 'setup' && (
+                            <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl p-6">
+                                <div className="flex items-center gap-2 mb-6">
+                                    <Cpu className="w-5 h-5 text-indigo-400" />
+                                    <h2 className="text-xl font-bold text-white">Configuración Avanzada (Setup)</h2>
+                                </div>
+                                
+                                <div className="space-y-6">
+                                    <div className="space-y-2">
+                                        <Label className="text-slate-300">Orientación de Pantalla</Label>
+                                        <Select value={deviceData.orientation || 'landscape'} onValueChange={(v) => updateDevice.mutate({ id: deviceData.id, updates: { orientation: v } })}>
+                                            <SelectTrigger className="w-full bg-slate-950 border-slate-700 text-white">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent className="bg-slate-900 border-slate-700 text-white">
+                                                <SelectItem value="landscape">Horizontal (Landscape)</SelectItem>
+                                                <SelectItem value="portrait">Vertical (Portrait)</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label className="text-slate-300">Escala del Contenido</Label>
+                                        <Select value={deviceData.scale || 'fit'} onValueChange={(v) => updateDevice.mutate({ id: deviceData.id, updates: { scale: v } })}>
+                                            <SelectTrigger className="w-full bg-slate-950 border-slate-700 text-white">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent className="bg-slate-900 border-slate-700 text-white">
+                                                <SelectItem value="fit">Ajustar (Fit) - Mantiene proporción</SelectItem>
+                                                <SelectItem value="fill">Llenar (Fill) - Recorta bordes</SelectItem>
+                                                <SelectItem value="stretch">Estirar (Stretch) - Distorsiona</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    <div className="pt-4 border-t border-slate-800">
+                                        <h3 className="text-sm font-medium text-slate-300 mb-4">Acciones Remotas</h3>
+                                        <div className="flex flex-col gap-3">
+                                            <Button onClick={handleForceReload} variant="outline" className="w-full justify-start border-slate-700 bg-slate-950 text-slate-300 hover:text-white hover:bg-slate-800">
+                                                <Activity className="w-4 h-4 mr-2 text-indigo-400" /> Forzar Recarga de la App
+                                            </Button>
+                                            <Button onClick={handleClearCache} variant="outline" className="w-full justify-start border-slate-700 bg-slate-950 text-slate-300 hover:text-white hover:bg-slate-800">
+                                                <Trash2 className="w-4 h-4 mr-2 text-rose-400" /> Limpiar Caché Remotamente
+                                            </Button>
+                                        </div>
+                                        <p className="text-xs text-slate-500 mt-3">
+                                            Las acciones remotas se ejecutan instantáneamente si la pantalla está online.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Right Col: Device Status */}

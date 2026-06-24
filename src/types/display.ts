@@ -25,6 +25,7 @@ export interface DisplayDevice {
     scale: string;
     orientation: string;
     pairing_status: 'pending' | 'linked';
+    settings: any | null; // For Setup Screens (timezone, cache, reload commands)
     last_seen: string | null;
     created_at: string;
     updated_at: string;
