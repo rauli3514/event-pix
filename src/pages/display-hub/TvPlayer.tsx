@@ -141,9 +141,18 @@ const TvPlayer = () => {
             sendHeartbeat();
         }, 60 * 1000);
 
+        // Recuperación automática cuando vuelve el internet
+        const handleOnline = () => {
+            console.log('Internet restaurado. Intentando reconectar...');
+            setStatus('loading');
+            fetchCampaign();
+        };
+        window.addEventListener('online', handleOnline);
+
         return () => {
             if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
             if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
+            window.removeEventListener('online', handleOnline);
         };
     }, [deviceCode]);
 
