@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { PlaySquare, ArrowLeft, Plus, Clock, LayoutDashboard, MoreVertical, Trash2, Edit } from 'lucide-react';
+import { PlaySquare, Plus, Clock, LayoutDashboard, MoreVertical, Trash2, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
