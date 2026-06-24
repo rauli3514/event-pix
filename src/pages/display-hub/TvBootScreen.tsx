@@ -5,7 +5,6 @@ import { MonitorPlay } from 'lucide-react';
 
 export default function TvBootScreen() {
   const [pin, setPin] = useState<string>('');
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -20,14 +19,14 @@ export default function TvBootScreen() {
       }
       
       // Revisar si existe en la base de datos
-      const { data: existing, error: selectError } = await supabase.from('display_devices')
+      const { data: existing } = await supabase.from('display_devices')
         .select('device_id')
         .eq('device_id', deviceId)
         .maybeSingle();
 
       if (!existing) {
         // Insert into Supabase
-        const { error: insertError } = await supabase.from('display_devices').insert([
+        await supabase.from('display_devices').insert([
           { device_id: deviceId, pairing_status: 'pending' }
         ]).select().single();
       } else {
