@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import { CampaignItem } from '@/types/display';
 
 interface PlayerRendererProps {
     item: any; // Using any to support both CampaignItem (V1) and UniversalElement (V2)
