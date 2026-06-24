@@ -39,10 +39,10 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, onSave }:
             setGroupId(device.group_id || 'none');
             // Check if there is an assigned media
             if (device.assignment?.media) {
-                setSelectedAsset(device.assignment.media);
+                setSelectedAsset({ ...device.assignment.media, type: device.assignment.media.type || 'asset' });
                 setContentType('asset');
             } else if (device.assignment?.campaign) {
-                setSelectedAsset(device.assignment.campaign);
+                setSelectedAsset({ ...device.assignment.campaign, type: 'campaign' });
                 setContentType('playlist');
             } else {
                 setSelectedAsset(null);
@@ -150,10 +150,10 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, onSave }:
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-[160px_1fr] items-center gap-4">
-                        <Label className="text-right text-slate-500 font-medium">Escala</Label>
-                        <Select value={scale} onValueChange={setScale}>
-                            <SelectTrigger className="w-full shadow-sm bg-white">
+                    <div className="grid grid-cols-[160px_1fr] items-center gap-4 opacity-60">
+                        <Label className="text-right text-slate-500 font-medium">Escala <span className="text-xs text-slate-400 block">(Próximamente)</span></Label>
+                        <Select value={scale} onValueChange={setScale} disabled>
+                            <SelectTrigger className="w-full shadow-sm bg-slate-50 cursor-not-allowed">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -164,10 +164,10 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, onSave }:
                         </Select>
                     </div>
 
-                    <div className="grid grid-cols-[160px_1fr] items-center gap-4">
-                        <Label className="text-right text-slate-500 font-medium">Orientación</Label>
-                        <Select value={orientation} onValueChange={setOrientation}>
-                            <SelectTrigger className="w-full shadow-sm bg-white">
+                    <div className="grid grid-cols-[160px_1fr] items-center gap-4 opacity-60">
+                        <Label className="text-right text-slate-500 font-medium">Orientación <span className="text-xs text-slate-400 block">(Próximamente)</span></Label>
+                        <Select value={orientation} onValueChange={setOrientation} disabled>
+                            <SelectTrigger className="w-full shadow-sm bg-slate-50 cursor-not-allowed">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
