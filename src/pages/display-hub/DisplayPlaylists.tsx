@@ -82,11 +82,7 @@ const DisplayPlaylists = () => {
                 {/* Header */}
                 <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
-                        <Button variant="ghost" asChild className="mb-4 text-slate-400 hover:text-white hover:bg-slate-800 -ml-4">
-                            <Link to={`/admin/display/commerce/${effectiveCommerceId}`}>
-                                <ArrowLeft className="w-4 h-4 mr-2" /> Volver a Pantallas
-                            </Link>
-                        </Button>
+
                         <div className="flex items-center gap-3">
                             <div className="w-12 h-12 bg-indigo-600/20 rounded-xl flex items-center justify-center border border-indigo-500/30">
                                 <PlaySquare className="w-6 h-6 text-indigo-400" />

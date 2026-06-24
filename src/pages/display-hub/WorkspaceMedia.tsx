@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Search, FolderPlus, Upload, LayoutGrid, List as ListIcon, Image as ImageIcon, Video, FileAudio, FileText, Globe, ArrowRightCircle, Tag, HardDrive, Trash2, Folder } from 'lucide-react';
 import { SendToScreensModal } from '@/components/display/SendToScreensModal';
 import { UploadMediaModal } from '@/components/display/UploadMediaModal';
-import { useDisplayMedia, useUploadDisplayMedia, useDeleteDisplayMedia } from '@/hooks/use-display-media';
+import { useDisplayMedia, useUploadDisplayMedia, useDeleteDisplayMedia, useUpdateDisplayMedia } from '@/hooks/use-display-media';
 import { toast } from 'sonner';
 import { DisplayMedia } from '@/types/display';
 
@@ -29,10 +29,13 @@ export function WorkspaceMedia() {
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isSendModalOpen, setIsSendModalOpen] = useState(false);
     const [currentFolder, setCurrentFolder] = useState<string>('/');
+    const [sortMode, setSortMode] = useState<'newest'|'oldest'|'az'|'za'>('newest');
+    const [draggedOverFolder, setDraggedOverFolder] = useState<string | null>(null);
 
     const { data: mediaFiles = [], isLoading } = useDisplayMedia(commerceId);
     const { mutateAsync: uploadMedia } = useUploadDisplayMedia();
     const { mutateAsync: deleteMedia } = useDeleteDisplayMedia();
+    const { mutateAsync: updateMedia } = useUpdateDisplayMedia();
 
     const currentCategory = CATEGORY_MAP[activeCategory];
 
@@ -53,8 +56,17 @@ export function WorkspaceMedia() {
             if (activeCategory === 'docs' && file.type === 'docs') return true;
             if (activeCategory === 'web' && file.type === 'web') return true;
             return false;
+        }).sort((a, b) => {
+            if (a.type === 'folder' && b.type !== 'folder') return -1;
+            if (a.type !== 'folder' && b.type === 'folder') return 1;
+
+            if (sortMode === 'newest') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+            if (sortMode === 'oldest') return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+            if (sortMode === 'az') return a.name.localeCompare(b.name);
+            if (sortMode === 'za') return b.name.localeCompare(a.name);
+            return 0;
         });
-    }, [activeCategory, search, mediaFiles, currentFolder]);
+    }, [activeCategory, search, mediaFiles, currentFolder, sortMode]);
 
     const handleUploadFiles = async (files: FileList | null) => {
         if (!files || !commerceId) return;
@@ -215,7 +227,7 @@ export function WorkspaceMedia() {
                                         onChange={(e) => setSearch(e.target.value)}
                                     />
                                 </div>
-                                <Button variant="outline" className="bg-white shadow-sm border-slate-200 text-slate-600">
+                                <Button variant="outline" className="bg-white shadow-sm border-slate-200 text-slate-600" onClick={() => toast('Función de etiquetas próximamente', { icon: '🏷️' })}>
                                     <Tag className="w-4 h-4 mr-2" /> Etiquetas
                                 </Button>
                             </div>
@@ -225,6 +237,16 @@ export function WorkspaceMedia() {
                                     <FolderPlus className="w-4 h-4 mr-2" />
                                     Agregar carpeta
                                 </Button>
+                                <select 
+                                    className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm text-slate-700 outline-none focus:ring-2 focus:ring-orange-500/20"
+                                    value={sortMode}
+                                    onChange={(e) => setSortMode(e.target.value as any)}
+                                >
+                                    <option value="newest">Más reciente</option>
+                                    <option value="oldest">Más antiguo</option>
+                                    <option value="az">A-Z</option>
+                                    <option value="za">Z-A</option>
+                                </select>
                                 <div className="flex bg-slate-200/50 p-1 rounded-md border border-slate-200">
                                     <Button 
                                         variant="ghost" size="sm" 
@@ -346,6 +368,37 @@ export function WorkspaceMedia() {
                                     return (
                                     <div 
                                         key={file.id} 
+                                        draggable={!isFolder}
+                                        onDragStart={(e) => {
+                                            if (!isFolder) {
+                                                e.dataTransfer.setData('mediaId', file.id);
+                                            }
+                                        }}
+                                        onDragOver={(e) => {
+                                            if (isFolder) {
+                                                e.preventDefault();
+                                                setDraggedOverFolder(file.id);
+                                            }
+                                        }}
+                                        onDragLeave={() => {
+                                            if (isFolder) setDraggedOverFolder(null);
+                                        }}
+                                        onDrop={async (e) => {
+                                            e.preventDefault();
+                                            setDraggedOverFolder(null);
+                                            if (isFolder) {
+                                                const droppedId = e.dataTransfer.getData('mediaId');
+                                                if (droppedId) {
+                                                    const newPath = currentFolder === '/' ? `/${file.name}` : `${currentFolder}/${file.name}`;
+                                                    try {
+                                                        await updateMedia({ id: droppedId, updates: { folder_path: newPath } });
+                                                        toast.success('Archivo movido a la carpeta');
+                                                    } catch (err) {
+                                                        toast.error('Error al mover el archivo');
+                                                    }
+                                                }
+                                            }
+                                        }}
                                         onClick={() => {
                                             if (isFolder) {
                                                 setCurrentFolder(currentFolder === '/' ? `/${file.name}` : `${currentFolder}/${file.name}`);
@@ -353,7 +406,7 @@ export function WorkspaceMedia() {
                                                 handleToggleSelect(file.id);
                                             }
                                         }} 
-                                        className={`bg-white rounded-xl shadow-sm border overflow-hidden group hover:border-orange-300 transition-colors cursor-pointer flex flex-col relative ${selectedIds.includes(file.id) ? 'border-orange-400 ring-2 ring-orange-400/20' : 'border-slate-200'}`}
+                                        className={`bg-white rounded-xl shadow-sm border overflow-hidden group transition-colors cursor-pointer flex flex-col relative ${selectedIds.includes(file.id) ? 'border-orange-400 ring-2 ring-orange-400/20' : 'border-slate-200'} ${draggedOverFolder === file.id ? 'border-emerald-500 ring-2 ring-emerald-500 shadow-md bg-emerald-50/50' : 'hover:border-orange-300'}`}
                                     >
                                         <div className="absolute top-2 left-2 z-10">
                                             <input 

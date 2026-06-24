@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { 
     ArrowLeft, Save, Trash2, Clock, Image as ImageIcon, 
-    Video, FileAudio, FileText, Globe, GripVertical, Settings2, Folder, LayoutDashboard
+    Video, FileAudio, FileText, Globe, GripVertical, Settings2, Folder, LayoutDashboard, Upload
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -14,8 +14,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 
 import { useIsSuperAdmin } from "@/hooks/use-roles";
 import { useDisplayCampaigns, useUpdateCampaign } from "@/hooks/use-display-hub";
-import { useDisplayMedia } from "@/hooks/use-display-media";
+import { useDisplayMedia, useUploadDisplayMedia } from "@/hooks/use-display-media";
 import { DisplayCampaignV2, UniversalElement, DisplayFitMode, DisplayTransition } from '@/types/display';
+import { UploadMediaModal } from '@/components/display/UploadMediaModal';
 
 const migrateToV2 = (data: any): DisplayCampaignV2 => {
     if (data?.version === '2.0') return data as DisplayCampaignV2;
@@ -68,12 +69,14 @@ const PlaylistBuilder = () => {
 
     const { data: playlists, isLoading: loadingPlaylists } = useDisplayCampaigns(commerceId);
     const { data: mediaFiles = [], isLoading: loadingMedia } = useDisplayMedia(commerceId);
+    const { mutateAsync: uploadMedia } = useUploadDisplayMedia();
     const updateCampaign = useUpdateCampaign();
 
     const playlistRecord = playlists?.find(c => c.id === playlistId);
 
     const [campaignV2, setCampaignV2] = useState<DisplayCampaignV2>(migrateToV2(null));
     const [mediaFolder, setMediaFolder] = useState<string>('/');
+    const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
     if (isSuperAdmin === false) {
         navigate('/admin', { replace: true });
@@ -92,6 +95,43 @@ const PlaylistBuilder = () => {
             onSuccess: () => toast.success('Playlist guardada. Las pantallas se actualizarán.'),
             onError: () => toast.error('Error al guardar la playlist')
         });
+    };
+
+    const handleUploadFiles = async (files: FileList | null) => {
+        if (!files || !commerceId) return;
+        
+        let successCount = 0;
+        let failCount = 0;
+        const toastId = toast.loading(`Subiendo ${files.length} archivo(s)...`);
+
+        for (let i = 0; i < files.length; i++) {
+            try {
+                await uploadMedia({ commerceId, file: files[i], folderPath: mediaFolder });
+                successCount++;
+            } catch (error) {
+                console.error("Upload error:", error);
+                failCount++;
+            }
+        }
+
+        if (failCount > 0) {
+            toast.error(`Se subieron ${successCount} archivos, pero fallaron ${failCount}.`, { id: toastId });
+        } else {
+            toast.success(`Se subieron ${successCount} archivo(s) correctamente.`, { id: toastId });
+            setIsUploadModalOpen(false);
+        }
+    };
+
+    const handleAddWebLink = async (url: string, name: string) => {
+        if (!commerceId) return;
+        const toastId = toast.loading("Agregando enlace...");
+        try {
+            await uploadMedia({ commerceId, webUrl: url, webName: name, folderPath: mediaFolder });
+            toast.success("Enlace agregado correctamente.", { id: toastId });
+        } catch (error) {
+            console.error("Web link error:", error);
+            toast.error("Error al agregar el enlace.", { id: toastId });
+        }
     };
 
     // --- Media Right Column Logic ---
@@ -346,6 +386,9 @@ const PlaylistBuilder = () => {
                             )}
                             Medios {mediaFolder !== '/' && <span className="text-slate-400 font-normal">/ {mediaFolder.split('/').pop()}</span>}
                         </h3>
+                        <Button variant="ghost" size="sm" className="h-8 px-2 text-slate-600 bg-white border border-slate-200" onClick={() => setIsUploadModalOpen(true)}>
+                            <Upload className="w-3.5 h-3.5 mr-1.5" /> Subir
+                        </Button>
                     </div>
                     
                     <div className="flex-1 overflow-y-auto p-3">
@@ -389,6 +432,14 @@ const PlaylistBuilder = () => {
                     </div>
                 </div>
             </div>
+
+            <UploadMediaModal 
+                isOpen={isUploadModalOpen} 
+                onClose={() => setIsUploadModalOpen(false)} 
+                onUpload={handleUploadFiles}
+                onAddWebLink={handleAddWebLink}
+                activeCategory="images"
+            />
         </div>
     );
 };

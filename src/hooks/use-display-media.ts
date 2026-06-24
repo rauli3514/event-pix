@@ -122,3 +122,24 @@ export const useDeleteDisplayMedia = () => {
         }
     });
 };
+
+export const useUpdateDisplayMedia = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ id, updates }: { id: string; updates: Partial<DisplayMedia> }) => {
+            const { data, error } = await supabase
+                .from('display_media')
+                .update(updates)
+                .eq('id', id)
+                .select()
+                .single();
+
+            if (error) throw error;
+            return data as DisplayMedia;
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ['display_media', data.commerce_id] });
+        }
+    });
+};
