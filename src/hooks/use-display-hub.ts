@@ -211,6 +211,11 @@ export const useDisplayDevices = (commerceId?: string | null) => {
             const { data, error } = await query;
 
             if (error) throw error;
+
+            // Fetch all assignments manually to ensure we get group assignments and bypass relation quirks
+            const { data: allAssignments } = await supabase
+                .from('display_assignments')
+                .select('*, campaign:display_campaigns(*), media:display_media(*)');
             
             const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
             
@@ -227,10 +232,18 @@ export const useDisplayDevices = (commerceId?: string | null) => {
                     }
                 }
 
+                // Find assignment: first check direct device_id match, then group_id match
+                let activeAssignment = null;
+                if (allAssignments) {
+                    const directMatch = allAssignments.find(a => a.device_id === device.id);
+                    const groupMatch = device.group_id ? allAssignments.find(a => a.group_id === device.group_id) : null;
+                    activeAssignment = directMatch || groupMatch || null;
+                }
+
                 return { 
                     ...device, 
                     derived_status: status,
-                    assignment: device.assignment && device.assignment.length > 0 ? device.assignment[0] : null
+                    assignment: activeAssignment
                 } as DisplayDeviceWithStatus & { assignment: DisplayAssignment | null };
             });
         },

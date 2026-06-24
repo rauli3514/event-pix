@@ -421,32 +421,17 @@ const DisplayHubList = () => {
                         </DialogTitle>
                     </DialogHeader>
                     <div className="flex-1 bg-black flex items-center justify-center relative overflow-hidden">
-                        {previewDevice?.assignment?.media ? (
-                            previewDevice.assignment.media.type.startsWith('video/') ? (
-                                <video 
-                                    src={previewDevice.assignment.media.url} 
-                                    controls 
-                                    autoPlay 
-                                    loop 
-                                    className="max-w-full max-h-full object-contain"
-                                />
-                            ) : (
-                                <img 
-                                    src={previewDevice.assignment.media.url} 
-                                    alt="Preview" 
-                                    className="max-w-full max-h-full object-contain"
-                                />
-                            )
-                        ) : previewDevice?.assignment?.campaign ? (
-                            <div className="text-slate-400 text-center">
-                                <Monitor className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                                <p className="text-lg">Reproduciendo Lista: {previewDevice.assignment.campaign.name}</p>
-                                <p className="text-sm mt-2 opacity-70">La vista previa de listas completas estará disponible pronto.</p>
-                            </div>
+                        {previewDevice ? (
+                            <iframe 
+                                src={`/display/tv/${previewDevice.device_id}`}
+                                className="w-full h-full border-0"
+                                title="Vista Previa TV"
+                                allow="autoplay; fullscreen"
+                            />
                         ) : (
                             <div className="text-slate-500 text-center">
                                 <Monitor className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                                <p>Esta pantalla no tiene ningún recurso asignado.</p>
+                                <p>Cargando vista previa...</p>
                             </div>
                         )}
                     </div>

@@ -12,6 +12,7 @@ const TvPlayer = () => {
     const [items, setItems] = useState<CampaignItem[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [status, setStatus] = useState<'loading' | 'playing' | 'offline_playing' | 'no_content' | 'error'>('loading');
+    const [deviceSettings, setDeviceSettings] = useState({ scale: 'fit', orientation: 'landscape' });
     
     // Referencias para limpiar timeouts e intervalos
     const rotationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -23,10 +24,10 @@ const TvPlayer = () => {
         if (!deviceCode) return;
 
         try {
-            // 1. Obtener UUID del dispositivo
+            // 1. Obtener UUID del dispositivo y configuración
             const { data: device, error: deviceError } = await supabase
                 .from('display_devices')
-                .select('id, group_id, pairing_status')
+                .select('id, group_id, pairing_status, scale, orientation')
                 .eq('device_id', deviceCode)
                 .single();
 
@@ -36,6 +37,11 @@ const TvPlayer = () => {
                 setStatus('no_content');
                 return;
             }
+
+            setDeviceSettings({
+                scale: device.scale || 'fit',
+                orientation: device.orientation || 'landscape'
+            });
 
             // 2. Buscar asignaciones para el dispositivo o su zona
             let orQuery = `device_id.eq.${device.id}`;
@@ -226,8 +232,30 @@ const TvPlayer = () => {
         );
     }
 
+    const containerStyle: React.CSSProperties = deviceSettings.orientation === 'portrait' 
+        ? { 
+            position: 'fixed',
+            transform: 'rotate(90deg)',
+            transformOrigin: 'center center',
+            width: '100vh',
+            height: '100vw',
+            top: 'calc(50vh - 50vw)',
+            left: 'calc(50vw - 50vh)',
+            backgroundColor: '#000',
+            overflow: 'hidden'
+          }
+        : {
+            position: 'fixed', 
+            top: 0, 
+            left: 0, 
+            width: '100vw', 
+            height: '100vh', 
+            backgroundColor: '#000', 
+            overflow: 'hidden'
+          };
+
     return (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: '#000', overflow: 'hidden' }}>
+        <div style={containerStyle}>
             {/* Indicador de modo offline invisible a simple vista, pero útil para debugear */}
             {status === 'offline_playing' && (
                 <div className="absolute top-2 right-2 z-50 bg-rose-600 text-white text-[10px] px-2 py-1 rounded opacity-30">
@@ -241,6 +269,7 @@ const TvPlayer = () => {
                     key={`${item.id}-${index}`} 
                     item={item} 
                     isActive={index === currentIndex} 
+                    deviceScale={deviceSettings.scale}
                 />
             ))}
 

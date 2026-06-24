@@ -3,9 +3,10 @@ import { useEffect, useRef } from 'react';
 interface PlayerRendererProps {
     item: any; // Using any to support both CampaignItem (V1) and UniversalElement (V2)
     isActive: boolean;
+    deviceScale?: string;
 }
 
-export const PlayerRenderer = ({ item, isActive }: PlayerRendererProps) => {
+export const PlayerRenderer = ({ item, isActive, deviceScale = 'fit' }: PlayerRendererProps) => {
     const iframeRef = useRef<HTMLIFrameElement>(null);
 
     // Si es un iframe, forzar una recarga suave cuando se vuelve activo (opcional, depende de si queremos resetear el estado de la web externa)
@@ -19,6 +20,13 @@ export const PlayerRenderer = ({ item, isActive }: PlayerRendererProps) => {
     // Usar display:none en lugar de opacity para TV Boxes antiguas con bugs de renderizado
     const displayStyle: React.CSSProperties = isActive ? { display: 'flex' } : { display: 'none' };
 
+    // Determinar object-fit basado en la escala del dispositivo o del item
+    let objectFitValue: any = 'contain'; // Default fit
+    if (deviceScale === 'fill') objectFitValue = 'cover';
+    if (deviceScale === 'stretch') objectFitValue = 'fill';
+    // Si el item tiene su propio fitMode, lo respetamos (opcional, o podemos forzar el del dispositivo)
+    if (item.fitMode) objectFitValue = item.fitMode;
+
     switch (item.type) {
         case 'url':
         case 'external_url':
@@ -26,11 +34,11 @@ export const PlayerRenderer = ({ item, isActive }: PlayerRendererProps) => {
             
             if (isImageUrl) {
                 return (
-                    <div style={{ position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: '#000', alignItems: 'center', justifyContent: 'center', ...displayStyle }}>
+                    <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: '#000', alignItems: 'center', justifyContent: 'center', ...displayStyle }}>
                         <img 
                             src={item.url} 
                             alt={item.title || item.content}
-                            style={{ width: '100vw', height: '100vh', objectFit: item.fitMode || 'contain' }}
+                            style={{ width: '100%', height: '100%', objectFit: objectFitValue }}
                             loading="lazy"
                         />
                     </div>
@@ -43,7 +51,7 @@ export const PlayerRenderer = ({ item, isActive }: PlayerRendererProps) => {
             }
 
             return (
-                <div style={{ position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: '#000', ...displayStyle }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: '#000', ...displayStyle }}>
                     {isActive && normalizedUrl ? (
                         <iframe 
                             ref={iframeRef}
@@ -53,7 +61,7 @@ export const PlayerRenderer = ({ item, isActive }: PlayerRendererProps) => {
                             title={item.title || item.content}
                         />
                     ) : isActive && !normalizedUrl ? (
-                        <div style={{ width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '1.5rem' }}>
+                        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '1.5rem' }}>
                             URL Externa no configurada
                         </div>
                     ) : null}
@@ -63,16 +71,16 @@ export const PlayerRenderer = ({ item, isActive }: PlayerRendererProps) => {
         case 'image':
         case 'image_ad':
             return (
-                <div style={{ position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: '#000', alignItems: 'center', justifyContent: 'center', ...displayStyle }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: '#000', alignItems: 'center', justifyContent: 'center', ...displayStyle }}>
                     {item.imageUrl || item.url ? (
                         <img 
                             src={item.imageUrl || item.url} 
                             alt={item.title || item.content}
-                            style={{ width: '100vw', height: '100vh', objectFit: item.fitMode || 'contain' }}
+                            style={{ width: '100%', height: '100%', objectFit: objectFitValue }}
                             loading="lazy"
                         />
                     ) : (
-                        <div style={{ width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '1.5rem' }}>
+                        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '1.5rem' }}>
                             Imagen no configurada
                         </div>
                     )}
@@ -82,18 +90,18 @@ export const PlayerRenderer = ({ item, isActive }: PlayerRendererProps) => {
         case 'video':
         case 'video_ad':
             return (
-                <div style={{ position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: '#000', alignItems: 'center', justifyContent: 'center', ...displayStyle }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: '#000', alignItems: 'center', justifyContent: 'center', ...displayStyle }}>
                     {item.url ? (
                         <video 
                             src={item.url} 
-                            style={{ width: '100vw', height: '100vh', objectFit: item.fitMode || 'contain' }}
+                            style={{ width: '100%', height: '100%', objectFit: objectFitValue }}
                             autoPlay={isActive}
                             muted={item.mute !== false}
                             loop={item.loop !== false}
                             playsInline
                         />
                     ) : (
-                        <div style={{ width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '1.5rem' }}>
+                        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '1.5rem' }}>
                             Video no configurado
                         </div>
                     )}
@@ -103,7 +111,7 @@ export const PlayerRenderer = ({ item, isActive }: PlayerRendererProps) => {
         case 'text':
             return (
                 <div 
-                    style={{ position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: item.backgroundColor || '#000', alignItems: 'center', justifyContent: 'center', ...displayStyle }} 
+                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: item.backgroundColor || '#000', alignItems: 'center', justifyContent: 'center', ...displayStyle }} 
                 >
                     <p style={{ color: item.color || '#fff', fontSize: '5rem', fontWeight: 'bold', textAlign: 'center', padding: '2rem' }}>
                         {item.content}
