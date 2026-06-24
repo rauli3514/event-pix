@@ -265,7 +265,7 @@ const PlaylistBuilder = () => {
                             </div>
                         ) : (
                             <div className="space-y-3">
-                                {activePlaylist.map((item, index) => {
+                                {activePlaylist.map((item) => {
                                     const TypeIcon = getIconForType(item.type);
                                     return (
                                         <div key={item.id} className="bg-white border border-slate-200 rounded-xl shadow-sm flex items-stretch group hover:border-orange-300 transition-colors">
