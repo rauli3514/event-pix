@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { CampaignItem } from '@/types/display';
 import { PlayerRenderer } from '@/components/display/PlayerRenderer';
+import { TvSettingsMenu } from '@/components/display/TvSettingsMenu';
 import { MonitorPlay, WifiOff } from 'lucide-react';
 
 const TvPlayer = () => {
@@ -184,6 +185,7 @@ const TvPlayer = () => {
             <div className="fixed inset-0 w-full h-full bg-black flex flex-col items-center justify-center text-white">
                 <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4" />
                 <h1 className="text-2xl font-mono text-slate-400">Iniciando EventPix Player...</h1>
+                <TvSettingsMenu deviceCode={deviceCode!} onRefresh={() => fetchCampaign()} />
             </div>
         );
     }
@@ -197,6 +199,7 @@ const TvPlayer = () => {
                     Esta pantalla está encendida pero no tiene contenido asignado. <br/><br/>
                     Ingresa a tu panel de EventPix y asígnale una campaña a este código.
                 </p>
+                <TvSettingsMenu deviceCode={deviceCode!} onRefresh={() => fetchCampaign()} />
             </div>
         );
     }
@@ -218,6 +221,7 @@ const TvPlayer = () => {
                 >
                     Reintentar Conexión
                 </button>
+                <TvSettingsMenu deviceCode={deviceCode!} onRefresh={() => fetchCampaign()} />
             </div>
         );
     }
@@ -239,6 +243,9 @@ const TvPlayer = () => {
                     isActive={index === currentIndex} 
                 />
             ))}
+
+            {/* Menú de configuración lateral oculto */}
+            <TvSettingsMenu deviceCode={deviceCode!} onRefresh={() => fetchCampaign()} />
         </div>
     );
 };
