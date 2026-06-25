@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { CloudRain, LayoutTemplate, Type, X } from 'lucide-react';
+import { CloudRain, LayoutTemplate, Type, DollarSign, X } from 'lucide-react';
 import { AppEditorModal } from './AppEditorModal';
 
 interface AppCatalogModalProps {
@@ -11,7 +11,7 @@ interface AppCatalogModalProps {
     currentFolder: string;
 }
 
-export type AppId = 'weather' | 'split-screen' | 'ticker';
+export type AppId = 'weather' | 'split-screen' | 'ticker' | 'dolar';
 
 const APPS = [
     {
@@ -37,6 +37,14 @@ const APPS = [
         icon: Type,
         color: 'text-emerald-400',
         bg: 'bg-emerald-400/10'
+    },
+    {
+        id: 'dolar' as AppId,
+        name: 'Cotización Dólar',
+        description: 'Muestra el precio del dólar oficial, blue, bolsa, y cripto actualizado minuto a minuto.',
+        icon: DollarSign,
+        color: 'text-green-400',
+        bg: 'bg-green-400/10'
     }
 ];
 

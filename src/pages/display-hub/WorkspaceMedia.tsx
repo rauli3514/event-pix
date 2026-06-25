@@ -24,12 +24,11 @@ const CATEGORY_MAP: Record<CategoryId, { title: string, icon: any }> = {
     apps: { title: 'Apps', icon: LayoutGrid }
 };
 
-export function WorkspaceMedia() {
+export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: CategoryId }) {
     const { commerceId } = useParams<{ commerceId: string }>();
     const [viewMode, setViewMode] = useState<'list'|'grid'>('grid');
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-    const [isAppCatalogOpen, setIsAppCatalogOpen] = useState(false);
-    const [activeCategory, setActiveCategory] = useState<CategoryId>('all');
+    const [activeCategory, setActiveCategory] = useState<CategoryId>(initialCategory);
     const [search, setSearch] = useState('');
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isSendModalOpen, setIsSendModalOpen] = useState(false);
@@ -177,14 +176,17 @@ export function WorkspaceMedia() {
                     <p className="text-sm text-slate-400 mt-1">Sube, organiza en carpetas y envía medios a tus pantallas.</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
-                    <Button variant="outline" className="bg-slate-800 text-slate-200 border-slate-700 shadow-sm hover:bg-slate-700 hover:text-white" onClick={() => setIsUploadModalOpen(true)}>
-                        <Upload className="w-4 h-4 mr-2" />
-                        Subir Archivos
-                    </Button>
-                    <Button variant="outline" className="bg-indigo-900/40 text-indigo-300 border-indigo-500/50 shadow-sm hover:bg-indigo-900/60 hover:text-indigo-200" onClick={() => setIsAppCatalogOpen(true)}>
-                        <LayoutGrid className="w-4 h-4 mr-2" />
-                        Crear App
-                    </Button>
+                    {activeCategory === 'apps' ? (
+                        <Button variant="outline" className="bg-indigo-900/40 text-indigo-300 border-indigo-500/50 shadow-sm hover:bg-indigo-900/60 hover:text-indigo-200" onClick={() => setIsAppCatalogOpen(true)}>
+                            <LayoutGrid className="w-4 h-4 mr-2" />
+                            Crear App
+                        </Button>
+                    ) : (
+                        <Button variant="outline" className="bg-slate-800 text-slate-200 border-slate-700 shadow-sm hover:bg-slate-700 hover:text-white" onClick={() => setIsUploadModalOpen(true)}>
+                            <Upload className="w-4 h-4 mr-2" />
+                            Subir Archivos
+                        </Button>
+                    )}
                     <div className="h-8 w-[1px] bg-slate-700 mx-1 hidden sm:block"></div>
                     <Button 
                         variant="outline"
@@ -251,6 +253,9 @@ export function WorkspaceMedia() {
                                     {(Object.keys(CATEGORY_MAP) as CategoryId[]).map(cat => {
                                         const config = CATEGORY_MAP[cat];
                                         const isSelected = activeCategory === cat;
+                                        // Hide apps from the standard filters to avoid overflow, it has its own dedicated sidebar tab
+                                        if (cat === 'apps' && initialCategory !== 'apps') return null;
+
                                         return (
                                             <button
                                                 key={cat}

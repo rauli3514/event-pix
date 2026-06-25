@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { WeatherPreview } from './apps/weather/WeatherApp';
 import { SplitScreenPreview } from './apps/split-screen/SplitScreenApp';
+import { DolarPreview } from './apps/dolar/DolarApp';
 
 interface PlayerRendererProps {
     item: any; // Using any to support both CampaignItem (V1) and UniversalElement (V2)
@@ -66,6 +67,8 @@ export const PlayerRenderer = ({ item, isActive }: PlayerRendererProps) => {
                             <WeatherPreview config={metadata.config || {}} />
                         ) : appId === 'split-screen' ? (
                             <SplitScreenPreview config={metadata.config || {}} />
+                        ) : appId === 'dolar' ? (
+                            <DolarPreview config={metadata.config || {}} />
                         ) : (
                             <div className="w-full h-full flex items-center justify-center text-white bg-slate-900 flex-col gap-4">
                                 <span className="text-2xl font-bold">App: {appId}</span>

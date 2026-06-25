@@ -21,7 +21,7 @@ const MENU_ITEMS = [
   { id: 'screens', label: 'Pantallas', icon: Monitor, path: 'screens' },
   { id: 'library', label: 'Medios', icon: FolderOpen, path: 'library' },
   { id: 'playlists', label: 'Playlists', icon: ListVideo, path: 'playlists' },
-  { id: 'widgets', label: 'Widgets', icon: Puzzle, path: 'widgets' },
+  { id: 'apps', label: 'Aplicaciones', icon: Puzzle, path: 'apps' },
   { id: 'schedule', label: 'Programación', icon: Calendar, path: 'schedule' },
   { id: 'analytics', label: 'Estadísticas', icon: BarChart3, path: 'analytics' },
   { id: 'settings', label: 'Configuración', icon: Settings, path: 'settings' },

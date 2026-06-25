@@ -8,9 +8,9 @@ import { AppId } from './AppCatalogModal';
 import { useUploadDisplayMedia } from '@/hooks/use-display-media';
 import { toast } from 'sonner';
 
-// TBD: Import actual forms and previews
 import { WeatherForm, WeatherPreview } from './weather/WeatherApp';
 import { SplitScreenForm, SplitScreenPreview } from './split-screen/SplitScreenApp';
+import { DolarForm, DolarPreview } from './dolar/DolarApp';
 // import { TickerForm, TickerPreview } from './ticker/TickerApp';
 
 interface AppEditorModalProps {
@@ -34,6 +34,8 @@ export const AppEditorModal = ({ isOpen, onClose, onBack, appId, commerceId, cur
                 return <WeatherForm config={appConfig} onChange={setAppConfig} />;
             case 'split-screen':
                 return <SplitScreenForm config={appConfig} onChange={setAppConfig} commerceId={commerceId} />;
+            case 'dolar':
+                return <DolarForm config={appConfig} onChange={setAppConfig} />;
             /*
             case 'ticker':
                 return <TickerForm config={appConfig} onChange={setAppConfig} />;
@@ -49,6 +51,8 @@ export const AppEditorModal = ({ isOpen, onClose, onBack, appId, commerceId, cur
                 return <WeatherPreview config={appConfig} />;
             case 'split-screen':
                 return <SplitScreenPreview config={appConfig} />;
+            case 'dolar':
+                return <DolarPreview config={appConfig} />;
             /*
             case 'ticker':
                 return <TickerPreview config={appConfig} />;

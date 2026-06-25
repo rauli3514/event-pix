@@ -61,7 +61,7 @@ const App = () => (
                 <Route path="screens" element={<DisplayHubList />} />
                 <Route path="library" element={<WorkspaceMedia />} />
                 <Route path="playlists" element={<DisplayPlaylists />} />
-                <Route path="widgets" element={<WorkspaceWidgets />} />
+                <Route path="apps" element={<WorkspaceMedia initialCategory="apps" />} />
                 <Route path="schedule" element={<WorkspaceSchedule />} />
                 <Route path="analytics" element={<WorkspaceAnalytics />} />
                 <Route path="settings" element={<WorkspaceSettings />} />
