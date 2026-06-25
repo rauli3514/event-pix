@@ -28,8 +28,7 @@ export const TvSettingsMenu = ({ deviceCode, onRefresh }: TvSettingsMenuProps) =
             icon: <Trash2 className="w-5 h-5" />,
             action: () => {
                 localStorage.removeItem(`tv_cache_${deviceCode}`);
-                onRefresh();
-                setIsOpen(false);
+                window.location.reload();
             }
         },
         {
