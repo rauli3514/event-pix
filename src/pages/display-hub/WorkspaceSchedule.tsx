@@ -1,9 +1,10 @@
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Calendar, Clock, Monitor, Trash2, CheckCircle2, AlertCircle, RefreshCw, PlaySquare, Image as ImageIcon, Globe } from 'lucide-react';
+import { Calendar, Clock, Monitor, Trash2, CheckCircle2, AlertCircle, RefreshCw, PlaySquare, Image as ImageIcon, Globe, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDisplaySchedules, useDeleteSchedule } from '@/hooks/use-display-hub';
 import { toast } from 'sonner';
+import { GlobalScheduleModal } from '@/components/display/GlobalScheduleModal';
 
 // Format ISO to dd/mm/aaaa
 function fmtDate(iso: string): string {
@@ -54,6 +55,7 @@ const WorkspaceSchedule = () => {
     const { commerceId } = useParams<{ commerceId: string }>();
     const { data: schedules = [], isLoading, refetch } = useDisplaySchedules(commerceId);
     const deleteSchedule = useDeleteSchedule();
+    const [isGlobalModalOpen, setIsGlobalModalOpen] = useState(false);
 
     const handleDelete = async (id: string, contentName: string) => {
         if (!confirm(`¿Eliminar la programación "${contentName}"?`)) return;
@@ -81,15 +83,24 @@ const WorkspaceSchedule = () => {
                         El sistema publica automáticamente cuando se cumple la fecha y hora configurada.
                     </p>
                 </div>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => refetch()}
-                    className="border-slate-700 text-slate-300 hover:bg-slate-800 gap-2"
-                >
-                    <RefreshCw className="w-4 h-4" />
-                    Actualizar
-                </Button>
+                <div className="flex gap-3">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => refetch()}
+                        className="border-slate-700 text-slate-300 hover:bg-slate-800 gap-2 h-10"
+                    >
+                        <RefreshCw className="w-4 h-4" />
+                        Actualizar
+                    </Button>
+                    <Button
+                        onClick={() => setIsGlobalModalOpen(true)}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 h-10 shadow-lg shadow-indigo-900/20"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Nueva Programación
+                    </Button>
+                </div>
             </div>
 
             {isLoading ? (
@@ -151,6 +162,18 @@ const WorkspaceSchedule = () => {
                         </section>
                     )}
                 </div>
+            )}
+
+            {commerceId && (
+                <GlobalScheduleModal 
+                    isOpen={isGlobalModalOpen}
+                    onClose={() => setIsGlobalModalOpen(false)}
+                    commerceId={commerceId}
+                    onScheduled={() => {
+                        setIsGlobalModalOpen(false);
+                        refetch();
+                    }}
+                />
             )}
         </div>
     );
