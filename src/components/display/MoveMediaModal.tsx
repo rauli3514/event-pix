@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,13 +57,13 @@ export const MoveMediaModal = ({ isOpen, onClose, selectedAssets, allMedia, comm
     }, [allMedia]);
 
     // Subfolders of currentPath
-    const subfolders = virtualFolders.filter(f => {
+    const subfolders = virtualFolders.filter((f: string) => {
         const parent = f.substring(0, f.lastIndexOf('/')) || '/';
         return parent === currentPath;
-    }).map(f => f.split('/').pop() || '');
+    }).map((f: string) => f.split('/').pop() || '');
     
     const filteredFolders = searchQuery.trim() 
-        ? subfolders.filter(name => name.toLowerCase().includes(searchQuery.toLowerCase()))
+        ? subfolders.filter((name: string) => name.toLowerCase().includes(searchQuery.toLowerCase()))
         : subfolders;
 
     const handleMove = async () => {
@@ -184,7 +184,7 @@ export const MoveMediaModal = ({ isOpen, onClose, selectedAssets, allMedia, comm
                             </div>
                         ) : (
                             <div className="p-1">
-                                {filteredFolders.map(folderName => (
+                                {filteredFolders.map((folderName: string) => (
                                     <button
                                         key={folderName}
                                         onClick={() => {
