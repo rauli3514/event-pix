@@ -70,7 +70,8 @@ export type ElementAlignmentV = 'top' | 'center' | 'bottom';
 export type UniversalElementType = 
     | 'image' | 'video' | 'url' | 'pdf' | 'text' | 'qr' 
     | 'clock' | 'weather' | 'rss' | 'news' | 'social' 
-    | 'queue' | 'dashboard' | 'eventpix' | 'giveaway';
+    | 'queue' | 'dashboard' | 'eventpix' | 'giveaway'
+    | 'app' | 'widget' | 'layout';
 
 export interface ElementMargin {
     top: number;
@@ -94,6 +95,7 @@ export interface UniversalElement {
     fitMode?: DisplayFitMode;
     alignment?: ElementAlignment;
     margin?: ElementMargin;
+    metadata?: any;            // Para configuración de Apps y Widgets
     
     // Configuraciones específicas
     mute?: boolean;            // Para video

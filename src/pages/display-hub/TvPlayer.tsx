@@ -102,6 +102,7 @@ const TvPlayer = () => {
                         id: assignment.media.id,
                         type: assignment.media.type === 'web' ? 'url' : (assignment.media.type || 'image'),
                         url: assignment.media.url,
+                        metadata: assignment.media.metadata,
                         duration: 0, // 0 = infinito / loop
                         title: assignment.media.name
                     }];

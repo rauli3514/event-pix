@@ -45,6 +45,7 @@ export const SendToScreensModal = ({ isOpen, onClose, selectedAssets, commerceId
                     type: asset.type === 'web' ? 'url' : asset.type,
                     url: asset.url,
                     content: asset.name,
+                    metadata: asset.metadata || {},
                     duration: asset.type === 'video' ? 15 : 10,
                     transition: 'fade',
                     fitMode: 'contain'
