@@ -24,11 +24,14 @@ export const WeatherForm = ({ config, onChange }: WeatherFormProps) => {
     const [searchResults, setSearchResults] = useState<any[]>([]);
 
     // Simple search using open-meteo geocoding API
-    const handleSearch = async () => {
-        if (!searchQuery) return;
+    const handleSearch = async (queryToSearch: string) => {
+        if (!queryToSearch || queryToSearch.length < 3) {
+            setSearchResults([]);
+            return;
+        }
         setIsSearching(true);
         try {
-            const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(searchQuery)}&count=5&language=es&format=json`);
+            const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(queryToSearch)}&count=5&language=es&format=json`);
             const data = await res.json();
             setSearchResults(data.results || []);
         } catch (error) {
@@ -37,6 +40,16 @@ export const WeatherForm = ({ config, onChange }: WeatherFormProps) => {
             setIsSearching(false);
         }
     };
+
+    // Auto-search when typing stops
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            if (searchQuery !== config.locationName) {
+                handleSearch(searchQuery);
+            }
+        }, 500);
+        return () => clearTimeout(timeoutId);
+    }, [searchQuery]);
 
     return (
         <div className="space-y-6">
@@ -47,10 +60,10 @@ export const WeatherForm = ({ config, onChange }: WeatherFormProps) => {
                         placeholder="Ej: Buenos Aires, Madrid" 
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSearch(searchQuery)}
                         className="bg-slate-950 border-slate-800 text-slate-200"
                     />
-                    <Button variant="outline" onClick={handleSearch} disabled={isSearching} className="border-slate-700 bg-slate-800 text-slate-200">
+                    <Button variant="outline" onClick={() => handleSearch(searchQuery)} disabled={isSearching} className="border-slate-700 bg-slate-800 text-slate-200">
                         <Search className="w-4 h-4" />
                     </Button>
                 </div>
