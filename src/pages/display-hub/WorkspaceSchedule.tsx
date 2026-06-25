@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Calendar, Clock, Monitor, Trash2, CheckCircle2, AlertCircle, RefreshCw, PlaySquare, Image as ImageIcon, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useDisplaySchedules, useDeleteSchedule, useUpdateSchedule, useAssignContentToDevice } from '@/hooks/use-display-hub';
+import { useDisplaySchedules, useDeleteSchedule } from '@/hooks/use-display-hub';
 import { toast } from 'sonner';
 
 // Format ISO to dd/mm/aaaa
@@ -54,45 +54,6 @@ const WorkspaceSchedule = () => {
     const { commerceId } = useParams<{ commerceId: string }>();
     const { data: schedules = [], isLoading, refetch } = useDisplaySchedules(commerceId);
     const deleteSchedule = useDeleteSchedule();
-    const updateSchedule = useUpdateSchedule();
-    const assignContent = useAssignContentToDevice();
-
-    // Auto-publish check: run every 60 seconds
-    useEffect(() => {
-        const checkAndPublish = async () => {
-            const now = new Date();
-            const pending = (schedules as any[]).filter(s => s.status === 'pending' && new Date(s.scheduled_at) <= now);
-            for (const schedule of pending) {
-                try {
-                    // Assign content to device
-                    await assignContent.mutateAsync({
-                        deviceId: schedule.device_id,
-                        mediaId: schedule.media_id || undefined,
-                        campaignId: schedule.campaign_id || undefined,
-                    });
-                    // Mark as published
-                    await updateSchedule.mutateAsync({ id: schedule.id, updates: { status: 'published' } });
-                    toast.success(`✅ Contenido "${schedule.content_name}" publicado en ${schedule.device_name}`);
-                } catch (err) {
-                    console.error('Auto-publish error:', err);
-                }
-            }
-
-            // Check expiry
-            const published = (schedules as any[]).filter(s => s.status === 'published' && s.expires_at && new Date(s.expires_at) <= now);
-            for (const schedule of published) {
-                try {
-                    await updateSchedule.mutateAsync({ id: schedule.id, updates: { status: 'expired' } });
-                } catch (err) {
-                    console.error('Expiry error:', err);
-                }
-            }
-        };
-
-        checkAndPublish();
-        const interval = setInterval(checkAndPublish, 60 * 1000);
-        return () => clearInterval(interval);
-    }, [schedules]);
 
     const handleDelete = async (id: string, contentName: string) => {
         if (!confirm(`¿Eliminar la programación "${contentName}"?`)) return;

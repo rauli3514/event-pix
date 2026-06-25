@@ -316,7 +316,10 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, commerceI
             asset={selectedAsset}
             device={device}
             commerceId={commerceId || device?.commerce_id || ''}
-            onScheduled={() => setIsScheduleModalOpen(false)}
+            onScheduled={() => {
+                setIsScheduleModalOpen(false);
+                onClose();
+            }}
         />
         </>
     );

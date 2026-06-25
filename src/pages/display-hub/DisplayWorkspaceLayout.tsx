@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Link, Outlet, useLocation, useParams } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -12,7 +13,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { useCommerces } from '@/hooks/use-display-hub';
+import { useCommerces, useDisplaySchedules, useUpdateSchedule, useAssignContentToDevice } from '@/hooks/use-display-hub';
+import { toast } from 'sonner';
 
 const MENU_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: 'dashboard' },
@@ -34,6 +36,52 @@ export default function DisplayWorkspaceLayout() {
   
   // Base path for workspace
   const basePath = `/admin/display/commerce/${commerceId}/workspace`;
+
+  // Global Auto-publish Logic for the active workspace
+  const { data: schedules = [] } = useDisplaySchedules(commerceId);
+  const updateSchedule = useUpdateSchedule();
+  const assignContent = useAssignContentToDevice();
+
+  useEffect(() => {
+    if (!commerceId) return;
+    
+    const checkAndPublish = async () => {
+        const now = new Date();
+        
+        // 1. Publish pending schedules
+        const pending = (schedules as any[]).filter(s => s.status === 'pending' && new Date(s.scheduled_at) <= now);
+        for (const schedule of pending) {
+            try {
+                // Assign content to device
+                await assignContent.mutateAsync({
+                    deviceId: schedule.device_id,
+                    mediaId: schedule.media_id || undefined,
+                    campaignId: schedule.campaign_id || undefined,
+                });
+                // Mark as published
+                await updateSchedule.mutateAsync({ id: schedule.id, updates: { status: 'published' } });
+                toast.success(`✅ Contenido "${schedule.content_name}" publicado automáticamente en ${schedule.device_name}`);
+            } catch (err) {
+                console.error('Auto-publish error:', err);
+            }
+        }
+
+        // 2. Expire published schedules
+        const published = (schedules as any[]).filter(s => s.status === 'published' && s.expires_at && new Date(s.expires_at) <= now);
+        for (const schedule of published) {
+            try {
+                await updateSchedule.mutateAsync({ id: schedule.id, updates: { status: 'expired' } });
+            } catch (err) {
+                console.error('Expiry error:', err);
+            }
+        }
+    };
+
+    // Run immediately and every 60 seconds
+    checkAndPublish();
+    const interval = setInterval(checkAndPublish, 60 * 1000);
+    return () => clearInterval(interval);
+  }, [commerceId, schedules]);
 
   return (
     <div className="flex h-screen w-full bg-slate-950 text-slate-200 overflow-hidden font-sans">
