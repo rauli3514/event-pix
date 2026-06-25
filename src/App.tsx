@@ -22,7 +22,6 @@ import TvBootScreen from "./pages/display-hub/TvBootScreen";
 import DisplayWorkspaceLayout from "./pages/display-hub/DisplayWorkspaceLayout";
 import { 
   WorkspaceDashboard, 
-  WorkspaceWidgets, 
   WorkspaceAnalytics, 
   WorkspaceSettings 
 } from "./pages/display-hub/WorkspacePlaceholders";

@@ -28,6 +28,7 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
     const { commerceId } = useParams<{ commerceId: string }>();
     const [viewMode, setViewMode] = useState<'list'|'grid'>('grid');
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+    const [isAppCatalogOpen, setIsAppCatalogOpen] = useState(false);
     const [activeCategory, setActiveCategory] = useState<CategoryId>(initialCategory);
     const [search, setSearch] = useState('');
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
