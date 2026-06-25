@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Calendar, Clock, Monitor, Trash2, CheckCircle2, AlertCircle, RefreshCw, PlaySquare, Image as ImageIcon, Globe, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
