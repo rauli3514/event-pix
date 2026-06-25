@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { DisplayGroup } from '@/types/display';
 import { useCreateDisplayGroup, useUpdateDisplayGroup, useDeleteDisplayGroup } from '@/hooks/use-display-hub';
-import { Folder, FolderOpen, FolderPlus, MoreVertical, Edit2, Trash2, Home, ChevronRight, ChevronDown, Layers, Monitor } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Folder, FolderOpen, FolderPlus, MoreVertical, Edit2, Trash2, Home, ChevronRight, ChevronDown, Layers } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';

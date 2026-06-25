@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Monitor, Activity, Tv, Plus, Hash, FolderOpen, PlaySquare, Eye, ChevronDown, MoreVertical, Edit2, Info, Move, Trash2, Power, Layers } from 'lucide-react';
+import { Monitor, Activity, Tv, Plus, Hash, FolderOpen, PlaySquare, Eye, ChevronDown, MoreVertical, Edit2, Info, Move, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';

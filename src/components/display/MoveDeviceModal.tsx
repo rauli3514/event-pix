@@ -124,7 +124,7 @@ export const MoveDeviceModal = ({ isOpen, onClose, device, groups, commerceId }:
                             <span className={!currentFolderId ? 'font-semibold text-slate-800' : ''}>Hogar</span>
                         </button>
                         
-                        {breadcrumbs.map((crumb, idx) => (
+                        {breadcrumbs.map((crumb) => (
                             <div key={crumb.id} className="flex items-center gap-1.5">
                                 <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
                                 <button
