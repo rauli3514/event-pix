@@ -5,8 +5,8 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { ChevronDown, ChevronUp, MapPin, MonitorPlay, Check } from 'lucide-react';
-import { DisplayDeviceWithStatus } from '@/hooks/use-display-hub';
+import { ChevronDown, ChevronUp, MapPin, MonitorPlay } from 'lucide-react';
+import { DisplayDeviceWithStatus, useDisplayCampaigns } from '@/hooks/use-display-hub';
 import { AssetSelectorModal } from './AssetSelectorModal';
 import { toast } from 'sonner';
 
@@ -15,16 +15,17 @@ interface EditScreenModalProps {
     onClose: () => void;
     device: DisplayDeviceWithStatus | null;
     linkGroups: any[];
+    commerceId?: string;
     onSave: (deviceId: string, updates: any, asset: any | null) => void;
 }
 
-export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, onSave }: EditScreenModalProps) => {
+export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, commerceId, onSave }: EditScreenModalProps) => {
     const [name, setName] = useState('');
     const [groupId, setGroupId] = useState('none');
     const [showAdvanced, setShowAdvanced] = useState(false);
     
-    // UI Mock States (Pro features)
     const [contentType, setContentType] = useState('asset');
+    const [selectedPlaylistId, setSelectedPlaylistId] = useState('none');
     const [orientation, setOrientation] = useState('0');
     const [location, setLocation] = useState('');
     const [showDownloading, setShowDownloading] = useState(true);
@@ -33,29 +34,45 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, onSave }:
     const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
     const [selectedAsset, setSelectedAsset] = useState<any>(null);
 
+    // Load campaigns for playlist dropdown
+    const { data: campaigns } = useDisplayCampaigns(commerceId || device?.commerce_id || '');
+
     useEffect(() => {
         if (device) {
             setName(device.name || '');
             setGroupId(device.group_id || 'none');
-            // Check if there is an assigned media
-            if (device.assignment?.media) {
-                setSelectedAsset({ ...device.assignment.media, type: device.assignment.media.type || 'asset' });
-                setContentType('asset');
-            } else if (device.assignment?.campaign) {
+            if (device.assignment?.campaign) {
                 setSelectedAsset({ ...device.assignment.campaign, type: 'campaign' });
+                setSelectedPlaylistId(device.assignment.campaign.id);
                 setContentType('playlist');
+            } else if (device.assignment?.media) {
+                setSelectedAsset({ ...device.assignment.media, type: device.assignment.media.type || 'asset' });
+                setSelectedPlaylistId('none');
+                setContentType('asset');
             } else {
                 setSelectedAsset(null);
+                setSelectedPlaylistId('none');
+                setContentType('asset');
             }
             setOrientation(device.orientation || '0');
             setShowAdvanced(false);
         }
     }, [device]);
 
+    const handlePlaylistChange = (id: string) => {
+        setSelectedPlaylistId(id);
+        if (id === 'none') {
+            setSelectedAsset(null);
+        } else {
+            const campaign = campaigns?.find(c => c.id === id);
+            if (campaign) setSelectedAsset({ ...campaign, type: 'campaign' });
+        }
+    };
+
     const handleSave = () => {
         if (!device) return;
-        if (!selectedAsset) {
-            toast.error("Por favor, selecciona un contenido pulsando el botón 'Cambiar'");
+        if (contentType !== 'stop' && !selectedAsset) {
+            toast.error("Por favor, selecciona un contenido");
             return;
         }
         
@@ -63,7 +80,7 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, onSave }:
             name,
             group_id: groupId === 'none' ? null : groupId,
             orientation
-        }, selectedAsset);
+        }, contentType === 'stop' ? null : selectedAsset);
     };
 
     if (!device) return null;
@@ -107,54 +124,56 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, onSave }:
 
                     <div className="grid grid-cols-[160px_1fr] items-center gap-4">
                         <Label className="text-right text-slate-500 font-medium">Tipo de Contenido <span className="text-rose-500">*</span></Label>
-                        <Select value={contentType} onValueChange={setContentType}>
-                            <SelectTrigger className="w-full shadow-sm bg-white relative">
+                        <Select value={contentType} onValueChange={(v) => { setContentType(v); setSelectedAsset(null); setSelectedPlaylistId('none'); }}>
+                            <SelectTrigger className="w-full shadow-sm bg-white">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="asset">
-                                    <div className="flex items-center justify-between w-full pr-4">
-                                        Archivo (Asset)
-                                        {contentType === 'asset' && <Check className="w-4 h-4 ml-2" />}
-                                    </div>
-                                </SelectItem>
-                                <SelectItem value="playlist">
-                                    <div className="flex items-center justify-between w-full pr-4">
-                                        Lista de Reproducción (Playlist)
-                                        {contentType === 'playlist' && <Check className="w-4 h-4 ml-2" />}
-                                    </div>
-                                </SelectItem>
-                                <SelectItem value="schedule">
-                                    <div className="flex items-center justify-between w-full pr-4">
-                                        Programación (Schedule)
-                                        {contentType === 'schedule' && <Check className="w-4 h-4 ml-2" />}
-                                    </div>
-                                </SelectItem>
-                                <SelectItem value="stop">
-                                    <div className="flex items-center justify-between w-full pr-4">
-                                        Detener Reproducción (Stop Playing)
-                                        {contentType === 'stop' && <Check className="w-4 h-4 ml-2" />}
-                                    </div>
-                                </SelectItem>
+                                <SelectItem value="asset">Archivo</SelectItem>
+                                <SelectItem value="playlist">Lista de Reproducción</SelectItem>
+                                <SelectItem value="schedule">Programación</SelectItem>
+                                <SelectItem value="stop">Detener Reproducción</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
 
+                    {/* Contenido - varía según el tipo */}
                     <div className="grid grid-cols-[160px_1fr] items-center gap-4">
                         <Label className="text-right text-slate-500 font-medium">Contenido Seleccionado <span className="text-rose-500">*</span></Label>
-                        <div className="flex gap-2">
-                            <Input 
-                                value={selectedAsset ? selectedAsset.name : "Sin asignar"} 
-                                readOnly 
-                                className="shadow-sm bg-slate-50 text-slate-600" 
-                            />
-                            <Button 
-                                onClick={() => setIsAssetModalOpen(true)}
-                                className="bg-emerald-500 hover:bg-emerald-600 text-white shrink-0 shadow-sm"
-                            >
-                                Cambiar
-                            </Button>
-                        </div>
+                        {contentType === 'playlist' ? (
+                            // Playlist: dropdown directo con campañas disponibles
+                            <Select value={selectedPlaylistId} onValueChange={handlePlaylistChange}>
+                                <SelectTrigger className="w-full shadow-sm bg-white">
+                                    <SelectValue placeholder="Seleccionar lista..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">-- Sin Asignar --</SelectItem>
+                                    {campaigns?.map(c => (
+                                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        ) : contentType === 'asset' ? (
+                            // Archivo: botón Cambiar que abre el selector
+                            <div className="flex gap-2">
+                                <Input 
+                                    value={selectedAsset ? selectedAsset.name : "Sin asignar"} 
+                                    readOnly 
+                                    className="shadow-sm bg-slate-50 text-slate-600" 
+                                />
+                                <Button 
+                                    onClick={() => setIsAssetModalOpen(true)}
+                                    className="bg-emerald-500 hover:bg-emerald-600 text-white shrink-0 shadow-sm"
+                                >
+                                    Cambiar
+                                </Button>
+                            </div>
+                        ) : (
+                            // Programación / Detener: mensaje informativo
+                            <div className="text-sm text-slate-400 italic py-2">
+                                {contentType === 'stop' ? 'La pantalla dejará de reproducir contenido.' : 'Configura el horario en la sección de abajo.'}
+                            </div>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-[160px_1fr] items-center gap-4">
