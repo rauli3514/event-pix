@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LayoutTemplate, MonitorPlay, Image as ImageIcon, Video } from 'lucide-react';
+import { LayoutTemplate } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { DisplayMedia } from '@/types/display';
-import { MediaPickerModal } from '../MediaPickerModal';
+import { MediaPickerModal } from '../../MediaPickerModal';
 
 export interface SplitZone {
     id: string;
@@ -27,26 +27,26 @@ const TEMPLATES = [
         id: '1main_1ticker',
         name: '1 Main + 1 Ticker',
         zones: [
-            { id: 'main', name: 'Main', x: 0, y: 0, w: 100, h: 85 },
-            { id: 'ticker', name: 'Bottom Ticker', x: 0, y: 85, w: 100, h: 15 }
-        ]
+            { id: 'main', name: 'Main', x: 0, y: 0, w: 100, h: 85, mediaId: undefined },
+            { id: 'ticker', name: 'Bottom Ticker', x: 0, y: 85, w: 100, h: 15, mediaId: undefined }
+        ] as SplitZone[]
     },
     {
         id: '2mains',
         name: '2 Mains',
         zones: [
-            { id: 'main_left', name: 'Main Left', x: 0, y: 0, w: 70, h: 100 },
-            { id: 'main_right', name: 'Main Right', x: 70, y: 0, w: 30, h: 100 }
-        ]
+            { id: 'main_left', name: 'Main Left', x: 0, y: 0, w: 70, h: 100, mediaId: undefined },
+            { id: 'main_right', name: 'Main Right', x: 70, y: 0, w: 30, h: 100, mediaId: undefined }
+        ] as SplitZone[]
     },
     {
         id: '2mains_1ticker',
         name: '2 Mains + 1 Ticker',
         zones: [
-            { id: 'main_left', name: 'Main Left', x: 0, y: 0, w: 70, h: 85 },
-            { id: 'main_right', name: 'Main Right', x: 70, y: 0, w: 30, h: 85 },
-            { id: 'ticker', name: 'Bottom Ticker', x: 0, y: 85, w: 100, h: 15 }
-        ]
+            { id: 'main_left', name: 'Main Left', x: 0, y: 0, w: 70, h: 85, mediaId: undefined },
+            { id: 'main_right', name: 'Main Right', x: 70, y: 0, w: 30, h: 85, mediaId: undefined },
+            { id: 'ticker', name: 'Bottom Ticker', x: 0, y: 85, w: 100, h: 15, mediaId: undefined }
+        ] as SplitZone[]
     }
 ];
 

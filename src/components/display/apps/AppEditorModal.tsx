@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Check, Loader2, X } from 'lucide-react';
+import { ArrowLeft, Check, Loader2 } from 'lucide-react';
 import { AppId } from './AppCatalogModal';
 import { useUploadDisplayMedia } from '@/hooks/use-display-media';
 import { toast } from 'sonner';
