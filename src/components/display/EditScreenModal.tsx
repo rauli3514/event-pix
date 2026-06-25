@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { ChevronDown, ChevronUp, MapPin, MonitorPlay } from 'lucide-react';
 import { DisplayDeviceWithStatus, useDisplayCampaigns } from '@/hooks/use-display-hub';
 import { AssetSelectorModal } from './AssetSelectorModal';
+import { ScheduleContentModal } from './ScheduleContentModal';
 import { toast } from 'sonner';
 
 interface EditScreenModalProps {
@@ -33,6 +34,7 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, commerceI
 
     const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
     const [selectedAsset, setSelectedAsset] = useState<any>(null);
+    const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
 
     // Load campaigns for playlist dropdown
     const { data: campaigns } = useDisplayCampaigns(commerceId || device?.commerce_id || '');
@@ -282,7 +284,12 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, commerceI
                         <Button variant="ghost" onClick={onClose} className="text-slate-600 hover:bg-slate-200">
                             Cerrar
                         </Button>
-                        <Button variant="outline" className="border-slate-200 shadow-sm text-slate-600 hover:bg-slate-100">
+                        <Button 
+                            variant="outline" 
+                            className="border-slate-200 shadow-sm text-slate-600 hover:bg-slate-100 disabled:opacity-40"
+                            disabled={!selectedAsset}
+                            onClick={() => setIsScheduleModalOpen(true)}
+                        >
                             Programar
                         </Button>
                         <div className="flex rounded-md shadow-sm">
@@ -302,6 +309,14 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, commerceI
             isOpen={isAssetModalOpen} 
             onClose={() => setIsAssetModalOpen(false)} 
             onSelect={(asset) => setSelectedAsset(asset)}
+        />
+        <ScheduleContentModal
+            isOpen={isScheduleModalOpen}
+            onClose={() => setIsScheduleModalOpen(false)}
+            asset={selectedAsset}
+            device={device}
+            commerceId={commerceId || device?.commerce_id || ''}
+            onScheduled={() => setIsScheduleModalOpen(false)}
         />
         </>
     );

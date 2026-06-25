@@ -23,11 +23,11 @@ import DisplayWorkspaceLayout from "./pages/display-hub/DisplayWorkspaceLayout";
 import { 
   WorkspaceDashboard, 
   WorkspaceWidgets, 
-  WorkspaceSchedule, 
   WorkspaceAnalytics, 
   WorkspaceSettings 
 } from "./pages/display-hub/WorkspacePlaceholders";
 import { WorkspaceMedia } from "./pages/display-hub/WorkspaceMedia";
+import WorkspaceSchedule from "./pages/display-hub/WorkspaceSchedule";
 import { StickerEditor } from "./components/stickers/StickerEditor";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { EventProvider } from "./context/EventContext";

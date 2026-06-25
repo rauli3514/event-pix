@@ -428,3 +428,105 @@ export const useDeviceHeartbeats = (deviceId?: string) => {
         enabled: !!deviceId,
     });
 };
+
+// ------------------------------------
+// SCHEDULES (Programación de contenido)
+// ------------------------------------
+
+export const useDisplaySchedules = (commerceId?: string) => {
+    return useQuery({
+        queryKey: ["display_schedules", commerceId],
+        queryFn: async () => {
+            if (!commerceId) return [];
+            const { data, error } = await supabase
+                .from("display_schedules")
+                .select(`
+                    *,
+                    device:display_devices(id, name),
+                    media:display_media(id, name, type, url),
+                    campaign:display_campaigns(id, name)
+                `)
+                .eq("commerce_id", commerceId)
+                .order("scheduled_at", { ascending: true });
+            if (error) throw error;
+            return data;
+        },
+        enabled: !!commerceId,
+    });
+};
+
+export const useCreateSchedule = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (payload: {
+            commerceId: string;
+            deviceId: string;
+            mediaId?: string | null;
+            campaignId?: string | null;
+            scheduledAt: string;   // ISO string
+            expiresAt?: string | null;
+            afterExpiry?: string | null;
+            format?: string | null;
+            contentName: string;
+            deviceName: string;
+        }) => {
+            const { data, error } = await supabase
+                .from("display_schedules")
+                .insert({
+                    commerce_id: payload.commerceId,
+                    device_id: payload.deviceId,
+                    media_id: payload.mediaId || null,
+                    campaign_id: payload.campaignId || null,
+                    scheduled_at: payload.scheduledAt,
+                    expires_at: payload.expiresAt || null,
+                    after_expiry: payload.afterExpiry || null,
+                    format: payload.format || 'landscape_16_9',
+                    content_name: payload.contentName,
+                    device_name: payload.deviceName,
+                    status: 'pending',
+                })
+                .select()
+                .single();
+            if (error) throw error;
+            return data;
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ["display_schedules", data.commerce_id] });
+        }
+    });
+};
+
+export const useDeleteSchedule = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (scheduleId: string) => {
+            const { error } = await supabase
+                .from("display_schedules")
+                .delete()
+                .eq("id", scheduleId);
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["display_schedules"] });
+        }
+    });
+};
+
+export const useUpdateSchedule = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ id, updates }: { id: string; updates: any }) => {
+            const { data, error } = await supabase
+                .from("display_schedules")
+                .update(updates)
+                .eq("id", id)
+                .select()
+                .single();
+            if (error) throw error;
+            return data;
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ["display_schedules", data.commerce_id] });
+        }
+    });
+};
