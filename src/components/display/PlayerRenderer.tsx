@@ -3,10 +3,9 @@ import { useEffect, useRef } from 'react';
 interface PlayerRendererProps {
     item: any; // Using any to support both CampaignItem (V1) and UniversalElement (V2)
     isActive: boolean;
-    deviceScale?: string;
 }
 
-export const PlayerRenderer = ({ item, isActive, deviceScale = 'fit' }: PlayerRendererProps) => {
+export const PlayerRenderer = ({ item, isActive }: PlayerRendererProps) => {
     const iframeRef = useRef<HTMLIFrameElement>(null);
 
     // Si es un iframe, forzar una recarga suave cuando se vuelve activo (opcional, depende de si queremos resetear el estado de la web externa)
@@ -48,13 +47,8 @@ export const PlayerRenderer = ({ item, isActive, deviceScale = 'fit' }: PlayerRe
     };
 
     const displayStyle = getTransitionStyle();
-
-    // Determinar object-fit basado en la escala del dispositivo o del item
-    let objectFitValue: any = 'contain'; // Default fit
-    if (deviceScale === 'fill') objectFitValue = 'cover';
-    if (deviceScale === 'stretch') objectFitValue = 'fill';
-    // Si el item tiene su propio fitMode, lo respetamos (opcional, o podemos forzar el del dispositivo)
-    if (item.fitMode) objectFitValue = item.fitMode;
+    // Si el item tiene su propio fitMode, lo respetamos, si no usamos contain por defecto
+    const objectFitValue: any = item.fitMode || 'contain';
 
     switch (item.type) {
         case 'url':

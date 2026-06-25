@@ -296,27 +296,38 @@ const TvPlayer = () => {
         );
     }
 
-    const containerStyle: React.CSSProperties = deviceSettings.orientation === 'portrait' 
-        ? { 
-            position: 'fixed',
-            transform: 'rotate(90deg)',
-            transformOrigin: 'center center',
-            width: '100vh',
-            height: '100vw',
-            top: 'calc(50vh - 50vw)',
-            left: 'calc(50vw - 50vh)',
-            backgroundColor: '#000',
-            overflow: 'hidden'
-          }
-        : {
+    const getRotationStyle = (orientation: string | undefined): React.CSSProperties => {
+        const degreeStr = orientation === 'portrait' ? '90' : (orientation === 'landscape' ? '0' : (orientation || '0'));
+        const isVertical = degreeStr === '90' || degreeStr === '270';
+        
+        if (isVertical) {
+            return {
+                position: 'fixed',
+                transform: `rotate(${degreeStr}deg)`,
+                transformOrigin: 'center center',
+                width: '100vh',
+                height: '100vw',
+                top: 'calc(50vh - 50vw)',
+                left: 'calc(50vw - 50vh)',
+                backgroundColor: '#000',
+                overflow: 'hidden'
+            };
+        }
+        
+        return {
             position: 'fixed', 
             top: 0, 
             left: 0, 
             width: '100vw', 
             height: '100vh', 
+            transform: `rotate(${degreeStr}deg)`,
+            transformOrigin: 'center center',
             backgroundColor: '#000', 
             overflow: 'hidden'
-          };
+        };
+    };
+
+    const containerStyle = getRotationStyle(deviceSettings.orientation);
 
     return (
         <div style={containerStyle}>
@@ -333,7 +344,6 @@ const TvPlayer = () => {
                     key={`${item.id}-${index}`} 
                     item={item} 
                     isActive={index === currentIndex} 
-                    deviceScale={deviceSettings.scale}
                 />
             ))}
 

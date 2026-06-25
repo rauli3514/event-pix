@@ -375,28 +375,16 @@ const DisplayDeviceDetail = () => {
                                 
                                 <div className="space-y-6">
                                     <div className="space-y-2">
-                                        <Label className="text-slate-300">Orientación de Pantalla</Label>
-                                        <Select value={deviceData.orientation || 'landscape'} onValueChange={(v) => updateDevice.mutate({ id: deviceData.id, updates: { orientation: v } })}>
+                                        <Label className="text-slate-300">Rotación de Pantalla (Grados)</Label>
+                                        <Select value={deviceData.orientation || '0'} onValueChange={(v) => updateDevice.mutate({ id: deviceData.id, updates: { orientation: v } })}>
                                             <SelectTrigger className="w-full bg-slate-950 border-slate-700 text-white">
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent className="bg-slate-900 border-slate-700 text-white">
-                                                <SelectItem value="landscape">Horizontal (Landscape)</SelectItem>
-                                                <SelectItem value="portrait">Vertical (Portrait)</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label className="text-slate-300">Escala del Contenido</Label>
-                                        <Select value={deviceData.scale || 'fit'} onValueChange={(v) => updateDevice.mutate({ id: deviceData.id, updates: { scale: v } })}>
-                                            <SelectTrigger className="w-full bg-slate-950 border-slate-700 text-white">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent className="bg-slate-900 border-slate-700 text-white">
-                                                <SelectItem value="fit">Ajustar (Fit) - Mantiene proporción</SelectItem>
-                                                <SelectItem value="fill">Llenar (Fill) - Recorta bordes</SelectItem>
-                                                <SelectItem value="stretch">Estirar (Stretch) - Distorsiona</SelectItem>
+                                                <SelectItem value="0">0° (Horizontal/Normal)</SelectItem>
+                                                <SelectItem value="90">90° (Vertical Derecha)</SelectItem>
+                                                <SelectItem value="180">180° (Horizontal Invertido)</SelectItem>
+                                                <SelectItem value="270">270° (Vertical Izquierda)</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
