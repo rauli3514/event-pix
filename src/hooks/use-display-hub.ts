@@ -49,10 +49,10 @@ export const useDisplayGroups = (commerceId?: string) => {
 export const useCreateDisplayGroup = () => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: async ({ commerceId, name, description }: { commerceId: string; name: string; description?: string }) => {
+        mutationFn: async ({ commerceId, name, description, parentId }: { commerceId: string; name: string; description?: string; parentId?: string | null }) => {
             const { data, error } = await supabase
                 .from("display_groups")
-                .insert({ commerce_id: commerceId, name, description })
+                .insert({ commerce_id: commerceId, name, description, parent_id: parentId })
                 .select()
                 .single();
             if (error) throw error;

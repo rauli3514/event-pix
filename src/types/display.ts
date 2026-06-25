@@ -34,6 +34,7 @@ export interface DisplayDevice {
 export interface DisplayGroup {
     id: string;
     commerce_id: string;
+    parent_id: string | null;
     name: string;
     description: string | null;
     created_at: string;
