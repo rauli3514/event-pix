@@ -39,8 +39,6 @@ export const MoveMediaModal = ({ isOpen, onClose, selectedAssets, allMedia, comm
         }
     }, [isOpen, selectedAssets]);
 
-    if (selectedAssets.length === 0) return null;
-
     // Build breadcrumbs path from currentPath (e.g. "/Navidad/2026")
     const breadcrumbs = currentPath === '/' ? [] : currentPath.split('/').filter(Boolean);
 
@@ -116,6 +114,8 @@ export const MoveMediaModal = ({ isOpen, onClose, selectedAssets, allMedia, comm
         const newPath = '/' + breadcrumbs.slice(0, index + 1).join('/');
         setCurrentPath(newPath);
     };
+
+    if (selectedAssets.length === 0) return null;
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
