@@ -148,6 +148,12 @@ export const GlobalScheduleModal = ({ isOpen, onClose, commerceId, onScheduled }
         }
     };
 
+    const toggleDevice = (id: string) => {
+        setSelectedDeviceIds(prev => 
+            prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]
+        );
+    };
+
     const toggleAllDevices = () => {
         if (selectedDeviceIds.length === devices.length) {
             setSelectedDeviceIds([]);
@@ -253,8 +259,9 @@ export const GlobalScheduleModal = ({ isOpen, onClose, commerceId, onScheduled }
                                 ) : (
                                     <div className="divide-y divide-slate-100 max-h-[220px] overflow-y-auto p-1">
                                         {devices.map(d => (
-                                            <label 
+                                            <div 
                                                 key={d.id} 
+                                                onClick={() => toggleDevice(d.id)}
                                                 className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
                                                     selectedDeviceIds.includes(d.id) 
                                                     ? 'bg-indigo-50/50 hover:bg-indigo-50' 
@@ -279,7 +286,7 @@ export const GlobalScheduleModal = ({ isOpen, onClose, commerceId, onScheduled }
                                                         <p className="text-xs text-slate-500 truncate">{d.description || 'Sin ubicación'}</p>
                                                     </div>
                                                 </div>
-                                            </label>
+                                            </div>
                                         ))}
                                     </div>
                                 )}
