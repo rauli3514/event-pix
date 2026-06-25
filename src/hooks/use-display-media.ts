@@ -150,7 +150,7 @@ export const useUpdateMediaFolder = () => {
     return useMutation({
         mutationFn: async ({ commerceId, oldPath, newPath }: { commerceId: string; oldPath: string; newPath: string }) => {
             // First update the folder item itself (type: 'folder')
-            const { error: folderError } = await supabase
+            await supabase
                 .from('display_media')
                 .update({ name: newPath.split('/').pop(), folder_path: newPath.substring(0, newPath.lastIndexOf('/')) || '/' })
                 .eq('commerce_id', commerceId)

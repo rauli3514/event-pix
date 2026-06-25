@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Folder, FolderPlus, Home, Search, ChevronRight, X, Loader2, HardDrive } from 'lucide-react';
+import { Folder, FolderPlus, Search, ChevronRight, X, Loader2, HardDrive } from 'lucide-react';
 import { DisplayMedia } from '@/types/display';
 import { useUploadDisplayMedia, useUpdateDisplayMedia } from '@/hooks/use-display-media';
 import { toast } from 'sonner';
