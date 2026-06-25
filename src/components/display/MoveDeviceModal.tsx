@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,7 +25,7 @@ export const MoveDeviceModal = ({ isOpen, onClose, device, groups, commerceId }:
     const createGroup = useCreateDisplayGroup();
 
     // Reset state when modal opens
-    useMemo(() => {
+    useEffect(() => {
         if (isOpen && device) {
             setCurrentFolderId(device.group_id);
             setSearchQuery('');

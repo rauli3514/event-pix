@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,7 +27,7 @@ export const MoveMediaModal = ({ isOpen, onClose, selectedAssets, allMedia, comm
     const uploadMedia = useUploadDisplayMedia();
 
     // Reset state when modal opens
-    useMemo(() => {
+    useEffect(() => {
         if (isOpen) {
             // Default destination is the folder of the first selected item, or root
             const defaultPath = selectedAssets.length > 0 ? selectedAssets[0].folder_path || '/' : '/';
