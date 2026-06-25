@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Calendar, Clock, Monitor, Trash2, Edit2, CheckCircle2, AlertCircle, RefreshCw, PlaySquare, Image as ImageIcon, Globe } from 'lucide-react';
+import { Calendar, Clock, Monitor, Trash2, CheckCircle2, AlertCircle, RefreshCw, PlaySquare, Image as ImageIcon, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDisplaySchedules, useDeleteSchedule, useUpdateSchedule, useAssignContentToDevice } from '@/hooks/use-display-hub';
 import { toast } from 'sonner';

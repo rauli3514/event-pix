@@ -4,8 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Input } from '@/components/ui/input';
-import { Calendar, Clock, Monitor, Image as ImageIcon, PlaySquare, Globe, CheckCircle2, X, ChevronDown } from 'lucide-react';
+import { Calendar, Clock, Monitor, Image as ImageIcon, PlaySquare, Globe, CheckCircle2 } from 'lucide-react';
 import { useCreateSchedule } from '@/hooks/use-display-hub';
 import { toast } from 'sonner';
 
@@ -140,16 +139,7 @@ export const ScheduleContentModal = ({ isOpen, onClose, asset, device, commerceI
         return map[f] || f;
     };
 
-    const afterExpiryLabel = (v: string) => {
-        const map: Record<string, string> = {
-            last_played: 'Reproducir últimos contenidos',
-            black_screen: 'Pantalla en negro',
-            no_content: 'Sin contenido',
-        };
-        return map[v] || v;
-    };
 
-    // Confirmation screen
     if (showConfirmation) {
         return (
             <Dialog open={isOpen} onOpenChange={onClose}>
