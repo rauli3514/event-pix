@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Calendar, Clock, Monitor, Image as ImageIcon, PlaySquare, Globe, CheckCircle2, ChevronRight, LayoutGrid } from 'lucide-react';
+import { Calendar, Clock, Monitor, PlaySquare, Globe, CheckCircle2, LayoutGrid } from 'lucide-react';
 import { useCreateSchedule, useDisplayDevices } from '@/hooks/use-display-hub';
 import { toast } from 'sonner';
 import { AssetSelectorModal } from './AssetSelectorModal';
@@ -148,12 +148,6 @@ export const GlobalScheduleModal = ({ isOpen, onClose, commerceId, onScheduled }
         }
     };
 
-    const toggleDevice = (id: string) => {
-        setSelectedDeviceIds(prev => 
-            prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]
-        );
-    };
-
     const toggleAllDevices = () => {
         if (selectedDeviceIds.length === devices.length) {
             setSelectedDeviceIds([]);
@@ -162,15 +156,7 @@ export const GlobalScheduleModal = ({ isOpen, onClose, commerceId, onScheduled }
         }
     };
 
-    const formatLabel = (f: string) => {
-        const map: Record<string, string> = {
-            landscape_16_9: 'Paisaje (16:9)',
-            portrait_9_16: 'Vertical (9:16)',
-            square_1_1: 'Cuadrado (1:1)',
-            landscape_4_3: 'Paisaje (4:3)',
-        };
-        return map[f] || f;
-    };
+
 
     if (showConfirmation) {
         return (
@@ -290,7 +276,7 @@ export const GlobalScheduleModal = ({ isOpen, onClose, commerceId, onScheduled }
                                                     </div>
                                                     <div className="truncate">
                                                         <p className="text-sm font-semibold text-slate-800 truncate">{d.name || 'Pantalla sin nombre'}</p>
-                                                        <p className="text-xs text-slate-500 truncate">{d.location || 'Sin ubicación'}</p>
+                                                        <p className="text-xs text-slate-500 truncate">{d.description || 'Sin ubicación'}</p>
                                                     </div>
                                                 </div>
                                             </label>
