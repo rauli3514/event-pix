@@ -143,3 +143,117 @@ export const useUpdateDisplayMedia = () => {
         }
     });
 };
+
+export const useUpdateMediaFolder = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ commerceId, oldPath, newPath }: { commerceId: string; oldPath: string; newPath: string }) => {
+            // First update the folder item itself (type: 'folder')
+            const { error: folderError } = await supabase
+                .from('display_media')
+                .update({ name: newPath.split('/').pop(), folder_path: newPath.substring(0, newPath.lastIndexOf('/')) || '/' })
+                .eq('commerce_id', commerceId)
+                .eq('type', 'folder')
+                .eq('folder_path', oldPath.substring(0, oldPath.lastIndexOf('/')) || '/')
+                .eq('name', oldPath.split('/').pop());
+
+            // Then update all children (files and subfolders)
+            // We fetch all items where folder_path exactly is oldPath or starts with oldPath/
+            const { data: children, error: fetchError } = await supabase
+                .from('display_media')
+                .select('*')
+                .eq('commerce_id', commerceId)
+                .or(`folder_path.eq.${oldPath},folder_path.like.${oldPath}/*`);
+
+            if (fetchError) throw fetchError;
+
+            if (children && children.length > 0) {
+                const updates = children.map(child => ({
+                    ...child,
+                    folder_path: child.folder_path === oldPath 
+                        ? newPath 
+                        : newPath + child.folder_path.substring(oldPath.length)
+                }));
+
+                const { error: updateError } = await supabase
+                    .from('display_media')
+                    .upsert(updates);
+
+                if (updateError) throw updateError;
+            }
+        },
+        onSuccess: (_, { commerceId }) => {
+            queryClient.invalidateQueries({ queryKey: ['display_media', commerceId] });
+        }
+    });
+};
+
+export const useDeleteMediaFolder = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ commerceId, folderPath }: { commerceId: string; folderPath: string }) => {
+            // Fetch all items in this folder or subfolders
+            const { data: itemsToDelete, error: fetchError } = await supabase
+                .from('display_media')
+                .select('*')
+                .eq('commerce_id', commerceId)
+                .or(`folder_path.eq.${folderPath},folder_path.like.${folderPath}/*`);
+
+            if (fetchError) throw fetchError;
+
+            if (itemsToDelete && itemsToDelete.length > 0) {
+                // Delete actual files from storage if not folders
+                const storagePaths = itemsToDelete
+                    .filter(item => item.type !== 'folder' && item.type !== 'web')
+                    .map(item => item.storage_path);
+
+                if (storagePaths.length > 0) {
+                    await supabase.storage.from('display-media').remove(storagePaths);
+                }
+
+                // Delete records from DB
+                const idsToDelete = itemsToDelete.map(item => item.id);
+                
+                // Also need to find the folder record itself (if the user clicks delete on it)
+                const folderName = folderPath.split('/').pop();
+                const parentPath = folderPath.substring(0, folderPath.lastIndexOf('/')) || '/';
+                const { data: folderRecord } = await supabase
+                    .from('display_media')
+                    .select('id')
+                    .eq('commerce_id', commerceId)
+                    .eq('type', 'folder')
+                    .eq('folder_path', parentPath)
+                    .eq('name', folderName)
+                    .single();
+
+                if (folderRecord) {
+                    idsToDelete.push(folderRecord.id);
+                }
+
+                // Chunk deletion because of limits if many files
+                const chunkSize = 100;
+                for (let i = 0; i < idsToDelete.length; i += chunkSize) {
+                    const chunk = idsToDelete.slice(i, i + chunkSize);
+                    await supabase.from('display_media').delete().in('id', chunk);
+                }
+            } else {
+                // Just delete the empty folder record
+                const folderName = folderPath.split('/').pop();
+                const parentPath = folderPath.substring(0, folderPath.lastIndexOf('/')) || '/';
+                await supabase
+                    .from('display_media')
+                    .delete()
+                    .eq('commerce_id', commerceId)
+                    .eq('type', 'folder')
+                    .eq('folder_path', parentPath)
+                    .eq('name', folderName);
+            }
+        },
+        onSuccess: (_, { commerceId }) => {
+            queryClient.invalidateQueries({ queryKey: ['display_media', commerceId] });
+        }
+    });
+};
+

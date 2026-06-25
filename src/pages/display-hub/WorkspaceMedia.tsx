@@ -2,32 +2,35 @@ import { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, FolderPlus, Upload, LayoutGrid, List as ListIcon, Image as ImageIcon, Video, FileAudio, FileText, Globe, ArrowRightCircle, Tag, HardDrive, Trash2, Folder } from 'lucide-react';
+import { Search, Upload, LayoutGrid, List as ListIcon, Image as ImageIcon, Video, FileAudio, FileText, Globe, ArrowRightCircle, HardDrive, Trash2, Folder, Move } from 'lucide-react';
 import { SendToScreensModal } from '@/components/display/SendToScreensModal';
 import { UploadMediaModal } from '@/components/display/UploadMediaModal';
 import { useDisplayMedia, useUploadDisplayMedia, useDeleteDisplayMedia, useUpdateDisplayMedia } from '@/hooks/use-display-media';
 import { toast } from 'sonner';
 import { DisplayMedia } from '@/types/display';
+import { MediaFolderSidebar } from '@/components/display/MediaFolderSidebar';
+import { MoveMediaModal } from '@/components/display/MoveMediaModal';
 
 export type CategoryId = 'all' | 'images' | 'videos' | 'audio' | 'docs' | 'web';
 
 const CATEGORY_MAP: Record<CategoryId, { title: string, icon: any }> = {
-    all: { title: 'Todos los artículos', icon: HardDrive },
+    all: { title: 'Todos', icon: HardDrive },
     images: { title: 'Imágenes', icon: ImageIcon },
     videos: { title: 'Vídeos', icon: Video },
     audio: { title: 'Audio', icon: FileAudio },
     docs: { title: 'Documentos', icon: FileText },
-    web: { title: 'Páginas web', icon: Globe }
+    web: { title: 'Enlaces', icon: Globe }
 };
 
 export function WorkspaceMedia() {
     const { commerceId } = useParams<{ commerceId: string }>();
     const [viewMode, setViewMode] = useState<'list'|'grid'>('grid');
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-    const [activeCategory, setActiveCategory] = useState<CategoryId>('images');
+    const [activeCategory, setActiveCategory] = useState<CategoryId>('all');
     const [search, setSearch] = useState('');
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isSendModalOpen, setIsSendModalOpen] = useState(false);
+    const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
     const [currentFolder, setCurrentFolder] = useState<string>('/');
     const [sortMode, setSortMode] = useState<'newest'|'oldest'|'az'|'za'>('newest');
     const [draggedOverFolder, setDraggedOverFolder] = useState<string | null>(null);
@@ -36,8 +39,6 @@ export function WorkspaceMedia() {
     const { mutateAsync: uploadMedia } = useUploadDisplayMedia();
     const { mutateAsync: deleteMedia } = useDeleteDisplayMedia();
     const { mutateAsync: updateMedia } = useUpdateDisplayMedia();
-
-    const currentCategory = CATEGORY_MAP[activeCategory];
 
     const filteredFiles = useMemo(() => {
         return mediaFiles.filter(file => {
@@ -106,19 +107,6 @@ export function WorkspaceMedia() {
         }
     };
 
-    const handleAddFolder = async () => {
-        const name = prompt("Nombre de la nueva carpeta:");
-        if (!name || !commerceId) return;
-        const toastId = toast.loading("Creando carpeta...");
-        try {
-            await uploadMedia({ commerceId, webName: name, folderPath: currentFolder, isFolder: true });
-            toast.success("Carpeta creada correctamente.", { id: toastId });
-        } catch (error) {
-            console.error("Folder error:", error);
-            toast.error("Error al crear carpeta.", { id: toastId });
-        }
-    };
-
     const handleDelete = async (file: DisplayMedia) => {
         if (!confirm(`¿Estás seguro de que deseas eliminar "${file.name}"?`)) return;
         
@@ -129,6 +117,20 @@ export function WorkspaceMedia() {
             console.error("Error deleting:", error);
             toast.error("Ocurrió un error al eliminar el archivo.");
         }
+    };
+
+    const handleBulkDelete = async () => {
+        if (!confirm(`¿Estás seguro de eliminar los ${selectedIds.length} elementos seleccionados?`)) return;
+        const toDelete = mediaFiles.filter(f => selectedIds.includes(f.id));
+        for (const f of toDelete) {
+            try {
+                await deleteMedia(f);
+            } catch (error) {
+                console.error("Error deleting", f.name);
+            }
+        }
+        toast.success(`${selectedIds.length} elementos eliminados`);
+        setSelectedIds([]);
     };
 
     const formatDate = (dateString: string) => {
@@ -148,97 +150,118 @@ export function WorkspaceMedia() {
         }
     };
 
+    const breadcrumbs = currentFolder === '/' ? [] : currentFolder.split('/').filter(Boolean);
+
+    const navigateToBreadcrumb = (index: number) => {
+        if (index === -1) {
+            setCurrentFolder('/');
+            return;
+        }
+        const newPath = '/' + breadcrumbs.slice(0, index + 1).join('/');
+        setCurrentFolder(newPath);
+    };
+
     return (
         <div className="h-full flex flex-col bg-slate-50 text-slate-900">
             {/* Top Bar for sending to screens */}
             <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm z-10">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <currentCategory.icon className="w-6 h-6 text-orange-500" />
-                        {currentCategory.title}
+                        <Folder className="w-6 h-6 text-orange-500" />
+                        Librería de Contenidos
                     </h1>
-                    <p className="text-sm text-slate-500 mt-1">Gestiona y organiza tus recursos para las pantallas.</p>
+                    <p className="text-sm text-slate-500 mt-1">Sube, organiza en carpetas y envía medios a tus pantallas.</p>
                 </div>
                 <div className="flex items-center gap-3">
                     <Button variant="outline" className="bg-white text-slate-600 border-slate-200 shadow-sm" onClick={() => setIsUploadModalOpen(true)}>
                         <Upload className="w-4 h-4 mr-2" />
-                        {activeCategory === 'web' ? 'Agregar Enlace' : 'Subir Archivos'}
+                        Subir Archivos
                     </Button>
+                    <div className="h-8 w-[1px] bg-slate-200 mx-1"></div>
                     <Button 
-                        className="bg-orange-500 hover:bg-orange-600 text-white shadow-md"
+                        variant="outline"
+                        className="bg-white text-slate-700 shadow-sm border-slate-200 hover:bg-slate-50"
+                        disabled={selectedIds.length === 0}
+                        onClick={() => setIsMoveModalOpen(true)}
+                    >
+                        <Move className="w-4 h-4 mr-2 text-indigo-500" />
+                        Mover
+                    </Button>
+                    {selectedIds.length > 0 && (
+                        <Button 
+                            variant="outline"
+                            className="bg-red-50 text-red-600 shadow-sm border-red-200 hover:bg-red-100"
+                            onClick={handleBulkDelete}
+                        >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Eliminar ({selectedIds.length})
+                        </Button>
+                    )}
+                    <Button 
+                        className="bg-orange-500 hover:bg-orange-600 text-white shadow-md ml-2"
                         disabled={selectedIds.length === 0}
                         onClick={() => setIsSendModalOpen(true)}
                     >
-                        Enviar a las pantallas
+                        Enviar a pantallas
                         <ArrowRightCircle className="w-4 h-4 ml-2" />
                     </Button>
                 </div>
             </div>
 
             <div className="flex flex-1 overflow-hidden">
-                {/* Left Sidebar - Categories */}
-                <div className="w-64 bg-white border-r border-slate-200 flex flex-col overflow-y-auto">
-                    <div className="p-4 space-y-6">
-                        {/* Todos los medios section */}
-                        <div>
-                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 px-3">Medios del Sistema</h3>
-                            <div className="space-y-1">
-                                <CategoryButton 
-                                    icon={HardDrive} label="Todos los artículos" active={activeCategory === 'all'} 
-                                    onClick={() => setActiveCategory('all')} 
-                                />
-                                <CategoryButton 
-                                    icon={ImageIcon} label="Imágenes" active={activeCategory === 'images'} 
-                                    onClick={() => setActiveCategory('images')} 
-                                />
-                                <CategoryButton 
-                                    icon={Video} label="Vídeos" active={activeCategory === 'videos'} 
-                                    onClick={() => setActiveCategory('videos')} 
-                                />
-                                <CategoryButton 
-                                    icon={FileAudio} label="Audio" active={activeCategory === 'audio'} 
-                                    onClick={() => setActiveCategory('audio')} 
-                                />
-                                <CategoryButton 
-                                    icon={FileText} label="Documentos" active={activeCategory === 'docs'} 
-                                    onClick={() => setActiveCategory('docs')} 
-                                />
-                                <CategoryButton 
-                                    icon={Globe} label="Páginas web" active={activeCategory === 'web'} 
-                                    onClick={() => setActiveCategory('web')} 
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                {/* Left Sidebar - Media Folders */}
+                {commerceId && (
+                    <MediaFolderSidebar 
+                        commerceId={commerceId}
+                        mediaFiles={mediaFiles}
+                        currentFolder={currentFolder}
+                        onSelectFolder={(path) => {
+                            setCurrentFolder(path);
+                            setSearch('');
+                            setSelectedIds([]);
+                        }}
+                    />
+                )}
 
                 {/* Main Content Area */}
                 <div className="flex-1 flex flex-col bg-slate-50/50">
-                    <div className="p-6">
-                        {/* Toolbar */}
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                            <div className="flex items-center gap-3 flex-1 max-w-xl">
-                                <div className="relative flex-1">
+                    <div className="p-6 flex-1 flex flex-col overflow-hidden">
+                        
+                        {/* Filters and Toolbar */}
+                        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-4 shrink-0">
+                            <div className="flex flex-col md:flex-row items-start md:items-center gap-3 flex-1">
+                                <div className="relative w-full md:w-64 shrink-0">
                                     <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
                                     <Input 
-                                        placeholder={`Buscar en ${currentCategory.title.toLowerCase()}...`}
+                                        placeholder="Buscar..."
                                         className="pl-9 bg-white shadow-sm border-slate-200"
                                         value={search}
                                         onChange={(e) => setSearch(e.target.value)}
                                     />
                                 </div>
-                                <Button variant="outline" className="bg-white shadow-sm border-slate-200 text-slate-600" onClick={() => toast('Función de etiquetas próximamente', { icon: '🏷️' })}>
-                                    <Tag className="w-4 h-4 mr-2" /> Etiquetas
-                                </Button>
+                                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 hide-scrollbar w-full">
+                                    {(Object.keys(CATEGORY_MAP) as CategoryId[]).map(cat => {
+                                        const config = CATEGORY_MAP[cat];
+                                        const isSelected = activeCategory === cat;
+                                        return (
+                                            <button
+                                                key={cat}
+                                                onClick={() => setActiveCategory(cat)}
+                                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors border shrink-0 ${
+                                                    isSelected ? 'bg-orange-100 border-orange-200 text-orange-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                                                }`}
+                                            >
+                                                <config.icon className="w-3.5 h-3.5" />
+                                                {config.title}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
                             </div>
 
-                            <div className="flex items-center gap-3">
-                                <Button variant="outline" className="bg-white shadow-sm border-slate-200 text-slate-700" onClick={handleAddFolder}>
-                                    <FolderPlus className="w-4 h-4 mr-2" />
-                                    Agregar carpeta
-                                </Button>
+                            <div className="flex items-center gap-3 shrink-0">
                                 <select 
-                                    className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm text-slate-700 outline-none focus:ring-2 focus:ring-orange-500/20"
+                                    className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm text-slate-700 outline-none focus:ring-2 focus:ring-orange-500/20 shadow-sm"
                                     value={sortMode}
                                     onChange={(e) => setSortMode(e.target.value as any)}
                                 >
@@ -247,7 +270,7 @@ export function WorkspaceMedia() {
                                     <option value="az">A-Z</option>
                                     <option value="za">Z-A</option>
                                 </select>
-                                <div className="flex bg-slate-200/50 p-1 rounded-md border border-slate-200">
+                                <div className="flex bg-slate-200/50 p-1 rounded-md border border-slate-200 shadow-sm">
                                     <Button 
                                         variant="ghost" size="sm" 
                                         className={`h-8 px-2 ${viewMode === 'grid' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
@@ -266,176 +289,203 @@ export function WorkspaceMedia() {
                             </div>
                         </div>
 
-                        {/* List Header & Breadcrumb */}
-                        <div className="mb-4 flex items-center justify-between">
-                            <div>
-                                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                                    {currentFolder !== '/' && (
-                                        <Button variant="ghost" size="sm" className="h-8 px-2 -ml-2 text-slate-500 hover:text-slate-900" onClick={() => {
-                                            const parts = currentFolder.split('/');
-                                            parts.pop();
-                                            setCurrentFolder(parts.length === 1 ? '/' : parts.join('/'));
-                                        }}>
-                                            ←
-                                        </Button>
-                                    )}
-                                    {currentCategory.title} {currentFolder !== '/' && <span className="text-slate-400 text-base font-normal">/ {currentFolder.split('/').pop()}</span>}
-                                </h2>
-                                <p className="text-sm text-slate-500 mt-1">{isLoading ? 'Cargando...' : `${filteredFiles.length} artículo(s) encontrados`}</p>
+                        {/* Breadcrumbs */}
+                        {!search && (
+                            <div className="mb-4 flex items-center gap-2 text-sm text-slate-600 shrink-0">
+                                <button 
+                                    onClick={() => navigateToBreadcrumb(-1)}
+                                    className="hover:text-orange-600 transition-colors font-medium"
+                                >
+                                    Raíz
+                                </button>
+                                {breadcrumbs.map((crumb, idx) => (
+                                    <div key={idx} className="flex items-center gap-2">
+                                        <span className="text-slate-300">/</span>
+                                        <button
+                                            onClick={() => navigateToBreadcrumb(idx)}
+                                            className={`hover:text-orange-600 transition-colors ${idx === breadcrumbs.length - 1 ? 'font-semibold text-slate-800' : 'font-medium'}`}
+                                        >
+                                            {crumb}
+                                        </button>
+                                    </div>
+                                ))}
+                                <span className="ml-auto text-xs text-slate-400 font-medium">
+                                    {isLoading ? 'Cargando...' : `${filteredFiles.length} elemento(s)`}
+                                </span>
                             </div>
-                        </div>
+                        )}
+                        {search && (
+                            <div className="mb-4 flex items-center justify-between shrink-0">
+                                <h3 className="text-sm font-medium text-slate-800">Resultados de búsqueda: "{search}"</h3>
+                                <span className="text-xs text-slate-400 font-medium">{filteredFiles.length} elemento(s)</span>
+                            </div>
+                        )}
 
                         {/* Data View */}
-                        {isLoading ? (
-                             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 flex flex-col items-center justify-center text-slate-500">
-                                <p className="text-lg font-medium text-slate-600">Cargando archivos...</p>
-                             </div>
-                        ) : filteredFiles.length === 0 ? (
-                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 flex flex-col items-center justify-center text-slate-500">
-                                <currentCategory.icon className="w-12 h-12 mb-4 text-slate-300" />
-                                <p className="text-lg font-medium text-slate-600">No hay archivos para mostrar</p>
-                                <p className="text-sm text-slate-400">Agrega nuevos recursos usando el botón superior.</p>
-                                <Button className="mt-6 bg-orange-500 hover:bg-orange-600 text-white" onClick={() => setIsUploadModalOpen(true)}>
-                                    <Upload className="w-4 h-4 mr-2" /> {activeCategory === 'web' ? 'Agregar Enlace' : 'Subir Archivos'}
-                                </Button>
-                            </div>
-                        ) : viewMode === 'list' ? (
-                            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr className="bg-slate-50/80 border-b border-slate-200">
-                                            <th className="px-4 py-3 w-12">
-                                                <input 
-                                                    type="checkbox" 
-                                                    className="rounded border-slate-300 text-orange-500 focus:ring-orange-500/20" 
-                                                    checked={selectedIds.length === filteredFiles.length && filteredFiles.length > 0}
-                                                    onChange={handleSelectAll}
-                                                />
-                                            </th>
-                                            <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Nombre</th>
-                                            <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Modificado</th>
-                                            <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {filteredFiles.map(file => {
-                                            const FileIcon = getIconForType(file.type);
-                                            const isFolder = file.type === 'folder';
-                                            return (
-                                            <tr key={file.id} className="hover:bg-slate-50/50 transition-colors group">
-                                                <td className="px-4 py-4">
+                        <div className="flex-1 overflow-y-auto pb-6 pr-2">
+                            {isLoading ? (
+                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 flex flex-col items-center justify-center text-slate-500 h-full">
+                                    <p className="text-lg font-medium text-slate-600">Cargando archivos...</p>
+                                </div>
+                            ) : filteredFiles.length === 0 ? (
+                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 flex flex-col items-center justify-center text-slate-500 h-full">
+                                    <HardDrive className="w-12 h-12 mb-4 text-slate-300" />
+                                    <p className="text-lg font-medium text-slate-600">Carpeta vacía</p>
+                                    <p className="text-sm text-slate-400">Sube archivos a esta ubicación.</p>
+                                    <Button className="mt-6 bg-orange-500 hover:bg-orange-600 text-white" onClick={() => setIsUploadModalOpen(true)}>
+                                        <Upload className="w-4 h-4 mr-2" /> Subir Archivos
+                                    </Button>
+                                </div>
+                            ) : viewMode === 'list' ? (
+                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr className="bg-slate-50/80 border-b border-slate-200">
+                                                <th className="px-4 py-3 w-12">
                                                     <input 
                                                         type="checkbox" 
                                                         className="rounded border-slate-300 text-orange-500 focus:ring-orange-500/20" 
-                                                        checked={selectedIds.includes(file.id)}
-                                                        onChange={() => handleToggleSelect(file.id)}
+                                                        checked={selectedIds.length === filteredFiles.length && filteredFiles.length > 0}
+                                                        onChange={handleSelectAll}
                                                     />
-                                                </td>
-                                                <td className="px-4 py-4 cursor-pointer" onClick={() => {
-                                                    if (isFolder) {
-                                                        setCurrentFolder(currentFolder === '/' ? `/${file.name}` : `${currentFolder}/${file.name}`);
-                                                    } else {
-                                                        handleToggleSelect(file.id);
-                                                    }
-                                                }}>
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 rounded bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden">
-                                                            {file.type === 'image' && file.url ? (
-                                                                <img src={file.url} alt={file.name} className="w-full h-full object-cover" />
-                                                            ) : (
-                                                                <FileIcon className="w-5 h-5 text-slate-400" />
-                                                            )}
-                                                        </div>
-                                                        <span className="font-medium text-slate-700 truncate max-w-sm" title={file.name}>{file.name}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-4 text-sm text-slate-500">{formatDate(file.created_at)}</td>
-                                                <td className="px-4 py-4 text-right">
-                                                    <Button variant="ghost" size="icon" className="text-red-400 hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete(file)}>
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </Button>
-                                                </td>
+                                                </th>
+                                                <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Nombre</th>
+                                                {search && <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Ubicación</th>}
+                                                <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Modificado</th>
+                                                <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Acciones</th>
                                             </tr>
-                                        )})}
-                                    </tbody>
-                                </table>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                                {filteredFiles.map(file => {
-                                    const FileIcon = getIconForType(file.type);
-                                    const isFolder = file.type === 'folder';
-                                    return (
-                                    <div 
-                                        key={file.id} 
-                                        draggable={!isFolder}
-                                        onDragStart={(e) => {
-                                            if (!isFolder) {
-                                                e.dataTransfer.setData('mediaId', file.id);
-                                            }
-                                        }}
-                                        onDragOver={(e) => {
-                                            if (isFolder) {
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {filteredFiles.map(file => {
+                                                const FileIcon = getIconForType(file.type);
+                                                const isFolder = file.type === 'folder';
+                                                return (
+                                                <tr key={file.id} className="hover:bg-slate-50/50 transition-colors group">
+                                                    <td className="px-4 py-4">
+                                                        <input 
+                                                            type="checkbox" 
+                                                            className="rounded border-slate-300 text-orange-500 focus:ring-orange-500/20" 
+                                                            checked={selectedIds.includes(file.id)}
+                                                            onChange={() => handleToggleSelect(file.id)}
+                                                        />
+                                                    </td>
+                                                    <td className="px-4 py-4 cursor-pointer" onClick={() => {
+                                                        if (isFolder) {
+                                                            setCurrentFolder(currentFolder === '/' ? `/${file.name}` : `${currentFolder}/${file.name}`);
+                                                            setSearch('');
+                                                        } else {
+                                                            handleToggleSelect(file.id);
+                                                        }
+                                                    }}>
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-10 h-10 rounded bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden">
+                                                                {file.type === 'image' && file.url ? (
+                                                                    <img src={file.url} alt={file.name} className="w-full h-full object-cover" />
+                                                                ) : (
+                                                                    <FileIcon className={`w-5 h-5 ${isFolder ? 'text-orange-400 fill-orange-400/20' : 'text-slate-400'}`} />
+                                                                )}
+                                                            </div>
+                                                            <span className="font-medium text-slate-700 truncate max-w-sm" title={file.name}>{file.name}</span>
+                                                        </div>
+                                                    </td>
+                                                    {search && (
+                                                        <td className="px-4 py-4 text-xs text-slate-400">
+                                                            {file.folder_path === '/' ? 'Raíz' : file.folder_path}
+                                                        </td>
+                                                    )}
+                                                    <td className="px-4 py-4 text-sm text-slate-500">{formatDate(file.created_at)}</td>
+                                                    <td className="px-4 py-4 text-right">
+                                                        <Button variant="ghost" size="icon" className="text-red-400 hover:text-red-600 hover:bg-red-50" onClick={(e) => { e.stopPropagation(); handleDelete(file); }}>
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </Button>
+                                                    </td>
+                                                </tr>
+                                            )})}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                                    {filteredFiles.map(file => {
+                                        const FileIcon = getIconForType(file.type);
+                                        const isFolder = file.type === 'folder';
+                                        return (
+                                        <div 
+                                            key={file.id} 
+                                            draggable={!isFolder}
+                                            onDragStart={(e) => {
+                                                if (!isFolder) {
+                                                    e.dataTransfer.setData('mediaId', file.id);
+                                                }
+                                            }}
+                                            onDragOver={(e) => {
+                                                if (isFolder) {
+                                                    e.preventDefault();
+                                                    setDraggedOverFolder(file.id);
+                                                }
+                                            }}
+                                            onDragLeave={() => {
+                                                if (isFolder) setDraggedOverFolder(null);
+                                            }}
+                                            onDrop={async (e) => {
                                                 e.preventDefault();
-                                                setDraggedOverFolder(file.id);
-                                            }
-                                        }}
-                                        onDragLeave={() => {
-                                            if (isFolder) setDraggedOverFolder(null);
-                                        }}
-                                        onDrop={async (e) => {
-                                            e.preventDefault();
-                                            setDraggedOverFolder(null);
-                                            if (isFolder) {
-                                                const droppedId = e.dataTransfer.getData('mediaId');
-                                                if (droppedId) {
-                                                    const newPath = currentFolder === '/' ? `/${file.name}` : `${currentFolder}/${file.name}`;
-                                                    try {
-                                                        await updateMedia({ id: droppedId, updates: { folder_path: newPath } });
-                                                        toast.success('Archivo movido a la carpeta');
-                                                    } catch (err) {
-                                                        toast.error('Error al mover el archivo');
+                                                setDraggedOverFolder(null);
+                                                if (isFolder) {
+                                                    const droppedId = e.dataTransfer.getData('mediaId');
+                                                    if (droppedId && droppedId !== file.id) {
+                                                        const newPath = currentFolder === '/' ? `/${file.name}` : `${currentFolder}/${file.name}`;
+                                                        try {
+                                                            await updateMedia({ id: droppedId, updates: { folder_path: newPath } });
+                                                            toast.success('Archivo movido a la carpeta');
+                                                        } catch (err) {
+                                                            toast.error('Error al mover el archivo');
+                                                        }
                                                     }
                                                 }
-                                            }
-                                        }}
-                                        onClick={() => {
-                                            if (isFolder) {
-                                                setCurrentFolder(currentFolder === '/' ? `/${file.name}` : `${currentFolder}/${file.name}`);
-                                            } else {
-                                                handleToggleSelect(file.id);
-                                            }
-                                        }} 
-                                        className={`bg-white rounded-xl shadow-sm border overflow-hidden group transition-colors cursor-pointer flex flex-col relative ${selectedIds.includes(file.id) ? 'border-orange-400 ring-2 ring-orange-400/20' : 'border-slate-200'} ${draggedOverFolder === file.id ? 'border-emerald-500 ring-2 ring-emerald-500 shadow-md bg-emerald-50/50' : 'hover:border-orange-300'}`}
-                                    >
-                                        <div className="absolute top-2 left-2 z-10">
-                                            <input 
-                                                type="checkbox" 
-                                                className="rounded border-slate-300 text-orange-500 focus:ring-orange-500/20 shadow-sm" 
-                                                checked={selectedIds.includes(file.id)}
-                                                onChange={(e) => { e.stopPropagation(); handleToggleSelect(file.id); }}
-                                            />
+                                            }}
+                                            onClick={() => {
+                                                if (isFolder) {
+                                                    setCurrentFolder(currentFolder === '/' ? `/${file.name}` : `${currentFolder}/${file.name}`);
+                                                    setSearch('');
+                                                } else {
+                                                    handleToggleSelect(file.id);
+                                                }
+                                            }} 
+                                            className={`bg-white rounded-xl shadow-sm border overflow-hidden group transition-colors cursor-pointer flex flex-col relative ${selectedIds.includes(file.id) ? 'border-orange-400 ring-2 ring-orange-400/20' : 'border-slate-200'} ${draggedOverFolder === file.id ? 'border-orange-500 ring-2 ring-orange-500 shadow-md bg-orange-50/50' : 'hover:border-orange-300'}`}
+                                        >
+                                            <div className="absolute top-2 left-2 z-10">
+                                                <input 
+                                                    type="checkbox" 
+                                                    className="rounded border-slate-300 text-orange-500 focus:ring-orange-500/20 shadow-sm bg-white" 
+                                                    checked={selectedIds.includes(file.id)}
+                                                    onChange={(e) => { e.stopPropagation(); handleToggleSelect(file.id); }}
+                                                />
+                                            </div>
+                                            <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <Button variant="ghost" size="icon" className="h-7 w-7 bg-white/90 text-red-500 hover:bg-red-50 hover:text-red-600 rounded-full shadow-sm" onClick={(e) => { e.stopPropagation(); handleDelete(file); }}>
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </Button>
+                                            </div>
+                                            <div className="aspect-[4/3] bg-slate-50 relative overflow-hidden flex items-center justify-center p-2">
+                                                {file.type === 'image' && file.url ? (
+                                                    <img src={file.url} alt={file.name} className="w-full h-full object-contain group-hover:scale-105 transition-transform drop-shadow-sm" />
+                                                ) : (
+                                                    <FileIcon className={`w-12 h-12 ${isFolder ? 'text-orange-400 fill-orange-400/20 group-hover:scale-110 transition-transform' : 'text-slate-300'}`} />
+                                                )}
+                                            </div>
+                                            <div className="p-3 border-t border-slate-100 bg-white">
+                                                <h4 className="font-medium text-slate-700 text-sm truncate" title={file.name}>{file.name}</h4>
+                                                {search ? (
+                                                    <p className="text-xs text-orange-500 mt-0.5 truncate">{file.folder_path === '/' ? 'Raíz' : file.folder_path}</p>
+                                                ) : (
+                                                    <p className="text-xs text-slate-400 mt-0.5 truncate">{formatDate(file.created_at).split(',')[0]}</p>
+                                                )}
+                                            </div>
                                         </div>
-                                        <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <Button variant="ghost" size="icon" className="h-7 w-7 bg-white/80 text-red-500 hover:bg-red-50 hover:text-red-600 rounded-full shadow-sm" onClick={(e) => { e.stopPropagation(); handleDelete(file); }}>
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                            </Button>
-                                        </div>
-                                        <div className="aspect-video bg-slate-100 relative overflow-hidden flex items-center justify-center">
-                                            {file.type === 'image' && file.url ? (
-                                                <img src={file.url} alt={file.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                                            ) : (
-                                                <FileIcon className="w-10 h-10 text-slate-300" />
-                                            )}
-                                        </div>
-                                        <div className="p-3 border-t border-slate-100">
-                                            <h4 className="font-medium text-slate-700 text-sm truncate" title={file.name}>{file.name}</h4>
-                                            <p className="text-xs text-slate-400 mt-1">{formatDate(file.created_at).split(',')[0]}</p>
-                                        </div>
-                                    </div>
-                                )})}
-                            </div>
-                        )}
+                                    )})}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -445,8 +495,18 @@ export function WorkspaceMedia() {
                 onClose={() => setIsUploadModalOpen(false)} 
                 onUpload={handleUploadFiles}
                 onAddWebLink={handleAddWebLink}
-                activeCategory={activeCategory}
+                activeCategory={activeCategory !== 'all' ? activeCategory : 'images'}
             />
+            {commerceId && (
+                <MoveMediaModal
+                    isOpen={isMoveModalOpen}
+                    onClose={() => setIsMoveModalOpen(false)}
+                    selectedAssets={mediaFiles.filter(f => selectedIds.includes(f.id))}
+                    allMedia={mediaFiles}
+                    commerceId={commerceId}
+                    onSuccess={() => setSelectedIds([])}
+                />
+            )}
             <SendToScreensModal
                 isOpen={isSendModalOpen}
                 onClose={() => setIsSendModalOpen(false)}
@@ -455,19 +515,6 @@ export function WorkspaceMedia() {
                 onSuccess={() => setSelectedIds([])}
             />
         </div>
-    );
-}
-
-// Sidebar Button Helper
-function CategoryButton({ icon: Icon, label, active, onClick, color }: any) {
-    return (
-        <button 
-            onClick={onClick}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${active ? 'bg-orange-50 text-orange-700 font-semibold' : 'text-slate-600 hover:bg-slate-100'}`}
-        >
-            <Icon className={`w-4 h-4 ${active ? color || 'text-orange-500' : 'text-slate-400'}`} />
-            {label}
-        </button>
     );
 }
 
