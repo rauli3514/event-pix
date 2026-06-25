@@ -3,9 +3,10 @@ import { useParams } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Image as ImageIcon, Folder, PlaySquare, Settings2, Plus, LayoutGrid, List, Globe } from 'lucide-react';
-import { useDisplayMedia } from '@/hooks/use-display-media';
-import { useDisplayCampaigns } from '@/hooks/use-display-hub';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Search, Image as ImageIcon, Folder, PlaySquare, Settings2, Plus, LayoutGrid, List, Globe, Upload, FolderPlus } from 'lucide-react';
+import { useDisplayMedia, useUploadDisplayMedia } from '@/hooks/use-display-media';
+import { useDisplayCampaigns, useCreateCampaign } from '@/hooks/use-display-hub';
 import { getIconForType } from '@/pages/display-hub/WorkspaceMedia';
 
 interface AssetSelectorModalProps {
@@ -19,11 +20,41 @@ export const AssetSelectorModal = ({ isOpen, onClose, onSelect }: AssetSelectorM
     const [search, setSearch] = useState('');
     const [activeTab, setActiveTab] = useState<'archivos' | 'listas'>('archivos');
     const [selectedAsset, setSelectedAsset] = useState<any>(null);
+    const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+    const [newFolderName, setNewFolderName] = useState('');
+
+    const uploadMedia = useUploadDisplayMedia();
+    const createCampaign = useCreateCampaign();
 
     const { data: mediaFiles = [], isLoading: isLoadingMedia } = useDisplayMedia(commerceId);
     const { data: campaigns = [], isLoading: isLoadingCampaigns } = useDisplayCampaigns(commerceId);
     
     const isLoading = activeTab === 'archivos' ? isLoadingMedia : isLoadingCampaigns;
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files;
+        if (!files || !commerceId) return;
+        for (const file of Array.from(files)) {
+            try {
+                await uploadMedia.mutateAsync({ file, commerceId, folderPath: '/' });
+            } catch (err) {
+                console.error('Upload error:', err);
+            }
+        }
+        e.target.value = '';
+    };
+
+    const handleCreatePlaylist = async () => {
+        if (!commerceId) return;
+        try {
+            const name = `Lista ${new Date().toLocaleDateString('es-AR')}`;
+            const campaign = await createCampaign.mutateAsync({ commerceId, name, items_json: [] });
+            setActiveTab('listas');
+            setSelectedAsset({ ...campaign, type: 'campaign' });
+        } catch (err) {
+            console.error('Error creating playlist:', err);
+        }
+    };
 
     const filteredAssets = useMemo(() => {
         if (activeTab === 'archivos') {
@@ -86,10 +117,74 @@ export const AssetSelectorModal = ({ isOpen, onClose, onSelect }: AssetSelectorM
                                 <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-400"><List className="w-4 h-4" /></Button>
                             </div>
 
-                            <Button className="h-9 bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm ml-2">
-                                <Plus className="w-4 h-4 mr-1" /> Crear
-                            </Button>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button className="h-9 bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm ml-2 flex items-center gap-1">
+                                        <Plus className="w-4 h-4" /> Crear
+                                        <svg className="w-3 h-3 ml-0.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-52 bg-white shadow-xl border border-slate-200 rounded-xl p-1">
+                                    <DropdownMenuItem
+                                        className="flex items-center gap-3 px-3 py-2.5 cursor-pointer rounded-lg hover:bg-slate-50"
+                                        onClick={() => document.getElementById('asset-upload-input')?.click()}
+                                    >
+                                        <Upload className="w-4 h-4 text-slate-500" />
+                                        <span className="text-slate-700 font-medium">Subir archivos</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        className="flex items-center gap-3 px-3 py-2.5 cursor-pointer rounded-lg hover:bg-slate-50"
+                                        onClick={handleCreatePlaylist}
+                                    >
+                                        <PlaySquare className="w-4 h-4 text-slate-500" />
+                                        <span className="text-slate-700 font-medium">Nueva lista</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        className="flex items-center gap-3 px-3 py-2.5 cursor-pointer rounded-lg hover:bg-slate-50"
+                                        onClick={() => setIsCreatingFolder(true)}
+                                    >
+                                        <FolderPlus className="w-4 h-4 text-slate-500" />
+                                        <span className="text-slate-700 font-medium">Nueva carpeta</span>
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+
+                            {/* Input oculto para subir archivos */}
+                            <input 
+                                id="asset-upload-input"
+                                type="file"
+                                multiple
+                                accept="image/*,video/*"
+                                className="hidden"
+                                onChange={handleFileUpload}
+                            />
                         </div>
+
+                        {/* Crear carpeta inline */}
+                        {isCreatingFolder && (
+                            <div className="px-4 py-3 bg-blue-50 border-b border-blue-100 flex items-center gap-2">
+                                <FolderPlus className="w-4 h-4 text-blue-500 shrink-0" />
+                                <Input
+                                    placeholder="Nombre de la carpeta..."
+                                    value={newFolderName}
+                                    onChange={(e) => setNewFolderName(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') setIsCreatingFolder(false);
+                                        if (e.key === 'Escape') { setIsCreatingFolder(false); setNewFolderName(''); }
+                                    }}
+                                    className="h-8 text-sm"
+                                    autoFocus
+                                />
+                                <Button size="sm" className="h-8 bg-blue-500 hover:bg-blue-600 text-white shrink-0" onClick={() => setIsCreatingFolder(false)}>
+                                    Crear
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-8 shrink-0" onClick={() => { setIsCreatingFolder(false); setNewFolderName(''); }}>
+                                    Cancelar
+                                </Button>
+                            </div>
+                        )}
 
                         {/* Grid Area */}
                         <div className="flex-1 overflow-y-auto p-6">

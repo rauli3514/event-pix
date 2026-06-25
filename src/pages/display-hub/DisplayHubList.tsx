@@ -381,6 +381,7 @@ const DisplayHubList = () => {
                 onClose={() => setEditModalOpen(false)} 
                 device={selectedDevice}
                 linkGroups={linkGroups || []}
+                commerceId={commerceId}
                 onSave={(id, updates, asset) => {
                     updateDevice.mutate({ id, updates }, {
                         onSuccess: () => {
