@@ -25,8 +25,7 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, onSave }:
     
     // UI Mock States (Pro features)
     const [contentType, setContentType] = useState('asset');
-    const [scale, setScale] = useState('fit');
-    const [orientation, setOrientation] = useState('landscape');
+    const [orientation, setOrientation] = useState('0');
     const [location, setLocation] = useState('');
     const [showDownloading, setShowDownloading] = useState(true);
     const [preloadAssets, setPreloadAssets] = useState(true);
@@ -48,6 +47,7 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, onSave }:
             } else {
                 setSelectedAsset(null);
             }
+            setOrientation(device.orientation || '0');
             setShowAdvanced(false);
         }
     }, [device]);
@@ -62,7 +62,6 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, onSave }:
         onSave(device.id, {
             name,
             group_id: groupId === 'none' ? null : groupId,
-            scale,
             orientation
         }, selectedAsset);
     };
@@ -159,28 +158,16 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, onSave }:
                     </div>
 
                     <div className="grid grid-cols-[160px_1fr] items-center gap-4">
-                        <Label className="text-right text-slate-500 font-medium">Escala</Label>
-                        <Select value={scale} onValueChange={setScale}>
-                            <SelectTrigger className="w-full shadow-sm bg-white">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="fit">Ajustar (Fit)</SelectItem>
-                                <SelectItem value="fill">Rellenar (Fill)</SelectItem>
-                                <SelectItem value="stretch">Estirar (Stretch)</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    <div className="grid grid-cols-[160px_1fr] items-center gap-4">
-                        <Label className="text-right text-slate-500 font-medium">Orientación</Label>
+                        <Label className="text-right text-slate-500 font-medium">Rotación de Pantalla (Grados)</Label>
                         <Select value={orientation} onValueChange={setOrientation}>
                             <SelectTrigger className="w-full shadow-sm bg-white">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="landscape">Horizontal (Landscape)</SelectItem>
-                                <SelectItem value="portrait">Vertical (Portrait)</SelectItem>
+                                <SelectItem value="0">0° (Horizontal/Normal)</SelectItem>
+                                <SelectItem value="90">90° (Vertical Derecha)</SelectItem>
+                                <SelectItem value="180">180° (Horizontal Invertido)</SelectItem>
+                                <SelectItem value="270">270° (Vertical Izquierda)</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
