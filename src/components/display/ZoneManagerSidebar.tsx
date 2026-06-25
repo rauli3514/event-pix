@@ -76,7 +76,6 @@ export const ZoneManagerSidebar = ({ commerceId, groups, selectedGroupId, onSele
     const handleDelete = async (id: string) => {
         if (!confirm('¿Estás seguro de eliminar esta carpeta? Las pantallas y subcarpetas que contenga subirán un nivel.')) return;
         try {
-            // Reasignar subcarpetas a parent_id del grupo borrado (para mantener el árbol)
             const groupToDelete = groups.find(g => g.id === id);
             const parentId = groupToDelete?.parent_id || null;
             
@@ -84,12 +83,6 @@ export const ZoneManagerSidebar = ({ commerceId, groups, selectedGroupId, onSele
             for (const child of children) {
                 await updateGroup.mutateAsync({ id: child.id, updates: { parent_id: parentId }});
             }
-
-            // Las pantallas se reasignan al root o al parent_id. 
-            // supabase ON DELETE CASCADE no queremos, queremos set null o similar.
-            // Ojo: en la DB dijimos "ON DELETE CASCADE". Si la eliminamos con cascade, se borran los hijos. 
-            // Espera, el usuario pidió "que solo elimine la carpeta pero las pantallas suban en nivel de raiz".
-            // Para eso, necesitamos hacer esto desde el cliente o tener un trigger.
             
             await deleteGroup.mutateAsync({ id });
             
@@ -107,32 +100,36 @@ export const ZoneManagerSidebar = ({ commerceId, groups, selectedGroupId, onSele
         if (nodes.length === 0 && isCreatingChildFor !== parentId) return null;
 
         return (
-            <div className="space-y-0.5 mt-0.5">
+            <div className={`space-y-0.5 mt-0.5 relative ${depth > 0 ? 'ml-4 border-l border-slate-800' : ''}`}>
                 {nodes.map(node => {
                     const isExpanded = expandedGroups[node.id];
                     const isSelected = selectedGroupId === node.id;
                     const hasChildren = groups.some(g => g.parent_id === node.id);
 
                     return (
-                        <div key={node.id}>
+                        <div key={node.id} className="relative">
+                            {depth > 0 && (
+                                <div className="absolute w-3 border-t border-slate-800 left-0 top-4" />
+                            )}
                             <div 
-                                className={`flex items-center group rounded-lg transition-colors pr-2 ${
-                                    isSelected ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-700'
+                                className={`flex items-center group rounded-lg transition-colors pr-2 py-1 relative ${
+                                    depth > 0 ? 'ml-3' : ''
+                                } ${
+                                    isSelected ? 'bg-indigo-500/10 text-indigo-400' : 'hover:bg-slate-800/50 text-slate-300'
                                 }`}
-                                style={{ paddingLeft: `${depth * 16 + 8}px` }}
                             >
                                 <button 
                                     onClick={() => hasChildren && toggleExpand(node.id)}
-                                    className={`p-1.5 rounded-md hover:bg-slate-200 transition-colors ${!hasChildren ? 'opacity-0 cursor-default' : ''}`}
+                                    className={`p-1 rounded-md hover:bg-slate-700 transition-colors ${!hasChildren ? 'opacity-0 cursor-default' : ''}`}
                                 >
                                     {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                                 </button>
                                 
                                 <button 
                                     onClick={() => onSelectGroup(node.id)}
-                                    className="flex-1 flex items-center gap-2 py-2 text-sm text-left truncate"
+                                    className="flex-1 flex items-center gap-2 py-1 text-sm text-left truncate"
                                 >
-                                    {isExpanded ? <FolderOpen className={`w-4 h-4 ${isSelected ? 'text-indigo-500' : 'text-slate-400'}`} /> : <Folder className={`w-4 h-4 ${isSelected ? 'text-indigo-500' : 'text-slate-400'}`} />}
+                                    {isExpanded ? <FolderOpen className={`w-4 h-4 ${isSelected ? 'text-indigo-400' : 'text-slate-400'}`} /> : <Folder className={`w-4 h-4 ${isSelected ? 'text-indigo-400' : 'text-slate-400'}`} />}
                                     
                                     {isRenaming === node.id ? (
                                         <Input 
@@ -141,22 +138,22 @@ export const ZoneManagerSidebar = ({ commerceId, groups, selectedGroupId, onSele
                                             onChange={e => setInputValue(e.target.value)}
                                             onKeyDown={e => e.key === 'Enter' && handleRename(node.id)}
                                             onBlur={() => handleRename(node.id)}
-                                            className="h-7 text-xs px-2"
+                                            className="h-7 text-xs px-2 bg-slate-950 border-indigo-500 text-white"
                                             onClick={e => e.stopPropagation()}
                                         />
                                     ) : (
-                                        <span className={`truncate font-medium ${isSelected ? 'text-indigo-700' : 'text-slate-700'}`}>{node.name}</span>
+                                        <span className={`truncate font-medium ${isSelected ? 'text-indigo-400' : 'text-slate-300'}`}>{node.name}</span>
                                     )}
                                 </button>
 
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                        <button className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-slate-200 rounded-md transition-all">
-                                            <MoreVertical className="w-4 h-4 text-slate-400" />
+                                        <button className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-slate-700 rounded-md transition-all text-slate-400 hover:text-white">
+                                            <MoreVertical className="w-4 h-4" />
                                         </button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-48">
-                                        <DropdownMenuItem onClick={() => {
+                                    <DropdownMenuContent align="end" className="w-48 bg-slate-900 border-slate-800 text-slate-200">
+                                        <DropdownMenuItem className="focus:bg-slate-800 focus:text-white cursor-pointer" onClick={() => {
                                             setIsCreatingChildFor(node.id);
                                             setInputValue('');
                                             setExpandedGroups(prev => ({ ...prev, [node.id]: true }));
@@ -164,14 +161,14 @@ export const ZoneManagerSidebar = ({ commerceId, groups, selectedGroupId, onSele
                                             <FolderPlus className="w-4 h-4 mr-2" />
                                             Nueva Subcarpeta
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => {
+                                        <DropdownMenuItem className="focus:bg-slate-800 focus:text-white cursor-pointer" onClick={() => {
                                             setIsRenaming(node.id);
                                             setInputValue(node.name);
                                         }}>
                                             <Edit2 className="w-4 h-4 mr-2" />
                                             Renombrar
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => handleDelete(node.id)} className="text-red-600 focus:text-red-600">
+                                        <DropdownMenuItem className="text-red-400 focus:text-red-300 focus:bg-red-950/30 cursor-pointer" onClick={() => handleDelete(node.id)}>
                                             <Trash2 className="w-4 h-4 mr-2" />
                                             Eliminar
                                         </DropdownMenuItem>
@@ -182,8 +179,9 @@ export const ZoneManagerSidebar = ({ commerceId, groups, selectedGroupId, onSele
                             {isExpanded && renderTree(node.id, depth + 1)}
                             
                             {isCreatingChildFor === node.id && isExpanded && (
-                                <div className="flex items-center gap-2 py-1.5 pr-2" style={{ paddingLeft: `${(depth + 1) * 16 + 8 + 24}px` }}>
-                                    <Folder className="w-4 h-4 text-slate-300" />
+                                <div className={`flex items-center gap-2 py-1.5 pr-2 relative ml-3 ${depth > -1 ? 'ml-7' : ''}`}>
+                                    <div className="absolute w-3 border-t border-slate-800 left-[-12px] top-1/2" />
+                                    <Folder className="w-4 h-4 text-slate-500" />
                                     <Input 
                                         autoFocus
                                         value={inputValue}
@@ -191,7 +189,7 @@ export const ZoneManagerSidebar = ({ commerceId, groups, selectedGroupId, onSele
                                         onKeyDown={e => e.key === 'Enter' && handleCreate(node.id)}
                                         onBlur={() => handleCreate(node.id)}
                                         placeholder="Nombre..."
-                                        className="h-7 text-xs px-2"
+                                        className="h-7 text-xs px-2 bg-slate-950 border-indigo-500 text-white"
                                     />
                                 </div>
                             )}
@@ -203,15 +201,15 @@ export const ZoneManagerSidebar = ({ commerceId, groups, selectedGroupId, onSele
     };
 
     return (
-        <div className="w-64 bg-white border-r border-slate-200 flex flex-col h-full overflow-hidden shrink-0">
-            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                <h2 className="font-semibold text-slate-800 flex items-center gap-2">
-                    <Layers className="w-5 h-5 text-indigo-500" />
+        <div className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col h-full overflow-hidden shrink-0 text-white">
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+                <h2 className="font-semibold text-white flex items-center gap-2">
+                    <Layers className="w-5 h-5 text-indigo-400" />
                     Zonas y Pantallas
                 </h2>
                 <button 
                     onClick={() => { setIsCreatingRoot(true); setInputValue(''); }}
-                    className="p-1.5 hover:bg-slate-100 rounded-md transition-colors text-slate-500 hover:text-indigo-600"
+                    className="p-1.5 hover:bg-slate-800 rounded-md transition-colors text-slate-400 hover:text-indigo-400"
                     title="Nueva Carpeta Principal"
                 >
                     <FolderPlus className="w-5 h-5" />
@@ -222,33 +220,33 @@ export const ZoneManagerSidebar = ({ commerceId, groups, selectedGroupId, onSele
                 <button
                     onClick={() => onSelectGroup('all')}
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-left ${
-                        selectedGroupId === 'all' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'hover:bg-slate-50 text-slate-700'
+                        selectedGroupId === 'all' ? 'bg-indigo-500/10 text-indigo-400 font-semibold' : 'hover:bg-slate-800/50 text-slate-300'
                     }`}
                 >
-                    <Layers className={`w-4 h-4 ${selectedGroupId === 'all' ? 'text-indigo-600' : 'text-slate-400'}`} />
+                    <Layers className={`w-4 h-4 ${selectedGroupId === 'all' ? 'text-indigo-400' : 'text-slate-400'}`} />
                     <span className="flex-1 text-sm">Todas las pantallas</span>
-                    <span className="text-xs bg-slate-100 px-1.5 py-0.5 rounded-full text-slate-500 font-medium">{totalCount}</span>
+                    <span className="text-xs bg-slate-800 px-1.5 py-0.5 rounded-full text-slate-400 font-medium">{totalCount}</span>
                 </button>
 
                 <button
                     onClick={() => onSelectGroup('unassigned')}
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-left ${
-                        selectedGroupId === 'unassigned' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'hover:bg-slate-50 text-slate-700'
+                        selectedGroupId === 'unassigned' ? 'bg-indigo-500/10 text-indigo-400 font-semibold' : 'hover:bg-slate-800/50 text-slate-300'
                     }`}
                 >
-                    <Home className={`w-4 h-4 ${selectedGroupId === 'unassigned' ? 'text-indigo-600' : 'text-slate-400'}`} />
+                    <Home className={`w-4 h-4 ${selectedGroupId === 'unassigned' ? 'text-indigo-400' : 'text-slate-400'}`} />
                     <span className="flex-1 text-sm">Sin Agrupar (Raíz)</span>
-                    <span className="text-xs bg-slate-100 px-1.5 py-0.5 rounded-full text-slate-500 font-medium">{unassignedCount}</span>
+                    <span className="text-xs bg-slate-800 px-1.5 py-0.5 rounded-full text-slate-400 font-medium">{unassignedCount}</span>
                 </button>
 
                 <div className="pt-4 pb-2">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider px-3 mb-2">Organigrama</p>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 mb-2">Organigrama</p>
                     
                     {renderTree(null, 0)}
 
                     {isCreatingRoot && (
-                        <div className="flex items-center gap-2 py-1.5 px-3 ml-6 mt-1">
-                            <Folder className="w-4 h-4 text-slate-300" />
+                        <div className="flex items-center gap-2 py-1.5 px-3 ml-2 mt-2 relative">
+                            <Folder className="w-4 h-4 text-slate-500" />
                             <Input 
                                 autoFocus
                                 value={inputValue}
@@ -256,7 +254,7 @@ export const ZoneManagerSidebar = ({ commerceId, groups, selectedGroupId, onSele
                                 onKeyDown={e => e.key === 'Enter' && handleCreate(null)}
                                 onBlur={() => handleCreate(null)}
                                 placeholder="Nombre de zona..."
-                                className="h-7 text-xs px-2"
+                                className="h-7 text-xs px-2 bg-slate-950 border-indigo-500 text-white"
                             />
                         </div>
                     )}
