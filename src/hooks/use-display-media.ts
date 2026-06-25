@@ -26,10 +26,10 @@ export const useUploadDisplayMedia = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ commerceId, file, webUrl, webName, folderPath = '/', isFolder = false }: { commerceId: string; file?: File; webUrl?: string; webName?: string; folderPath?: string; isFolder?: boolean }) => {
-            let type = 'docs';
+        mutationFn: async ({ commerceId, file, webUrl, webName, folderPath = '/', isFolder = false, type: overrideType, metadata }: { commerceId: string; file?: File; webUrl?: string; webName?: string; folderPath?: string; isFolder?: boolean; type?: string; metadata?: any }) => {
+            let type = overrideType || 'docs';
             let publicUrl = '';
-            let storagePath = 'web_link';
+            let storagePath = overrideType === 'app' ? `app://${webName?.replace(/[^a-z0-9]/gi, '_').toLowerCase()}` : 'web_link';
             let name = webName || '';
             let size = 0;
 
@@ -62,10 +62,13 @@ export const useUploadDisplayMedia = () => {
                 
                 publicUrl = data.publicUrl;
             } else if (webUrl) {
-                type = 'web';
+                if (!overrideType) type = 'web';
                 publicUrl = webUrl;
+            } else if (overrideType === 'app') {
+                type = 'app';
+                publicUrl = `app://${metadata?.appId || 'unknown'}`;
             } else {
-                throw new Error("No file or web URL provided");
+                throw new Error("No file, web URL, or app config provided");
             }
 
             const { data: mediaRecord, error: dbError } = await supabase
@@ -77,7 +80,8 @@ export const useUploadDisplayMedia = () => {
                     url: publicUrl,
                     storage_path: storagePath,
                     size_bytes: size,
-                    folder_path: folderPath
+                    folder_path: folderPath,
+                    metadata: metadata || {}
                 })
                 .select()
                 .single();

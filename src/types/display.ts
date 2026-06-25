@@ -8,6 +8,7 @@ export interface DisplayMedia {
     storage_path: string;
     size_bytes: number;
     folder_path: string;
+    metadata?: any;
     created_at: string;
 }
 

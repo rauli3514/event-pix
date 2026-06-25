@@ -10,8 +10,9 @@ import { toast } from 'sonner';
 import { DisplayMedia } from '@/types/display';
 import { MediaFolderSidebar } from '@/components/display/MediaFolderSidebar';
 import { MoveMediaModal } from '@/components/display/MoveMediaModal';
+import { AppCatalogModal } from '@/components/display/apps/AppCatalogModal';
 
-export type CategoryId = 'all' | 'images' | 'videos' | 'audio' | 'docs' | 'web';
+export type CategoryId = 'all' | 'images' | 'videos' | 'audio' | 'docs' | 'web' | 'apps';
 
 const CATEGORY_MAP: Record<CategoryId, { title: string, icon: any }> = {
     all: { title: 'Todos', icon: HardDrive },
@@ -19,13 +20,15 @@ const CATEGORY_MAP: Record<CategoryId, { title: string, icon: any }> = {
     videos: { title: 'Vídeos', icon: Video },
     audio: { title: 'Audio', icon: FileAudio },
     docs: { title: 'Documentos', icon: FileText },
-    web: { title: 'Enlaces', icon: Globe }
+    web: { title: 'Enlaces', icon: Globe },
+    apps: { title: 'Apps', icon: LayoutGrid }
 };
 
 export function WorkspaceMedia() {
     const { commerceId } = useParams<{ commerceId: string }>();
     const [viewMode, setViewMode] = useState<'list'|'grid'>('grid');
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+    const [isAppCatalogOpen, setIsAppCatalogOpen] = useState(false);
     const [activeCategory, setActiveCategory] = useState<CategoryId>('all');
     const [search, setSearch] = useState('');
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -56,6 +59,7 @@ export function WorkspaceMedia() {
             if (activeCategory === 'audio' && file.type === 'audio') return true;
             if (activeCategory === 'docs' && file.type === 'docs') return true;
             if (activeCategory === 'web' && file.type === 'web') return true;
+            if (activeCategory === 'apps' && (file.type === 'app' || file.type === 'widget' || file.type === 'layout')) return true;
             return false;
         }).sort((a, b) => {
             if (a.type === 'folder' && b.type !== 'folder') return -1;
@@ -176,6 +180,10 @@ export function WorkspaceMedia() {
                     <Button variant="outline" className="bg-slate-800 text-slate-200 border-slate-700 shadow-sm hover:bg-slate-700 hover:text-white" onClick={() => setIsUploadModalOpen(true)}>
                         <Upload className="w-4 h-4 mr-2" />
                         Subir Archivos
+                    </Button>
+                    <Button variant="outline" className="bg-indigo-900/40 text-indigo-300 border-indigo-500/50 shadow-sm hover:bg-indigo-900/60 hover:text-indigo-200" onClick={() => setIsAppCatalogOpen(true)}>
+                        <LayoutGrid className="w-4 h-4 mr-2" />
+                        Crear App
                     </Button>
                     <div className="h-8 w-[1px] bg-slate-700 mx-1 hidden sm:block"></div>
                     <Button 
@@ -514,6 +522,14 @@ export function WorkspaceMedia() {
                 commerceId={commerceId || ''}
                 onSuccess={() => setSelectedIds([])}
             />
+            {commerceId && (
+                <AppCatalogModal
+                    isOpen={isAppCatalogOpen}
+                    onClose={() => setIsAppCatalogOpen(false)}
+                    commerceId={commerceId}
+                    currentFolder={currentFolder}
+                />
+            )}
         </div>
     );
 }
@@ -526,6 +542,9 @@ export function getIconForType(type: string) {
         case 'audio': return FileAudio;
         case 'docs': return FileText;
         case 'web': return Globe;
+        case 'app': 
+        case 'widget': 
+        case 'layout': return LayoutGrid;
         default: return FileText;
     }
 }
