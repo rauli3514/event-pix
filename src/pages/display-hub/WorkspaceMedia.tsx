@@ -14,22 +14,12 @@ import { AppCatalogModal } from '@/components/display/apps/AppCatalogModal';
 
 export type CategoryId = 'all' | 'images' | 'videos' | 'audio' | 'docs' | 'web' | 'apps';
 
-const CATEGORY_MAP: Record<CategoryId, { title: string, icon: any }> = {
-    all: { title: 'Todos', icon: HardDrive },
-    images: { title: 'Imágenes', icon: ImageIcon },
-    videos: { title: 'Vídeos', icon: Video },
-    audio: { title: 'Audio', icon: FileAudio },
-    docs: { title: 'Documentos', icon: FileText },
-    web: { title: 'Enlaces', icon: Globe },
-    apps: { title: 'Apps', icon: LayoutGrid }
-};
-
 export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: CategoryId }) {
     const { commerceId } = useParams<{ commerceId: string }>();
     const [viewMode, setViewMode] = useState<'list'|'grid'>('grid');
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const [isAppCatalogOpen, setIsAppCatalogOpen] = useState(false);
-    const [activeCategory, setActiveCategory] = useState<CategoryId>(initialCategory);
+    const [activeCategory] = useState<CategoryId>(initialCategory);
     const [search, setSearch] = useState('');
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isSendModalOpen, setIsSendModalOpen] = useState(false);
@@ -171,10 +161,12 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
             <div className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex flex-col md:flex-row md:items-center justify-between shadow-sm z-10 gap-4 shrink-0">
                 <div>
                     <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-                        <Folder className="w-6 h-6 text-orange-400" />
-                        Librería de Contenidos
+                        {activeCategory === 'apps' ? <LayoutGrid className="w-6 h-6 text-indigo-400" /> : <Folder className="w-6 h-6 text-orange-400" />}
+                        {activeCategory === 'apps' ? 'Aplicaciones' : 'Librería de Contenidos'}
                     </h1>
-                    <p className="text-sm text-slate-400 mt-1">Sube, organiza en carpetas y envía medios a tus pantallas.</p>
+                    <p className="text-sm text-slate-400 mt-1">
+                        {activeCategory === 'apps' ? 'Crea y administra aplicaciones y widgets.' : 'Sube, organiza en carpetas y envía medios a tus pantallas.'}
+                    </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                     {activeCategory === 'apps' ? (
@@ -221,7 +213,7 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
 
             <div className="flex flex-1 overflow-hidden">
                 {/* Left Sidebar - Media Folders */}
-                {commerceId && (
+                {commerceId && activeCategory !== 'apps' && (
                     <MediaFolderSidebar 
                         commerceId={commerceId}
                         mediaFiles={mediaFiles}

@@ -30,10 +30,7 @@ const DisplayPlaylists = () => {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [newCampaignData, setNewCampaignData] = useState({ name: '', description: '' });
 
-    if (isSuperAdmin === false) {
-        navigate('/admin', { replace: true });
-        return null;
-    }
+
 
     const handleCreateSubmit = (e: React.FormEvent) => {
         e.preventDefault();
