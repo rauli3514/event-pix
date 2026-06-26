@@ -8,7 +8,11 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { toast } from 'sonner';
 import { Link, Navigate } from 'react-router-dom';
-import { UserPlus, Users, ArrowLeft, Mail, Calendar, Shield, Lock, Ban, CheckCircle } from 'lucide-react';
+import { UserPlus, Users, ArrowLeft, Mail, Calendar, Shield, Lock, Ban, CheckCircle, Settings2 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
+import { useEventProviders, useUserEventAssignments, useCommerceAssignments, useUserCommerceAssignments } from '@/hooks/use-roles';
+import { useCommerces } from '@/hooks/use-display-hub';
 
 const ProvidersList = () => {
     const isSuperAdmin = useIsSuperAdmin();
@@ -28,6 +32,43 @@ const ProvidersList = () => {
     const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
     const [selectedProvider, setSelectedProvider] = useState<any>(null);
     const [newPassword, setNewPassword] = useState('');
+
+    const [accessDialogOpen, setAccessDialogOpen] = useState(false);
+
+    // Fetch all available resources
+    const { data: allEvents } = useQuery({
+        queryKey: ['events'],
+        queryFn: async () => {
+            const { data } = await supabase.from('events').select('*').order('created_at', { ascending: false });
+            return data || [];
+        }
+    });
+    const { data: allCommerces } = useCommerces();
+
+    // Assignment hooks
+    const { assignProvider: assignEvent, removeProvider: removeEvent } = useEventProviders();
+    const { assignCommerce, removeCommerce } = useCommerceAssignments();
+
+    const { data: userEvents } = useUserEventAssignments(selectedProvider?.id);
+    const { data: userCommerces } = useUserCommerceAssignments(selectedProvider?.id);
+
+    const toggleEventAccess = (eventId: string, hasAccess: boolean) => {
+        if (!selectedProvider) return;
+        if (hasAccess) {
+            removeEvent.mutate({ eventId, providerId: selectedProvider.id });
+        } else {
+            assignEvent.mutate({ eventId, providerId: selectedProvider.id });
+        }
+    };
+
+    const toggleCommerceAccess = (commerceId: string, hasAccess: boolean) => {
+        if (!selectedProvider) return;
+        if (hasAccess) {
+            removeCommerce.mutate({ commerceId, userId: selectedProvider.id });
+        } else {
+            assignCommerce.mutate({ commerceId, userId: selectedProvider.id });
+        }
+    };
 
     const handleCreateSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -207,23 +248,35 @@ const ProvidersList = () => {
                                 </span>
                             </div>
                         </CardContent>
-                        <CardFooter className="pt-2 border-t bg-slate-50/50 flex justify-between gap-2">
+                        <CardFooter className="pt-2 border-t bg-slate-50/50 grid grid-cols-3 gap-2">
                             <Button
                                 variant="outline"
                                 size="sm"
-                                className="flex-1 text-xs h-8"
+                                className="w-full text-xs h-8"
                                 onClick={() => {
                                     setSelectedProvider(provider);
                                     setPasswordDialogOpen(true);
                                 }}
                             >
-                                <Lock className="w-3 h-3 mr-1.5" />
-                                Contraseña
+                                <Lock className="w-3 h-3 md:mr-1.5" />
+                                <span className="hidden md:inline">Clave</span>
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full text-xs h-8 bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+                                onClick={() => {
+                                    setSelectedProvider(provider);
+                                    setAccessDialogOpen(true);
+                                }}
+                            >
+                                <Settings2 className="w-3 h-3 md:mr-1.5" />
+                                <span className="hidden md:inline">Accesos</span>
                             </Button>
                             <Button
                                 variant={provider.is_active !== false ? "outline" : "default"}
                                 size="sm"
-                                className={`flex-1 text-xs h-8 ${provider.is_active !== false
+                                className={`w-full text-xs h-8 ${provider.is_active !== false
                                     ? 'text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200'
                                     : 'bg-green-600 hover:bg-green-700 text-white'
                                     }`}
@@ -231,13 +284,13 @@ const ProvidersList = () => {
                             >
                                 {provider.is_active !== false ? (
                                     <>
-                                        <Ban className="w-3 h-3 mr-1.5" />
-                                        Desactivar
+                                        <Ban className="w-3 h-3 md:mr-1.5" />
+                                        <span className="hidden md:inline">Desactivar</span>
                                     </>
                                 ) : (
                                     <>
-                                        <CheckCircle className="w-3 h-3 mr-1.5" />
-                                        Activar
+                                        <CheckCircle className="w-3 h-3 md:mr-1.5" />
+                                        <span className="hidden md:inline">Activar</span>
                                     </>
                                 )}
                             </Button>
@@ -287,6 +340,67 @@ const ProvidersList = () => {
                             </Button>
                         </DialogFooter>
                     </form>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={accessDialogOpen} onOpenChange={setAccessDialogOpen}>
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Gestionar Accesos: {selectedProvider?.name || selectedProvider?.email}</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-6 mt-4">
+                        
+                        <div>
+                            <h3 className="font-bold text-slate-800 border-b pb-2 mb-3">Accesos Display Digital (Cartelería)</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {allCommerces?.map((commerce: any) => {
+                                    const hasAccess = userCommerces?.includes(commerce.id);
+                                    return (
+                                        <div key={commerce.id} className="flex items-center justify-between p-3 bg-slate-50 border rounded-lg">
+                                            <span className="text-sm font-medium text-slate-700">{commerce.name}</span>
+                                            <Button 
+                                                size="sm" 
+                                                variant={hasAccess ? "default" : "outline"}
+                                                className={hasAccess ? "bg-indigo-600 hover:bg-indigo-700" : ""}
+                                                onClick={() => toggleCommerceAccess(commerce.id, !!hasAccess)}
+                                            >
+                                                {hasAccess ? "Asignado" : "Asignar"}
+                                            </Button>
+                                        </div>
+                                    )
+                                })}
+                                {(!allCommerces || allCommerces.length === 0) && (
+                                    <p className="text-sm text-slate-500 italic">No hay comercios creados.</p>
+                                )}
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 className="font-bold text-slate-800 border-b pb-2 mb-3">Accesos EventPix (Eventos)</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {allEvents?.map((evt: any) => {
+                                    const hasAccess = userEvents?.includes(evt.id);
+                                    return (
+                                        <div key={evt.id} className="flex items-center justify-between p-3 bg-slate-50 border rounded-lg">
+                                            <span className="text-sm font-medium text-slate-700 truncate mr-2">{evt.name}</span>
+                                            <Button 
+                                                size="sm" 
+                                                variant={hasAccess ? "default" : "outline"}
+                                                className={hasAccess ? "bg-blue-600 hover:bg-blue-700" : ""}
+                                                onClick={() => toggleEventAccess(evt.id, !!hasAccess)}
+                                            >
+                                                {hasAccess ? "Asignado" : "Asignar"}
+                                            </Button>
+                                        </div>
+                                    )
+                                })}
+                                {(!allEvents || allEvents.length === 0) && (
+                                    <p className="text-sm text-slate-500 italic">No hay eventos creados.</p>
+                                )}
+                            </div>
+                        </div>
+
+                    </div>
                 </DialogContent>
             </Dialog>
         </div>

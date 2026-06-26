@@ -20,12 +20,45 @@ export const useCommerces = () => {
         queryKey: ["display_commerces"],
         queryFn: async () => {
             const { data, error } = await supabase
-                .from("profiles")
+                .from("display_commerces")
                 .select("id, name, email")
-                .eq("role", "provider")
                 .order("name");
             if (error) throw error;
             return data;
+        }
+    });
+};
+
+export const useCreateCommerce = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ name, email }: { name: string; email?: string }) => {
+            const { data, error } = await supabase
+                .from("display_commerces")
+                .insert([{ name, email }])
+                .select()
+                .single();
+            if (error) throw error;
+            return data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["display_commerces"] });
+        }
+    });
+};
+
+export const useDeleteCommerce = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (id: string) => {
+            const { error } = await supabase
+                .from("display_commerces")
+                .delete()
+                .eq("id", id);
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["display_commerces"] });
         }
     });
 };

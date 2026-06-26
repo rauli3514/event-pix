@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 
 import { useUserProfile, useIsSuperAdmin } from "@/hooks/use-roles";
-import { useDisplayDevices, useCommerces } from "@/hooks/use-display-hub";
+import { useDisplayDevices, useCommerces, useCreateCommerce, useDeleteCommerce } from "@/hooks/use-display-hub";
 
 type Event = {
     id: string;
@@ -34,6 +34,9 @@ const AdminDashboard = () => {
 
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [newEvent, setNewEvent] = useState({ name: '', slug: '', date: new Date().toISOString().split('T')[0] });
+
+    const [isCreateCommerceOpen, setIsCreateCommerceOpen] = useState(false);
+    const [newCommerce, setNewCommerce] = useState({ name: '', email: '' });
 
     // Dev Helper: Claim Admin
     const claimAdmin = useMutation({
@@ -68,6 +71,23 @@ const AdminDashboard = () => {
     const linkedDevices = devices?.filter(d => d.derived_status !== 'pending') || [];
     const onlineCount = linkedDevices.filter(d => d.derived_status === 'online').length;
     const offlineCount = linkedDevices.filter(d => d.derived_status === 'offline').length;
+
+    const createCommerce = useCreateCommerce();
+    const deleteCommerce = useDeleteCommerce();
+
+    const handleCreateCommerceSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        createCommerce.mutate(newCommerce, {
+            onSuccess: () => {
+                setIsCreateCommerceOpen(false);
+                setNewCommerce({ name: '', email: '' });
+                toast.success('Comercio creado exitosamente');
+            },
+            onError: (error: any) => {
+                toast.error(error.message || 'Error al crear comercio');
+            }
+        });
+    };
 
     const createEvent = useMutation({
         mutationFn: async (eventData: typeof newEvent) => {
@@ -453,9 +473,45 @@ const AdminDashboard = () => {
                             <div className="flex justify-between items-center mb-4">
                                 <h2 className="text-xl font-bold text-white">Comercios / Clientes Registrados</h2>
                                 {isSuperAdmin && (
-                                    <Button className="bg-indigo-600 hover:bg-indigo-700 text-white border border-indigo-500/50 shadow-[0_0_15px_rgba(79,70,229,0.3)]">
-                                        <Plus className="w-4 h-4 mr-2" /> Nuevo Comercio
-                                    </Button>
+                                    <Dialog open={isCreateCommerceOpen} onOpenChange={setIsCreateCommerceOpen}>
+                                        <DialogTrigger asChild>
+                                            <Button className="bg-indigo-600 hover:bg-indigo-700 text-white border border-indigo-500/50 shadow-[0_0_15px_rgba(79,70,229,0.3)]">
+                                                <Plus className="w-4 h-4 mr-2" /> Nuevo Comercio
+                                            </Button>
+                                        </DialogTrigger>
+                                        <DialogContent className="bg-slate-900 border-slate-800 text-white">
+                                            <DialogHeader>
+                                                <DialogTitle>Crear Nuevo Comercio</DialogTitle>
+                                            </DialogHeader>
+                                            <form onSubmit={handleCreateCommerceSubmit} className="space-y-4 mt-4">
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="c-name" className="text-slate-300">Nombre del Comercio</Label>
+                                                    <Input
+                                                        id="c-name"
+                                                        value={newCommerce.name}
+                                                        onChange={(e) => setNewCommerce({ ...newCommerce, name: e.target.value })}
+                                                        placeholder="Ej: Farmacia XYZ"
+                                                        className="bg-slate-950 border-slate-700 text-white"
+                                                        required
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="c-email" className="text-slate-300">Email (Opcional)</Label>
+                                                    <Input
+                                                        id="c-email"
+                                                        type="email"
+                                                        value={newCommerce.email}
+                                                        onChange={(e) => setNewCommerce({ ...newCommerce, email: e.target.value })}
+                                                        placeholder="contacto@empresa.com"
+                                                        className="bg-slate-950 border-slate-700 text-white"
+                                                    />
+                                                </div>
+                                                <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700" disabled={createCommerce.isPending}>
+                                                    {createCommerce.isPending ? 'Creando...' : 'Crear Comercio'}
+                                                </Button>
+                                            </form>
+                                        </DialogContent>
+                                    </Dialog>
                                 )}
                             </div>
                             
@@ -476,8 +532,26 @@ const AdminDashboard = () => {
                                                     <h3 className="text-xl font-bold text-white group-hover:text-indigo-400 transition-colors">{commerce.name || 'Sin Nombre'}</h3>
                                                     <p className="text-xs text-slate-500 mt-1">{commerce.email}</p>
                                                 </div>
-                                                <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center group-hover:bg-indigo-600 transition-colors">
-                                                    <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-white" />
+                                                <div className="flex gap-2">
+                                                    <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center group-hover:bg-indigo-600 transition-colors">
+                                                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-white" />
+                                                    </div>
+                                                    {isSuperAdmin && (
+                                                        <Button
+                                                            size="icon"
+                                                            variant="ghost"
+                                                            className="w-8 h-8 rounded-full text-slate-500 hover:text-red-400 hover:bg-red-950/30 transition-colors relative z-20"
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                                if (confirm(`¿Eliminar el comercio "${commerce.name}" y todas sus pantallas?`)) {
+                                                                    deleteCommerce.mutate(commerce.id);
+                                                                }
+                                                            }}
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </Button>
+                                                    )}
                                                 </div>
                                             </div>
                                             

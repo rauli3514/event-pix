@@ -113,6 +113,54 @@ export const useEventProviders = () => {
 };
 
 /**
+ * Hook para asignar/desasignar providers a comercios
+ */
+export const useCommerceAssignments = () => {
+    const queryClient = useQueryClient();
+
+    const assignCommerce = useMutation({
+        mutationFn: async ({ commerceId, userId }: { commerceId: string; userId: string }) => {
+            const { data: { user } } = await supabase.auth.getUser();
+
+            const { data, error } = await supabase
+                .from("display_commerce_users")
+                .insert({
+                    commerce_id: commerceId,
+                    user_id: userId,
+                    assigned_by: user?.id,
+                })
+                .select()
+                .single();
+
+            if (error) throw error;
+            return data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["display_commerces"] });
+            queryClient.invalidateQueries({ queryKey: ["commerce-users"] });
+        },
+    });
+
+    const removeCommerce = useMutation({
+        mutationFn: async ({ commerceId, userId }: { commerceId: string; userId: string }) => {
+            const { error } = await supabase
+                .from("display_commerce_users")
+                .delete()
+                .eq("commerce_id", commerceId)
+                .eq("user_id", userId);
+
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["display_commerces"] });
+            queryClient.invalidateQueries({ queryKey: ["commerce-users"] });
+        },
+    });
+
+    return { assignCommerce, removeCommerce };
+};
+
+/**
  * Hook para obtener los providers asignados a un evento
  */
 export const useEventProvidersList = (eventId?: string) => {
@@ -133,6 +181,44 @@ export const useEventProvidersList = (eventId?: string) => {
             return data;
         },
         enabled: !!eventId,
+    });
+};
+
+/**
+ * Hook para obtener los eventos asignados a un provider
+ */
+export const useUserEventAssignments = (userId?: string) => {
+    return useQuery({
+        queryKey: ["user-event-assignments", userId],
+        queryFn: async () => {
+            if (!userId) return [];
+            const { data, error } = await supabase
+                .from("event_providers")
+                .select("event_id")
+                .eq("provider_id", userId);
+            if (error) throw error;
+            return data.map(d => d.event_id);
+        },
+        enabled: !!userId,
+    });
+};
+
+/**
+ * Hook para obtener los comercios asignados a un provider
+ */
+export const useUserCommerceAssignments = (userId?: string) => {
+    return useQuery({
+        queryKey: ["commerce-users", userId],
+        queryFn: async () => {
+            if (!userId) return [];
+            const { data, error } = await supabase
+                .from("display_commerce_users")
+                .select("commerce_id")
+                .eq("user_id", userId);
+            if (error) throw error;
+            return data.map(d => d.commerce_id);
+        },
+        enabled: !!userId,
     });
 };
 
