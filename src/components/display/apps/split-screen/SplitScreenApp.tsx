@@ -5,6 +5,8 @@ import { LayoutTemplate } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { DisplayMedia } from '@/types/display';
 import { MediaPickerModal } from '../../MediaPickerModal';
+import { WeatherPreview } from '../weather/WeatherApp';
+import { DolarPreview } from '../dolar/DolarApp';
 
 export interface SplitZone {
     id: string;
@@ -203,11 +205,11 @@ const ZoneRenderer = ({ media }: { media: DisplayMedia }) => {
         return <video src={media.url} className="w-full h-full object-cover" autoPlay loop muted playsInline />;
     }
     if (media.type === 'app') {
-        // App inside an App! (Placeholder for now to avoid circular dependency, but works with IFrames if needed)
-        // To implement true recursive apps, we would dynamically load the app component here based on media.metadata.appId
         if (media.metadata?.appId === 'weather') {
-            // Lazy load or just return a simple indicator for preview
-            return <div className="w-full h-full bg-sky-900/50 flex items-center justify-center text-sky-200 font-bold">App: Clima</div>;
+            return <WeatherPreview config={media.metadata.config || {}} />;
+        }
+        if (media.metadata?.appId === 'dolar') {
+            return <DolarPreview config={media.metadata.config || {}} />;
         }
         if (media.metadata?.appId === 'ticker') {
             return <div className="w-full h-full bg-emerald-900/50 flex items-center justify-center text-emerald-200 font-bold">App: Ticker</div>;
