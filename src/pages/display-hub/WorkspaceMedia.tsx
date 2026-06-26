@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Search, Upload, LayoutGrid, List as ListIcon, Image as ImageIcon, Video, FileAudio, FileText, Globe, ArrowRightCircle, HardDrive, Trash2, Folder, Move } from 'lucide-react';
 import { SendToScreensModal } from '@/components/display/SendToScreensModal';
 import { UploadMediaModal } from '@/components/display/UploadMediaModal';
@@ -18,6 +19,7 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
     const { commerceId } = useParams<{ commerceId: string }>();
     const [viewMode, setViewMode] = useState<'list'|'grid'>('grid');
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+    const [uploadCategory, setUploadCategory] = useState<CategoryId>('all');
     const [isAppCatalogOpen, setIsAppCatalogOpen] = useState(false);
     const [activeCategory] = useState<CategoryId>(initialCategory);
     const [search, setSearch] = useState('');
@@ -175,10 +177,22 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                             Crear App
                         </Button>
                     ) : (
-                        <Button variant="outline" className="bg-slate-800 text-slate-200 border-slate-700 shadow-sm hover:bg-slate-700 hover:text-white" onClick={() => setIsUploadModalOpen(true)}>
-                            <Upload className="w-4 h-4 mr-2" />
-                            Subir Archivos
-                        </Button>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button className="bg-slate-800 text-slate-200 border border-slate-700 shadow-sm hover:bg-slate-700 hover:text-white">
+                                    <Upload className="w-4 h-4 mr-2" />
+                                    Subir / Agregar...
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48 bg-slate-900 border-slate-800 text-slate-200 z-50">
+                                <DropdownMenuItem onClick={() => { setUploadCategory('all'); setIsUploadModalOpen(true); }} className="hover:bg-slate-800 cursor-pointer focus:bg-slate-800 focus:text-white">
+                                    <Upload className="w-4 h-4 mr-2" /> Subir Archivo
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => { setUploadCategory('web'); setIsUploadModalOpen(true); }} className="hover:bg-slate-800 cursor-pointer focus:bg-slate-800 focus:text-white">
+                                    <Globe className="w-4 h-4 mr-2 text-blue-400" /> Agregar Enlace Web
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     )}
                     <div className="h-8 w-[1px] bg-slate-700 mx-1 hidden sm:block"></div>
                     <Button 
@@ -481,7 +495,7 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                 onClose={() => setIsUploadModalOpen(false)} 
                 onUpload={handleUploadFiles}
                 onAddWebLink={handleAddWebLink}
-                activeCategory={activeCategory !== 'all' ? activeCategory : 'images'}
+                activeCategory={uploadCategory}
             />
             {commerceId && (
                 <MoveMediaModal
