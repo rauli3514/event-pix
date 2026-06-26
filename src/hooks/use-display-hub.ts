@@ -231,7 +231,7 @@ export const useDisplayDevices = (commerceId?: string | null) => {
                 .from("display_devices")
                 .select(`
                     *,
-                    commerce:profiles(name, email),
+                    commerce:display_commerces(name, email),
                     group:display_groups(*),
                     assignment:display_assignments(*, campaign:display_campaigns(*), media:display_media(*))
                 `)
@@ -294,7 +294,7 @@ export const useDisplayDevice = (id?: string) => {
                 .from("display_devices")
                 .select(`
                     *,
-                    commerce:profiles(name, email),
+                    commerce:display_commerces(name, email),
                     group:display_groups(*)
                 `)
                 .eq("id", id)
