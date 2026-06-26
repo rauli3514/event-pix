@@ -250,27 +250,7 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                                         onChange={(e) => setSearch(e.target.value)}
                                     />
                                 </div>
-                                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 hide-scrollbar w-full">
-                                    {(Object.keys(CATEGORY_MAP) as CategoryId[]).map(cat => {
-                                        const config = CATEGORY_MAP[cat];
-                                        const isSelected = activeCategory === cat;
-                                        // Hide apps from the standard filters to avoid overflow, it has its own dedicated sidebar tab
-                                        if (cat === 'apps' && initialCategory !== 'apps') return null;
 
-                                        return (
-                                            <button
-                                                key={cat}
-                                                onClick={() => setActiveCategory(cat)}
-                                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors border shrink-0 ${
-                                                    isSelected ? 'bg-orange-500/20 border-orange-500/30 text-orange-400' : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-slate-300'
-                                                }`}
-                                            >
-                                                <config.icon className="w-3.5 h-3.5" />
-                                                {config.title}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
                             </div>
 
                             <div className="flex items-center gap-3 shrink-0">
