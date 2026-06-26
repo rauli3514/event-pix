@@ -9,13 +9,11 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
-import { useIsSuperAdmin } from "@/hooks/use-roles";
 import { useCommerces, useDisplayCampaigns, useCreateCampaign, useDeleteCampaign } from "@/hooks/use-display-hub";
 
 const DisplayPlaylists = () => {
     const navigate = useNavigate();
     const { commerceId } = useParams<{ commerceId: string }>();
-    const isSuperAdmin = useIsSuperAdmin();
     
     const effectiveCommerceId = commerceId || 'unknown';
 
