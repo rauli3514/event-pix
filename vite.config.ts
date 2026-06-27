@@ -6,6 +6,7 @@ import path from 'path'
 // https://vitejs.dev/config/
 export default defineConfig({
   server: {
+    host: true, // Permite conexiones desde la IP del emulador (10.0.2.2)
     proxy: {
       '/api/replicate': {
         target: 'https://api.replicate.com',

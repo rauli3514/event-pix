@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
-import { MonitorPlay } from 'lucide-react';
+
 
 export default function TvBootScreen() {
   const [pin, setPin] = useState<string>('');
@@ -90,21 +90,23 @@ export default function TvBootScreen() {
   }, [navigate]);
 
   return (
-    <div className="fixed inset-0 w-full h-full bg-black text-white p-8 flex flex-col items-center justify-center">
+    <div 
+      className="fixed inset-0 w-full h-full text-white p-8 flex flex-col items-center justify-center bg-black bg-cover bg-center bg-no-repeat"
+      style={{ backgroundImage: 'url(/edm-assets/fondo.PNG)' }}
+    >
       <div className="bg-zinc-900/80 border border-zinc-800 p-12 rounded-3xl text-center shadow-2xl max-w-lg w-full backdrop-blur-md">
-        <MonitorPlay className="w-16 h-16 text-indigo-500 mx-auto mb-6" />
-        <h1 className="text-4xl font-bold mb-4">EventPix TV</h1>
-        <p className="text-zinc-400 mb-8 text-lg">Para vincular esta pantalla, ingresa el siguiente código en tu panel de control:</p>
+        <img src="/edm-assets/logo.PNG" alt="EventPix" className="w-48 mx-auto mb-6 drop-shadow-lg" />
+        <p className="text-zinc-300 mb-8 text-lg">Para vincular esta pantalla, ingresa el siguiente código en tu panel de control:</p>
         
-        <div className="bg-zinc-950 px-10 py-6 rounded-2xl border border-zinc-800 inline-block">
+        <div className="bg-zinc-950 px-10 py-6 rounded-2xl border border-zinc-800 inline-block shadow-inner">
           <p className="text-6xl font-mono tracking-widest text-[#00E5FF] font-bold">
             {pin || '------'}
           </p>
         </div>
         
-        <div className="mt-12 flex items-center justify-center space-x-3 text-zinc-500">
-          <div className="w-4 h-4 rounded-full border-2 border-t-[#00E5FF] animate-spin"></div>
-          <p>Esperando enlace...</p>
+        <div className="mt-12 flex items-center justify-center space-x-3 text-zinc-400">
+          <div className="w-4 h-4 rounded-full border-2 border-zinc-500 border-t-[#00E5FF] animate-spin"></div>
+          <p className="font-medium tracking-wide">Esperando enlace...</p>
         </div>
       </div>
     </div>
