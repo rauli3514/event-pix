@@ -18,72 +18,85 @@ export default function TvBootScreen() {
         localStorage.setItem('device_id', deviceId);
       }
       
-      // Revisar si existe en la base de datos
-      const { data: existing } = await supabase.from('display_devices')
-        .select('device_id')
-        .eq('device_id', deviceId)
-        .maybeSingle();
+      try {
+        // Revisar si existe en la base de datos
+        const { data: existing } = await supabase.from('display_devices')
+          .select('device_id')
+          .eq('device_id', deviceId)
+          .maybeSingle();
 
-      if (!existing) {
-        // Insert into Supabase
-        await supabase.from('display_devices').insert([
-          { device_id: deviceId, pairing_status: 'pending' }
-        ]).select().single();
-      } else {
-        // Update last seen if exists
-        await supabase.from('display_devices')
-          .update({ last_seen: new Date().toISOString() })
-          .eq('device_id', deviceId);
-      }
-      
-      setPin(deviceId);
-      
-      // Check if already active
-      const { data } = await supabase.from('display_devices')
-        .select('pairing_status')
-        .eq('device_id', deviceId)
-        .single();
+        if (!existing) {
+          // Insert into Supabase
+          await supabase.from('display_devices').insert([
+            { device_id: deviceId, pairing_status: 'pending' }
+          ]).select().single();
+        } else {
+          // Update last seen if exists
+          await supabase.from('display_devices')
+            .update({ last_seen: new Date().toISOString() })
+            .eq('device_id', deviceId);
+        }
         
-      if (data && data.pairing_status === 'linked') {
-        navigate(`/tv/${deviceId}`);
-        return;
-      }
-      
-      // Subscribe to real-time changes
-      const subscription = supabase
-        .channel('public:display_devices')
-        .on('postgres_changes', { 
-            event: 'UPDATE', 
-            schema: 'public', 
-            table: 'display_devices',
-            filter: `device_id=eq.${deviceId}`
-          }, 
-          (payload) => {
-            if (payload.new.pairing_status === 'linked') {
-              subscription.unsubscribe();
-              navigate(`/tv/${deviceId}`);
-            }
-          }
-        )
-        .subscribe();
+        setPin(deviceId);
         
-      // Polling de respaldo cada 5 segundos
-      const pollInterval = setInterval(async () => {
+        // Check if already active
         const { data } = await supabase.from('display_devices')
           .select('pairing_status')
           .eq('device_id', deviceId)
           .single();
+          
         if (data && data.pairing_status === 'linked') {
-          clearInterval(pollInterval);
-          subscription.unsubscribe();
           navigate(`/tv/${deviceId}`);
+          return;
         }
-      }, 5000);
+        
+        // Subscribe to real-time changes
+        const subscription = supabase
+          .channel('public:display_devices')
+          .on('postgres_changes', { 
+              event: 'UPDATE', 
+              schema: 'public', 
+              table: 'display_devices',
+              filter: `device_id=eq.${deviceId}`
+            }, 
+            (payload) => {
+              if (payload.new.pairing_status === 'linked') {
+                subscription.unsubscribe();
+                navigate(`/tv/${deviceId}`);
+              }
+            }
+          )
+          .subscribe();
+          
+        // Polling de respaldo cada 5 segundos
+        const pollInterval = setInterval(async () => {
+          try {
+            const { data } = await supabase.from('display_devices')
+              .select('pairing_status')
+              .eq('device_id', deviceId)
+              .single();
+            if (data && data.pairing_status === 'linked') {
+              clearInterval(pollInterval);
+              subscription.unsubscribe();
+              navigate(`/tv/${deviceId}`);
+            }
+          } catch(e) {}
+        }, 5000);
 
-      return () => {
-        subscription.unsubscribe();
-        clearInterval(pollInterval);
-      };
+        return () => {
+          subscription.unsubscribe();
+          clearInterval(pollInterval);
+        };
+      } catch (error) {
+        console.log("Offline or network error, checking for cached data...");
+        // Si no hay internet, pero ya tenemos contenido offline, vamos directo al reproductor
+        const cachedData = localStorage.getItem(`tv_cache_${deviceId}`);
+        if (cachedData) {
+          navigate(`/tv/${deviceId}`);
+        } else {
+          setPin(deviceId); // Show PIN just in case it's a first run with flaky network
+        }
+      }
     }
     
     initDevice();

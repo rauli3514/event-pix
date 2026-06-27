@@ -102,9 +102,6 @@ class MainActivity : AppCompatActivity() {
             // Set WebView background to black to prevent white flash
             webView.setBackgroundColor(android.graphics.Color.BLACK)
             
-            // Clear cache to bypass PWA Service Worker caching during development
-            webViewManager.clearCache()
-            
             // INSTRUCCIÓN PARA PRODUCCIÓN:
             // Reemplaza esta URL por la dirección real de tu web en Vercel/hosting
             // Ej: "https://event-pix.vercel.app/tv-boot"
