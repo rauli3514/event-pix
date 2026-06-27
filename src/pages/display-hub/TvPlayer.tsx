@@ -13,6 +13,8 @@ const TvPlayer = () => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [status, setStatus] = useState<'loading' | 'playing' | 'offline_playing' | 'no_content' | 'error'>('loading');
     const [deviceSettings, setDeviceSettings] = useState({ scale: 'fit', orientation: 'landscape' });
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [localRotation, setLocalRotation] = useState<number | null>(null);
     
     // Referencias para limpiar timeouts e intervalos
     const rotationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -110,12 +112,18 @@ const TvPlayer = () => {
 
                 if (compiledItems.length > 0) {
                     const newItemsString = JSON.stringify(compiledItems);
-                    localStorage.setItem(`tv_cache_${deviceCode}`, newItemsString);
-                    setItems((prevItems) => {
-                        if (JSON.stringify(prevItems) === newItemsString) return prevItems;
-                        return compiledItems;
-                    });
-                    setStatus('playing');
+                    const oldItemsString = localStorage.getItem(`tv_cache_${deviceCode}`);
+                    
+                    if (oldItemsString !== newItemsString) {
+                        setIsSyncing(true);
+                        localStorage.setItem(`tv_cache_${deviceCode}`, newItemsString);
+                        setItems(compiledItems);
+                        setStatus('playing');
+                        setTimeout(() => setIsSyncing(false), 3000);
+                    } else if (status !== 'playing') {
+                        setItems(compiledItems);
+                        setStatus('playing');
+                    }
                     return;
                 }
                 }
@@ -169,11 +177,10 @@ const TvPlayer = () => {
         fetchCampaign();
         sendHeartbeat();
 
-        // Sincronización periódica (cada 30 segundos)
+        // Sincronización rápida cada 5 segundos para que los cambios se sientan instantáneos
         syncIntervalRef.current = setInterval(() => {
-            console.log('Syncing TV campaign...', new Date().toISOString());
             fetchCampaign();
-        }, 30 * 1000);
+        }, 5 * 1000);
 
         // Heartbeat (cada 60 segundos)
         heartbeatIntervalRef.current = setInterval(() => {
@@ -188,12 +195,25 @@ const TvPlayer = () => {
         };
         window.addEventListener('online', handleOnline);
 
-        return () => {
-            if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
-            if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
-            window.removeEventListener('online', handleOnline);
+        // Leer rotación local
+        const storedRotation = localStorage.getItem('local_rotation');
+        if (storedRotation !== null) {
+            setLocalRotation(parseInt(storedRotation, 10));
+        }
+
+        const handleRotationChange = (e: any) => {
+            setLocalRotation(e.detail);
         };
-    }, [deviceCode]);
+        window.addEventListener('local_rotation_changed', handleRotationChange);
+
+        return () => {
+            if (rotationTimeoutRef.current) clearTimeout(rotationTimeoutRef.current);
+            if (heartbeatIntervalRef.current) clearTimeout(heartbeatIntervalRef.current);
+            if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('local_rotation_changed', handleRotationChange);
+        };
+    }, [deviceCode, status]);
 
     // 3. Rotation Logic
     useEffect(() => {
@@ -203,6 +223,10 @@ const TvPlayer = () => {
         if (rotationTimeoutRef.current) clearTimeout(rotationTimeoutRef.current);
 
         const currentItem = items[currentIndex];
+        if (!currentItem) {
+            setCurrentIndex(0);
+            return;
+        }
         // Si la duración es inválida, usar 10 segundos por defecto
         const durationMs = (currentItem.duration && currentItem.duration > 0 ? currentItem.duration : 10) * 1000;
 
@@ -225,7 +249,7 @@ const TvPlayer = () => {
                     <div className="w-24 h-24 border-4 border-slate-800 rounded-full"></div>
                     <div className="w-24 h-24 border-4 border-orange-500 border-t-transparent rounded-full animate-spin absolute top-0 left-0"></div>
                     <div className="absolute inset-0 flex items-center justify-center">
-                        <MonitorPlay className="w-8 h-8 text-orange-500" />
+                        <img src="/edm-assets/logo.PNG" alt="Logo" className="w-12 h-12 object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]" />
                     </div>
                 </div>
                 <h1 className="text-3xl font-bold mt-8 mb-2 tracking-wide text-white">Descargando Contenido</h1>
@@ -249,11 +273,11 @@ const TvPlayer = () => {
                     <div className="relative w-40 h-40 mb-10 flex items-center justify-center">
                         <div className="absolute inset-0 bg-slate-800/50 rounded-3xl animate-ping opacity-20"></div>
                         <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl relative z-10">
-                            <MonitorPlay className="w-20 h-20 text-orange-500" />
+                            <img src="/edm-assets/logo.PNG" alt="Logo" className="w-32 object-contain" />
                         </div>
                     </div>
                     
-                    <h1 className="text-6xl font-black tracking-tight mb-4 bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">Event-Pix Display</h1>
+                    <h1 className="text-5xl font-black tracking-tight mb-4 bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">Display Digital by eventpix</h1>
                     
                     <div className="flex items-center gap-3 mt-4 mb-12 bg-slate-900/50 border border-slate-800 px-6 py-3 rounded-full backdrop-blur-md">
                         <div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse"></div>
@@ -298,7 +322,12 @@ const TvPlayer = () => {
     }
 
     const getRotationStyle = (orientation: string | undefined): React.CSSProperties => {
-        const degreeStr = orientation === 'portrait' ? '90' : (orientation === 'landscape' ? '0' : (orientation || '0'));
+        let degreeStr = orientation === 'portrait' ? '90' : (orientation === 'landscape' ? '0' : (orientation || '0'));
+        
+        if (localRotation !== null) {
+            degreeStr = String(localRotation);
+        }
+        
         const isVertical = degreeStr === '90' || degreeStr === '270';
         
         if (isVertical) {
@@ -350,6 +379,12 @@ const TvPlayer = () => {
 
             {/* Menú de configuración lateral oculto */}
             <TvSettingsMenu deviceCode={deviceCode!} onRefresh={() => fetchCampaign()} />
+            {isSyncing && (
+                <div className="absolute top-8 right-8 bg-zinc-900/90 border border-indigo-500/50 text-white px-6 py-3 rounded-full flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-500 z-50 shadow-2xl backdrop-blur-md">
+                    <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="font-medium">Sincronizando caché...</span>
+                </div>
+            )}
         </div>
     );
 };

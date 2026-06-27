@@ -16,7 +16,7 @@ class WebViewManager(private val webView: WebView) {
             javaScriptEnabled = true
             domStorageEnabled = true
             mediaPlaybackRequiresUserGesture = false
-            cacheMode = WebSettings.LOAD_CACHE_ELSE_NETWORK
+            cacheMode = WebSettings.LOAD_DEFAULT
             // Optimizations for TV
             useWideViewPort = true
             loadWithOverviewMode = true

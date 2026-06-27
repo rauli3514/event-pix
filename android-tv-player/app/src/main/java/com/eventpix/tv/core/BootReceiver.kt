@@ -11,13 +11,21 @@ class BootReceiver : BroadcastReceiver() {
             intent.action == "android.intent.action.QUICKBOOT_POWERON" ||
             intent.action == "android.intent.action.LOCKED_BOOT_COMPLETED") {
             
-            Log.d("BootReceiver", "Boot completed detected! Starting EventPix TV...")
+            Log.d("BootReceiver", "Boot completed detected! Checking autoBoot preference...")
             
-            val launchIntent = Intent(context, MainActivity::class.java).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            val prefs = context.getSharedPreferences("TvSettings", Context.MODE_PRIVATE)
+            val autoBoot = prefs.getBoolean("autoBoot", true)
+            
+            if (autoBoot) {
+                Log.d("BootReceiver", "autoBoot is enabled. Starting EventPix TV...")
+                val launchIntent = Intent(context, MainActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                }
+                context.startActivity(launchIntent)
+            } else {
+                Log.d("BootReceiver", "autoBoot is disabled. Skipping launch.")
             }
-            context.startActivity(launchIntent)
         }
     }
 }

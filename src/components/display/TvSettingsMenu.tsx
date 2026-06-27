@@ -1,6 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, RefreshCw, Unlink, Trash2, X, Info } from 'lucide-react';
+import { Settings, RefreshCw, Unlink, Trash2, X, Info, Power, Monitor, Clock, ShieldCheck, Zap } from 'lucide-react';
+
+// Declare TvBridge for TypeScript
+declare global {
+    interface Window {
+        TvBridge?: any;
+    }
+}
 
 interface TvSettingsMenuProps {
     deviceCode: string;
@@ -12,6 +19,39 @@ export const TvSettingsMenu = ({ deviceCode, onRefresh }: TvSettingsMenuProps) =
     const [selectedIndex, setSelectedIndex] = useState(0);
     const navigate = useNavigate();
 
+    // Hardware Settings State
+    const [autoBoot, setAutoBoot] = useState(true);
+    const [watchdog, setWatchdog] = useState(true);
+    const [keepAwake, setKeepAwake] = useState(true);
+    const [localRotation, setLocalRotation] = useState<number>(0);
+    const [rebootHour, setRebootHour] = useState(3);
+
+    const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+    useEffect(() => {
+        if (isOpen && window.TvBridge) {
+            setAutoBoot(window.TvBridge.getAutoBoot());
+            setWatchdog(window.TvBridge.getWatchdog());
+            setKeepAwake(window.TvBridge.getKeepAwake());
+            setRebootHour(window.TvBridge.getRebootHour());
+            window.TvBridge.setOrientation(true); // Force hardware to landscape
+        }
+        
+        const stored = localStorage.getItem('local_rotation');
+        if (stored !== null) {
+            setLocalRotation(parseInt(stored, 10));
+        }
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (isOpen && itemRefs.current[selectedIndex]) {
+            itemRefs.current[selectedIndex]?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'nearest'
+            });
+        }
+    }, [selectedIndex, isOpen]);
+
     const menuItems = [
         {
             id: 'refresh',
@@ -20,6 +60,58 @@ export const TvSettingsMenu = ({ deviceCode, onRefresh }: TvSettingsMenuProps) =
             action: () => {
                 onRefresh();
                 setIsOpen(false);
+            }
+        },
+        {
+            id: 'autoboot',
+            label: `Inicio Automático: ${autoBoot ? 'ON' : 'OFF'}`,
+            icon: <Power className="w-5 h-5" />,
+            action: () => {
+                const newVal = !autoBoot;
+                setAutoBoot(newVal);
+                window.TvBridge?.setAutoBoot(newVal);
+            }
+        },
+        {
+            id: 'watchdog',
+            label: `Reinicio ante fallos: ${watchdog ? 'ON' : 'OFF'}`,
+            icon: <ShieldCheck className="w-5 h-5" />,
+            action: () => {
+                const newVal = !watchdog;
+                setWatchdog(newVal);
+                window.TvBridge?.setWatchdog(newVal);
+            }
+        },
+        {
+            id: 'keepawake',
+            label: `Mantener Despierto: ${keepAwake ? 'ON' : 'OFF'}`,
+            icon: <Zap className="w-5 h-5" />,
+            action: () => {
+                const newVal = !keepAwake;
+                setKeepAwake(newVal);
+                window.TvBridge?.setKeepAwake(newVal);
+            }
+        },
+        {
+            id: 'orientation',
+            label: `Rotación: ${localRotation}°`,
+            icon: <Monitor className="w-5 h-5" />,
+            action: () => {
+                const nextRotation = (localRotation + 90) % 360;
+                setLocalRotation(nextRotation);
+                localStorage.setItem('local_rotation', String(nextRotation));
+                window.dispatchEvent(new CustomEvent('local_rotation_changed', { detail: nextRotation }));
+                window.TvBridge?.setOrientation(true); // Force hardware to landscape
+            }
+        },
+        {
+            id: 'reboot',
+            label: `Reinicio Diario: ${String(rebootHour).padStart(2, '0')}:00`,
+            icon: <Clock className="w-5 h-5" />,
+            action: () => {
+                const nextHour = (rebootHour + 1) % 24;
+                setRebootHour(nextHour);
+                window.TvBridge?.scheduleDailyRestart(nextHour, 0);
             }
         },
         {
@@ -47,7 +139,21 @@ export const TvSettingsMenu = ({ deviceCode, onRefresh }: TvSettingsMenuProps) =
             label: 'Información del Sistema',
             icon: <Info className="w-5 h-5" />,
             action: () => {
-                alert(`Device ID: ${deviceCode}\nVersión: 2.0.1 (Web)\nResolución: ${window.innerWidth}x${window.innerHeight}`);
+                alert(`Device ID: ${deviceCode}\nVersión: 2.1.0 (Kiosk)\nResolución: ${window.innerWidth}x${window.innerHeight}`);
+            }
+        },
+        {
+            id: 'exit',
+            label: 'Salir de la App',
+            icon: <Power className="w-5 h-5 text-red-500" />,
+            action: () => {
+                if (window.confirm('¿Seguro que deseas salir de la aplicación?')) {
+                    if (window.TvBridge) {
+                        window.TvBridge.exitApp();
+                    } else {
+                        alert('Esta función solo está disponible en la TV.');
+                    }
+                }
             }
         },
         {
@@ -69,12 +175,16 @@ export const TvSettingsMenu = ({ deviceCode, onRefresh }: TvSettingsMenuProps) =
 
             if (isOpen) {
                 if (e.key === 'ArrowDown') {
+                    e.preventDefault();
                     setSelectedIndex((prev) => (prev + 1) % menuItems.length);
                 } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
                     setSelectedIndex((prev) => (prev - 1 + menuItems.length) % menuItems.length);
                 } else if (e.key === 'Enter') {
+                    e.preventDefault(); // Evitar que el navegador dispare un 'click' adicional en el botón
                     menuItems[selectedIndex].action();
                 } else if (e.key === 'Escape' || e.key === 'Backspace') {
+                    e.preventDefault();
                     setIsOpen(false);
                 }
             }
@@ -102,8 +212,9 @@ export const TvSettingsMenu = ({ deviceCode, onRefresh }: TvSettingsMenuProps) =
             {/* Sidebar oscura */}
             <div className="w-96 h-full bg-zinc-950/95 backdrop-blur-xl border-r border-zinc-800 shadow-2xl flex flex-col animate-in slide-in-from-left duration-300">
                 <div className="p-8 border-b border-zinc-800/50">
-                    <h2 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
-                        <Settings className="text-indigo-500" /> EventPix TV
+                    <img src="/edm-assets/logo.PNG" alt="EventPix" className="h-12 mb-4 object-contain" />
+                    <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-3">
+                        Display Digital by eventpix
                     </h2>
                     <p className="text-zinc-400 font-mono text-sm">ID: {deviceCode}</p>
                 </div>
@@ -114,6 +225,7 @@ export const TvSettingsMenu = ({ deviceCode, onRefresh }: TvSettingsMenuProps) =
                         return (
                             <button
                                 key={item.id}
+                                ref={(el) => (itemRefs.current[index] = el)}
                                 onClick={item.action}
                                 onMouseEnter={() => setSelectedIndex(index)}
                                 className={`w-full flex items-center gap-4 px-6 py-4 rounded-xl text-left transition-all duration-200 ${

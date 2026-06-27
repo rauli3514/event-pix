@@ -11,8 +11,8 @@
     <!-- Web/HTML Layer (Apps, Widgets) -->
     <WebView
         android:id="@+id/webView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
         android:visibility="gone"
         android:background="#000000"
         app:layout_constraintBottom_toBottomOf="parent"
@@ -23,8 +23,8 @@
     <!-- ExoPlayer Video Layer (Native Video/Audio) -->
     <androidx.media3.ui.PlayerView
         android:id="@+id/playerView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
         android:visibility="gone"
         android:background="#000000"
         app:use_controller="false"
@@ -37,8 +37,8 @@
     <!-- Splash Video Layer -->
     <VideoView
         android:id="@+id/splashVideoView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
         android:visibility="gone"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
