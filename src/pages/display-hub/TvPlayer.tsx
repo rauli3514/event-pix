@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { CampaignItem } from '@/types/display';
 import { PlayerRenderer } from '@/components/display/PlayerRenderer';
 import { TvSettingsMenu } from '@/components/display/TvSettingsMenu';
-import { MonitorPlay, WifiOff } from 'lucide-react';
+import { WifiOff } from 'lucide-react';
 
 const TvPlayer = () => {
     const { deviceCode } = useParams<{ deviceCode: string }>();

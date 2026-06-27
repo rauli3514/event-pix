@@ -225,7 +225,7 @@ export const TvSettingsMenu = ({ deviceCode, onRefresh }: TvSettingsMenuProps) =
                         return (
                             <button
                                 key={item.id}
-                                ref={(el) => (itemRefs.current[index] = el)}
+                                ref={(el) => { itemRefs.current[index] = el; }}
                                 onClick={item.action}
                                 onMouseEnter={() => setSelectedIndex(index)}
                                 className={`w-full flex items-center gap-4 px-6 py-4 rounded-xl text-left transition-all duration-200 ${
