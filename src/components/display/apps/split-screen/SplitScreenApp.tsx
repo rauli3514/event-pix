@@ -1,13 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LayoutTemplate } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { LayoutTemplate, Plus, Trash2, Copy, Move, Maximize2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { DisplayMedia } from '@/types/display';
 import { MediaPickerModal } from '../../MediaPickerModal';
 import { WeatherPreview } from '../weather/WeatherApp';
 import { DolarPreview } from '../dolar/DolarApp';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 export interface SplitZone {
     id: string;
@@ -16,15 +19,20 @@ export interface SplitZone {
     y: number; // percentage 0-100
     w: number; // percentage 0-100
     h: number; // percentage 0-100
-    color?: string; // Hex color for the empty state preview
+    color?: string;
     mediaId?: string;
-    mediaObj?: DisplayMedia; // For preview rendering
+    mediaObj?: DisplayMedia; 
 }
 
 export interface SplitScreenConfig {
     templateId: string;
     orientation: 'landscape' | 'portrait';
     zones: SplitZone[];
+    unitType?: 'percent' | 'pixel';
+    resolution?: string;
+    backgroundMusicId?: string;
+    audioZoneId?: string | 'all';
+    primaryZoneId?: string;
 }
 
 const BRAND_BLUE = '#1ea8eb';
@@ -34,27 +42,21 @@ const BRAND_PURPLE = '#8b5cf6';
 
 const TEMPLATES = [
     {
-        id: '1main_1ticker',
-        name: '1 Main + 1 Ticker',
-        orientation: 'landscape',
+        id: '1main_1ticker', name: '1 Main + 1 Ticker', orientation: 'landscape',
         zones: [
             { id: 'main', name: 'Main', x: 0, y: 0, w: 100, h: 85, color: BRAND_BLUE, mediaId: undefined },
             { id: 'ticker', name: 'Bottom Ticker', x: 0, y: 85, w: 100, h: 15, color: BRAND_ORANGE, mediaId: undefined }
         ] as SplitZone[]
     },
     {
-        id: '2mains',
-        name: '2 Mains',
-        orientation: 'landscape',
+        id: '2mains', name: '2 Mains', orientation: 'landscape',
         zones: [
             { id: 'main_left', name: 'Main Left', x: 0, y: 0, w: 70, h: 100, color: BRAND_BLUE, mediaId: undefined },
             { id: 'main_right', name: 'Main Right', x: 70, y: 0, w: 30, h: 100, color: BRAND_GREEN, mediaId: undefined }
         ] as SplitZone[]
     },
     {
-        id: '2mains_1ticker',
-        name: '2 Mains + 1 Ticker',
-        orientation: 'landscape',
+        id: '2mains_1ticker', name: '2 Mains + 1 Ticker', orientation: 'landscape',
         zones: [
             { id: 'main_left', name: 'Main Left', x: 0, y: 0, w: 70, h: 85, color: BRAND_BLUE, mediaId: undefined },
             { id: 'main_right', name: 'Main Right', x: 70, y: 0, w: 30, h: 85, color: BRAND_GREEN, mediaId: undefined },
@@ -62,9 +64,7 @@ const TEMPLATES = [
         ] as SplitZone[]
     },
     {
-        id: '4splits',
-        name: '4 Splits',
-        orientation: 'landscape',
+        id: '4splits', name: '4 Splits', orientation: 'landscape',
         zones: [
             { id: 'top_left', name: 'Top Left', x: 0, y: 0, w: 50, h: 50, color: BRAND_BLUE, mediaId: undefined },
             { id: 'top_right', name: 'Top Right', x: 50, y: 0, w: 50, h: 50, color: BRAND_GREEN, mediaId: undefined },
@@ -73,49 +73,38 @@ const TEMPLATES = [
         ] as SplitZone[]
     },
     {
-        id: 'portrait_1main_1ticker',
-        name: '1 Main + 1 Ticker',
-        orientation: 'portrait',
+        id: 'portrait_1main_1ticker', name: '1 Main + 1 Ticker', orientation: 'portrait',
         zones: [
             { id: 'main', name: 'Main', x: 0, y: 0, w: 100, h: 90, color: BRAND_BLUE, mediaId: undefined },
             { id: 'ticker', name: 'Bottom Ticker', x: 0, y: 90, w: 100, h: 10, color: BRAND_ORANGE, mediaId: undefined }
         ] as SplitZone[]
     },
     {
-        id: 'portrait_2mains',
-        name: '2 Mains',
-        orientation: 'portrait',
+        id: 'portrait_2mains', name: '2 Mains', orientation: 'portrait',
         zones: [
             { id: 'main_top', name: 'Main Top', x: 0, y: 0, w: 100, h: 50, color: BRAND_BLUE, mediaId: undefined },
             { id: 'main_bottom', name: 'Main Bottom', x: 0, y: 50, w: 100, h: 50, color: BRAND_GREEN, mediaId: undefined }
         ] as SplitZone[]
-    },
-    {
-        id: 'portrait_3splits',
-        name: '3 Splits',
-        orientation: 'portrait',
-        zones: [
-            { id: 'main_top', name: 'Main Top', x: 0, y: 0, w: 100, h: 45, color: BRAND_BLUE, mediaId: undefined },
-            { id: 'main_mid', name: 'Main Mid', x: 0, y: 45, w: 100, h: 45, color: BRAND_GREEN, mediaId: undefined },
-            { id: 'ticker', name: 'Bottom Ticker', x: 0, y: 90, w: 100, h: 10, color: BRAND_ORANGE, mediaId: undefined }
-        ] as SplitZone[]
     }
 ];
 
-export const SplitScreenForm = ({ config, onChange, commerceId }: { config: Partial<SplitScreenConfig>, onChange: (c: Partial<SplitScreenConfig>) => void, commerceId: string }) => {
+export const SplitScreenForm = ({ config, onChange, commerceId, appName, setAppName }: { config: Partial<SplitScreenConfig>, onChange: (c: Partial<SplitScreenConfig>) => void, commerceId: string, appName?: string, setAppName?: (n: string) => void }) => {
     const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
     const [isPickerOpen, setIsPickerOpen] = useState(false);
     
     const orientation = config.orientation || 'landscape';
 
-    // Initialize with default template if empty
     useEffect(() => {
         if (!config.templateId) {
             const defaultTpl = TEMPLATES.find(t => t.orientation === 'landscape') || TEMPLATES[0];
             onChange({
+                ...config,
                 orientation: 'landscape',
                 templateId: defaultTpl.id,
-                zones: defaultTpl.zones
+                zones: defaultTpl.zones,
+                unitType: 'percent',
+                resolution: '1080p',
+                audioZoneId: 'all'
             });
         }
     }, []);
@@ -125,6 +114,7 @@ export const SplitScreenForm = ({ config, onChange, commerceId }: { config: Part
     const handleOrientationChange = (newOrientation: 'landscape' | 'portrait') => {
         const defaultTpl = TEMPLATES.find(t => t.orientation === newOrientation) || TEMPLATES[0];
         onChange({
+            ...config,
             orientation: newOrientation,
             templateId: defaultTpl.id,
             zones: defaultTpl.zones
@@ -138,29 +128,45 @@ export const SplitScreenForm = ({ config, onChange, commerceId }: { config: Part
         }
     };
 
+    const handleAddZone = () => {
+        const newZones = [...(config.zones || [])];
+        newZones.push({
+            id: `zone_${Date.now()}`,
+            name: `Zona ${newZones.length + 1}`,
+            x: 25, y: 25, w: 50, h: 50,
+            color: BRAND_PURPLE
+        });
+        onChange({ ...config, zones: newZones });
+    };
+
     const currentTemplate = TEMPLATES.find(t => t.id === config.templateId) || TEMPLATES[0];
     const zones = config.zones || currentTemplate.zones;
 
     return (
-        <div className="space-y-6">
-            <div className="space-y-3">
-                <Label className="text-slate-300">Orientación</Label>
-                <Select 
-                    value={orientation} 
-                    onValueChange={(v) => handleOrientationChange(v as 'landscape'|'portrait')}
-                >
-                    <SelectTrigger className="bg-slate-950 border-slate-800 text-slate-200">
-                        <SelectValue placeholder="Selecciona orientación" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-slate-900 border-slate-800 text-slate-200">
-                        <SelectItem value="landscape">Paisaje (Horizontal)</SelectItem>
-                        <SelectItem value="portrait">Retrato (Vertical)</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
-
-            <div className="space-y-3">
-                <Label className="text-slate-300">Plantillas</Label>
+        <Tabs defaultValue="plantillas" className="w-full">
+            <TabsList className="w-full grid grid-cols-3 bg-slate-950 border border-slate-800">
+                <TabsTrigger value="plantillas" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white">Plantillas</TabsTrigger>
+                <TabsTrigger value="zonas" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white">Propiedades</TabsTrigger>
+                <TabsTrigger value="avanzado" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white">Avanzado</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="plantillas" className="mt-4 space-y-4">
+                <div className="space-y-3">
+                    <Label className="text-slate-300">Orientación</Label>
+                    <Select 
+                        value={orientation} 
+                        onValueChange={(v) => handleOrientationChange(v as 'landscape'|'portrait')}
+                    >
+                        <SelectTrigger className="bg-slate-950 border-slate-800 text-slate-200">
+                            <SelectValue placeholder="Selecciona orientación" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-200">
+                            <SelectItem value="landscape">Paisaje (Horizontal)</SelectItem>
+                            <SelectItem value="portrait">Retrato (Vertical)</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                
                 <div className="grid grid-cols-2 gap-3">
                     {availableTemplates.map(t => (
                         <button
@@ -182,11 +188,29 @@ export const SplitScreenForm = ({ config, onChange, commerceId }: { config: Part
                         </button>
                     ))}
                 </div>
-            </div>
+            </TabsContent>
 
-            <div className="space-y-3">
-                <Label className="text-slate-300">Contenido de Zonas</Label>
-                <div className="space-y-2">
+            <TabsContent value="zonas" className="mt-4 space-y-6">
+                {setAppName && (
+                    <div className="space-y-3">
+                        <Label className="text-slate-300">Nombre de la App <span className="text-red-400">*</span></Label>
+                        <Input 
+                            placeholder="Ej: Menú 3 Zonas" 
+                            value={appName || ''}
+                            onChange={(e) => setAppName(e.target.value)}
+                            className="bg-slate-950 border-slate-800 text-slate-200 focus-visible:ring-indigo-500"
+                        />
+                    </div>
+                )}
+                <div className="flex items-center justify-between">
+                    <Label className="text-slate-300">Zonas de Contenido</Label>
+                    <Button variant="outline" size="sm" onClick={handleAddZone} className="h-8 text-xs bg-slate-950 border-slate-800 text-slate-300 hover:text-white">
+                        <Plus className="w-3 h-3 mr-1" />
+                        Agregar zona
+                    </Button>
+                </div>
+                
+                <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
                     {zones.map(zone => (
                         <div key={zone.id} className={cn("p-3 bg-slate-950 border border-slate-800 rounded-lg flex items-center justify-between", selectedZoneId === zone.id && "border-indigo-500/50 bg-indigo-500/5")}>
                             <div className="flex items-center gap-3">
@@ -210,7 +234,79 @@ export const SplitScreenForm = ({ config, onChange, commerceId }: { config: Part
                         </div>
                     ))}
                 </div>
-            </div>
+            </TabsContent>
+
+            <TabsContent value="avanzado" className="mt-4 space-y-6">
+                <div className="space-y-3">
+                    <Label className="text-slate-300">Tipo de unidad</Label>
+                    <Select 
+                        value={config.unitType || 'percent'} 
+                        onValueChange={(v) => onChange({...config, unitType: v as any})}
+                    >
+                        <SelectTrigger className="bg-slate-950 border-slate-800 text-slate-200">
+                            <SelectValue placeholder="%" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-200">
+                            <SelectItem value="percent">Porcentaje (%)</SelectItem>
+                            <SelectItem value="pixel">Píxeles (px)</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                
+                <div className="space-y-3">
+                    <Label className="text-slate-300">Resolución Base</Label>
+                    <Select 
+                        value={config.resolution || '1080p'} 
+                        onValueChange={(v) => onChange({...config, resolution: v})}
+                    >
+                        <SelectTrigger className="bg-slate-950 border-slate-800 text-slate-200">
+                            <SelectValue placeholder="1080p - FHD" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-200">
+                            <SelectItem value="1080p">1080p - FHD (1920 x 1080)</SelectItem>
+                            <SelectItem value="4k">4K - UHD (3840 x 2160)</SelectItem>
+                            <SelectItem value="720p">720p - HD (1280 x 720)</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                <div className="space-y-3">
+                    <Label className="text-slate-300">Zona de audio (Reproducción)</Label>
+                    <Select 
+                        value={config.audioZoneId || 'all'} 
+                        onValueChange={(v) => onChange({...config, audioZoneId: v})}
+                    >
+                        <SelectTrigger className="bg-slate-950 border-slate-800 text-slate-200">
+                            <SelectValue placeholder="Todo" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-200">
+                            <SelectItem value="all">Todas las zonas (Mix)</SelectItem>
+                            {zones.map(z => (
+                                <SelectItem key={z.id} value={z.id}>Solo {z.name}</SelectItem>
+                            ))}
+                            <SelectItem value="none">Silenciar todas</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                <div className="space-y-3">
+                    <Label className="text-slate-300">Zona Primaria</Label>
+                    <Select 
+                        value={config.primaryZoneId || 'none'} 
+                        onValueChange={(v) => onChange({...config, primaryZoneId: v})}
+                    >
+                        <SelectTrigger className="bg-slate-950 border-slate-800 text-slate-200">
+                            <SelectValue placeholder="Ninguno" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-200">
+                            <SelectItem value="none">Ninguno</SelectItem>
+                            {zones.map(z => (
+                                <SelectItem key={z.id} value={z.id}>{z.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+            </TabsContent>
 
             {isPickerOpen && selectedZoneId && (
                 <MediaPickerModal
@@ -228,10 +324,15 @@ export const SplitScreenForm = ({ config, onChange, commerceId }: { config: Part
     );
 };
 
-export const SplitScreenPreview = ({ config }: { config: Partial<SplitScreenConfig> }) => {
+export const SplitScreenPreview = ({ config, onChange }: { config: Partial<SplitScreenConfig>, onChange?: (c: Partial<SplitScreenConfig>) => void }) => {
     const zones = config.zones || [];
     const orientation = config.orientation || 'landscape';
     const [hydratedZones, setHydratedZones] = useState<SplitZone[]>(zones);
+    const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    
+    // Drag state
+    const [dragState, setDragState] = useState<{ id: string, type: 'move'|'resize', startX: number, startY: number, initialRect: {x:number, y:number, w:number, h:number} } | null>(null);
 
     // Hydrate zones with full media objects for runtime preview
     useEffect(() => {
@@ -259,57 +360,150 @@ export const SplitScreenPreview = ({ config }: { config: Partial<SplitScreenConf
         hydrate();
     }, [zones]);
 
+    // Global mouse events for drag and resize
+    useEffect(() => {
+        if (!dragState || !containerRef.current || !onChange) return;
+
+        const handleMouseMove = (e: MouseEvent) => {
+            const container = containerRef.current!.getBoundingClientRect();
+            const dx = ((e.clientX - dragState.startX) / container.width) * 100;
+            const dy = ((e.clientY - dragState.startY) / container.height) * 100;
+            
+            let newZones = [...zones];
+            const zoneIndex = newZones.findIndex(z => z.id === dragState.id);
+            if (zoneIndex === -1) return;
+            
+            const z = { ...newZones[zoneIndex] };
+            
+            if (dragState.type === 'move') {
+                z.x = Math.max(0, Math.min(100 - z.w, dragState.initialRect.x + dx));
+                z.y = Math.max(0, Math.min(100 - z.h, dragState.initialRect.y + dy));
+            } else if (dragState.type === 'resize') {
+                z.w = Math.max(5, Math.min(100 - z.x, dragState.initialRect.w + dx));
+                z.h = Math.max(5, Math.min(100 - z.y, dragState.initialRect.h + dy));
+            }
+            
+            newZones[zoneIndex] = z;
+            onChange({ ...config, zones: newZones });
+        };
+
+        const handleMouseUp = () => setDragState(null);
+
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [dragState, zones, config, onChange]);
+
     return (
         <div className="w-full h-full flex items-center justify-center bg-[#050810] p-4">
             <div 
+                ref={containerRef}
                 className={cn(
                     "relative bg-black overflow-hidden shadow-2xl rounded-sm ring-1 ring-slate-800 transition-all duration-300",
                     orientation === 'landscape' ? "w-full aspect-video" : "h-full aspect-[9/16]"
                 )}
+                onClick={() => setSelectedZoneId(null)}
             >
-                {hydratedZones.map(zone => (
-                    <div 
-                        key={zone.id}
-                        className="@container absolute flex flex-col items-center justify-center overflow-hidden transition-all duration-300"
-                        style={{
-                            top: `${zone.y}%`,
-                            left: `${zone.x}%`,
-                            width: `${zone.w}%`,
-                            height: `${zone.h}%`,
-                            backgroundColor: zone.mediaObj ? '#000' : (zone.color || BRAND_BLUE)
-                        }}
-                    >
-                        {zone.mediaObj ? (
-                            <ZoneRenderer media={zone.mediaObj} />
-                        ) : (
-                            <div className="text-white/80 text-center flex flex-col items-center p-4">
-                                <LayoutTemplate className="w-8 h-8 mb-2 opacity-50" />
-                                <span className="text-sm font-bold tracking-wide">{zone.name}</span>
-                            </div>
-                        )}
-                    </div>
-                ))}
+                {hydratedZones.map(zone => {
+                    const isSelected = selectedZoneId === zone.id && onChange; // Interactive only if onChange is provided (editor mode)
+                    return (
+                        <div 
+                            key={zone.id}
+                            className={cn(
+                                "@container absolute flex flex-col items-center justify-center overflow-hidden transition-colors duration-200",
+                                isSelected ? "ring-2 ring-indigo-500 z-50 cursor-move" : "z-10"
+                            )}
+                            style={{
+                                top: `${zone.y}%`, left: `${zone.x}%`, width: `${zone.w}%`, height: `${zone.h}%`,
+                                backgroundColor: zone.mediaObj ? '#000' : (zone.color || BRAND_BLUE)
+                            }}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (onChange) setSelectedZoneId(zone.id);
+                            }}
+                            onMouseDown={(e) => {
+                                if (isSelected) {
+                                    setDragState({ id: zone.id, type: 'move', startX: e.clientX, startY: e.clientY, initialRect: {x: zone.x, y: zone.y, w: zone.w, h: zone.h} });
+                                }
+                            }}
+                        >
+                            {zone.mediaObj ? (
+                                <ZoneRenderer media={zone.mediaObj} />
+                            ) : (
+                                <div className="text-white/80 text-center flex flex-col items-center p-4 pointer-events-none select-none">
+                                    <LayoutTemplate className="w-8 h-8 mb-2 opacity-50" />
+                                    <span className="text-sm font-bold tracking-wide">{zone.name}</span>
+                                </div>
+                            )}
+
+                            {/* Resize Handle */}
+                            {isSelected && (
+                                <div 
+                                    className="absolute bottom-0 right-0 w-4 h-4 bg-indigo-500 cursor-nwse-resize z-50"
+                                    onMouseDown={(e) => {
+                                        e.stopPropagation();
+                                        setDragState({ id: zone.id, type: 'resize', startX: e.clientX, startY: e.clientY, initialRect: {x: zone.x, y: zone.y, w: zone.w, h: zone.h} });
+                                    }}
+                                />
+                            )}
+                            
+                            {/* Toolbar */}
+                            {isSelected && (
+                                <div className="absolute top-2 right-2 flex items-center bg-slate-900/90 rounded border border-slate-700 shadow-lg p-1 gap-1 z-50" onMouseDown={e => e.stopPropagation()}>
+                                    <button 
+                                        className="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded transition-colors"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (onChange) {
+                                                const newZone = { ...zone, id: `zone_${Date.now()}`, x: zone.x + 5, y: zone.y + 5 };
+                                                onChange({ ...config, zones: [...zones, newZone] });
+                                            }
+                                        }}
+                                        title="Duplicar"
+                                    >
+                                        <Copy className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button 
+                                        className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-900/30 rounded transition-colors"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (onChange) {
+                                                onChange({ ...config, zones: zones.filter(z => z.id !== zone.id) });
+                                                setSelectedZoneId(null);
+                                            }
+                                        }}
+                                        title="Eliminar"
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );
 };
 
 const ZoneRenderer = ({ media }: { media: DisplayMedia }) => {
-    // We use a blurred background effect + object-contain to prevent cropping and empty spaces
     if (media.type === 'image') {
         return (
-            <div className="relative w-full h-full flex items-center justify-center">
+            <div className="relative w-full h-full flex items-center justify-center pointer-events-none">
                 <div 
                     className="absolute inset-0 w-full h-full opacity-40 scale-110 blur-xl bg-center bg-cover"
                     style={{ backgroundImage: `url(${media.url})` }}
                 />
-                <img src={media.url} className="relative w-full h-full object-contain z-10" alt="" />
+                <img src={media.url} className="relative w-full h-full object-contain z-10" alt="" draggable={false} />
             </div>
         );
     }
     if (media.type === 'video') {
         return (
-            <div className="relative w-full h-full flex items-center justify-center bg-black">
+            <div className="relative w-full h-full flex items-center justify-center bg-black pointer-events-none">
                 <video src={media.url} className="absolute inset-0 w-full h-full object-cover opacity-40 blur-xl scale-110" autoPlay loop muted playsInline />
                 <video src={media.url} className="relative w-full h-full object-contain z-10" autoPlay loop muted playsInline />
             </div>
@@ -323,10 +517,10 @@ const ZoneRenderer = ({ media }: { media: DisplayMedia }) => {
             return <DolarPreview config={media.metadata.config || {}} />;
         }
         if (media.metadata?.appId === 'ticker') {
-            return <div className="w-full h-full bg-slate-900 flex items-center justify-center text-slate-200 font-bold">App: Ticker</div>;
+            return <div className="w-full h-full bg-slate-900 flex items-center justify-center text-slate-200 font-bold pointer-events-none">App: Ticker</div>;
         }
-        return <div className="text-white w-full h-full flex items-center justify-center">App: {media.metadata?.appId}</div>;
+        return <div className="text-white w-full h-full flex items-center justify-center pointer-events-none">App: {media.metadata?.appId}</div>;
     }
     
-    return <div className="text-white w-full h-full flex items-center justify-center">{media.type}</div>;
+    return <div className="text-white w-full h-full flex items-center justify-center pointer-events-none">{media.type}</div>;
 };

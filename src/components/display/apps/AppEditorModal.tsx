@@ -31,14 +31,14 @@ export const AppEditorModal = ({ isOpen, onClose, onBack, appId, commerceId, cur
     const renderForm = () => {
         switch (appId) {
             case 'weather':
-                return <WeatherForm config={appConfig} onChange={setAppConfig} />;
+                return <WeatherForm config={appConfig} onChange={setAppConfig} appName={appName} setAppName={setAppName} />;
             case 'split-screen':
-                return <SplitScreenForm config={appConfig} onChange={setAppConfig} commerceId={commerceId} />;
+                return <SplitScreenForm config={appConfig} onChange={setAppConfig} commerceId={commerceId} appName={appName} setAppName={setAppName} />;
             case 'dolar':
-                return <DolarForm config={appConfig} onChange={setAppConfig} />;
+                return <DolarForm config={appConfig} onChange={setAppConfig} appName={appName} setAppName={setAppName} />;
             /*
             case 'ticker':
-                return <TickerForm config={appConfig} onChange={setAppConfig} />;
+                return <TickerForm config={appConfig} onChange={setAppConfig} appName={appName} setAppName={setAppName} />;
             */
             default:
                 return <div className="text-slate-500 p-4">App form not implemented yet.</div>;
@@ -129,18 +129,22 @@ export const AppEditorModal = ({ isOpen, onClose, onBack, appId, commerceId, cur
                     {/* Left Panel: Settings Form */}
                     <div className="w-full md:w-96 border-r border-slate-800 bg-slate-900 flex flex-col overflow-y-auto">
                         <div className="p-6 space-y-6">
-                            {/* General Settings */}
-                            <div className="space-y-3">
-                                <Label className="text-slate-300">Nombre de la App <span className="text-red-400">*</span></Label>
-                                <Input 
-                                    placeholder="Ej: Clima Recepción" 
-                                    value={appName}
-                                    onChange={(e) => setAppName(e.target.value)}
-                                    className="bg-slate-950 border-slate-800 text-slate-200 focus-visible:ring-indigo-500"
-                                />
-                            </div>
+                            {/* General Settings (Hidden for split-screen since it has its own tabs) */}
+                            {appId !== 'split-screen' && (
+                                <>
+                                    <div className="space-y-3">
+                                        <Label className="text-slate-300">Nombre de la App <span className="text-red-400">*</span></Label>
+                                        <Input 
+                                            placeholder="Ej: Clima Recepción" 
+                                            value={appName}
+                                            onChange={(e) => setAppName(e.target.value)}
+                                            className="bg-slate-950 border-slate-800 text-slate-200 focus-visible:ring-indigo-500"
+                                        />
+                                    </div>
 
-                            <div className="h-px bg-slate-800 w-full" />
+                                    <div className="h-px bg-slate-800 w-full" />
+                                </>
+                            )}
 
                             {/* App Specific Form */}
                             {renderForm()}
