@@ -176,8 +176,6 @@ export const WeatherForm = ({ config, onChange }: WeatherFormProps) => {
     );
 };
 
-// --- PREVIEW ---
-
 export const WeatherPreview = ({ config }: { config: Partial<WeatherConfig> }) => {
     const [weatherDataList, setWeatherDataList] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
@@ -221,77 +219,82 @@ export const WeatherPreview = ({ config }: { config: Partial<WeatherConfig> }) =
         fetchAll();
     }, [JSON.stringify(locations), config.unit]);
 
-    if (locations.length === 0) {
+    const renderContent = () => {
+        if (locations.length === 0) {
+            return (
+                <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 bg-slate-950 p-4 text-center">
+                    <CloudRain className="w-12 h-12 mb-2 opacity-20" />
+                    <p className="text-sm">Configura al menos una ciudad</p>
+                </div>
+            );
+        }
+
+        if (loading || weatherDataList.length === 0) {
+            return (
+                <div className="w-full h-full flex items-center justify-center text-slate-500 bg-slate-950">
+                    <span className="animate-pulse">Cargando clima...</span>
+                </div>
+            );
+        }
+
+        const { width, height } = dimensions;
+        if (width === 0 || height === 0) return null;
+
+        const isMicro = width < 250 && height < 250;
+        const isTicker = height < 150;
+        const isColumn = width < 400 && height >= 150;
+        const isSquare = width >= 250 && width < 500 && height >= 150 && height < 400;
+        const isMain = width >= 400 && height >= 400;
+
+        const unitStr = config.unit === 'fahrenheit' ? '°F' : '°C';
+        const theme = config.theme || 'dynamic';
+
         return (
-            <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 bg-slate-950 p-4 text-center">
-                <CloudRain className="w-12 h-12 mb-2 opacity-20" />
-                <p className="text-sm">Configura al menos una ciudad</p>
-            </div>
-        );
-    }
+            <>
+                {isTicker && (
+                    <div className="w-full h-full bg-slate-900 text-white flex items-center overflow-hidden whitespace-nowrap">
+                        <div className="animate-[marquee_25s_linear_infinite] flex items-center gap-16 px-4">
+                            {weatherDataList.map((data, idx) => (
+                                <TickerItem key={idx} data={data} unitStr={unitStr} />
+                            ))}
+                            {weatherDataList.map((data, idx) => (
+                                <TickerItem key={`dup-${idx}`} data={data} unitStr={unitStr} />
+                            ))}
+                        </div>
+                        <style>{`@keyframes marquee { 0% { transform: translateX(0%); } 100% { transform: translateX(-50%); } }`}</style>
+                    </div>
+                )}
 
-    if (loading || weatherDataList.length === 0) {
-        return (
-            <div ref={containerRef} className="w-full h-full flex items-center justify-center text-slate-500 bg-slate-950">
-                <span className="animate-pulse">Cargando clima...</span>
-            </div>
-        );
-    }
+                {(isMicro || isSquare) && (
+                    <WeatherCard data={weatherDataList[0]} unitStr={unitStr} mode={isMicro ? 'micro' : 'square'} theme={theme} />
+                )}
 
-    const { width, height } = dimensions;
-    if (width === 0 || height === 0) return <div ref={containerRef} className="w-full h-full" />;
-
-    // Breakpoints
-    const isMicro = width < 250 && height < 250;
-    const isTicker = height < 150;
-    const isColumn = width < 400 && height >= 150;
-    const isSquare = width >= 250 && width < 500 && height >= 150 && height < 400;
-    const isMain = width >= 400 && height >= 400;
-
-    const unitStr = config.unit === 'fahrenheit' ? '°F' : '°C';
-    const theme = config.theme || 'dynamic';
-
-    return (
-        <div ref={containerRef} className="w-full h-full flex overflow-hidden bg-black">
-            {/* If Main or Column, we split the screen evenly for each city. If Ticker, we wrap in marquee. If Micro/Square we only show the first city. */}
-            
-            {isTicker && (
-                <div className="w-full h-full bg-slate-900 text-white flex items-center overflow-hidden whitespace-nowrap">
-                    <div className="animate-[marquee_25s_linear_infinite] flex items-center gap-16 px-4">
+                {isColumn && (
+                    <div className="w-full h-full flex flex-col">
                         {weatherDataList.map((data, idx) => (
-                            <TickerItem key={idx} data={data} unitStr={unitStr} />
-                        ))}
-                        {weatherDataList.map((data, idx) => (
-                            <TickerItem key={`dup-${idx}`} data={data} unitStr={unitStr} />
+                            <div key={idx} className="flex-1 min-h-0 border-b border-black/10 last:border-0 relative">
+                                <WeatherCard data={data} unitStr={unitStr} mode="column" theme={theme} />
+                            </div>
                         ))}
                     </div>
-                    <style>{`@keyframes marquee { 0% { transform: translateX(0%); } 100% { transform: translateX(-50%); } }`}</style>
-                </div>
-            )}
+                )}
 
-            {(isMicro || isSquare) && (
-                <WeatherCard data={weatherDataList[0]} unitStr={unitStr} mode={isMicro ? 'micro' : 'square'} theme={theme} />
-            )}
+                {isMain && (
+                    <div className="w-full h-full flex">
+                        {weatherDataList.map((data, idx) => (
+                            <div key={idx} className="flex-1 min-w-0 border-r border-black/20 last:border-0 relative">
+                                <WeatherCard data={data} unitStr={unitStr} mode="main" theme={theme} />
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </>
+        );
+    };
 
-            {isColumn && (
-                <div className="w-full h-full flex flex-col">
-                    {weatherDataList.map((data, idx) => (
-                        <div key={idx} className="flex-1 min-h-0 border-b border-black/10 last:border-0 relative">
-                            <WeatherCard data={data} unitStr={unitStr} mode="column" theme={theme} />
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            {isMain && (
-                <div className="w-full h-full flex">
-                    {weatherDataList.map((data, idx) => (
-                        <div key={idx} className="flex-1 min-w-0 border-r border-black/20 last:border-0 relative">
-                            <WeatherCard data={data} unitStr={unitStr} mode="main" theme={theme} />
-                        </div>
-                    ))}
-                </div>
-            )}
+    return (
+        <div ref={containerRef} className="w-full h-full flex flex-col overflow-hidden relative bg-black">
+            {renderContent()}
         </div>
     );
 };
@@ -352,7 +355,7 @@ const WeatherCard = ({ data, unitStr, mode, theme }: { data: any, unitStr: strin
 
     if (mode === 'micro') {
         return (
-            <div className={cn("absolute inset-0 flex flex-col items-center justify-center p-2", bgStyle)}>
+            <div className={cn("w-full h-full flex flex-col items-center justify-center p-2", bgStyle)}>
                 <Icon className="w-3/5 h-3/5 max-w-[80px] max-h-[80px] drop-shadow-md mb-1" />
                 <div className="text-3xl font-bold tracking-tighter">{currentTemp}°</div>
             </div>
@@ -361,7 +364,7 @@ const WeatherCard = ({ data, unitStr, mode, theme }: { data: any, unitStr: strin
 
     if (mode === 'square') {
         return (
-            <div className={cn("absolute inset-0 flex flex-col p-4", bgStyle)}>
+            <div className={cn("w-full h-full flex flex-col p-4", bgStyle)}>
                 <div className="text-sm font-semibold opacity-70 truncate">{data.location.name}</div>
                 <div className="flex-1 flex flex-col items-center justify-center">
                     <Icon className="w-16 h-16 drop-shadow-md mb-2" />
@@ -374,7 +377,7 @@ const WeatherCard = ({ data, unitStr, mode, theme }: { data: any, unitStr: strin
 
     if (mode === 'column') {
         return (
-            <div className={cn("absolute inset-0 flex flex-col p-6 overflow-hidden", bgStyle)}>
+            <div className={cn("w-full h-full flex flex-col p-6 overflow-hidden", bgStyle)}>
                 <div className="flex justify-between items-start mb-4">
                     <div>
                         <h2 className="text-2xl font-bold truncate max-w-[200px]">{data.location.name.split(',')[0]}</h2>
@@ -412,7 +415,7 @@ const WeatherCard = ({ data, unitStr, mode, theme }: { data: any, unitStr: strin
 
     // Main mode
     return (
-        <div className={cn("absolute inset-0 flex flex-col relative p-8", bgStyle)}>
+        <div className={cn("w-full h-full flex flex-col relative p-8 overflow-hidden", bgStyle)}>
             <div className="absolute inset-0 opacity-10 pointer-events-none">
                 <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full">
                     <path d="M0,50 Q25,30 50,50 T100,50" fill="none" stroke="currentColor" strokeWidth="0.5" />
