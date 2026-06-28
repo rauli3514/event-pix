@@ -9,6 +9,7 @@ import { DisplayMedia } from '@/types/display';
 import { MediaPickerModal } from '../../MediaPickerModal';
 import { WeatherPreview } from '../weather/WeatherApp';
 import { DolarPreview } from '../dolar/DolarApp';
+import { TickerPreview } from '../ticker/TickerApp';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -641,7 +642,7 @@ const ZoneRenderer = ({ media }: { media: DisplayMedia }) => {
             return <DolarPreview config={media.metadata.config || {}} />;
         }
         if (media.metadata?.appId === 'ticker') {
-            return <div className="w-full h-full bg-slate-900 flex items-center justify-center text-slate-200 font-bold pointer-events-none">App: Ticker</div>;
+            return <TickerPreview config={media.metadata.config || {}} containerWidth={undefined} />;
         }
         return <div className="text-white w-full h-full flex items-center justify-center pointer-events-none">App: {media.metadata?.appId}</div>;
     }

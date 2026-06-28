@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import { WeatherForm, WeatherPreview } from './weather/WeatherApp';
 import { SplitScreenForm, SplitScreenPreview } from './split-screen/SplitScreenApp';
 import { DolarForm, DolarPreview } from './dolar/DolarApp';
-// import { TickerForm, TickerPreview } from './ticker/TickerApp';
+import { TickerForm, TickerPreview } from './ticker/TickerApp';
 
 interface AppEditorModalProps {
     isOpen: boolean;
@@ -47,10 +47,8 @@ export const AppEditorModal = ({ isOpen, onClose, onBack, appId, commerceId, cur
                 return <SplitScreenForm config={appConfig} onChange={setAppConfig} commerceId={commerceId} appName={appName} setAppName={setAppName} />;
             case 'dolar':
                 return <DolarForm config={appConfig} onChange={setAppConfig} />;
-            /*
             case 'ticker':
                 return <TickerForm config={appConfig} onChange={setAppConfig} />;
-            */
             default:
                 return <div className="text-slate-500 p-4">App form not implemented yet.</div>;
         }
@@ -64,10 +62,8 @@ export const AppEditorModal = ({ isOpen, onClose, onBack, appId, commerceId, cur
                 return <SplitScreenPreview config={appConfig} />;
             case 'dolar':
                 return <DolarPreview config={appConfig} />;
-            /*
             case 'ticker':
                 return <TickerPreview config={appConfig} />;
-            */
             default:
                 return <div className="text-slate-500 flex items-center justify-center h-full">App preview not implemented yet.</div>;
         }
