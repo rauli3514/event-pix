@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ArrowLeft, Check, Loader2 } from 'lucide-react';
 import { AppId } from './AppCatalogModal';
-import { useUploadDisplayMedia } from '@/hooks/use-display-media';
+import { DisplayMedia } from '@/types/display';
+import { useUploadDisplayMedia, useUpdateDisplayMedia } from '@/hooks/use-display-media';
 import { toast } from 'sonner';
 
 import { WeatherForm, WeatherPreview } from './weather/WeatherApp';
@@ -20,12 +21,22 @@ interface AppEditorModalProps {
     appId: AppId;
     commerceId: string;
     currentFolder: string;
+    editingApp?: DisplayMedia;
 }
 
-export const AppEditorModal = ({ isOpen, onClose, onBack, appId, commerceId, currentFolder }: AppEditorModalProps) => {
+export const AppEditorModal = ({ isOpen, onClose, onBack, appId, commerceId, currentFolder, editingApp }: AppEditorModalProps) => {
     const [appName, setAppName] = useState('');
     const [appConfig, setAppConfig] = useState<any>({});
     const uploadMedia = useUploadDisplayMedia();
+    const updateMedia = useUpdateDisplayMedia();
+
+    // Reset state when modal opens or editingApp changes
+    useEffect(() => {
+        if (isOpen) {
+            setAppName(editingApp?.name || '');
+            setAppConfig(editingApp?.metadata?.config || {});
+        }
+    }, [isOpen, editingApp]);
 
     // Dynamically select the Form and Preview components based on appId
     const renderForm = () => {
@@ -70,23 +81,32 @@ export const AppEditorModal = ({ isOpen, onClose, onBack, appId, commerceId, cur
 
         const toastId = toast.loading("Guardando App...");
         try {
-            // We save it as a "display_media" object, but with type = 'app'
-            // The metadata contains the appId and the config.
             const metadata = {
                 appId,
                 config: appConfig
             };
 
-            // Stringify metadata to save it as the URL for now, or just send it if our hook supports it.
-            // Wait, we modified the type to include `metadata?: any`. We need to update useUploadDisplayMedia to support it.
-            await uploadMedia.mutateAsync({
-                commerceId,
-                folderPath: currentFolder,
-                webUrl: 'app://' + appId, // Fallback url format
-                webName: appName.trim(),
-                type: 'app',
-                metadata: metadata
-            } as any); // using any to bypass strict type check for now
+            if (editingApp) {
+                // Update existing app
+                await updateMedia.mutateAsync({
+                    id: editingApp.id,
+                    updates: {
+                        name: appName.trim(),
+                        metadata: metadata,
+                        url: 'app://' + appId // ensure url matches if changed?
+                    }
+                });
+            } else {
+                // Create new app
+                await uploadMedia.mutateAsync({
+                    commerceId,
+                    folderPath: currentFolder,
+                    webUrl: 'app://' + appId,
+                    webName: appName.trim(),
+                    type: 'app',
+                    metadata: metadata
+                } as any);
+            }
 
             toast.success("App guardada correctamente", { id: toastId });
             onClose();
@@ -95,6 +115,8 @@ export const AppEditorModal = ({ isOpen, onClose, onBack, appId, commerceId, cur
             toast.error("Error al guardar la App", { id: toastId });
         }
     };
+
+    const isPending = uploadMedia.isPending || updateMedia.isPending;
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -115,10 +137,10 @@ export const AppEditorModal = ({ isOpen, onClose, onBack, appId, commerceId, cur
                         <Button 
                             className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md"
                             onClick={handleSave}
-                            disabled={uploadMedia.isPending}
+                            disabled={isPending}
                         >
-                            {uploadMedia.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
-                            Guardar App
+                            {isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
+                            {editingApp ? 'Guardar Cambios' : 'Guardar App'}
                         </Button>
                     </div>
                 </div>

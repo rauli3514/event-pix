@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Search, Upload, LayoutGrid, List as ListIcon, Image as ImageIcon, Video, FileAudio, FileText, Globe, ArrowRightCircle, HardDrive, Trash2, Folder, Move } from 'lucide-react';
+import { Search, Upload, LayoutGrid, List as ListIcon, Image as ImageIcon, Video, FileAudio, FileText, Globe, ArrowRightCircle, HardDrive, Trash2, Folder, Move, MoreVertical, Edit2, Play } from 'lucide-react';
 import { SendToScreensModal } from '@/components/display/SendToScreensModal';
 import { UploadMediaModal } from '@/components/display/UploadMediaModal';
 import { useDisplayMedia, useUploadDisplayMedia, useDeleteDisplayMedia, useUpdateDisplayMedia } from '@/hooks/use-display-media';
@@ -11,7 +11,8 @@ import { toast } from 'sonner';
 import { DisplayMedia } from '@/types/display';
 import { MediaFolderSidebar } from '@/components/display/MediaFolderSidebar';
 import { MoveMediaModal } from '@/components/display/MoveMediaModal';
-import { AppCatalogModal } from '@/components/display/apps/AppCatalogModal';
+import { AppCatalogModal, APPS, AppId } from '@/components/display/apps/AppCatalogModal';
+import { AppEditorModal } from '@/components/display/apps/AppEditorModal';
 
 export type CategoryId = 'all' | 'images' | 'videos' | 'audio' | 'docs' | 'web' | 'apps';
 
@@ -29,6 +30,7 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
     const [currentFolder, setCurrentFolder] = useState<string>('/');
     const [sortMode, setSortMode] = useState<'newest'|'oldest'|'az'|'za'>('newest');
     const [draggedOverFolder, setDraggedOverFolder] = useState<string | null>(null);
+    const [editingApp, setEditingApp] = useState<DisplayMedia | null>(null);
 
     const { data: mediaFiles = [], isLoading } = useDisplayMedia(commerceId);
     const { mutateAsync: uploadMedia } = useUploadDisplayMedia();
@@ -409,6 +411,7 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                                     {filteredFiles.map(file => {
                                         const FileIcon = getIconForType(file.type);
                                         const isFolder = file.type === 'folder';
+                                        const appData = file.type === 'app' ? APPS.find(a => a.id === file.metadata?.appId) : null;
                                         return (
                                         <div 
                                             key={file.id} 
@@ -462,13 +465,45 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                                                 />
                                             </div>
                                             <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <Button variant="ghost" size="icon" className="h-7 w-7 bg-slate-900/90 text-red-400 hover:bg-red-950 hover:text-red-300 rounded-full shadow-sm" onClick={(e) => { e.stopPropagation(); handleDelete(file); }}>
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                </Button>
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" size="icon" className="h-7 w-7 bg-slate-900/90 text-slate-300 hover:bg-slate-800 hover:text-white rounded-full shadow-sm" onClick={(e) => e.stopPropagation()}>
+                                                            <MoreVertical className="w-4 h-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end" className="w-48 bg-slate-900 border-slate-800 text-slate-200 z-50">
+                                                        {file.type === 'app' && (
+                                                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditingApp(file); }} className="hover:bg-slate-800 cursor-pointer focus:bg-slate-800 focus:text-white">
+                                                                <Edit2 className="w-4 h-4 mr-2 text-indigo-400" /> Editar App
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                        <DropdownMenuItem onClick={(e) => { 
+                                                            e.stopPropagation(); 
+                                                            setSelectedIds([file.id]);
+                                                            setIsSendModalOpen(true);
+                                                        }} className="hover:bg-slate-800 cursor-pointer focus:bg-slate-800 focus:text-white">
+                                                            <Play className="w-4 h-4 mr-2 text-orange-400" /> Enviar a pantallas
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={(e) => { 
+                                                            e.stopPropagation(); 
+                                                            setSelectedIds([file.id]);
+                                                            setIsMoveModalOpen(true);
+                                                        }} className="hover:bg-slate-800 cursor-pointer focus:bg-slate-800 focus:text-white">
+                                                            <Move className="w-4 h-4 mr-2 text-blue-400" /> Mover
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDelete(file); }} className="hover:bg-red-900/50 cursor-pointer focus:bg-red-900/50 focus:text-red-300 text-red-400">
+                                                            <Trash2 className="w-4 h-4 mr-2" /> Eliminar
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
                                             </div>
                                             <div className="aspect-[4/3] bg-slate-950 relative overflow-hidden flex items-center justify-center p-2">
                                                 {file.type === 'image' && file.url ? (
                                                     <img src={file.url} alt={file.name} className="w-full h-full object-contain group-hover:scale-105 transition-transform" />
+                                                ) : appData ? (
+                                                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${appData.bg} group-hover:scale-110 transition-transform shadow-inner`}>
+                                                        <appData.icon className={`w-8 h-8 ${appData.color}`} />
+                                                    </div>
                                                 ) : (
                                                     <FileIcon className={`w-12 h-12 ${isFolder ? 'text-orange-400 fill-orange-400/20 group-hover:scale-110 transition-transform' : 'text-slate-600'}`} />
                                                 )}
@@ -520,6 +555,17 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                     onClose={() => setIsAppCatalogOpen(false)}
                     commerceId={commerceId}
                     currentFolder={currentFolder}
+                />
+            )}
+            {commerceId && editingApp && (
+                <AppEditorModal
+                    isOpen={!!editingApp}
+                    onClose={() => setEditingApp(null)}
+                    onBack={() => setEditingApp(null)}
+                    appId={editingApp.metadata?.appId as AppId}
+                    commerceId={commerceId}
+                    currentFolder={currentFolder}
+                    editingApp={editingApp}
                 />
             )}
         </div>

@@ -13,7 +13,7 @@ interface AppCatalogModalProps {
 
 export type AppId = 'weather' | 'split-screen' | 'ticker' | 'dolar';
 
-const APPS = [
+export const APPS = [
     {
         id: 'weather' as AppId,
         name: 'El Clima',
