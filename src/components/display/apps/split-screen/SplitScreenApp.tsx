@@ -320,7 +320,7 @@ export const SplitScreenForm = ({ config, onChange, commerceId, appName, setAppN
                     }}
                 />
             )}
-        </div>
+        </Tabs>
     );
 };
 
