@@ -584,6 +584,13 @@ const ZoneRenderer = ({ media }: { media: DisplayMedia }) => {
         }
         return <div className="text-white w-full h-full flex items-center justify-center pointer-events-none">App: {media.metadata?.appId}</div>;
     }
+    if (media.type === 'web') {
+        return (
+            <div className="relative w-full h-full bg-white pointer-events-none">
+                <iframe src={media.url} className="w-full h-full border-none" title={media.name || "Web Content"} />
+            </div>
+        );
+    }
     
     return <div className="text-white w-full h-full flex items-center justify-center pointer-events-none">{media.type}</div>;
 };
