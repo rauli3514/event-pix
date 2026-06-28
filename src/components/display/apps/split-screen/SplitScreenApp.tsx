@@ -378,7 +378,7 @@ export const SplitScreenForm = ({ config, onChange, commerceId, appName, setAppN
                     isOpen={isPickerOpen}
                     onClose={() => setIsPickerOpen(false)}
                     commerceId={commerceId}
-                    onSelect={(item, type) => {
+                    onSelect={(item: any, type) => {
                         let newZones = [...zones];
                         if (type === 'playlist') {
                             newZones = zones.map(z => z.id === selectedZoneId ? { ...z, playlistId: item.id, playlistObj: item, mediaId: undefined, mediaObj: undefined } : z);
@@ -580,7 +580,7 @@ export const SplitScreenPreview = ({ config, onChange }: { config: Partial<Split
 };
 
 const NestedPlaylistRunner = ({ playlist }: { playlist: any }) => {
-    const items = playlist.items_json || [];
+    const items = Array.isArray(playlist.items_json) ? playlist.items_json : (playlist.items_json?.zones?.[0]?.playlist || []);
     const [currentIndex, setCurrentIndex] = useState(0);
 
     useEffect(() => {
@@ -605,7 +605,9 @@ const NestedPlaylistRunner = ({ playlist }: { playlist: any }) => {
         metadata: currentItem.metadata || {},
         folder_path: '',
         commerce_id: '',
-        created_at: ''
+        created_at: '',
+        storage_path: '',
+        size_bytes: 0
     };
 
     return <ZoneRenderer media={fakeMedia} />;

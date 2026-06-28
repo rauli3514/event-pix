@@ -5,13 +5,13 @@ import { Input } from '@/components/ui/input';
 import { Search, X, Folder, Image as ImageIcon, Video, FileAudio, FileText, Globe, LayoutGrid, LayoutDashboard } from 'lucide-react';
 import { useDisplayMedia } from '@/hooks/use-display-media';
 import { useDisplayCampaigns } from '@/hooks/use-display-hub';
-import { DisplayMedia, DisplayCampaignV2 } from '@/types/display';
+import { DisplayMedia, DisplayCampaign } from '@/types/display';
 
 interface MediaPickerModalProps {
     isOpen: boolean;
     onClose: () => void;
     commerceId: string;
-    onSelect: (item: DisplayMedia | DisplayCampaignV2, type: 'media' | 'playlist') => void;
+    onSelect: (item: DisplayMedia | DisplayCampaign, type: 'media' | 'playlist') => void;
 }
 
 export const MediaPickerModal = ({ isOpen, onClose, commerceId, onSelect }: MediaPickerModalProps) => {
@@ -22,7 +22,7 @@ export const MediaPickerModal = ({ isOpen, onClose, commerceId, onSelect }: Medi
     const [search, setSearch] = useState('');
     const [currentFolder, setCurrentFolder] = useState('/');
 
-    const playlists = useMemo(() => campaigns.filter(c => c.type === 'playlist'), [campaigns]);
+    const playlists = useMemo(() => campaigns, [campaigns]);
 
     const filteredFiles = useMemo(() => {
         return mediaFiles.filter(file => {
@@ -162,7 +162,7 @@ export const MediaPickerModal = ({ isOpen, onClose, commerceId, onSelect }: Medi
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <h4 className="font-medium text-slate-200 truncate">{playlist.name}</h4>
-                                        <p className="text-xs text-slate-500">{playlist.items_json?.length || 0} elementos</p>
+                                        <p className="text-xs text-slate-500">{Array.isArray(playlist.items_json) ? playlist.items_json.length : ((playlist.items_json as any)?.zones?.[0]?.playlist?.length || 0)} elementos</p>
                                     </div>
                                 </div>
                             ))}
