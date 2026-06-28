@@ -381,7 +381,6 @@ const WeatherCard = ({ data, unitStr, mode, theme, containerWidth = 1920 }: { da
 
     // JS based responsiveness to avoid viewport media query bleeding in preview modals
     const isLg = containerWidth >= 1024;
-    const isMd = containerWidth >= 768;
 
     const renderMainLayout = () => {
         if (theme === 'vibrant') {
