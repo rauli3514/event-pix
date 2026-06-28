@@ -273,7 +273,7 @@ export const WeatherPreview = ({ config }: { config: Partial<WeatherConfig> }) =
                     <div className="w-full h-full flex flex-col">
                         {weatherDataList.map((data, idx) => (
                             <div key={idx} className="flex-1 min-h-0 border-b border-white/10 last:border-0 relative">
-                                <WeatherCard data={data} unitStr={unitStr} mode={weatherDataList.length > 1 ? 'square' : 'column'} theme={theme} containerWidth={width} />
+                                <WeatherCard data={data} unitStr={unitStr} mode="main" theme={theme} containerWidth={width} />
                             </div>
                         ))}
                     </div>
@@ -283,7 +283,7 @@ export const WeatherPreview = ({ config }: { config: Partial<WeatherConfig> }) =
                     <div className="w-full h-full flex">
                         {weatherDataList.map((data, idx) => (
                             <div key={idx} className="flex-1 min-w-0 border-r border-white/20 last:border-0 relative">
-                                <WeatherCard data={data} unitStr={unitStr} mode={weatherDataList.length === 1 ? 'main' : 'column'} theme={theme} containerWidth={width / weatherDataList.length} />
+                                <WeatherCard data={data} unitStr={unitStr} mode="main" theme={theme} containerWidth={width / weatherDataList.length} />
                             </div>
                         ))}
                     </div>
