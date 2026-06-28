@@ -210,29 +210,92 @@ export const SplitScreenForm = ({ config, onChange, commerceId, appName, setAppN
                     </Button>
                 </div>
                 
-                <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
-                    {zones.map(zone => (
-                        <div key={zone.id} className={cn("p-3 bg-slate-950 border border-slate-800 rounded-lg flex items-center justify-between", selectedZoneId === zone.id && "border-indigo-500/50 bg-indigo-500/5")}>
-                            <div className="flex items-center gap-3">
-                                <div className="w-4 h-4 rounded-full" style={{ backgroundColor: zone.color || BRAND_BLUE }} />
-                                <div>
-                                    <div className="text-sm font-medium text-slate-200">{zone.name}</div>
-                                    <div className="text-xs text-slate-500 mt-0.5">
-                                        {zone.mediaId ? 'Configurado' : 'Sin contenido'}
+                <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+                    {zones.map(zone => {
+                        const isExpanded = selectedZoneId === zone.id;
+                        return (
+                            <div key={zone.id} className={cn("bg-slate-950 border rounded-lg overflow-hidden transition-all", isExpanded ? "border-indigo-500" : "border-slate-800 hover:border-slate-700")}>
+                                {/* Header (Clickable) */}
+                                <div 
+                                    className="p-3 flex items-center justify-between cursor-pointer select-none"
+                                    onClick={() => setSelectedZoneId(isExpanded ? null : zone.id)}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: zone.color || BRAND_BLUE }} />
+                                        <div>
+                                            <div className="text-sm font-medium text-slate-200">{zone.name}</div>
+                                            <div className="text-xs text-slate-500 mt-0.5">
+                                                {zone.mediaId ? 'Configurado' : 'Sin contenido'}
+                                            </div>
+                                        </div>
                                     </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 px-3 bg-slate-900 text-slate-300 hover:text-white"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedZoneId(zone.id);
+                                            setIsPickerOpen(true);
+                                        }}
+                                    >
+                                        {zone.mediaId ? 'Cambiar' : 'Seleccionar'}
+                                    </Button>
                                 </div>
+                                
+                                {/* Expanded Body */}
+                                {isExpanded && (
+                                    <div className="p-4 border-t border-slate-800 bg-slate-900/50 space-y-4">
+                                        <div className="space-y-2">
+                                            <Label className="text-xs text-slate-400">Nombre de la Zona</Label>
+                                            <Input 
+                                                value={zone.name}
+                                                onChange={(e) => {
+                                                    const newZones = zones.map(z => z.id === zone.id ? { ...z, name: e.target.value } : z);
+                                                    onChange({ ...config, zones: newZones });
+                                                }}
+                                                className="bg-slate-950 border-slate-800 h-8 text-sm"
+                                            />
+                                        </div>
+                                        
+                                        <div>
+                                            <Label className="text-xs text-slate-400 mb-2 block">Posición y Tamaño (%)</Label>
+                                            <div className="grid grid-cols-4 gap-2">
+                                                <div className="space-y-1">
+                                                    <span className="text-[10px] text-slate-500">X</span>
+                                                    <Input type="number" min="0" max="100" value={Math.round(zone.x)} onChange={(e) => {
+                                                        const newZones = zones.map(z => z.id === zone.id ? { ...z, x: Number(e.target.value) } : z);
+                                                        onChange({ ...config, zones: newZones });
+                                                    }} className="bg-slate-950 border-slate-800 h-8 px-2 text-xs" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <span className="text-[10px] text-slate-500">Y</span>
+                                                    <Input type="number" min="0" max="100" value={Math.round(zone.y)} onChange={(e) => {
+                                                        const newZones = zones.map(z => z.id === zone.id ? { ...z, y: Number(e.target.value) } : z);
+                                                        onChange({ ...config, zones: newZones });
+                                                    }} className="bg-slate-950 border-slate-800 h-8 px-2 text-xs" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <span className="text-[10px] text-slate-500">Ancho</span>
+                                                    <Input type="number" min="1" max="100" value={Math.round(zone.w)} onChange={(e) => {
+                                                        const newZones = zones.map(z => z.id === zone.id ? { ...z, w: Number(e.target.value) } : z);
+                                                        onChange({ ...config, zones: newZones });
+                                                    }} className="bg-slate-950 border-slate-800 h-8 px-2 text-xs" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <span className="text-[10px] text-slate-500">Alto</span>
+                                                    <Input type="number" min="1" max="100" value={Math.round(zone.h)} onChange={(e) => {
+                                                        const newZones = zones.map(z => z.id === zone.id ? { ...z, h: Number(e.target.value) } : z);
+                                                        onChange({ ...config, zones: newZones });
+                                                    }} className="bg-slate-950 border-slate-800 h-8 px-2 text-xs" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-                            <button
-                                onClick={() => {
-                                    setSelectedZoneId(zone.id);
-                                    setIsPickerOpen(true);
-                                }}
-                                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded transition-colors"
-                            >
-                                {zone.mediaId ? 'Cambiar' : 'Seleccionar'}
-                            </button>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </TabsContent>
 
