@@ -203,7 +203,7 @@ export const WeatherPreview = ({ config }: { config: Partial<WeatherConfig> }) =
             try {
                 const unitParam = config.unit === 'fahrenheit' ? '&temperature_unit=fahrenheit' : '';
                 const promises = locations.map(loc => 
-                    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&current_weather=true&daily=temperature_2m_max,temperature_2m_min,weathercode,sunrise,sunset&timezone=auto${unitParam}`)
+                    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_probability_max&timezone=auto${unitParam}`)
                     .then(res => res.json())
                     .then(data => ({ ...data, location: loc }))
                 );
@@ -302,8 +302,8 @@ export const WeatherPreview = ({ config }: { config: Partial<WeatherConfig> }) =
 // --- SUBCOMPONENTS ---
 
 const TickerItem = ({ data, unitStr }: { data: any, unitStr: string }) => {
-    const currentTemp = Math.round(data.current_weather.temperature);
-    const Icon = getWeatherIcon(data.current_weather.weathercode, data.current_weather.is_day === 1);
+    const { code, temp, isDay } = parseWeatherData(data);
+    const Icon = getWeatherIcon(code, isDay);
     
     return (
         <div className="flex items-center gap-6">
@@ -313,22 +313,47 @@ const TickerItem = ({ data, unitStr }: { data: any, unitStr: string }) => {
             </div>
             <div className="flex items-center gap-3">
                 <Icon className="w-8 h-8 text-white" />
-                <span className="text-3xl font-black text-white">{currentTemp}{unitStr}</span>
+                <span className="text-3xl font-black text-white">{temp}{unitStr}</span>
             </div>
         </div>
     );
 };
 
+const parseWeatherData = (data: any) => {
+    const current = data.current || data.current_weather || {};
+    const code = current.weather_code ?? current.weathercode ?? 0;
+    const temp = Math.round(current.temperature_2m ?? current.temperature ?? 0);
+    const isDay = (current.is_day === 1 || current.is_day === true);
+    const windSpeed = current.wind_speed_10m ?? current.windspeed ?? 0;
+    const humidity = current.relative_humidity_2m ?? 0;
+    const feelsLike = Math.round(current.apparent_temperature ?? temp);
+    const cloudCover = current.cloud_cover ?? 0;
+    const rain = current.precipitation ?? 0;
+    return { code, temp, isDay, windSpeed, humidity, feelsLike, cloudCover, rain };
+};
+
+const getBackgroundImage = (code: number, isDay: boolean) => {
+    if (!isDay) {
+        if (code <= 3) return 'https://images.unsplash.com/photo-1505322022520-5e1ceaf74c93?auto=format&fit=crop&w=1920&q=80'; // clear night
+        return 'https://images.unsplash.com/photo-1483702581635-c33118cf6f5e?auto=format&fit=crop&w=1920&q=80'; // cloudy night
+    }
+    if (code === 0) return 'https://images.unsplash.com/photo-1601297183305-6df14faa7181?auto=format&fit=crop&w=1920&q=80'; // clear day
+    if (code >= 1 && code <= 3) return 'https://images.unsplash.com/photo-1534274988757-a28bf1a5753a?auto=format&fit=crop&w=1920&q=80'; // cloudy day
+    if (code >= 51 && code <= 67) return 'https://images.unsplash.com/photo-1515694346937-94d85e41e6f0?auto=format&fit=crop&w=1920&q=80'; // rain
+    if (code >= 71 && code <= 82) return 'https://images.unsplash.com/photo-1478265409131-1f65c88f965c?auto=format&fit=crop&w=1920&q=80'; // snow
+    if (code >= 95) return 'https://images.unsplash.com/photo-1605722243979-fc647f98f267?auto=format&fit=crop&w=1920&q=80'; // storm
+    return 'https://images.unsplash.com/photo-1601297183305-6df14faa7181?auto=format&fit=crop&w=1920&q=80';
+};
+
 const WeatherCard = ({ data, unitStr, mode, theme }: { data: any, unitStr: string, mode: 'micro' | 'square' | 'column' | 'main', theme: string }) => {
-    const isDay = data.current_weather.is_day === 1;
-    const code = data.current_weather.weathercode;
-    const currentTemp = Math.round(data.current_weather.temperature);
+    const { code, temp, isDay, windSpeed, humidity, feelsLike, cloudCover, rain } = parseWeatherData(data);
     const Icon = getWeatherIcon(code, isDay);
     const desc = getWeatherDesc(code);
     
     // Theme computation
     let bgStyle = 'bg-slate-900 text-white';
     let cardStyle = 'bg-white/10 border-white/5';
+    let bgImage = '';
 
     if (theme === 'vibrant') {
         bgStyle = isDay 
@@ -336,10 +361,9 @@ const WeatherCard = ({ data, unitStr, mode, theme }: { data: any, unitStr: strin
             : 'bg-indigo-900 text-white';
         cardStyle = 'bg-black/20 border-black/10';
     } else if (theme === 'glass') {
-        bgStyle = isDay 
-            ? (code <= 3 ? 'bg-gradient-to-br from-sky-400 to-blue-600 text-white' : 'bg-gradient-to-br from-slate-400 to-slate-600 text-white')
-            : 'bg-gradient-to-br from-indigo-950 to-slate-900 text-white';
-        cardStyle = 'bg-white/10 backdrop-blur-xl border border-white/20 shadow-xl';
+        bgStyle = 'text-white bg-slate-900';
+        bgImage = getBackgroundImage(code, isDay);
+        cardStyle = 'bg-black/40 backdrop-blur-xl border border-white/20 shadow-xl';
     } else if (theme === 'light') {
         bgStyle = 'bg-slate-50 text-slate-900';
         cardStyle = 'bg-white border border-slate-200 shadow-sm';
@@ -347,135 +371,236 @@ const WeatherCard = ({ data, unitStr, mode, theme }: { data: any, unitStr: strin
         bgStyle = 'bg-slate-950 text-slate-100';
         cardStyle = 'bg-slate-900 border border-slate-800';
     } else if (theme === 'dynamic') {
-        bgStyle = isDay ? 'bg-sky-50 text-slate-800' : 'bg-slate-900 text-slate-100';
-        cardStyle = isDay ? 'bg-white/60 border border-sky-100' : 'bg-slate-800/60 border border-slate-700';
+        bgStyle = 'text-white bg-slate-900';
+        bgImage = getBackgroundImage(code, isDay);
+        cardStyle = 'bg-black/60 backdrop-blur-md border border-white/10 shadow-xl';
     }
 
     const timeString = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    const dateString = new Date().toLocaleDateString('es-ES', { weekday: 'long', month: 'long', day: 'numeric' });
 
-    if (mode === 'micro') {
-        return (
-            <div className={cn("w-full h-full flex flex-col items-center justify-center p-2", bgStyle)}>
-                <Icon className="w-3/5 h-3/5 max-w-[80px] max-h-[80px] drop-shadow-md mb-1" />
-                <div className="text-3xl font-bold tracking-tighter">{currentTemp}°</div>
-            </div>
-        );
-    }
-
-    if (mode === 'square') {
-        return (
-            <div className={cn("w-full h-full flex flex-col p-4", bgStyle)}>
-                <div className="text-sm font-semibold opacity-70 truncate">{data.location.name}</div>
-                <div className="flex-1 flex flex-col items-center justify-center">
-                    <Icon className="w-16 h-16 drop-shadow-md mb-2" />
-                    <div className="text-5xl font-bold">{currentTemp}°</div>
-                    <div className="text-sm opacity-80 mt-1 capitalize">{desc}</div>
-                </div>
-            </div>
-        );
-    }
-
-    if (mode === 'column') {
-        return (
-            <div className={cn("w-full h-full flex flex-col p-6 overflow-hidden", bgStyle)}>
-                <div className="flex justify-between items-start mb-4">
-                    <div>
-                        <h2 className="text-2xl font-bold truncate max-w-[200px]">{data.location.name.split(',')[0]}</h2>
-                        <p className="text-sm opacity-70">Hoy {timeString}</p>
+    const renderMainLayout = () => {
+        if (theme === 'vibrant') {
+            return (
+                <div className="w-full h-full flex flex-col relative p-12 overflow-hidden z-10">
+                    <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
+                        <svg viewBox="0 0 1440 320" className="absolute bottom-0 w-full h-auto min-h-[50%]" preserveAspectRatio="none">
+                            <path fill="currentColor" d="M0,160L48,176C96,192,192,224,288,213.3C384,203,480,149,576,128C672,107,768,117,864,138.7C960,160,1056,192,1152,197.3C1248,203,1344,181,1392,170.7L1440,160L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
+                        </svg>
                     </div>
+
+                    <div className="flex justify-between items-start relative z-10">
+                        <div>
+                            <h1 className="text-5xl lg:text-6xl font-bold tracking-tight mb-4">{data.location.name.split(',')[0]}</h1>
+                            <p className="text-2xl lg:text-3xl opacity-90 capitalize">{dateString}</p>
+                        </div>
+                        <div className="text-4xl lg:text-5xl font-medium">{timeString}</div>
+                    </div>
+
+                    <div className="flex-1 flex flex-col lg:flex-row items-center justify-center gap-12 lg:gap-16 relative z-10 py-8">
+                        <Icon className="w-48 h-48 lg:w-64 lg:h-64 drop-shadow-2xl" />
+                        <div className="flex flex-col items-center lg:items-start">
+                            <div className="text-[10rem] lg:text-[14rem] font-bold tracking-tighter leading-none">
+                                {temp}<span className="text-6xl lg:text-7xl align-top opacity-70">{unitStr}</span>
+                            </div>
+                            <div className="text-4xl lg:text-5xl font-medium opacity-100 capitalize mt-4">{desc}</div>
+                        </div>
+                    </div>
+
+                    <div className={cn("w-full rounded-[2.5rem] p-6 lg:p-8 flex flex-wrap lg:flex-nowrap justify-around items-center relative z-10 mt-auto", cardStyle)}>
+                        <div className="flex flex-col items-center px-4 py-2">
+                            <Wind className="w-8 h-8 lg:w-10 lg:h-10 mb-2 lg:mb-3 opacity-80"/>
+                            <div className="text-xl lg:text-2xl font-bold">Viento</div>
+                            <div className="text-lg lg:text-xl opacity-90 mt-1">{windSpeed} km/h</div>
+                        </div>
+                        {data.daily.time.slice(1, 5).map((time: string, idx: number) => {
+                            const max = Math.round(data.daily.temperature_2m_max[idx + 1]);
+                            const dayName = new Date(time).toLocaleDateString('es-ES', { weekday: 'short' });
+                            return (
+                                <div key={time} className="flex flex-col items-center px-4 py-2 lg:px-8 lg:border-l lg:border-white/20">
+                                    <span className="text-xl lg:text-2xl font-bold uppercase mb-2 lg:mb-3">{dayName}</span>
+                                    <div className="text-3xl lg:text-4xl font-bold">{max}°</div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        }
+
+        if (theme === 'glass') {
+            return (
+                <div className="w-full h-full flex flex-col lg:flex-row p-6 lg:p-8 gap-6 lg:gap-8 relative z-10">
+                    <div className="flex-1 flex flex-col justify-between lg:pt-8 lg:pb-4">
+                        <div className="flex flex-col gap-2 lg:gap-4">
+                            <div className="flex items-center gap-3 text-2xl lg:text-3xl font-medium drop-shadow-md">
+                                <MapPin className="w-6 h-6 lg:w-8 lg:h-8" /> {data.location.name.split(',')[0]}
+                            </div>
+                            <div className="text-5xl lg:text-7xl font-light tracking-tight drop-shadow-lg leading-tight capitalize">
+                                {dateString.split(',')[0]}<br/>
+                                <span className="font-bold">{dateString.split(' ')[1]} {dateString.split(' ')[2]}</span>
+                            </div>
+                        </div>
+                        <div className="mt-8 lg:mt-0">
+                            <div className="text-[8rem] lg:text-[12rem] font-light tracking-tighter leading-none drop-shadow-2xl">
+                                {temp}<span className="text-5xl lg:text-7xl align-top opacity-80">{unitStr}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="w-full lg:w-1/2 flex flex-col gap-4">
+                        <div className="hidden lg:flex justify-end text-3xl font-medium drop-shadow-md mb-2">{timeString}</div>
+                        <div className="flex gap-4 h-32 lg:h-48">
+                            <div className={cn("flex-1 rounded-3xl p-4 lg:p-6 flex flex-col justify-between", cardStyle)}>
+                                <div className="text-lg lg:text-xl font-medium">Sensación</div>
+                                <div className="text-4xl lg:text-5xl font-bold">{feelsLike}°</div>
+                                <div className="text-base lg:text-xl opacity-80 capitalize">{desc}</div>
+                            </div>
+                            <div className={cn("w-32 lg:w-48 rounded-3xl p-4 lg:p-6 flex flex-col items-center justify-center", cardStyle)}>
+                                <Icon className="w-16 h-16 lg:w-24 lg:h-24 drop-shadow-lg" />
+                            </div>
+                        </div>
+                        <div className="flex gap-4 h-32 lg:h-48">
+                            <div className={cn("flex-1 rounded-3xl p-4 lg:p-6 flex flex-col items-center justify-center", cardStyle)}>
+                                <div className="text-base lg:text-xl font-medium mb-1 lg:mb-auto">Humedad</div>
+                                <Droplets className="w-8 h-8 lg:w-12 lg:h-12 text-blue-300 mb-1" />
+                                <div className="text-2xl lg:text-4xl font-bold">{humidity}%</div>
+                            </div>
+                            <div className={cn("flex-1 rounded-3xl p-4 lg:p-6 flex flex-col items-center justify-center", cardStyle)}>
+                                <div className="text-base lg:text-xl font-medium mb-1 lg:mb-auto">Lluvia</div>
+                                <CloudRain className="w-8 h-8 lg:w-12 lg:h-12 text-blue-300 mb-1" />
+                                <div className="text-2xl lg:text-4xl font-bold">{rain}mm</div>
+                            </div>
+                            <div className={cn("flex-1 rounded-3xl p-4 lg:p-6 flex flex-col items-center justify-center", cardStyle)}>
+                                <div className="text-base lg:text-xl font-medium mb-1 lg:mb-auto">Nubes</div>
+                                <Cloud className="w-8 h-8 lg:w-12 lg:h-12 text-white mb-1" />
+                                <div className="text-2xl lg:text-4xl font-bold">{cloudCover}%</div>
+                            </div>
+                        </div>
+                        <div className="flex gap-2 lg:gap-4 h-28 lg:h-40">
+                            {data.daily.time.slice(1, 6).map((time: string, idx: number) => {
+                                const max = Math.round(data.daily.temperature_2m_max[idx + 1]);
+                                const dayName = new Date(time).toLocaleDateString('es-ES', { weekday: 'short' });
+                                const DIcon = getWeatherIcon(data.daily.weathercode[idx+1], true);
+                                return (
+                                    <div key={time} className={cn("flex-1 rounded-3xl p-2 lg:p-4 flex flex-col items-center justify-between", cardStyle)}>
+                                        <span className="text-sm lg:text-lg font-medium capitalize">{dayName}</span>
+                                        <DIcon className="w-6 h-6 lg:w-10 lg:h-10" />
+                                        <div className="text-lg lg:text-2xl font-bold">{max}°</div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <div className="w-full h-full flex flex-col items-center justify-center p-8 lg:p-12 overflow-hidden z-10">
+                <div className="flex items-center gap-2 text-xl lg:text-2xl font-medium mb-4 lg:mb-8 drop-shadow-md">
+                    <MapPin className="w-5 h-5 lg:w-6 lg:h-6" /> {data.location.name.split(',')[0]}
                 </div>
                 
-                <div className="flex flex-col items-center justify-center mb-6">
-                    <Icon className="w-20 h-20 drop-shadow-lg mb-2" />
-                    <div className="text-6xl font-bold tracking-tighter">
-                        {currentTemp}<span className="text-2xl align-top opacity-50">{unitStr}</span>
-                    </div>
-                    <div className="text-base opacity-80 font-medium capitalize">{desc}</div>
+                <Icon className="w-24 h-24 lg:w-32 lg:h-32 drop-shadow-xl mb-4 lg:mb-6" />
+                
+                <div className="text-[7rem] lg:text-[9rem] font-light tracking-tighter leading-none drop-shadow-2xl mb-6 lg:mb-8">
+                    {temp}<span className="text-5xl lg:text-6xl align-top font-normal">{unitStr}</span>
+                </div>
+                
+                <div className="flex gap-6 lg:gap-8 text-xl lg:text-2xl font-medium drop-shadow-md mb-8">
+                    <div className="flex items-center gap-2 lg:gap-3"><Droplets className="w-5 h-5 lg:w-6 lg:h-6"/> {humidity}%</div>
+                    <div className="flex items-center gap-2 lg:gap-3"><Wind className="w-5 h-5 lg:w-6 lg:h-6"/> {windSpeed} km/h</div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 mt-auto">
-                    {data.daily.time.slice(1, 5).map((time: string, idx: number) => {
-                        const max = Math.round(data.daily.temperature_2m_max[idx + 1]);
-                        const min = Math.round(data.daily.temperature_2m_min[idx + 1]);
-                        const dayName = new Date(time).toLocaleDateString('es-ES', { weekday: 'short' });
-                        const DIcon = getWeatherIcon(data.daily.weathercode[idx+1], true);
-                        
-                        return (
-                            <div key={time} className={cn("p-3 rounded-xl flex flex-col items-center", cardStyle)}>
-                                <span className="text-xs font-semibold uppercase opacity-70 mb-1">{dayName}</span>
-                                <DIcon className="w-6 h-6 mb-2" />
-                                <div className="text-sm font-bold">{max}° <span className="opacity-50 font-normal">{min}°</span></div>
-                            </div>
-                        );
-                    })}
+                <div className={cn("w-full max-w-5xl rounded-[2rem] p-6 lg:p-8 mt-auto flex flex-col gap-4 lg:gap-6", cardStyle)}>
+                    <div className="flex justify-between text-lg lg:text-xl opacity-90 px-2 lg:px-4 font-medium">
+                        <span>{timeString}</span>
+                        <span className="capitalize">{dateString}</span>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                        {data.daily.time.slice(0, 6).map((time: string, idx: number) => {
+                            const max = Math.round(data.daily.temperature_2m_max[idx]);
+                            const min = Math.round(data.daily.temperature_2m_min[idx]);
+                            const dayName = idx === 0 ? 'Hoy' : new Date(time).toLocaleDateString('es-ES', { weekday: 'short' });
+                            const DIcon = getWeatherIcon(data.daily.weathercode[idx], true);
+                            return (
+                                <div key={time} className="flex-1 flex flex-col items-center gap-2 lg:gap-4">
+                                    <span className="text-base lg:text-2xl font-medium capitalize">{dayName}</span>
+                                    <DIcon className="w-8 h-8 lg:w-12 lg:h-12" />
+                                    <div className="text-lg lg:text-2xl font-bold">{max}° <span className="opacity-60 font-normal ml-1">{min}°</span></div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             </div>
         );
-    }
+    };
 
-    // Main mode
     return (
-        <div className={cn("w-full h-full flex flex-col relative p-8 overflow-hidden", bgStyle)}>
-            <div className="absolute inset-0 opacity-10 pointer-events-none">
-                <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full">
-                    <path d="M0,50 Q25,30 50,50 T100,50" fill="none" stroke="currentColor" strokeWidth="0.5" />
-                </svg>
-            </div>
+        <div className={cn("w-full h-full flex flex-col relative overflow-hidden", bgStyle)}>
+            {bgImage && (
+                <div 
+                    className="absolute inset-0 bg-cover bg-center transition-opacity duration-1000 z-0" 
+                    style={{ backgroundImage: `url(${bgImage})` }} 
+                />
+            )}
+            
+            {mode === 'main' && renderMainLayout()}
 
-            <div className="flex justify-between items-start relative z-10">
-                <div>
-                    <h1 className="text-4xl lg:text-5xl font-bold tracking-tight mb-2 truncate max-w-[300px] lg:max-w-none">{data.location.name.split(',')[0]}</h1>
-                    <p className="text-lg lg:text-xl opacity-70">{new Date().toLocaleDateString('es-ES', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+            {mode === 'micro' && (
+                <div className="w-full h-full flex flex-col items-center justify-center p-2 relative z-10">
+                    <Icon className="w-3/5 h-3/5 max-w-[80px] max-h-[80px] drop-shadow-md mb-1" />
+                    <div className="text-3xl font-bold tracking-tighter">{temp}°</div>
                 </div>
-                <div className="text-3xl lg:text-4xl font-light opacity-80">{timeString}</div>
-            </div>
+            )}
 
-            <div className="flex-1 flex flex-col xl:flex-row items-center justify-center gap-8 lg:gap-12 relative z-10 py-8">
-                <Icon className="w-40 h-40 lg:w-48 lg:h-48 drop-shadow-2xl" />
-                <div className="flex flex-col items-center xl:items-start">
-                    <div className="text-[8rem] lg:text-[10rem] xl:text-[12rem] font-bold tracking-tighter leading-none">
-                        {currentTemp}<span className="text-5xl lg:text-6xl align-top opacity-50">{unitStr}</span>
-                    </div>
-                    <div className="text-2xl lg:text-3xl font-medium opacity-90 capitalize mt-2 xl:mt-4">{desc}</div>
-                </div>
-            </div>
-
-            <div className="flex flex-col lg:flex-row gap-6 mt-auto relative z-10">
-                {/* Stats */}
-                <div className={cn("w-full lg:w-1/3 rounded-3xl p-6 flex lg:flex-col justify-around gap-4", cardStyle)}>
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3 opacity-80 text-sm lg:text-base"><Wind className="w-4 h-4 lg:w-5 lg:h-5"/> Viento</div>
-                        <div className="font-bold text-sm lg:text-xl">{data.current_weather.windspeed} km/h</div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3 opacity-80 text-sm lg:text-base"><Droplets className="w-4 h-4 lg:w-5 lg:h-5"/> Precip.</div>
-                        <div className="font-bold text-sm lg:text-xl">{code >= 50 ? 'Alta' : 'Baja'}</div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3 opacity-80 text-sm lg:text-base"><Sunrise className="w-4 h-4 lg:w-5 lg:h-5"/> Sol</div>
-                        <div className="font-bold text-sm lg:text-xl">{new Date(data.daily.sunrise[0]).toLocaleTimeString('es-ES', {hour: '2-digit', minute:'2-digit'})}</div>
+            {mode === 'square' && (
+                <div className="w-full h-full flex flex-col p-4 relative z-10">
+                    <div className="text-sm font-semibold opacity-70 truncate drop-shadow-md">{data.location.name}</div>
+                    <div className="flex-1 flex flex-col items-center justify-center">
+                        <Icon className="w-16 h-16 drop-shadow-md mb-2" />
+                        <div className="text-5xl font-bold drop-shadow-md">{temp}°</div>
+                        <div className="text-sm opacity-90 mt-1 capitalize drop-shadow-md">{desc}</div>
                     </div>
                 </div>
+            )}
 
-                {/* Forecast */}
-                <div className="flex-1 flex gap-2 lg:gap-4">
-                    {data.daily.time.slice(1, 6).map((time: string, idx: number) => {
-                        const max = Math.round(data.daily.temperature_2m_max[idx + 1]);
-                        const min = Math.round(data.daily.temperature_2m_min[idx + 1]);
-                        const dayName = new Date(time).toLocaleDateString('es-ES', { weekday: 'short' });
-                        const DIcon = getWeatherIcon(data.daily.weathercode[idx+1], true);
-                        
-                        return (
-                            <div key={time} className={cn("flex-1 rounded-3xl flex flex-col items-center justify-center p-3 lg:p-4", cardStyle)}>
-                                <span className="text-xs lg:text-lg font-semibold uppercase opacity-70 mb-2 lg:mb-4">{dayName}</span>
-                                <DIcon className="w-8 h-8 lg:w-12 lg:h-12 mb-2 lg:mb-4" />
-                                <div className="text-lg lg:text-2xl font-bold">{max}°</div>
-                                <div className="text-sm lg:text-lg opacity-50">{min}°</div>
-                            </div>
-                        );
-                    })}
+            {mode === 'column' && (
+                <div className="w-full h-full flex flex-col p-6 overflow-hidden relative z-10">
+                    <div className="flex justify-between items-start mb-4">
+                        <div>
+                            <h2 className="text-2xl font-bold truncate max-w-[200px] drop-shadow-md">{data.location.name.split(',')[0]}</h2>
+                            <p className="text-sm opacity-90 drop-shadow-md">Hoy {timeString}</p>
+                        </div>
+                    </div>
+                    
+                    <div className="flex flex-col items-center justify-center mb-6">
+                        <Icon className="w-20 h-20 drop-shadow-lg mb-2" />
+                        <div className="text-6xl font-bold tracking-tighter drop-shadow-xl">
+                            {temp}<span className="text-2xl align-top opacity-80">{unitStr}</span>
+                        </div>
+                        <div className="text-base opacity-90 font-medium capitalize drop-shadow-md">{desc}</div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 mt-auto">
+                        {data.daily.time.slice(1, 5).map((time: string, idx: number) => {
+                            const max = Math.round(data.daily.temperature_2m_max[idx + 1]);
+                            const min = Math.round(data.daily.temperature_2m_min[idx + 1]);
+                            const dayName = new Date(time).toLocaleDateString('es-ES', { weekday: 'short' });
+                            const DIcon = getWeatherIcon(data.daily.weathercode[idx+1], true);
+                            return (
+                                <div key={time} className={cn("p-3 rounded-xl flex flex-col items-center", cardStyle)}>
+                                    <span className="text-xs font-semibold uppercase opacity-90 mb-1">{dayName}</span>
+                                    <DIcon className="w-6 h-6 mb-2" />
+                                    <div className="text-sm font-bold">{max}° <span className="opacity-70 font-normal">{min}°</span></div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 };
@@ -484,7 +609,7 @@ const getWeatherIcon = (code: number, isDay: boolean) => {
     if (code === 0) return isDay ? Sun : Moon;
     if (code >= 1 && code <= 3) return Cloud;
     if (code >= 51 && code <= 67) return CloudRain;
-    if (code >= 71 && code <= 82) return CloudRain; // Snow, fallback to rain
+    if (code >= 71 && code <= 82) return CloudRain;
     if (code >= 95) return CloudLightning;
     return Sun;
 };
