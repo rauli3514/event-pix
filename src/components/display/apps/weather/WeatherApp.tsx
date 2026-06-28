@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Cloud, CloudRain, CloudLightning, Sun, Search, MapPin, X, Wind, Droplets, Sunrise, Moon } from 'lucide-react';
+import { Cloud, CloudRain, CloudLightning, Sun, Search, MapPin, X, Wind, Droplets, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
