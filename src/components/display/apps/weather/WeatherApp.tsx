@@ -481,7 +481,7 @@ const WeatherCard = ({ data, unitStr, mode, theme }: { data: any, unitStr: strin
                             {data.daily.time.slice(1, 6).map((time: string, idx: number) => {
                                 const max = Math.round(data.daily.temperature_2m_max[idx + 1]);
                                 const dayName = new Date(time).toLocaleDateString('es-ES', { weekday: 'short' });
-                                const DIcon = getWeatherIcon(data.daily.weathercode[idx+1], true);
+                                const DIcon = getWeatherIcon((data.daily.weather_code || data.daily.weathercode)[idx+1], true);
                                 return (
                                     <div key={time} className={cn("flex-1 rounded-3xl p-2 lg:p-4 flex flex-col items-center justify-between", cardStyle)}>
                                         <span className="text-sm lg:text-lg font-medium capitalize">{dayName}</span>
@@ -523,7 +523,7 @@ const WeatherCard = ({ data, unitStr, mode, theme }: { data: any, unitStr: strin
                             const max = Math.round(data.daily.temperature_2m_max[idx]);
                             const min = Math.round(data.daily.temperature_2m_min[idx]);
                             const dayName = idx === 0 ? 'Hoy' : new Date(time).toLocaleDateString('es-ES', { weekday: 'short' });
-                            const DIcon = getWeatherIcon(data.daily.weathercode[idx], true);
+                            const DIcon = getWeatherIcon((data.daily.weather_code || data.daily.weathercode)[idx], true);
                             return (
                                 <div key={time} className="flex-1 flex flex-col items-center gap-2 lg:gap-4">
                                     <span className="text-base lg:text-2xl font-medium capitalize">{dayName}</span>
@@ -589,7 +589,7 @@ const WeatherCard = ({ data, unitStr, mode, theme }: { data: any, unitStr: strin
                             const max = Math.round(data.daily.temperature_2m_max[idx + 1]);
                             const min = Math.round(data.daily.temperature_2m_min[idx + 1]);
                             const dayName = new Date(time).toLocaleDateString('es-ES', { weekday: 'short' });
-                            const DIcon = getWeatherIcon(data.daily.weathercode[idx+1], true);
+                            const DIcon = getWeatherIcon((data.daily.weather_code || data.daily.weathercode)[idx+1], true);
                             return (
                                 <div key={time} className={cn("p-3 rounded-xl flex flex-col items-center", cardStyle)}>
                                     <span className="text-xs font-semibold uppercase opacity-90 mb-1">{dayName}</span>
