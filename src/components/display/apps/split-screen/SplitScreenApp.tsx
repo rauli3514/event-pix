@@ -22,6 +22,8 @@ export interface SplitZone {
     color?: string;
     mediaId?: string;
     mediaObj?: DisplayMedia; 
+    playlistId?: string;
+    playlistObj?: any;
 }
 
 export interface SplitScreenConfig {
@@ -225,7 +227,7 @@ export const SplitScreenForm = ({ config, onChange, commerceId, appName, setAppN
                                         <div>
                                             <div className="text-sm font-medium text-slate-200">{zone.name}</div>
                                             <div className="text-xs text-slate-500 mt-0.5">
-                                                {zone.mediaId ? 'Configurado' : 'Sin contenido'}
+                                                {zone.mediaId || zone.playlistId ? 'Configurado' : 'Sin contenido'}
                                             </div>
                                         </div>
                                     </div>
@@ -376,8 +378,13 @@ export const SplitScreenForm = ({ config, onChange, commerceId, appName, setAppN
                     isOpen={isPickerOpen}
                     onClose={() => setIsPickerOpen(false)}
                     commerceId={commerceId}
-                    onSelect={(media) => {
-                        const newZones = zones.map(z => z.id === selectedZoneId ? { ...z, mediaId: media.id, mediaObj: media } : z);
+                    onSelect={(item, type) => {
+                        let newZones = [...zones];
+                        if (type === 'playlist') {
+                            newZones = zones.map(z => z.id === selectedZoneId ? { ...z, playlistId: item.id, playlistObj: item, mediaId: undefined, mediaObj: undefined } : z);
+                        } else {
+                            newZones = zones.map(z => z.id === selectedZoneId ? { ...z, mediaId: item.id, mediaObj: item as DisplayMedia, playlistId: undefined, playlistObj: undefined } : z);
+                        }
                         onChange({ ...config, zones: newZones });
                         setIsPickerOpen(false);
                     }}
@@ -400,25 +407,43 @@ export const SplitScreenPreview = ({ config, onChange }: { config: Partial<Split
     // Hydrate zones with full media objects for runtime preview
     useEffect(() => {
         const hydrate = async () => {
-            const needsHydration = zones.some(z => z.mediaId && !z.mediaObj);
-            if (!needsHydration) {
+            const needsMediaHydration = zones.some(z => z.mediaId && !z.mediaObj);
+            const needsPlaylistHydration = zones.some(z => z.playlistId && !z.playlistObj);
+            
+            if (!needsMediaHydration && !needsPlaylistHydration) {
                 setHydratedZones(zones);
                 return;
             }
 
-            const mediaIds = zones.map(z => z.mediaId).filter(Boolean) as string[];
-            if (mediaIds.length === 0) return;
+            let updatedZones = [...zones];
 
-            const { data } = await supabase.from('display_media').select('*').in('id', mediaIds);
-            if (data) {
-                const updated = zones.map(z => {
-                    if (z.mediaId) {
-                        return { ...z, mediaObj: data.find(m => m.id === z.mediaId) };
+            if (needsMediaHydration) {
+                const mediaIds = updatedZones.map(z => z.mediaId).filter(Boolean) as string[];
+                if (mediaIds.length > 0) {
+                    const { data } = await supabase.from('display_media').select('*').in('id', mediaIds);
+                    if (data) {
+                        updatedZones = updatedZones.map(z => {
+                            if (z.mediaId) return { ...z, mediaObj: data.find(m => m.id === z.mediaId) };
+                            return z;
+                        });
                     }
-                    return z;
-                });
-                setHydratedZones(updated);
+                }
             }
+
+            if (needsPlaylistHydration) {
+                const playlistIds = updatedZones.map(z => z.playlistId).filter(Boolean) as string[];
+                if (playlistIds.length > 0) {
+                    const { data } = await supabase.from('display_campaigns').select('*').in('id', playlistIds);
+                    if (data) {
+                        updatedZones = updatedZones.map(z => {
+                            if (z.playlistId) return { ...z, playlistObj: data.find(p => p.id === z.playlistId) };
+                            return z;
+                        });
+                    }
+                }
+            }
+            
+            setHydratedZones(updatedZones);
         };
         hydrate();
     }, [zones]);
@@ -493,7 +518,9 @@ export const SplitScreenPreview = ({ config, onChange }: { config: Partial<Split
                                 }
                             }}
                         >
-                            {zone.mediaObj ? (
+                            {zone.playlistObj ? (
+                                <NestedPlaylistRunner playlist={zone.playlistObj} />
+                            ) : zone.mediaObj ? (
                                 <ZoneRenderer media={zone.mediaObj} />
                             ) : (
                                 <div className="text-white/80 text-center flex flex-col items-center p-4 pointer-events-none select-none">
@@ -550,6 +577,38 @@ export const SplitScreenPreview = ({ config, onChange }: { config: Partial<Split
             </div>
         </div>
     );
+};
+
+const NestedPlaylistRunner = ({ playlist }: { playlist: any }) => {
+    const items = playlist.items_json || [];
+    const [currentIndex, setCurrentIndex] = useState(0);
+
+    useEffect(() => {
+        if (!items || items.length <= 1) return;
+        const currentItem = items[currentIndex];
+        const durationMs = (currentItem.duration || 10) * 1000;
+        
+        const timer = setTimeout(() => {
+            setCurrentIndex((prev) => (prev + 1) % items.length);
+        }, durationMs);
+        return () => clearTimeout(timer);
+    }, [currentIndex, items]);
+
+    if (!items || items.length === 0) return null;
+
+    const currentItem = items[currentIndex];
+    const fakeMedia: DisplayMedia = {
+        id: currentItem.id,
+        name: currentItem.content || '',
+        type: currentItem.type === 'url' ? 'web' : (currentItem.type || 'image'),
+        url: currentItem.url || '',
+        metadata: currentItem.metadata || {},
+        folder_path: '',
+        commerce_id: '',
+        created_at: ''
+    };
+
+    return <ZoneRenderer media={fakeMedia} />;
 };
 
 const ZoneRenderer = ({ media }: { media: DisplayMedia }) => {
