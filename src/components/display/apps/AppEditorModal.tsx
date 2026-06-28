@@ -31,14 +31,14 @@ export const AppEditorModal = ({ isOpen, onClose, onBack, appId, commerceId, cur
     const renderForm = () => {
         switch (appId) {
             case 'weather':
-                return <WeatherForm config={appConfig} onChange={setAppConfig} appName={appName} setAppName={setAppName} />;
+                return <WeatherForm config={appConfig} onChange={setAppConfig} />;
             case 'split-screen':
                 return <SplitScreenForm config={appConfig} onChange={setAppConfig} commerceId={commerceId} appName={appName} setAppName={setAppName} />;
             case 'dolar':
-                return <DolarForm config={appConfig} onChange={setAppConfig} appName={appName} setAppName={setAppName} />;
+                return <DolarForm config={appConfig} onChange={setAppConfig} />;
             /*
             case 'ticker':
-                return <TickerForm config={appConfig} onChange={setAppConfig} appName={appName} setAppName={setAppName} />;
+                return <TickerForm config={appConfig} onChange={setAppConfig} />;
             */
             default:
                 return <div className="text-slate-500 p-4">App form not implemented yet.</div>;
