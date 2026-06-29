@@ -123,16 +123,18 @@ export const TickerPreview = ({ config }: { config: Partial<TickerConfig>, conta
     const [newsItems, setNewsItems] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
-    const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+    const [sizeType, setSizeType] = useState<'small' | 'normal' | 'large'>('normal');
 
     useEffect(() => {
         if (!containerRef.current) return;
         const observer = new ResizeObserver(entries => {
             for (let entry of entries) {
-                setDimensions({
-                    width: entry.contentRect.width,
-                    height: entry.contentRect.height
-                });
+                const height = entry.contentRect.height;
+                let newSize: 'small' | 'normal' | 'large' = 'normal';
+                if (height > 0 && height < 80) newSize = 'small';
+                else if (height > 150) newSize = 'large';
+                
+                setSizeType(prev => prev !== newSize ? newSize : prev);
             }
         });
         observer.observe(containerRef.current);
@@ -159,7 +161,8 @@ export const TickerPreview = ({ config }: { config: Partial<TickerConfig>, conta
                 const data = await res.json();
                 
                 if (data.status === 'ok') {
-                    const titles = data.items.map((item: any) => item.title);
+                    // Limit items to 12 to avoid massive DOM trees that hurt performance
+                    const titles = data.items.slice(0, 12).map((item: any) => item.title);
                     setNewsItems(titles);
                 } else {
                     setNewsItems(['Error al cargar las noticias.']);
@@ -179,9 +182,6 @@ export const TickerPreview = ({ config }: { config: Partial<TickerConfig>, conta
 
     const speed = config.speed || 'normal';
     const theme = config.theme || 'dark';
-    
-    // JS based responsiveness
-    const actualHeight = dimensions.height || 100;
     
     let duration = 30; // seconds
     if (speed === 'slow') duration = 50;
@@ -212,8 +212,8 @@ export const TickerPreview = ({ config }: { config: Partial<TickerConfig>, conta
     }
 
     // Dynamic sizing based on height
-    const isSmall = actualHeight < 80;
-    const isLarge = actualHeight > 150;
+    const isSmall = sizeType === 'small';
+    const isLarge = sizeType === 'large';
 
     return (
         <div ref={containerRef} className={cn("w-full h-full flex items-center overflow-hidden whitespace-nowrap transition-colors duration-500 relative", bgClass)}>
