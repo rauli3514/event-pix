@@ -154,18 +154,34 @@ export const TickerPreview = ({ config }: { config: Partial<TickerConfig>, conta
             setLoading(true);
             try {
                 const rssUrl = config.rssUrl || PREDEFINED_RSS[0].url;
-                // Use rss2json API to easily convert XML RSS to JSON
-                const apiEndpoint = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
                 
-                const res = await fetch(apiEndpoint);
-                const data = await res.json();
+                // Using corsproxy.io to bypass CORS, then parsing the raw XML
+                // This is much more reliable than rss2json free tier which fails on non-cached feeds.
+                const proxyUrl = `https://corsproxy.io/?url=${encodeURIComponent(rssUrl)}`;
                 
-                if (data.status === 'ok') {
-                    // Limit items to 12 to avoid massive DOM trees that hurt performance
-                    const titles = data.items.slice(0, 12).map((item: any) => item.title);
-                    setNewsItems(titles);
+                const res = await fetch(proxyUrl);
+                if (!res.ok) throw new Error('Failed to fetch RSS');
+                
+                const text = await res.text();
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(text, "text/xml");
+                
+                // Find all <item> tags
+                const items = Array.from(xmlDoc.querySelectorAll("item"));
+                
+                if (items.length > 0) {
+                    const titles = items
+                        .slice(0, 12) // limit to 12
+                        .map(item => item.querySelector("title")?.textContent || '')
+                        .filter(title => title.trim().length > 0);
+                        
+                    if (titles.length > 0) {
+                        setNewsItems(titles);
+                    } else {
+                        setNewsItems(['No se encontraron noticias válidas.']);
+                    }
                 } else {
-                    setNewsItems(['Error al cargar las noticias.']);
+                    setNewsItems(['El formato RSS no es válido.']);
                 }
             } catch (error) {
                 console.error("RSS Fetch Error", error);
