@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { CloudRain, LayoutTemplate, Type, DollarSign, X } from 'lucide-react';
+import { CloudRain, LayoutTemplate, Type, DollarSign, X, Clock, QrCode, Star } from 'lucide-react';
 import { AppEditorModal } from './AppEditorModal';
 
 interface AppCatalogModalProps {
@@ -11,7 +11,7 @@ interface AppCatalogModalProps {
     currentFolder: string;
 }
 
-export type AppId = 'weather' | 'split-screen' | 'ticker' | 'dolar';
+export type AppId = 'weather' | 'split-screen' | 'ticker' | 'dolar' | 'clock' | 'qr' | 'reviews';
 
 export const APPS = [
     {
@@ -45,6 +45,30 @@ export const APPS = [
         icon: DollarSign,
         color: 'text-green-400',
         bg: 'bg-green-400/10'
+    },
+    {
+        id: 'clock' as AppId,
+        name: 'Reloj y Fecha',
+        description: 'Un reloj elegante a pantalla completa, analógico o digital.',
+        icon: Clock,
+        color: 'text-blue-400',
+        bg: 'bg-blue-400/10'
+    },
+    {
+        id: 'qr' as AppId,
+        name: 'Código QR',
+        description: 'Genera un código QR gigante para links, menú, o WiFi.',
+        icon: QrCode,
+        color: 'text-purple-400',
+        bg: 'bg-purple-400/10'
+    },
+    {
+        id: 'reviews' as AppId,
+        name: 'Reseñas',
+        description: 'Carrusel con opiniones de clientes y calificaciones.',
+        icon: Star,
+        color: 'text-yellow-400',
+        bg: 'bg-yellow-400/10'
     }
 ];
 

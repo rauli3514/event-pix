@@ -13,6 +13,9 @@ import { WeatherForm, WeatherPreview } from './weather/WeatherApp';
 import { SplitScreenForm, SplitScreenPreview } from './split-screen/SplitScreenApp';
 import { DolarForm, DolarPreview } from './dolar/DolarApp';
 import { TickerForm, TickerPreview } from './ticker/TickerApp';
+import { ClockForm, ClockPreview } from './clock/ClockApp';
+import { QRForm, QRPreview } from './qr/QRApp';
+import { ReviewsForm, ReviewsPreview } from './reviews/ReviewsApp';
 
 interface AppEditorModalProps {
     isOpen: boolean;
@@ -41,31 +44,27 @@ export const AppEditorModal = ({ isOpen, onClose, onBack, appId, commerceId, cur
     // Dynamically select the Form and Preview components based on appId
     const renderForm = () => {
         switch (appId) {
-            case 'weather':
-                return <WeatherForm config={appConfig} onChange={setAppConfig} />;
-            case 'split-screen':
-                return <SplitScreenForm config={appConfig} onChange={setAppConfig} commerceId={commerceId} appName={appName} setAppName={setAppName} />;
-            case 'dolar':
-                return <DolarForm config={appConfig} onChange={setAppConfig} />;
-            case 'ticker':
-                return <TickerForm config={appConfig} onChange={setAppConfig} />;
-            default:
-                return <div className="text-slate-500 p-4">App form not implemented yet.</div>;
+            case 'weather': return <WeatherForm config={appConfig} onChange={setAppConfig} />;
+            case 'split-screen': return <SplitScreenForm config={appConfig} onChange={setAppConfig} commerceId={commerceId} appName={appName} setAppName={setAppName} />;
+            case 'dolar': return <DolarForm config={appConfig} onChange={setAppConfig} />;
+            case 'ticker': return <TickerForm config={appConfig} onChange={setAppConfig} />;
+            case 'clock': return <ClockForm config={appConfig} onChange={setAppConfig} />;
+            case 'qr': return <QRForm config={appConfig} onChange={setAppConfig} />;
+            case 'reviews': return <ReviewsForm config={appConfig} onChange={setAppConfig} />;
+            default: return <div className="text-slate-500 p-4">App form not implemented yet.</div>;
         }
     };
 
     const renderPreview = () => {
         switch (appId) {
-            case 'weather':
-                return <WeatherPreview config={appConfig} />;
-            case 'split-screen':
-                return <SplitScreenPreview config={appConfig} />;
-            case 'dolar':
-                return <DolarPreview config={appConfig} />;
-            case 'ticker':
-                return <TickerPreview config={appConfig} />;
-            default:
-                return <div className="text-slate-500 flex items-center justify-center h-full">App preview not implemented yet.</div>;
+            case 'weather': return <WeatherPreview config={appConfig} />;
+            case 'split-screen': return <SplitScreenPreview config={appConfig} />;
+            case 'dolar': return <DolarPreview config={appConfig} />;
+            case 'ticker': return <TickerPreview config={appConfig} />;
+            case 'clock': return <ClockPreview config={appConfig} />;
+            case 'qr': return <QRPreview config={appConfig} />;
+            case 'reviews': return <ReviewsPreview config={appConfig} />;
+            default: return <div className="text-slate-500 flex items-center justify-center h-full">App preview not implemented yet.</div>;
         }
     };
 

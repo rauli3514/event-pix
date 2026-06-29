@@ -3,6 +3,9 @@ import { WeatherPreview } from './apps/weather/WeatherApp';
 import { SplitScreenPreview } from './apps/split-screen/SplitScreenApp';
 import { DolarPreview } from './apps/dolar/DolarApp';
 import { TickerPreview } from './apps/ticker/TickerApp';
+import { ClockPreview } from './apps/clock/ClockApp';
+import { QRPreview } from './apps/qr/QRApp';
+import { ReviewsPreview } from './apps/reviews/ReviewsApp';
 
 interface PlayerRendererProps {
     item: any; // Using any to support both CampaignItem (V1) and UniversalElement (V2)
@@ -72,6 +75,12 @@ export const PlayerRenderer = ({ item, isActive }: PlayerRendererProps) => {
                             <DolarPreview config={metadata.config || {}} />
                         ) : appId === 'ticker' ? (
                             <TickerPreview config={metadata.config || {}} />
+                        ) : appId === 'clock' ? (
+                            <ClockPreview config={metadata.config || {}} />
+                        ) : appId === 'qr' ? (
+                            <QRPreview config={metadata.config || {}} />
+                        ) : appId === 'reviews' ? (
+                            <ReviewsPreview config={metadata.config || {}} />
                         ) : (
                             <div className="w-full h-full flex items-center justify-center text-white bg-slate-900 flex-col gap-4">
                                 <span className="text-2xl font-bold">App: {appId}</span>

@@ -10,6 +10,9 @@ import { MediaPickerModal } from '../../MediaPickerModal';
 import { WeatherPreview } from '../weather/WeatherApp';
 import { DolarPreview } from '../dolar/DolarApp';
 import { TickerPreview } from '../ticker/TickerApp';
+import { ClockPreview } from '../clock/ClockApp';
+import { QRPreview } from '../qr/QRApp';
+import { ReviewsPreview } from '../reviews/ReviewsApp';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -643,6 +646,15 @@ const ZoneRenderer = ({ media }: { media: DisplayMedia }) => {
         }
         if (media.metadata?.appId === 'ticker') {
             return <TickerPreview config={media.metadata.config || {}} containerWidth={undefined} />;
+        }
+        if (media.metadata?.appId === 'clock') {
+            return <ClockPreview config={media.metadata.config || {}} />;
+        }
+        if (media.metadata?.appId === 'qr') {
+            return <QRPreview config={media.metadata.config || {}} />;
+        }
+        if (media.metadata?.appId === 'reviews') {
+            return <ReviewsPreview config={media.metadata.config || {}} />;
         }
         return <div className="text-white w-full h-full flex items-center justify-center pointer-events-none">App: {media.metadata?.appId}</div>;
     }
