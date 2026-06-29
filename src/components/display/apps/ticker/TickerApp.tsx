@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Newspaper, Info, FastForward, Play, Type } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/lib/supabase';
 
 export interface TickerConfig {
     sourceType: 'custom' | 'rss';
@@ -155,14 +156,14 @@ export const TickerPreview = ({ config }: { config: Partial<TickerConfig>, conta
             try {
                 const rssUrl = config.rssUrl || PREDEFINED_RSS[0].url;
                 
-                // Using corsproxy.io to bypass CORS, then parsing the raw XML
-                // This is much more reliable than rss2json free tier which fails on non-cached feeds.
-                const proxyUrl = `https://corsproxy.io/?url=${encodeURIComponent(rssUrl)}`;
+                // Using our own Supabase Edge Function to bypass CORS and Cloudflare blocks
+                const { data, error } = await supabase.functions.invoke('fetch-rss', {
+                    body: { url: rssUrl }
+                });
                 
-                const res = await fetch(proxyUrl);
-                if (!res.ok) throw new Error('Failed to fetch RSS');
+                if (error || !data || !data.xml) throw new Error('Failed to fetch RSS via Edge Function');
                 
-                const text = await res.text();
+                const text = data.xml;
                 const parser = new DOMParser();
                 const xmlDoc = parser.parseFromString(text, "text/xml");
                 
