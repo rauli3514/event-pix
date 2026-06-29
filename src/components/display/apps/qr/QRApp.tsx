@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useLayoutEffect, useRef } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -105,7 +105,7 @@ export const QRPreview = ({ config, containerWidth: extContainerWidth }: { confi
     const containerRef = useRef<HTMLDivElement>(null);
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (!containerRef.current) return;
         let timeoutId: any;
         const observer = new ResizeObserver(entries => {
@@ -144,8 +144,8 @@ export const QRPreview = ({ config, containerWidth: extContainerWidth }: { confi
         }
     };
 
-    const width = extContainerWidth || dimensions.width;
-    const height = dimensions.height || width;
+    const width = extContainerWidth || dimensions.width || 100;
+    const height = dimensions.height || 100;
     const minDimension = Math.min(width, height);
     
     const isSmall = minDimension > 0 && minDimension < 350;

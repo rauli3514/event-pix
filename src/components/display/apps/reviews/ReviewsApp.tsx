@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -171,7 +171,7 @@ export const ReviewsPreview = ({ config, containerWidth: extContainerWidth }: { 
         { id: '3', author: 'Ana Martínez', text: 'Hermoso ambiente y excelente servicio. Sin dudas volveremos muy pronto.', rating: 4 }
     ];
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (!containerRef.current) return;
         let timeoutId: any;
         const observer = new ResizeObserver(entries => {
@@ -217,8 +217,8 @@ export const ReviewsPreview = ({ config, containerWidth: extContainerWidth }: { 
         }
     };
 
-    const width = extContainerWidth || dimensions.width;
-    const height = dimensions.height || width;
+    const width = extContainerWidth || dimensions.width || 100;
+    const height = dimensions.height || 100;
     const minDimension = Math.min(width, height);
     
     const isSmall = minDimension > 0 && minDimension < 400;

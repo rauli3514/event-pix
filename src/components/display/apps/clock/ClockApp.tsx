@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
@@ -92,7 +92,7 @@ export const ClockPreview = ({ config, containerWidth: extContainerWidth }: { co
         return () => clearInterval(interval);
     }, []);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (!containerRef.current) return;
         let timeoutId: any;
         const observer = new ResizeObserver(entries => {
@@ -129,13 +129,18 @@ export const ClockPreview = ({ config, containerWidth: extContainerWidth }: { co
         }
     };
 
-    const width = extContainerWidth || dimensions.width;
-    const height = dimensions.height || width;
-    const minDimension = Math.min(width, height);
+    const width = extContainerWidth || dimensions.width || 100;
+    const height = dimensions.height || 100;
     
-    const isSmall = minDimension > 0 && minDimension < 300;
-    const isMedium = minDimension >= 300 && minDimension < 600;
-
+    // Cálculos precisos y fluidos para que NUNCA desborde el contenedor
+    const analogSize = Math.max(30, Math.min(width, height) * 0.8);
+    const digitalFontSize = Math.max(16, Math.min(height * 0.5, width * 0.2, 200));
+    const secFontSize = digitalFontSize * 0.4;
+    const ampmFontSize = digitalFontSize * 0.3;
+    const dateFontSize = Math.max(12, Math.min(height * 0.15, width * 0.05, 40));
+    
+    const isTinyHeight = height < 150;
+    
     // Digital formatting
     const hours = format24h ? time.getHours().toString().padStart(2, '0') : (time.getHours() % 12 || 12).toString();
     const minutes = time.getMinutes().toString().padStart(2, '0');
@@ -151,7 +156,7 @@ export const ClockPreview = ({ config, containerWidth: extContainerWidth }: { co
     const hourDegrees = ((time.getHours() / 12) * 360) + ((time.getMinutes()/60)*30) + 90;
 
     return (
-        <div ref={containerRef} className={cn("w-full h-full flex flex-col items-center justify-center p-8 transition-all overflow-hidden relative", getThemeStyles())}>
+        <div ref={containerRef} className={cn("w-full h-full flex flex-col items-center justify-center transition-all overflow-hidden relative", isTinyHeight ? 'p-2' : 'p-8', getThemeStyles())}>
             
             {theme === 'glass' && (
                 <>
@@ -160,28 +165,28 @@ export const ClockPreview = ({ config, containerWidth: extContainerWidth }: { co
                 </>
             )}
 
-            <div className="relative z-10 flex flex-col items-center justify-center w-full h-full gap-4">
+            <div className="relative z-10 flex flex-col items-center justify-center w-full h-full gap-2 lg:gap-4">
                 
                 {type === 'digital' ? (
                     <div className="flex flex-col items-center justify-center">
                         <div className={cn(
-                            "font-bold tabular-nums tracking-tighter leading-none flex items-baseline gap-2",
+                            "font-bold tabular-nums tracking-tighter leading-none flex items-baseline gap-1 lg:gap-2",
                             theme === 'neon' ? 'font-mono' : 'font-sans'
                         )}
-                        style={{ fontSize: isSmall ? '4rem' : isMedium ? '8rem' : '12rem' }}
+                        style={{ fontSize: `${digitalFontSize}px` }}
                         >
                             {hours}:{minutes}
-                            <div className="flex flex-col items-start justify-end pb-2 lg:pb-6 gap-2">
+                            <div className="flex flex-col items-start justify-end gap-1" style={{ paddingBottom: `${digitalFontSize * 0.1}px` }}>
                                 <span className={cn(
                                     "font-medium tabular-nums leading-none text-opacity-80",
                                     theme === 'neon' ? 'text-cyan-600' : 'text-slate-400'
                                 )}
-                                style={{ fontSize: isSmall ? '1.5rem' : isMedium ? '2.5rem' : '4rem' }}
+                                style={{ fontSize: `${secFontSize}px` }}
                                 >
                                     {seconds}
                                 </span>
                                 {!format24h && (
-                                    <span className="text-xl lg:text-3xl font-medium opacity-80 leading-none">
+                                    <span className="font-medium opacity-80 leading-none" style={{ fontSize: `${ampmFontSize}px` }}>
                                         {ampm}
                                     </span>
                                 )}
@@ -197,21 +202,21 @@ export const ClockPreview = ({ config, containerWidth: extContainerWidth }: { co
                         'bg-slate-900 border-slate-700'
                     )}
                     style={{ 
-                        width: isSmall ? '150px' : isMedium ? '300px' : '500px',
-                        height: isSmall ? '150px' : isMedium ? '300px' : '500px' 
+                        width: `${analogSize}px`,
+                        height: `${analogSize}px` 
                     }}>
                         {/* Clock Center */}
                         <div className={cn(
                             "absolute z-50 rounded-full",
                             theme === 'neon' ? 'bg-cyan-400 shadow-[0_0_10px_cyan]' : 'bg-red-500'
                         )}
-                        style={{ width: isSmall ? '8px' : '16px', height: isSmall ? '8px' : '16px' }} />
+                        style={{ width: `${analogSize * 0.04}px`, height: `${analogSize * 0.04}px` }} />
 
                         {/* Hour Hand */}
                         <div className="absolute top-1/2 left-1/2 origin-left z-20 rounded-full"
                              style={{
                                  width: '25%',
-                                 height: isSmall ? '4px' : '8px',
+                                 height: `${Math.max(2, analogSize * 0.015)}px`,
                                  transform: `translateY(-50%) rotate(${hourDegrees}deg)`,
                                  backgroundColor: theme === 'neon' ? '#22d3ee' : theme === 'light' ? '#0f172a' : '#fff'
                              }} />
@@ -220,7 +225,7 @@ export const ClockPreview = ({ config, containerWidth: extContainerWidth }: { co
                         <div className="absolute top-1/2 left-1/2 origin-left z-30 rounded-full"
                              style={{
                                  width: '38%',
-                                 height: isSmall ? '3px' : '6px',
+                                 height: `${Math.max(1.5, analogSize * 0.01)}px`,
                                  transform: `translateY(-50%) rotate(${minDegrees}deg)`,
                                  backgroundColor: theme === 'neon' ? '#67e8f9' : theme === 'light' ? '#475569' : '#cbd5e1'
                              }} />
@@ -229,31 +234,38 @@ export const ClockPreview = ({ config, containerWidth: extContainerWidth }: { co
                         <div className="absolute top-1/2 left-1/2 origin-left z-40 rounded-full"
                              style={{
                                  width: '42%',
-                                 height: isSmall ? '1px' : '2px',
+                                 height: `${Math.max(1, analogSize * 0.005)}px`,
                                  transform: `translateY(-50%) rotate(${secDegrees}deg)`,
                                  backgroundColor: theme === 'neon' ? '#cffafe' : '#ef4444'
                              }} />
 
                         {/* Clock Markers */}
-                        {[...Array(12)].map((_, i) => (
-                            <div key={i} className="absolute w-full h-full" style={{ transform: `rotate(${i * 30}deg)` }}>
-                                <div className={cn(
-                                    "mx-auto mt-2",
-                                    i % 3 === 0 ? (isSmall ? 'h-3 w-1' : 'h-6 w-2') : (isSmall ? 'h-1.5 w-0.5' : 'h-3 w-1'),
-                                    theme === 'neon' ? 'bg-cyan-800' : theme === 'light' ? 'bg-slate-300' : 'bg-white/30'
-                                )} />
-                            </div>
-                        ))}
+                        {[...Array(12)].map((_, i) => {
+                            const isMajor = i % 3 === 0;
+                            return (
+                                <div key={i} className="absolute w-full h-full" style={{ transform: `rotate(${i * 30}deg)` }}>
+                                    <div className={cn(
+                                        "mx-auto mt-2 rounded-full",
+                                        theme === 'neon' ? 'bg-cyan-800' : theme === 'light' ? 'bg-slate-300' : 'bg-white/30'
+                                    )} 
+                                    style={{
+                                        width: `${Math.max(1, analogSize * (isMajor ? 0.015 : 0.005))}px`,
+                                        height: `${analogSize * (isMajor ? 0.05 : 0.02)}px`,
+                                        marginTop: `${analogSize * 0.02}px`
+                                    }}/>
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
 
                 {showDate && (
                     <div className={cn(
-                        "font-medium capitalize mt-4 transition-all",
+                        "font-medium capitalize transition-all",
                         theme === 'glass' ? 'text-white/80' : 
                         theme === 'neon' ? 'text-cyan-600' : 'opacity-70'
                     )}
-                    style={{ fontSize: isSmall ? '1rem' : isMedium ? '1.5rem' : '2.5rem' }}
+                    style={{ fontSize: `${dateFontSize}px` }}
                     >
                         {dateStr}
                     </div>
