@@ -58,20 +58,24 @@ export const TickerForm = ({ config, onChange }: TickerFormProps) => {
                 </div>
             ) : (
                 <div className="space-y-3">
-                    <Label className="text-slate-300">Canal RSS de Noticias</Label>
-                    <Select 
-                        value={config.rssUrl || PREDEFINED_RSS[0].url} 
-                        onValueChange={(val) => onChange({ ...config, rssUrl: val })}
-                    >
-                        <SelectTrigger className="bg-slate-950 border-slate-800 text-slate-200">
-                            <SelectValue placeholder="Selecciona un canal de noticias" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-slate-900 border-slate-800 text-slate-200">
-                            {PREDEFINED_RSS.map((rss) => (
-                                <SelectItem key={rss.url} value={rss.url}>{rss.name}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    <Label className="text-slate-300">URL del Canal RSS</Label>
+                    <Input 
+                        value={config.rssUrl || ''} 
+                        onChange={(e) => onChange({ ...config, rssUrl: e.target.value })}
+                        placeholder="Ej: https://www.infobae.com/argentina-rss.xml"
+                        className="bg-slate-950 border-slate-800 text-slate-200"
+                    />
+                    <div className="flex flex-wrap gap-2 pt-1">
+                        {PREDEFINED_RSS.map((rss) => (
+                            <button
+                                key={rss.url}
+                                onClick={() => onChange({ ...config, rssUrl: rss.url })}
+                                className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded transition-colors"
+                            >
+                                {rss.name}
+                            </button>
+                        ))}
+                    </div>
                 </div>
             )}
 
