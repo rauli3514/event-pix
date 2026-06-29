@@ -218,8 +218,11 @@ export const ReviewsPreview = ({ config, containerWidth: extContainerWidth }: { 
     };
 
     const width = extContainerWidth || dimensions.width;
-    const isSmall = width > 0 && width < 400;
-    const isMedium = width >= 400 && width < 700;
+    const height = dimensions.height || width;
+    const minDimension = Math.min(width, height);
+    
+    const isSmall = minDimension > 0 && minDimension < 400;
+    const isMedium = minDimension >= 400 && minDimension < 700;
 
     const currentReview = reviews[currentIndex];
 

@@ -130,8 +130,11 @@ export const ClockPreview = ({ config, containerWidth: extContainerWidth }: { co
     };
 
     const width = extContainerWidth || dimensions.width;
-    const isSmall = width > 0 && width < 300;
-    const isMedium = width >= 300 && width < 600;
+    const height = dimensions.height || width;
+    const minDimension = Math.min(width, height);
+    
+    const isSmall = minDimension > 0 && minDimension < 300;
+    const isMedium = minDimension >= 300 && minDimension < 600;
 
     // Digital formatting
     const hours = format24h ? time.getHours().toString().padStart(2, '0') : (time.getHours() % 12 || 12).toString();

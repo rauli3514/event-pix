@@ -145,8 +145,11 @@ export const QRPreview = ({ config, containerWidth: extContainerWidth }: { confi
     };
 
     const width = extContainerWidth || dimensions.width;
-    const isSmall = width > 0 && width < 350;
-    const isMedium = width >= 350 && width < 700;
+    const height = dimensions.height || width;
+    const minDimension = Math.min(width, height);
+    
+    const isSmall = minDimension > 0 && minDimension < 350;
+    const isMedium = minDimension >= 350 && minDimension < 700;
 
     const qrSize = isSmall ? 150 : isMedium ? 250 : 400;
 
