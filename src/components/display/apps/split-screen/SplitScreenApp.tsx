@@ -490,12 +490,15 @@ export const SplitScreenPreview = ({ config, onChange }: { config: Partial<Split
     }, [dragState, zones, config, onChange]);
 
     return (
-        <div className="w-full h-full flex items-center justify-center bg-[#050810] p-4">
+        <div className={cn("w-full h-full flex items-center justify-center bg-[#050810]", onChange ? "p-4" : "")}>
             <div 
                 ref={containerRef}
                 className={cn(
-                    "relative bg-black overflow-hidden shadow-2xl rounded-sm ring-1 ring-slate-800 transition-all duration-300",
-                    orientation === 'landscape' ? "w-full aspect-video" : "h-full aspect-[9/16]"
+                    "relative bg-black overflow-hidden shadow-2xl transition-all duration-300",
+                    onChange ? "rounded-sm ring-1 ring-slate-800" : "", // only rounded/ring in editor
+                    !onChange 
+                        ? "w-full h-full" // Full screen in player mode
+                        : (orientation === 'landscape' ? "w-full aspect-video" : "h-full aspect-[9/16]")
                 )}
                 onClick={() => setSelectedZoneId(null)}
             >
