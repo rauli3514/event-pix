@@ -57,6 +57,7 @@
     "react-qr-code": "^2.0.18",
     "react-router-dom": "^7.9.6",
     "recharts": "^3.5.1",
+    "resize-observer-polyfill": "^1.5.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
     "vite-plugin-pwa": "^1.2.0",

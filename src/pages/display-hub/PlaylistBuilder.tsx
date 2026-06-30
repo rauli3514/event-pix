@@ -260,10 +260,10 @@ const PlaylistBuilder = () => {
                 </div>
             </header>
 
-            <div className="flex-1 flex overflow-hidden">
+            <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
                 
                 {/* LEFT COLUMN: Folders & Playlists */}
-                <div className="w-64 bg-slate-900/50 border-r border-slate-800 flex flex-col hidden md:flex shrink-0">
+                <div className="w-64 bg-slate-900/50 border-r border-slate-800 hidden xl:flex flex-col shrink-0">
                     <div className="p-4 border-b border-slate-800/50">
                         <Button className="w-full bg-slate-800 hover:bg-slate-700 text-white justify-start" asChild>
                             <Link to={`/admin/display/commerce/${commerceId}/workspace/playlists`}><LayoutDashboard className="w-4 h-4 mr-2"/> Ir a Playlists</Link>
@@ -285,39 +285,39 @@ const PlaylistBuilder = () => {
 
                 {/* CENTER COLUMN: The Blackboard (Pizarra) */}
                 <div className="flex-1 bg-black flex flex-col overflow-y-auto">
-                    <div className="p-8 max-w-4xl mx-auto w-full">
+                    <div className="p-4 md:p-8 max-w-4xl mx-auto w-full">
                         
-                        <div className="flex items-center justify-between mb-6">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
                             <div>
                                 <h2 className="text-xl font-bold text-white">Contenido de la Playlist</h2>
-                                <p className="text-sm text-slate-400">Arrastra o haz clic en los medios de la derecha para agregarlos aquí.</p>
+                                <p className="text-sm text-slate-400">Arrastra o haz clic en los medios para agregarlos aquí.</p>
                             </div>
-                            <div className="bg-slate-900 border border-slate-800 rounded-lg px-4 py-2 flex items-center gap-4 text-sm font-medium text-slate-300">
-                                <div className="flex items-center gap-1.5"><LayoutDashboard className="w-4 h-4 text-indigo-400"/> {activePlaylist.length} items</div>
-                                <div className="flex items-center gap-1.5"><Clock className="w-4 h-4 text-indigo-400"/> {totalDuration}s total</div>
+                            <div className="bg-slate-900 border border-slate-800 rounded-lg px-4 py-2 flex items-center gap-4 text-sm font-medium text-slate-300 w-full sm:w-auto overflow-x-auto">
+                                <div className="flex items-center gap-1.5 whitespace-nowrap"><LayoutDashboard className="w-4 h-4 text-indigo-400 shrink-0"/> {activePlaylist.length} items</div>
+                                <div className="flex items-center gap-1.5 whitespace-nowrap"><Clock className="w-4 h-4 text-indigo-400 shrink-0"/> {totalDuration}s total</div>
                             </div>
                         </div>
 
                         {activePlaylist.length === 0 ? (
-                            <div className="bg-slate-900/30 border-2 border-dashed border-slate-700 rounded-2xl p-16 text-center flex flex-col items-center justify-center">
+                            <div className="bg-slate-900/30 border-2 border-dashed border-slate-700 rounded-2xl p-8 md:p-16 text-center flex flex-col items-center justify-center">
                                 <div className="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mb-4">
                                     <ImageIcon className="w-8 h-8 text-slate-500" />
                                 </div>
                                 <h3 className="text-lg font-bold text-slate-300">La playlist está vacía</h3>
-                                <p className="text-slate-500 max-w-sm mt-2">Haz clic en cualquier imagen o video del panel derecho para agregarlo inmediatamente a esta playlist.</p>
+                                <p className="text-slate-500 max-w-sm mt-2 text-sm md:text-base">Haz clic en cualquier imagen o video para agregarlo inmediatamente a esta playlist.</p>
                             </div>
                         ) : (
                             <div className="space-y-3">
                                 {activePlaylist.map((item) => {
                                     const TypeIcon = getIconForType(item.type);
                                     return (
-                                        <div key={item.id} className="bg-slate-900 border border-slate-800 rounded-xl shadow-sm flex items-stretch group hover:border-indigo-500/50 transition-colors">
-                                            <div className="w-10 bg-slate-950/50 border-r border-slate-800 flex items-center justify-center cursor-grab text-slate-500 group-hover:text-slate-300 rounded-l-xl">
+                                        <div key={item.id} className="bg-slate-900 border border-slate-800 rounded-xl shadow-sm flex flex-col sm:flex-row items-stretch group hover:border-indigo-500/50 transition-colors overflow-hidden">
+                                            <div className="hidden sm:flex w-10 bg-slate-950/50 border-r border-slate-800 items-center justify-center cursor-grab text-slate-500 group-hover:text-slate-300">
                                                 <GripVertical className="w-4 h-4" />
                                             </div>
                                             
-                                            <div className="p-4 flex-1 flex items-center gap-4">
-                                                <div className="w-16 h-16 bg-slate-950 rounded-lg overflow-hidden flex items-center justify-center shrink-0 border border-slate-800">
+                                            <div className="p-3 md:p-4 flex-1 flex items-center gap-3 md:gap-4 overflow-hidden">
+                                                <div className="w-14 h-14 md:w-16 md:h-16 bg-slate-950 rounded-lg overflow-hidden flex items-center justify-center shrink-0 border border-slate-800">
                                                     {item.type === 'image' && item.url ? (
                                                         <img src={item.url} alt="thumb" className="w-full h-full object-cover" />
                                                     ) : (
@@ -325,11 +325,11 @@ const PlaylistBuilder = () => {
                                                     )}
                                                 </div>
                                                 
-                                                <div className="flex-1 min-w-0">
-                                                    <h4 className="font-bold text-slate-200 truncate">{item.content || 'Sin Título'}</h4>
-                                                    <div className="flex items-center gap-2 mt-1">
+                                                <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                                    <h4 className="font-bold text-slate-200 truncate text-sm md:text-base">{item.content || 'Sin Título'}</h4>
+                                                    <div className="flex flex-wrap items-center gap-2 mt-1">
                                                         <Select value={item.fitMode || 'contain'} onValueChange={v => handleUpdateItem(item.id, { fitMode: v as DisplayFitMode })}>
-                                                            <SelectTrigger className="h-7 text-xs px-2 w-[110px] bg-slate-950 border-slate-800 text-slate-300">
+                                                            <SelectTrigger className="h-7 text-xs px-2 w-[90px] md:w-[110px] bg-slate-950 border-slate-800 text-slate-300">
                                                                 <SelectValue />
                                                             </SelectTrigger>
                                                             <SelectContent className="bg-slate-900 border-slate-800 text-slate-200">
@@ -340,7 +340,7 @@ const PlaylistBuilder = () => {
                                                         </Select>
                                                         
                                                         <Select value={item.transition || 'fade'} onValueChange={v => handleUpdateItem(item.id, { transition: v as DisplayTransition })}>
-                                                            <SelectTrigger className="h-7 text-xs px-2 w-[110px] bg-slate-950 border-slate-800 text-slate-300">
+                                                            <SelectTrigger className="h-7 text-xs px-2 w-[90px] md:w-[110px] bg-slate-950 border-slate-800 text-slate-300">
                                                                 <SelectValue />
                                                             </SelectTrigger>
                                                             <SelectContent className="bg-slate-900 border-slate-800 text-slate-200">
@@ -353,17 +353,17 @@ const PlaylistBuilder = () => {
                                                 </div>
                                             </div>
                                             
-                                            <div className="p-4 flex flex-col items-end justify-center border-l border-slate-800 bg-slate-950/30 rounded-r-xl">
-                                                <div className="flex items-center gap-2 mb-2">
+                                            <div className="p-3 md:p-4 flex sm:flex-col items-center sm:items-end justify-between sm:justify-center border-t sm:border-t-0 sm:border-l border-slate-800 bg-slate-950/30 gap-2 sm:gap-2">
+                                                <div className="flex items-center gap-2">
                                                     <Input 
-                                                        type="number" min={5} className="w-16 h-8 text-center px-1 font-mono text-sm bg-slate-950 border-slate-800 text-slate-200"
+                                                        type="number" min={5} className="w-14 md:w-16 h-8 text-center px-1 font-mono text-xs md:text-sm bg-slate-950 border-slate-800 text-slate-200"
                                                         value={item.duration}
                                                         onChange={e => handleUpdateItem(item.id, { duration: parseInt(e.target.value) || 10 })}
                                                     />
-                                                    <span className="text-xs text-slate-500 font-medium">segs</span>
+                                                    <span className="text-[10px] md:text-xs text-slate-500 font-medium">segs</span>
                                                 </div>
-                                                <Button variant="ghost" size="sm" onClick={() => handleRemoveItem(item.id)} className="h-7 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 w-full">
-                                                    <Trash2 className="w-3.5 h-3.5 mr-1" /> Quitar
+                                                <Button variant="ghost" size="sm" onClick={() => handleRemoveItem(item.id)} className="h-8 sm:h-7 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10">
+                                                    <Trash2 className="w-3.5 h-3.5 sm:mr-1" /> <span className="sm:inline hidden">Quitar</span>
                                                 </Button>
                                             </div>
                                         </div>
@@ -375,11 +375,11 @@ const PlaylistBuilder = () => {
                 </div>
 
                 {/* RIGHT COLUMN: Media Library Picker */}
-                <div className="w-72 bg-slate-900/50 border-l border-slate-800 flex flex-col shrink-0 shadow-[-10px_0_30px_-15px_rgba(0,0,0,0.3)] z-10">
-                    <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/50">
-                        <h3 className="font-bold text-slate-200 text-sm flex items-center gap-2">
+                <div className="w-full lg:w-72 h-[35vh] lg:h-auto bg-slate-900/50 border-t lg:border-t-0 lg:border-l border-slate-800 flex flex-col shrink-0 shadow-[-10px_0_30px_-15px_rgba(0,0,0,0.3)] z-10 overflow-hidden">
+                    <div className="p-3 md:p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/50 shrink-0">
+                        <h3 className="font-bold text-slate-200 text-sm flex items-center gap-2 truncate">
                             {mediaFolder !== '/' && (
-                                <Button variant="ghost" size="icon" className="w-6 h-6 -ml-2 text-slate-400 hover:text-white" onClick={() => {
+                                <Button variant="ghost" size="icon" className="w-6 h-6 -ml-2 text-slate-400 hover:text-white shrink-0" onClick={() => {
                                     const parts = mediaFolder.split('/');
                                     parts.pop();
                                     setMediaFolder(parts.length === 1 ? '/' : parts.join('/'));
@@ -387,9 +387,9 @@ const PlaylistBuilder = () => {
                                     <ArrowLeft className="w-3 h-3" />
                                 </Button>
                             )}
-                            Medios {mediaFolder !== '/' && <span className="text-slate-500 font-normal">/ {mediaFolder.split('/').pop()}</span>}
+                            Medios {mediaFolder !== '/' && <span className="text-slate-500 font-normal truncate">/ {mediaFolder.split('/').pop()}</span>}
                         </h3>
-                        <Button variant="ghost" size="sm" className="h-8 px-2 text-slate-300 bg-slate-800 border border-slate-700 hover:text-white hover:bg-slate-700" onClick={() => setIsUploadModalOpen(true)}>
+                        <Button variant="ghost" size="sm" className="h-8 px-2 text-slate-300 bg-slate-800 border border-slate-700 hover:text-white hover:bg-slate-700 shrink-0" onClick={() => setIsUploadModalOpen(true)}>
                             <Upload className="w-3.5 h-3.5 mr-1.5" /> Subir
                         </Button>
                     </div>
@@ -398,7 +398,7 @@ const PlaylistBuilder = () => {
                         {loadingMedia ? (
                             <div className="text-center text-sm text-slate-500 py-4">Cargando medios...</div>
                         ) : (
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-2 gap-2">
                                 {currentMediaFiles.map(file => {
                                     const Icon = getIconForType(file.type);
                                     return (
@@ -411,11 +411,11 @@ const PlaylistBuilder = () => {
                                                 {file.type === 'image' && file.url ? (
                                                     <img src={file.url} alt="thumb" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                                                 ) : (
-                                                    <Icon className="w-8 h-8 text-slate-600 group-hover:text-slate-400 transition-colors" />
+                                                    <Icon className="w-6 h-6 md:w-8 md:h-8 text-slate-600 group-hover:text-slate-400 transition-colors" />
                                                 )}
                                             </div>
-                                            <div className="p-2 bg-slate-950 border-t border-slate-800">
-                                                <p className="text-[10px] font-medium text-slate-400 truncate group-hover:text-slate-200 transition-colors" title={file.name}>{file.name}</p>
+                                            <div className="p-1 md:p-2 bg-slate-950 border-t border-slate-800">
+                                                <p className="text-[9px] md:text-[10px] font-medium text-slate-400 truncate group-hover:text-slate-200 transition-colors" title={file.name}>{file.name}</p>
                                             </div>
                                             <div className="absolute inset-0 bg-indigo-500/0 group-hover:bg-indigo-500/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <div className="bg-[#0A101D] text-indigo-400 border border-indigo-500/30 text-[10px] font-bold px-2 py-1 rounded shadow-lg">
@@ -426,7 +426,7 @@ const PlaylistBuilder = () => {
                                     )
                                 })}
                                 {currentMediaFiles.length === 0 && (
-                                    <div className="col-span-2 text-center text-xs text-slate-600 py-8">
+                                    <div className="col-span-full text-center text-xs text-slate-600 py-8">
                                         Carpeta vacía
                                     </div>
                                 )}

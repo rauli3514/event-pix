@@ -76,22 +76,19 @@ const DisplayPlaylists = () => {
             <div className="max-w-6xl mx-auto relative z-10 space-y-8">
                 {/* Header */}
                 <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <div>
-
-                        <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 bg-indigo-600/20 rounded-xl flex items-center justify-center border border-indigo-500/30">
-                                <PlaySquare className="w-6 h-6 text-indigo-400" />
-                            </div>
-                            <div>
-                                <h1 className="text-3xl font-bold text-white">
-                                    Playlists
-                                </h1>
-                                <p className="text-slate-400 text-sm">Crea listas de reproducción para {commerceProfile?.name}</p>
-                            </div>
+                    <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 shrink-0 bg-indigo-600/20 rounded-xl flex items-center justify-center border border-indigo-500/30">
+                            <PlaySquare className="w-6 h-6 text-indigo-400" />
+                        </div>
+                        <div>
+                            <h1 className="text-2xl md:text-3xl font-bold text-white leading-tight">
+                                Playlists
+                            </h1>
+                            <p className="text-slate-400 text-xs md:text-sm truncate">Crea listas de reproducción para {commerceProfile?.name}</p>
                         </div>
                     </div>
 
-                    <Button onClick={() => setIsCreateModalOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-[0_0_20px_rgba(79,70,229,0.3)]">
+                    <Button onClick={() => setIsCreateModalOpen(true)} className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white shadow-[0_0_20px_rgba(79,70,229,0.3)]">
                         <Plus className="w-4 h-4 mr-2" /> Crear Playlist
                     </Button>
                 </header>
