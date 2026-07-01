@@ -79,8 +79,8 @@ export const AssetSelectorModal = ({ isOpen, onClose, onSelect }: AssetSelectorM
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="bg-white text-slate-900 border-0 shadow-2xl max-w-5xl p-0 overflow-hidden sm:rounded-2xl h-[85vh] flex flex-col">
-                <DialogHeader className="px-6 py-4 border-b border-slate-100 flex flex-row items-center justify-between">
+            <DialogContent className="bg-white text-slate-900 border-0 shadow-2xl max-w-5xl p-0 overflow-hidden rounded-xl w-[95vw] md:w-full h-[90dvh] md:h-[85vh] flex flex-col">
+                <DialogHeader className="px-4 md:px-6 py-4 border-b border-slate-100 flex flex-row items-center justify-between shrink-0">
                     <div>
                         <DialogTitle className="text-xl font-bold flex items-center gap-2">
                             <Folder className="w-5 h-5 text-slate-500" />
@@ -90,9 +90,9 @@ export const AssetSelectorModal = ({ isOpen, onClose, onSelect }: AssetSelectorM
                     </div>
                 </DialogHeader>
 
-                <div className="flex-1 flex overflow-hidden">
+                <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
                     {/* Left Panel - Grid */}
-                    <div className="flex-1 flex flex-col border-r border-slate-100 bg-slate-50/50">
+                    <div className="flex-1 flex flex-col md:border-r border-b md:border-b-0 border-slate-100 bg-slate-50/50 min-h-0 overflow-hidden">
                         {/* Toolbar */}
                         <div className="p-4 flex gap-3 items-center border-b border-slate-100 bg-white">
                             <div className="flex bg-slate-100 p-1 rounded-md">
@@ -100,17 +100,17 @@ export const AssetSelectorModal = ({ isOpen, onClose, onSelect }: AssetSelectorM
                                 <Button variant="ghost" size="sm" className={`h-8 px-4 ${activeTab === 'listas' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`} onClick={() => { setActiveTab('listas'); setSelectedAsset(null); }}>Listas de Reproducción</Button>
                             </div>
                             
-                            <div className="flex-1 relative">
+                            <div className="flex-1 relative mt-2 sm:mt-0 min-w-0">
                                 <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
                                 <Input 
-                                    placeholder="Buscar recursos..." 
-                                    className="pl-9 h-9 shadow-sm"
+                                    placeholder="Buscar..." 
+                                    className="pl-9 h-9 shadow-sm w-full"
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
                                 />
                             </div>
 
-                            <div className="flex gap-1">
+                            <div className="hidden sm:flex gap-1 ml-2">
                                 <Button variant="outline" size="icon" className="h-9 w-9"><Settings2 className="w-4 h-4" /></Button>
                                 <div className="w-px h-9 bg-slate-200 mx-1" />
                                 <Button variant="outline" size="icon" className="h-9 w-9 bg-slate-100"><LayoutGrid className="w-4 h-4" /></Button>
@@ -236,35 +236,36 @@ export const AssetSelectorModal = ({ isOpen, onClose, onSelect }: AssetSelectorM
                     </div>
 
                     {/* Right Panel - Preview */}
-                    <div className="w-80 bg-white flex flex-col">
+                    <div className={`w-full md:w-80 bg-white flex flex-col shrink-0 ${!selectedAsset ? 'hidden md:flex' : 'h-[250px] md:h-auto border-t md:border-t-0 border-slate-200'}`}>
                         {selectedAsset ? (
                             <div className="flex flex-col h-full">
-                                <div className="p-4 border-b border-slate-100">
+                                <div className="p-3 md:p-4 border-b border-slate-100 hidden md:block">
                                     <h3 className="font-bold text-slate-800 text-lg truncate" title={selectedAsset.name}>{selectedAsset.name}</h3>
                                     <p className="text-sm text-slate-500 flex items-center gap-1 mt-1">
                                         <Folder className="w-3.5 h-3.5" /> Medios
                                     </p>
                                 </div>
-                                <div className="p-6 flex-1 flex flex-col items-center">
-                                    <div className="w-full aspect-video rounded-lg overflow-hidden bg-slate-100 border border-slate-200 shadow-sm mb-6 flex justify-center items-center">
+                                <div className="p-3 md:p-6 flex-1 flex flex-row md:flex-col items-center gap-4 md:gap-0 overflow-y-auto min-h-0">
+                                    <div className="w-32 md:w-full shrink-0 aspect-video rounded-lg overflow-hidden bg-slate-100 border border-slate-200 shadow-sm md:mb-6 flex justify-center items-center">
                                         {selectedAsset.type === 'image' && selectedAsset.url ? (
                                             <img src={selectedAsset.url} alt={selectedAsset.name} className="w-full h-full object-contain" />
                                         ) : selectedAsset.type === 'video' && selectedAsset.url ? (
                                             <video src={selectedAsset.url} className="w-full h-full object-contain bg-black" controls />
                                         ) : selectedAsset.type === 'campaign' ? (
                                             <div className="text-emerald-500 flex flex-col items-center">
-                                                <PlaySquare className="w-16 h-16 mb-2" />
-                                                <span className="text-sm font-medium">Lista de Reproducción</span>
+                                                <PlaySquare className="w-8 h-8 md:w-16 md:h-16 mb-2" />
+                                                <span className="text-xs md:text-sm font-medium text-center leading-tight">Lista de Rep.</span>
                                             </div>
                                         ) : (
                                             <div className="text-slate-400 flex flex-col items-center">
-                                                <Globe className="w-12 h-12 mb-2" />
-                                                <span className="text-sm">Vista no disponible</span>
+                                                <Globe className="w-8 h-8 md:w-12 md:h-12 mb-2" />
+                                                <span className="text-xs md:text-sm">Vista no disponible</span>
                                             </div>
                                         )}
                                     </div>
                                     
-                                    <div className="w-full space-y-4">
+                                    <div className="flex-1 w-full space-y-2 md:space-y-4">
+                                        <h3 className="font-bold text-slate-800 text-sm md:text-lg truncate block md:hidden" title={selectedAsset.name}>{selectedAsset.name}</h3>
                                         <div className="grid grid-cols-2 gap-y-3 text-sm">
                                             <div className="text-slate-500">Tipo</div>
                                             <div className="font-medium text-slate-800 capitalize">{selectedAsset.type === 'campaign' ? 'Lista de Rep.' : selectedAsset.type}</div>
@@ -294,7 +295,7 @@ export const AssetSelectorModal = ({ isOpen, onClose, onSelect }: AssetSelectorM
                             </div>
                         )}
                         
-                        <div className="p-4 border-t border-slate-100 bg-slate-50 mt-auto flex justify-end">
+                        <div className="p-3 md:p-4 border-t border-slate-100 bg-slate-50 mt-auto flex justify-end shrink-0">
                             <Button 
                                 onClick={() => {
                                     if (selectedAsset) {
