@@ -187,17 +187,18 @@ export const GlobalScheduleModal = ({ isOpen, onClose, commerceId, onScheduled }
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="bg-white text-slate-900 border-0 shadow-2xl max-w-4xl p-0 overflow-hidden sm:rounded-2xl">
-                <DialogHeader className="px-6 py-4 border-b border-slate-100 flex flex-row items-center justify-between">
+            <DialogContent className="bg-white text-slate-900 border-0 shadow-2xl max-w-4xl p-0 overflow-hidden rounded-xl w-[95vw] md:w-full h-[90dvh] md:h-auto md:max-h-[85vh] flex flex-col">
+                <DialogHeader className="px-4 md:px-6 py-4 border-b border-slate-100 flex flex-row items-center justify-between shrink-0">
                     <div className="flex items-center gap-2">
                         <Calendar className="w-5 h-5 text-indigo-500" />
                         <DialogTitle className="text-xl font-bold">Nueva Programación</DialogTitle>
                     </div>
                 </DialogHeader>
 
-                <div className="flex flex-col md:flex-row min-h-[500px]">
-                    {/* Left: Selecciones (Contenido y Pantallas) */}
-                    <div className="w-full md:w-1/2 p-6 space-y-8 border-r border-slate-100 bg-slate-50/50">
+                <div className="flex-1 overflow-y-auto min-h-0">
+                    <div className="flex flex-col md:flex-row min-h-full md:min-h-[500px]">
+                        {/* Left: Selecciones (Contenido y Pantallas) */}
+                        <div className="w-full md:w-1/2 p-4 md:p-6 space-y-6 md:space-y-8 md:border-r border-b md:border-b-0 border-slate-100 bg-slate-50/50 flex flex-col">
                         
                         {/* Paso 1: Contenido */}
                         <div>
@@ -238,7 +239,7 @@ export const GlobalScheduleModal = ({ isOpen, onClose, commerceId, onScheduled }
                         </div>
 
                         {/* Paso 2: Pantallas */}
-                        <div className="flex-1 flex flex-col min-h-0">
+                        <div className="flex-1 flex flex-col min-h-0 mt-6 md:mt-0">
                             <div className="flex items-center justify-between mb-3">
                                 <Label className="text-slate-500 text-xs font-semibold uppercase tracking-wide">
                                     2. Seleccionar Pantallas
@@ -298,7 +299,7 @@ export const GlobalScheduleModal = ({ isOpen, onClose, commerceId, onScheduled }
                     </div>
 
                     {/* Right: Configuración de Fechas */}
-                    <div className="w-full md:w-1/2 p-6 space-y-6">
+                    <div className="w-full md:w-1/2 p-4 md:p-6 space-y-6 flex flex-col">
                         <Label className="text-slate-500 text-xs font-semibold uppercase tracking-wide mb-3 block">
                             3. Configuración de Tiempos
                         </Label>
@@ -403,9 +404,10 @@ export const GlobalScheduleModal = ({ isOpen, onClose, commerceId, onScheduled }
                         </div>
                     </div>
                 </div>
+                </div>
 
                 {/* Footer */}
-                <div className="px-6 py-4 border-t border-slate-100 flex justify-between items-center bg-slate-50">
+                <div className="px-4 md:px-6 py-4 border-t border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
                     <Button variant="ghost" onClick={onClose} className="text-slate-600 hover:bg-slate-200">
                         Cancelar
                     </Button>

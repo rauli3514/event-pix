@@ -250,7 +250,7 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                 </div>
             </div>
 
-            <div className="flex flex-1 overflow-hidden flex-col md:flex-row">
+            <div className="flex flex-1 overflow-hidden flex-col md:flex-row min-h-0">
                 {/* Left Sidebar - Media Folders */}
                 <div className="hidden md:block shrink-0 h-full">
                     {commerceId && activeCategory !== 'apps' && (
@@ -268,8 +268,8 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                 </div>
 
                 {/* Main Content Area */}
-                <div className="flex-1 flex flex-col bg-[#0A101D]">
-                    <div className="p-6 flex-1 flex flex-col overflow-hidden">
+                <div className="flex-1 flex flex-col bg-[#0A101D] min-h-0">
+                    <div className="p-6 flex-1 flex flex-col overflow-hidden min-h-0">
                         
                         {/* Filters and Toolbar */}
                         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-4 shrink-0">
@@ -349,7 +349,7 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                         )}
 
                         {/* Data View */}
-                        <div className="flex-1 overflow-y-auto pb-6 pr-2">
+                        <div className="flex-1 overflow-y-auto pb-6 pr-2 min-h-0">
                             {isLoading ? (
                                 <div className="bg-slate-900/50 rounded-xl shadow-sm border border-slate-800 p-12 flex flex-col items-center justify-center text-slate-500 h-full">
                                     <p className="text-lg font-medium text-slate-400">Cargando archivos...</p>

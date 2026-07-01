@@ -1,14 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation, useParams } from 'react-router-dom';
 import { 
-  LayoutDashboard, 
   Monitor, 
   FolderOpen, 
   ListVideo, 
   Puzzle, 
   Calendar, 
-  BarChart3, 
-  Settings,
   ArrowLeft,
   Menu
 } from 'lucide-react';
@@ -19,14 +16,11 @@ import { useCommerces, useDisplaySchedules, useUpdateSchedule, useAssignContentT
 import { toast } from 'sonner';
 
 const MENU_ITEMS = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: 'dashboard' },
   { id: 'screens', label: 'Pantallas', icon: Monitor, path: 'screens' },
   { id: 'library', label: 'Medios', icon: FolderOpen, path: 'library' },
   { id: 'playlists', label: 'Playlists', icon: ListVideo, path: 'playlists' },
   { id: 'apps', label: 'Aplicaciones', icon: Puzzle, path: 'apps' },
   { id: 'schedule', label: 'Programación', icon: Calendar, path: 'schedule' },
-  { id: 'analytics', label: 'Estadísticas', icon: BarChart3, path: 'analytics' },
-  { id: 'settings', label: 'Configuración', icon: Settings, path: 'settings' },
 ];
 
 export default function DisplayWorkspaceLayout() {

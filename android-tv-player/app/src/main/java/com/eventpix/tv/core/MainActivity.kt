@@ -86,13 +86,13 @@ class MainActivity : AppCompatActivity() {
         // Run diagnostic checks in background while video plays
         scope.launch {
             updateStatus("Verificando almacenamiento local...")
-            delay(1500) // Simulating work
+            delay(3000) // Simulating work
             
             updateStatus("Inicializando motor multimedia...")
-            delay(1500)
+            delay(3000)
             
             updateStatus("Conectando a EventPix...")
-            delay(1500)
+            delay(4000)
             
             // Transition to WebView for the actual Display App UI
             diagnosticPanel.visibility = View.GONE
