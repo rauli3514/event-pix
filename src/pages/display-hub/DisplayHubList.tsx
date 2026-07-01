@@ -7,9 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import { EditScreenModal } from "@/components/display/EditScreenModal";
 import { ZoneManagerSidebar } from "@/components/display/ZoneManagerSidebar";
 import { MoveDeviceModal } from "@/components/display/MoveDeviceModal";
+import { Layers } from 'lucide-react';
 
 import { toast } from 'sonner';
 
@@ -135,29 +137,51 @@ const DisplayHubList = () => {
     );
 
     return (
-        <div className="flex h-[calc(100vh-64px)] w-full overflow-hidden bg-slate-950 text-white">
+        <div className="flex h-[calc(100vh-64px)] w-full overflow-hidden bg-slate-950 text-white flex-col md:flex-row">
             
-            {/* Sidebar de Zonas */}
-            <ZoneManagerSidebar 
-                commerceId={effectiveCommerceId}
-                groups={linkGroups || []}
-                selectedGroupId={selectedGroupId}
-                onSelectGroup={setSelectedGroupId}
-                unassignedCount={unassignedCount}
-                totalCount={linkedDevices.length}
-            />
+            {/* Sidebar de Zonas (Desktop) */}
+            <div className="hidden md:block shrink-0 h-full">
+                <ZoneManagerSidebar 
+                    commerceId={effectiveCommerceId}
+                    groups={linkGroups || []}
+                    selectedGroupId={selectedGroupId}
+                    onSelectGroup={setSelectedGroupId}
+                    unassignedCount={unassignedCount}
+                    totalCount={linkedDevices.length}
+                />
+            </div>
 
             {/* Contenido Principal */}
-            <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
+            <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6">
                 
                 {/* Header: Resumen General */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-6">
                     <div>
-                        <h1 className="text-2xl font-bold text-white tracking-tight">Tus Pantallas</h1>
+                        <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
+                            <Sheet>
+                                <SheetTrigger asChild>
+                                    <Button variant="outline" size="icon" className="md:hidden border-slate-700 bg-slate-900 text-slate-300 w-10 h-10 shrink-0">
+                                        <Layers className="w-5 h-5" />
+                                    </Button>
+                                </SheetTrigger>
+                                <SheetContent side="left" className="p-0 bg-slate-900 border-slate-800 w-72 flex flex-col">
+                                    <SheetTitle className="sr-only">Zonas y Pantallas</SheetTitle>
+                                    <ZoneManagerSidebar 
+                                        commerceId={effectiveCommerceId}
+                                        groups={linkGroups || []}
+                                        selectedGroupId={selectedGroupId}
+                                        onSelectGroup={setSelectedGroupId}
+                                        unassignedCount={unassignedCount}
+                                        totalCount={linkedDevices.length}
+                                    />
+                                </SheetContent>
+                            </Sheet>
+                            Tus Pantallas
+                        </h1>
                         <p className="text-sm text-slate-400 mt-1">Administra los dispositivos y el contenido que reproducen.</p>
                     </div>
-                    <div className="flex gap-3">
-                        <Button className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/20" onClick={() => setIsLinkModalOpen(true)}>
+                    <div className="flex gap-3 w-full md:w-auto">
+                        <Button className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/20 w-full md:w-auto" onClick={() => setIsLinkModalOpen(true)}>
                             <Plus className="w-4 h-4 mr-2" /> Agregar Pantalla
                         </Button>
                     </div>

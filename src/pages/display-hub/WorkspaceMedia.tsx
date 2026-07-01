@@ -13,6 +13,7 @@ import { MediaFolderSidebar } from '@/components/display/MediaFolderSidebar';
 import { MoveMediaModal } from '@/components/display/MoveMediaModal';
 import { AppCatalogModal, APPS, AppId } from '@/components/display/apps/AppCatalogModal';
 import { AppEditorModal } from '@/components/display/apps/AppEditorModal';
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 
 export type CategoryId = 'all' | 'images' | 'videos' | 'audio' | 'docs' | 'web' | 'apps';
 
@@ -165,7 +166,29 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
             <div className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex flex-col md:flex-row md:items-center justify-between shadow-sm z-10 gap-4 shrink-0">
                 <div>
                     <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-                        {activeCategory === 'apps' ? <LayoutGrid className="w-6 h-6 text-indigo-400" /> : <Folder className="w-6 h-6 text-orange-400" />}
+                        {activeCategory !== 'apps' && (
+                            <Sheet>
+                                <SheetTrigger asChild>
+                                    <Button variant="outline" size="icon" className="md:hidden border-slate-700 bg-slate-800 text-slate-300 w-9 h-9 shrink-0">
+                                        <Folder className="w-4 h-4" />
+                                    </Button>
+                                </SheetTrigger>
+                                <SheetContent side="left" className="p-0 bg-slate-900 border-slate-800 w-72 flex flex-col">
+                                    <SheetTitle className="sr-only">Carpetas de Medios</SheetTitle>
+                                    <MediaFolderSidebar 
+                                        commerceId={commerceId!}
+                                        mediaFiles={mediaFiles}
+                                        currentFolder={currentFolder}
+                                        onSelectFolder={(path) => {
+                                            setCurrentFolder(path);
+                                            setSearch('');
+                                            setSelectedIds([]);
+                                        }}
+                                    />
+                                </SheetContent>
+                            </Sheet>
+                        )}
+                        {activeCategory === 'apps' ? <LayoutGrid className="w-6 h-6 text-indigo-400 hidden md:block" /> : <Folder className="w-6 h-6 text-orange-400 hidden md:block" />}
                         {activeCategory === 'apps' ? 'Aplicaciones' : 'Librería de Contenidos'}
                     </h1>
                     <p className="text-sm text-slate-400 mt-1">
@@ -227,20 +250,22 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                 </div>
             </div>
 
-            <div className="flex flex-1 overflow-hidden">
+            <div className="flex flex-1 overflow-hidden flex-col md:flex-row">
                 {/* Left Sidebar - Media Folders */}
-                {commerceId && activeCategory !== 'apps' && (
-                    <MediaFolderSidebar 
-                        commerceId={commerceId}
-                        mediaFiles={mediaFiles}
-                        currentFolder={currentFolder}
-                        onSelectFolder={(path) => {
-                            setCurrentFolder(path);
-                            setSearch('');
-                            setSelectedIds([]);
-                        }}
-                    />
-                )}
+                <div className="hidden md:block shrink-0 h-full">
+                    {commerceId && activeCategory !== 'apps' && (
+                        <MediaFolderSidebar 
+                            commerceId={commerceId}
+                            mediaFiles={mediaFiles}
+                            currentFolder={currentFolder}
+                            onSelectFolder={(path) => {
+                                setCurrentFolder(path);
+                                setSearch('');
+                                setSelectedIds([]);
+                            }}
+                        />
+                    )}
+                </div>
 
                 {/* Main Content Area */}
                 <div className="flex-1 flex flex-col bg-[#0A101D]">
