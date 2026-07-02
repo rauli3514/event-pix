@@ -36,12 +36,13 @@ export default function WorkspaceDashboard() {
         <div className="p-6 md:p-10 space-y-8 animate-in fade-in duration-500 w-full max-w-7xl mx-auto">
             {/* Top Banner (Hero) */}
             <div className="relative overflow-hidden rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl h-72 md:h-80 flex items-center">
-                {/* Space/Galaxy Background Effect */}
-                <div className="absolute inset-0 bg-gradient-to-r from-indigo-950 via-slate-900 to-black overflow-hidden pointer-events-none">
-                    <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-500/20 rounded-full blur-[100px] mix-blend-screen"></div>
-                    <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-fuchsia-500/10 rounded-full blur-[100px] mix-blend-screen"></div>
-                    {/* Simulated planet/orb */}
-                    <div className="absolute -bottom-48 -right-20 w-[600px] h-[600px] rounded-full border border-white/5 bg-gradient-to-b from-transparent to-indigo-900/40 blur-sm transform rotate-45"></div>
+                {/* Custom Image Background */}
+                <div 
+                    className="absolute inset-0 bg-cover bg-center bg-no-repeat pointer-events-none"
+                    style={{ backgroundImage: 'url("/banner-dashboard.PNG")' }}
+                >
+                    {/* Dark overlay just in case the image is too bright, so text stays readable */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-slate-950/80 via-slate-900/40 to-transparent"></div>
                 </div>
                 
                 <div className="relative z-10 p-10 md:p-16 flex flex-col items-start w-full">

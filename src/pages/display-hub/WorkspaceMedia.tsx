@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Search, Upload, LayoutGrid, List as ListIcon, Image as ImageIcon, Video, FileAudio, FileText, Globe, ArrowRightCircle, HardDrive, Trash2, Folder, Move, MoreVertical, Edit2, Play } from 'lucide-react';
+import { Search, Upload, LayoutGrid, List as ListIcon, Image as ImageIcon, Video, FileAudio, FileText, Globe, ArrowRightCircle, HardDrive, Trash2, Folder, Move, MoreVertical, Edit2, Play, Clock } from 'lucide-react';
 import { SendToScreensModal } from '@/components/display/SendToScreensModal';
 import { UploadMediaModal } from '@/components/display/UploadMediaModal';
 import { useDisplayMedia, useUploadDisplayMedia, useDeleteDisplayMedia, useUpdateDisplayMedia } from '@/hooks/use-display-media';
@@ -162,38 +162,54 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
 
     return (
         <div className="h-full flex flex-col bg-[#0A101D] text-slate-200">
-            {/* Top Bar for sending to screens */}
-            <div className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex flex-col md:flex-row md:items-center justify-between shadow-sm z-10 gap-4 shrink-0">
-                <div>
-                    <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-                        {activeCategory !== 'apps' && (
-                            <Sheet>
-                                <SheetTrigger asChild>
-                                    <Button variant="outline" size="icon" className="md:hidden border-slate-700 bg-slate-800 text-slate-300 w-9 h-9 shrink-0">
-                                        <Folder className="w-4 h-4" />
-                                    </Button>
-                                </SheetTrigger>
-                                <SheetContent side="left" className="p-0 bg-slate-900 border-slate-800 w-72 flex flex-col">
-                                    <SheetTitle className="sr-only">Carpetas de Medios</SheetTitle>
-                                    <MediaFolderSidebar 
-                                        commerceId={commerceId!}
-                                        mediaFiles={mediaFiles}
-                                        currentFolder={currentFolder}
-                                        onSelectFolder={(path) => {
-                                            setCurrentFolder(path);
-                                            setSearch('');
-                                            setSelectedIds([]);
-                                        }}
-                                    />
-                                </SheetContent>
-                            </Sheet>
-                        )}
-                        {activeCategory === 'apps' ? <LayoutGrid className="w-6 h-6 text-indigo-400 hidden md:block" /> : <Folder className="w-6 h-6 text-orange-400 hidden md:block" />}
-                        {activeCategory === 'apps' ? 'Aplicaciones' : 'Librería de Contenidos'}
-                    </h1>
-                    <p className="text-sm text-slate-400 mt-1">
-                        {activeCategory === 'apps' ? 'Crea y administra aplicaciones y widgets.' : 'Sube, organiza en carpetas y envía medios a tus pantallas.'}
-                    </p>
+            {/* Descriptive Top Banner */}
+            <div className="p-6 md:px-8 pt-6 pb-2 shrink-0">
+                <div className="relative overflow-hidden rounded-3xl bg-slate-900 border border-slate-800 shadow-xl flex items-center min-h-[140px] px-8 py-6">
+                    {/* Decorative Background for Banner */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-indigo-950/40 via-slate-900/20 to-orange-950/20 pointer-events-none">
+                        <div className="absolute right-10 top-1/2 -translate-y-1/2 w-48 h-48 bg-orange-500/10 rounded-full blur-[60px]"></div>
+                        <div className="absolute right-32 bottom-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-[40px]"></div>
+                    </div>
+                    
+                    <div className="relative z-10 flex flex-col gap-1 w-full max-w-3xl">
+                        <h1 className="text-3xl font-extrabold text-white flex items-center gap-3">
+                            {activeCategory !== 'apps' && (
+                                <Sheet>
+                                    <SheetTrigger asChild>
+                                        <Button variant="outline" size="icon" className="md:hidden border-slate-700 bg-slate-800/50 text-slate-300 w-10 h-10 shrink-0">
+                                            <Folder className="w-5 h-5" />
+                                        </Button>
+                                    </SheetTrigger>
+                                    <SheetContent side="left" className="p-0 bg-slate-900 border-slate-800 w-72 flex flex-col">
+                                        <SheetTitle className="sr-only">Carpetas de Medios</SheetTitle>
+                                        <MediaFolderSidebar 
+                                            commerceId={commerceId!}
+                                            mediaFiles={mediaFiles}
+                                            currentFolder={currentFolder}
+                                            onSelectFolder={(path) => {
+                                                setCurrentFolder(path);
+                                                setSearch('');
+                                                setSelectedIds([]);
+                                            }}
+                                        />
+                                    </SheetContent>
+                                </Sheet>
+                            )}
+                            {activeCategory === 'apps' ? 'Aplicaciones' : 'Medios y Archivos'}
+                        </h1>
+                        <p className="text-slate-400 font-medium max-w-xl">
+                            {activeCategory === 'apps' 
+                                ? 'Creá y administrá aplicaciones y widgets dinámicos para tus pantallas.' 
+                                : 'Gestioná tus imágenes, videos y enlaces, agrupándolos en carpetas para un mayor control al enviarlos.'}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Action Bar */}
+            <div className="px-6 md:px-8 py-3 flex flex-col md:flex-row md:items-center justify-between z-10 gap-4 shrink-0">
+                <div className="flex items-center gap-2">
+                    {/* Placeholder for left-side actions in the future, if needed */}
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                     {activeCategory === 'apps' ? (
@@ -478,21 +494,32 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                                                 } else {
                                                     handleToggleSelect(file.id);
                                                 }
-                                            }} 
-                                            className={`bg-slate-900 rounded-xl shadow-sm border overflow-hidden group transition-colors cursor-pointer flex flex-col relative ${selectedIds.includes(file.id) ? 'border-orange-500 ring-2 ring-orange-500/50' : 'border-slate-800'} ${draggedOverFolder === file.id ? 'border-orange-500 ring-2 ring-orange-500 shadow-md bg-orange-500/10' : 'hover:border-slate-700'}`}
+                                            }}
+                                            className={`bg-slate-900/40 backdrop-blur-sm rounded-2xl shadow-lg border overflow-hidden group transition-all duration-300 cursor-pointer flex flex-col relative transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/50 ${selectedIds.includes(file.id) ? 'border-orange-500 ring-2 ring-orange-500/50 bg-orange-500/5' : 'border-slate-800/60'} ${draggedOverFolder === file.id ? 'border-orange-500 ring-2 ring-orange-500 shadow-md bg-orange-500/10' : 'hover:border-slate-700/80 hover:bg-slate-800/60'}`}
                                         >
-                                            <div className="absolute top-2 left-2 z-10">
+                                            <div className="absolute top-3 left-3 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 focus-within:opacity-100">
                                                 <input 
                                                     type="checkbox" 
-                                                    className="rounded border-slate-700 text-orange-500 focus:ring-orange-500/20 shadow-sm bg-slate-900" 
+                                                    className="w-4 h-4 rounded border-slate-600 text-orange-500 focus:ring-orange-500/30 shadow-sm bg-slate-900/80 backdrop-blur-md cursor-pointer transition-colors" 
                                                     checked={selectedIds.includes(file.id)}
                                                     onChange={(e) => { e.stopPropagation(); handleToggleSelect(file.id); }}
                                                 />
                                             </div>
-                                            <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            {/* Si está seleccionado siempre mostramos el checkbox */}
+                                            {selectedIds.includes(file.id) && (
+                                                <div className="absolute top-3 left-3 z-10">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        className="w-4 h-4 rounded border-orange-500 text-orange-500 focus:ring-orange-500/30 shadow-sm bg-slate-900/80 cursor-pointer" 
+                                                        checked={true}
+                                                        onChange={(e) => { e.stopPropagation(); handleToggleSelect(file.id); }}
+                                                    />
+                                                </div>
+                                            )}
+                                            <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="icon" className="h-7 w-7 bg-slate-900/90 text-slate-300 hover:bg-slate-800 hover:text-white rounded-full shadow-sm" onClick={(e) => e.stopPropagation()}>
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8 bg-slate-900/60 backdrop-blur-md text-slate-300 hover:bg-slate-800 hover:text-white rounded-full shadow-sm border border-slate-700/50" onClick={(e) => e.stopPropagation()}>
                                                             <MoreVertical className="w-4 h-4" />
                                                         </Button>
                                                     </DropdownMenuTrigger>
@@ -522,23 +549,23 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
                                             </div>
-                                            <div className="aspect-[4/3] bg-slate-950 relative overflow-hidden flex items-center justify-center p-2">
+                                            <div className="aspect-[4/3] bg-slate-950/50 relative overflow-hidden flex items-center justify-center p-4">
                                                 {file.type === 'image' && file.url ? (
-                                                    <img src={file.url} alt={file.name} className="w-full h-full object-contain group-hover:scale-105 transition-transform" />
+                                                    <img src={file.url} alt={file.name} className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500 ease-out drop-shadow-md" />
                                                 ) : appData ? (
-                                                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${appData.bg} group-hover:scale-110 transition-transform shadow-inner`}>
+                                                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${appData.bg} group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 ease-out shadow-inner`}>
                                                         <appData.icon className={`w-8 h-8 ${appData.color}`} />
                                                     </div>
                                                 ) : (
-                                                    <FileIcon className={`w-12 h-12 ${isFolder ? 'text-orange-400 fill-orange-400/20 group-hover:scale-110 transition-transform' : 'text-slate-600'}`} />
+                                                    <FileIcon className={`w-14 h-14 ${isFolder ? 'text-orange-400 fill-orange-400/20 group-hover:scale-110 transition-transform duration-500 drop-shadow-md' : 'text-slate-600'}`} />
                                                 )}
                                             </div>
-                                            <div className="p-3 border-t border-slate-800 bg-slate-900">
-                                                <h4 className="font-medium text-slate-200 text-sm truncate" title={file.name}>{file.name}</h4>
+                                            <div className="p-4 border-t border-slate-800/60 bg-slate-900/40 backdrop-blur-sm flex flex-col justify-center min-h-[4rem]">
+                                                <h4 className="font-semibold text-slate-200 text-sm truncate group-hover:text-white transition-colors" title={file.name}>{file.name}</h4>
                                                 {search ? (
-                                                    <p className="text-xs text-orange-400 mt-0.5 truncate">{file.folder_path === '/' ? 'Raíz' : file.folder_path}</p>
+                                                    <p className="text-xs font-medium text-orange-400/90 mt-1 truncate">{file.folder_path === '/' ? 'Raíz' : file.folder_path}</p>
                                                 ) : (
-                                                    <p className="text-xs text-slate-500 mt-0.5 truncate">{formatDate(file.created_at).split(',')[0]}</p>
+                                                    <p className="text-xs text-slate-500 mt-1 truncate flex items-center gap-1.5"><Clock className="w-3 h-3" /> {formatDate(file.created_at).split(',')[0]}</p>
                                                 )}
                                             </div>
                                         </div>

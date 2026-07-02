@@ -150,36 +150,47 @@ const DisplayHubList = () => {
             {/* Contenido Principal */}
             <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6">
                 
-                {/* Header: Resumen General */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-6">
-                    <div>
-                        <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
-                            <Sheet>
-                                <SheetTrigger asChild>
-                                    <Button variant="outline" size="icon" className="md:hidden border-slate-700 bg-slate-900 text-slate-300 w-10 h-10 shrink-0">
-                                        <Layers className="w-5 h-5" />
-                                    </Button>
-                                </SheetTrigger>
-                                <SheetContent side="left" className="p-0 bg-slate-900 border-slate-800 w-72 flex flex-col">
-                                    <SheetTitle className="sr-only">Zonas y Pantallas</SheetTitle>
-                                    <ZoneManagerSidebar 
-                                        commerceId={effectiveCommerceId}
-                                        groups={linkGroups || []}
-                                        selectedGroupId={selectedGroupId}
-                                        onSelectGroup={setSelectedGroupId}
-                                        unassignedCount={unassignedCount}
-                                        totalCount={linkedDevices.length}
-                                    />
-                                </SheetContent>
-                            </Sheet>
-                            Tus Pantallas
-                        </h1>
-                        <p className="text-sm text-slate-400 mt-1">Administra los dispositivos y el contenido que reproducen.</p>
+                {/* Descriptive Top Banner */}
+                <div className="relative overflow-hidden rounded-3xl bg-slate-900 border border-slate-800 shadow-xl flex items-center min-h-[140px] px-8 py-6 mb-6">
+                    {/* Decorative Background for Banner */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-sky-950/40 via-slate-900/20 to-emerald-950/20 pointer-events-none">
+                        <div className="absolute right-10 top-1/2 -translate-y-1/2 w-48 h-48 bg-emerald-500/10 rounded-full blur-[60px]"></div>
+                        <div className="absolute right-32 bottom-0 w-32 h-32 bg-sky-500/10 rounded-full blur-[40px]"></div>
                     </div>
-                    <div className="flex gap-3 w-full md:w-auto">
-                        <Button className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/20 w-full md:w-auto" onClick={() => setIsLinkModalOpen(true)}>
-                            <Plus className="w-4 h-4 mr-2" /> Agregar Pantalla
-                        </Button>
+                    
+                    <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between w-full gap-6">
+                        <div className="flex flex-col gap-1 w-full max-w-2xl">
+                            <h1 className="text-3xl font-extrabold text-white flex items-center gap-3">
+                                <Sheet>
+                                    <SheetTrigger asChild>
+                                        <Button variant="outline" size="icon" className="md:hidden border-slate-700 bg-slate-800/50 text-slate-300 w-10 h-10 shrink-0">
+                                            <Layers className="w-5 h-5" />
+                                        </Button>
+                                    </SheetTrigger>
+                                    <SheetContent side="left" className="p-0 bg-slate-900 border-slate-800 w-72 flex flex-col">
+                                        <SheetTitle className="sr-only">Zonas y Pantallas</SheetTitle>
+                                        <ZoneManagerSidebar 
+                                            commerceId={effectiveCommerceId}
+                                            groups={linkGroups || []}
+                                            selectedGroupId={selectedGroupId}
+                                            onSelectGroup={setSelectedGroupId}
+                                            unassignedCount={unassignedCount}
+                                            totalCount={linkedDevices.length}
+                                        />
+                                    </SheetContent>
+                                </Sheet>
+                                Tus Pantallas
+                            </h1>
+                            <p className="text-slate-400 font-medium max-w-xl mt-1">
+                                Administrá los dispositivos y el contenido que reproducen, agrupándolos en zonas para un mayor control.
+                            </p>
+                        </div>
+                        
+                        <div className="shrink-0">
+                            <Button className="bg-white hover:bg-slate-200 text-slate-900 rounded-full px-6 py-5 text-sm font-bold shadow-lg shadow-white/10 transition-all hover:scale-105" onClick={() => setIsLinkModalOpen(true)}>
+                                <Plus className="w-4 h-4 mr-2 text-indigo-600" /> Agregar Pantalla
+                            </Button>
+                        </div>
                     </div>
                 </div>
 

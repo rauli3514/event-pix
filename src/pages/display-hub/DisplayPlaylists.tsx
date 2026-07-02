@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
-import { useCommerces, useDisplayCampaigns, useCreateCampaign, useDeleteCampaign } from "@/hooks/use-display-hub";
+import { useDisplayCampaigns, useCreateCampaign, useDeleteCampaign } from "@/hooks/use-display-hub";
 
 const DisplayPlaylists = () => {
     const navigate = useNavigate();
@@ -17,13 +17,12 @@ const DisplayPlaylists = () => {
     
     const effectiveCommerceId = commerceId || 'unknown';
 
-    const { data: commerces } = useCommerces();
+
     const { data: campaigns, isLoading } = useDisplayCampaigns(effectiveCommerceId);
     
     const createCampaign = useCreateCampaign();
     const deleteCampaign = useDeleteCampaign();
 
-    const commerceProfile = commerces?.find(c => c.id === effectiveCommerceId);
 
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [newCampaignData, setNewCampaignData] = useState({ name: '', description: '' });
@@ -74,24 +73,34 @@ const DisplayPlaylists = () => {
             <div className="absolute top-[-20%] right-[-10%] w-[800px] h-[800px] bg-indigo-600/10 rounded-full mix-blend-screen filter blur-[120px] pointer-events-none" />
 
             <div className="max-w-6xl mx-auto relative z-10 space-y-8">
-                {/* Header */}
-                <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 shrink-0 bg-indigo-600/20 rounded-xl flex items-center justify-center border border-indigo-500/30">
-                            <PlaySquare className="w-6 h-6 text-indigo-400" />
-                        </div>
-                        <div>
-                            <h1 className="text-2xl md:text-3xl font-bold text-white leading-tight">
-                                Playlists
+                {/* Descriptive Top Banner */}
+                <div className="relative overflow-hidden rounded-3xl bg-slate-900 border border-slate-800 shadow-xl flex items-center min-h-[140px] px-8 py-6 mb-8">
+                    {/* Decorative Background for Banner */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-indigo-950/40 via-slate-900/20 to-fuchsia-950/20 pointer-events-none">
+                        <div className="absolute right-10 top-1/2 -translate-y-1/2 w-48 h-48 bg-fuchsia-500/10 rounded-full blur-[60px]"></div>
+                        <div className="absolute right-32 bottom-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-[40px]"></div>
+                    </div>
+                    
+                    <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between w-full gap-6">
+                        <div className="flex flex-col gap-1 w-full max-w-2xl">
+                            <h1 className="text-3xl font-extrabold text-white flex items-center gap-3">
+                                <div className="w-10 h-10 shrink-0 bg-fuchsia-500/20 rounded-xl flex items-center justify-center border border-fuchsia-500/30">
+                                    <PlaySquare className="w-5 h-5 text-fuchsia-400" />
+                                </div>
+                                Tus Playlists
                             </h1>
-                            <p className="text-slate-400 text-xs md:text-sm truncate">Crea listas de reproducción para {commerceProfile?.name}</p>
+                            <p className="text-slate-400 font-medium max-w-xl mt-1">
+                                Creá y organizá secuencias de contenido (imágenes, videos, apps) para proyectar en tus pantallas con el orden y tiempos que definas.
+                            </p>
+                        </div>
+                        
+                        <div className="shrink-0">
+                            <Button onClick={() => setIsCreateModalOpen(true)} className="bg-white hover:bg-slate-200 text-slate-900 rounded-full px-6 py-5 text-sm font-bold shadow-lg shadow-white/10 transition-all hover:scale-105">
+                                <Plus className="w-4 h-4 mr-2 text-indigo-600" /> Crear Playlist
+                            </Button>
                         </div>
                     </div>
-
-                    <Button onClick={() => setIsCreateModalOpen(true)} className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white shadow-[0_0_20px_rgba(79,70,229,0.3)]">
-                        <Plus className="w-4 h-4 mr-2" /> Crear Playlist
-                    </Button>
-                </header>
+                </div>
 
                 <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
                     <DialogContent className="bg-slate-900 border-slate-800 text-white">
