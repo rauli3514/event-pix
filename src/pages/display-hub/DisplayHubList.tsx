@@ -225,7 +225,7 @@ const DisplayHubList = () => {
                             <PlaySquare className="w-6 h-6 text-purple-400" />
                         </div>
                         <div>
-                            <p className="text-sm text-slate-400 font-medium">Playlists Activas</p>
+                            <p className="text-sm text-slate-400 font-medium">Listas Creadas</p>
                             <p className="text-2xl font-bold text-white">{activeCampaignsCount}</p>
                         </div>
                     </div>
