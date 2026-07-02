@@ -20,8 +20,8 @@ import PlaylistBuilder from "./pages/display-hub/PlaylistBuilder";
 import TvPlayer from "./pages/display-hub/TvPlayer";
 import TvBootScreen from "./pages/display-hub/TvBootScreen";
 import DisplayWorkspaceLayout from "./pages/display-hub/DisplayWorkspaceLayout";
+import WorkspaceDashboard from "./pages/display-hub/WorkspaceDashboard";
 import { 
-  WorkspaceDashboard, 
   WorkspaceAnalytics, 
   WorkspaceSettings 
 } from "./pages/display-hub/WorkspacePlaceholders";

@@ -1,4 +1,4 @@
-import { LayoutDashboard, FolderOpen, Puzzle, Calendar, BarChart3, Settings } from 'lucide-react';
+import { FolderOpen, Puzzle, Calendar, BarChart3, Settings } from 'lucide-react';
 
 function PlaceholderView({ title, icon: Icon, description }: { title: string, icon: any, description: string }) {
   return (
@@ -17,9 +17,6 @@ function PlaceholderView({ title, icon: Icon, description }: { title: string, ic
   );
 }
 
-export function WorkspaceDashboard() {
-  return <PlaceholderView title="Dashboard" icon={LayoutDashboard} description="Vista panorámica de tu red con gráficos avanzados y métricas en tiempo real." />;
-}
 
 export function WorkspaceLibrary() {
   return <PlaceholderView title="Biblioteca" icon={FolderOpen} description="Gestiona tus imágenes, videos y documentos en un solo lugar. Crea carpetas y organiza tus assets." />;

@@ -132,8 +132,17 @@ const TvPlayer = () => {
             // Si llega aquí, no hay contenido válido
             setStatus('no_content');
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error fetching campaign from Supabase:', error);
+            
+            // Si el error es PGRST116 (No rows found), significa que el dispositivo fue eliminado de la base de datos
+            if (error.code === 'PGRST116') {
+                console.log('El dispositivo ha sido eliminado. Desvinculando...');
+                localStorage.removeItem('device_id');
+                window.location.href = '/';
+                return;
+            }
+
             const cachedData = localStorage.getItem(`tv_cache_${deviceCode}`);
             if (cachedData) {
                 try {

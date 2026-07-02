@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation, useParams } from 'react-router-dom';
 import { 
+  LayoutDashboard,
   Monitor, 
   FolderOpen, 
   ListVideo, 
@@ -16,6 +17,7 @@ import { useCommerces, useDisplaySchedules, useUpdateSchedule, useAssignContentT
 import { toast } from 'sonner';
 
 const MENU_ITEMS = [
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: 'dashboard' },
   { id: 'screens', label: 'Pantallas', icon: Monitor, path: 'screens' },
   { id: 'library', label: 'Medios', icon: FolderOpen, path: 'library' },
   { id: 'playlists', label: 'Playlists', icon: ListVideo, path: 'playlists' },

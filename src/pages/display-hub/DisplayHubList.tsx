@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Monitor, Activity, Tv, Plus, Hash, FolderOpen, PlaySquare, Eye, ChevronDown, MoreVertical, Edit2, Info, Move, Trash2 } from 'lucide-react';
+import { Monitor, Plus, Hash, Eye, ChevronDown, MoreVertical, Edit2, Info, Move, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,7 +15,7 @@ import { Layers } from 'lucide-react';
 
 import { toast } from 'sonner';
 
-import { useDisplayDevices, useLinkDevice, useDisplayGroups, useDisplayCampaigns, useUpdateDisplayDevice, useAssignContentToDevice } from "@/hooks/use-display-hub";
+import { useDisplayDevices, useLinkDevice, useDisplayGroups, useUpdateDisplayDevice, useAssignContentToDevice } from "@/hooks/use-display-hub";
 import { supabase } from '@/lib/supabase';
 import { useQueryClient } from '@tanstack/react-query';
 import { DisplayDevice } from '@/types/display';
@@ -40,7 +40,6 @@ const DisplayHubList = () => {
     // Data Fetching
     const { data: devices, isLoading } = useDisplayDevices(effectiveCommerceId);
     const { data: linkGroups } = useDisplayGroups(effectiveCommerceId);
-    const { data: campaigns } = useDisplayCampaigns(effectiveCommerceId);
     const linkDevice = useLinkDevice();
     const updateDevice = useUpdateDisplayDevice();
     const assignContent = useAssignContentToDevice();
@@ -55,7 +54,6 @@ const DisplayHubList = () => {
     const [moveDeviceTarget, setMoveDeviceTarget] = useState<DisplayDevice | null>(null);
 
     const linkedDevices = devices?.filter(d => d.derived_status !== 'pending') || [];
-    const activeCampaignsCount = campaigns?.length || 0; 
     
     const unassignedCount = linkedDevices.filter(d => !d.group_id).length;
 
@@ -124,8 +122,6 @@ const DisplayHubList = () => {
         return matchesStatus && matchesGroup && matchesSearch;
     });
 
-    const onlineCount = linkedDevices.filter(d => d.derived_status === 'online').length;
-    const offlineCount = linkedDevices.filter(d => d.derived_status === 'offline').length;
 
     if (isLoading) return (
         <div className="h-full flex items-center justify-center bg-slate-950 text-white">
@@ -187,49 +183,6 @@ const DisplayHubList = () => {
                     </div>
                 </div>
 
-                {/* Metrics Top Bar */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
-                            <Tv className="w-6 h-6 text-blue-400" />
-                        </div>
-                        <div>
-                            <p className="text-sm text-slate-400 font-medium">Totales</p>
-                            <p className="text-2xl font-bold text-white">{linkedDevices.length}</p>
-                        </div>
-                    </div>
-                    <div className="bg-slate-900 border border-emerald-900/50 rounded-xl p-5 flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0">
-                            <Activity className="w-6 h-6 text-emerald-400" />
-                        </div>
-                        <div>
-                            <p className="text-sm text-slate-400 font-medium">Online / Offline</p>
-                            <div className="flex items-baseline gap-2">
-                                <p className="text-2xl font-bold text-emerald-400">{onlineCount}</p>
-                                <span className="text-slate-500">/</span>
-                                <p className="text-lg font-bold text-rose-400">{offlineCount}</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center shrink-0">
-                            <FolderOpen className="w-6 h-6 text-amber-400" />
-                        </div>
-                        <div>
-                            <p className="text-sm text-slate-400 font-medium">Archivos</p>
-                            <p className="text-2xl font-bold text-white">0</p>
-                        </div>
-                    </div>
-                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full bg-purple-500/10 flex items-center justify-center shrink-0">
-                            <PlaySquare className="w-6 h-6 text-purple-400" />
-                        </div>
-                        <div>
-                            <p className="text-sm text-slate-400 font-medium">Listas Creadas</p>
-                            <p className="text-2xl font-bold text-white">{activeCampaignsCount}</p>
-                        </div>
-                    </div>
-                </div>
 
                 {/* Filters & Search */}
                 <div className="flex flex-col sm:flex-row gap-4 items-center justify-between mt-8">
