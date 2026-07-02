@@ -10,6 +10,7 @@ import {
   ArrowLeft,
   Menu
 } from 'lucide-react';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
@@ -83,17 +84,17 @@ export default function DisplayWorkspaceLayout() {
 
   const SidebarContent = () => (
     <>
-      <div className="h-16 flex items-center px-4 border-b border-slate-800 shrink-0">
-        <Button variant="ghost" size="sm" asChild className="text-slate-400 hover:text-white hover:bg-slate-800 -ml-2 mr-2 px-2">
+      <div className="h-16 flex items-center px-4 border-b border-border shrink-0 transition-colors duration-300">
+        <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground hover:bg-muted -ml-2 mr-2 px-2">
           <Link to="/admin/display">
             <ArrowLeft className="w-4 h-4" />
           </Link>
         </Button>
         <div className="flex flex-col overflow-hidden">
-          <div className="font-bold text-lg font-[Orbitron] text-white leading-tight">
-            Display <span className="text-indigo-400">Hub</span>
+          <div className="font-bold text-lg font-[Orbitron] text-foreground leading-tight transition-colors duration-300">
+            Display <span className="text-indigo-500">Hub</span>
           </div>
-          <div className="text-xs text-slate-400 truncate max-w-[130px] md:max-w-full" title={currentCommerce?.name || ''}>
+          <div className="text-xs text-muted-foreground truncate max-w-[130px] md:max-w-full" title={currentCommerce?.name || ''}>
             {currentCommerce?.name || 'Cargando...'}
           </div>
         </div>
@@ -111,35 +112,40 @@ export default function DisplayWorkspaceLayout() {
               className={cn(
                 "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                 isActive 
-                  ? "bg-indigo-600/10 text-indigo-400" 
-                  : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
+                  ? "bg-indigo-600/10 text-indigo-500" 
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
               )}
             >
-              <item.icon className={cn("w-5 h-5 shrink-0", isActive ? "text-indigo-400" : "text-slate-500")} />
+              <item.icon className={cn("w-5 h-5 shrink-0", isActive ? "text-indigo-500" : "text-muted-foreground")} />
               <span className="truncate">{item.label}</span>
             </Link>
           );
         })}
       </nav>
+      
+      <div className="p-4 border-t border-border mt-auto flex items-center justify-between">
+        <span className="text-xs text-muted-foreground font-medium">Tema</span>
+        <ThemeToggle />
+      </div>
     </>
   );
 
   return (
-    <div className="flex h-[100dvh] w-full bg-slate-950 text-slate-200 overflow-hidden font-sans flex-col md:flex-row">
+    <div className="flex h-[100dvh] w-full bg-background text-foreground overflow-hidden font-sans flex-col md:flex-row transition-colors duration-300">
       
       {/* Mobile Top Navbar */}
-      <div className="md:hidden h-14 shrink-0 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-4 z-20">
+      <div className="md:hidden h-14 shrink-0 bg-card border-b border-border flex items-center justify-between px-4 z-20 transition-colors duration-300">
         <div className="flex items-center gap-2 overflow-hidden">
-            <Button variant="ghost" size="icon" asChild className="text-slate-400 hover:text-white">
+            <Button variant="ghost" size="icon" asChild className="text-muted-foreground hover:text-foreground">
                 <Link to="/admin/display">
                     <ArrowLeft className="w-5 h-5" />
                 </Link>
             </Button>
             <div className="flex flex-col min-w-0">
-                <div className="font-bold text-base font-[Orbitron] text-white leading-tight truncate">
-                    Display <span className="text-indigo-400">Hub</span>
+                <div className="font-bold text-base font-[Orbitron] text-foreground leading-tight truncate">
+                    Display <span className="text-indigo-500">Hub</span>
                 </div>
-                <div className="text-[10px] text-slate-400 truncate">
+                <div className="text-[10px] text-muted-foreground truncate">
                     {currentCommerce?.name}
                 </div>
             </div>
@@ -147,11 +153,11 @@ export default function DisplayWorkspaceLayout() {
 
         <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white">
+            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
               <Menu className="w-6 h-6" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-[280px] sm:w-[320px] p-0 bg-slate-900 border-r-slate-800 flex flex-col">
+          <SheetContent side="left" className="w-[280px] sm:w-[320px] p-0 bg-card border-r-border flex flex-col transition-colors duration-300">
             <SheetTitle className="sr-only">Menú de Navegación</SheetTitle>
             <SidebarContent />
           </SheetContent>
@@ -159,12 +165,12 @@ export default function DisplayWorkspaceLayout() {
       </div>
 
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-64 shrink-0 bg-slate-900 border-r border-slate-800 flex-col h-full z-20">
+      <aside className="hidden md:flex w-64 shrink-0 bg-card border-r border-border flex-col h-full z-20 transition-colors duration-300">
         <SidebarContent />
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden relative bg-slate-950">
+      <main className="flex-1 flex flex-col h-full overflow-hidden relative bg-background transition-colors duration-300">
         {/* Decorative background blurs for aesthetics */}
         <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] bg-indigo-600/5 rounded-full mix-blend-screen filter blur-[100px] pointer-events-none" />
         

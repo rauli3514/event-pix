@@ -161,10 +161,10 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
     };
 
     return (
-        <div className="h-full flex flex-col bg-[#0A101D] text-slate-200">
+        <div className="h-full flex flex-col bg-background text-foreground transition-colors duration-300">
             {/* Descriptive Top Banner */}
             <div className="p-6 md:px-8 pt-6 pb-2 shrink-0">
-                <div className="relative overflow-hidden rounded-3xl bg-slate-900 border border-slate-800 shadow-xl flex items-center min-h-[140px] px-8 py-6">
+                <div className="relative overflow-hidden rounded-3xl bg-card border border-border shadow-xl flex items-center min-h-[140px] px-8 py-6 transition-colors duration-300">
                     {/* Decorative Background for Banner */}
                     <div className="absolute inset-0 bg-gradient-to-r from-indigo-950/40 via-slate-900/20 to-orange-950/20 pointer-events-none">
                         <div className="absolute right-10 top-1/2 -translate-y-1/2 w-48 h-48 bg-orange-500/10 rounded-full blur-[60px]"></div>
@@ -176,11 +176,11 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                             {activeCategory !== 'apps' && (
                                 <Sheet>
                                     <SheetTrigger asChild>
-                                        <Button variant="outline" size="icon" className="md:hidden border-slate-700 bg-slate-800/50 text-slate-300 w-10 h-10 shrink-0">
+                                        <Button variant="outline" size="icon" className="md:hidden border-border bg-muted/50 text-muted-foreground hover:text-foreground w-10 h-10 shrink-0">
                                             <Folder className="w-5 h-5" />
                                         </Button>
                                     </SheetTrigger>
-                                    <SheetContent side="left" className="p-0 bg-slate-900 border-slate-800 w-72 flex flex-col">
+                                    <SheetContent side="left" className="p-0 bg-card border-r-border w-72 flex flex-col transition-colors duration-300">
                                         <SheetTitle className="sr-only">Carpetas de Medios</SheetTitle>
                                         <MediaFolderSidebar 
                                             commerceId={commerceId!}
@@ -197,7 +197,7 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                             )}
                             {activeCategory === 'apps' ? 'Aplicaciones' : 'Medios y Archivos'}
                         </h1>
-                        <p className="text-slate-400 font-medium max-w-xl">
+                        <p className="text-muted-foreground font-medium max-w-xl">
                             {activeCategory === 'apps' 
                                 ? 'Creá y administrá aplicaciones y widgets dinámicos para tus pantallas.' 
                                 : 'Gestioná tus imágenes, videos y enlaces, agrupándolos en carpetas para un mayor control al enviarlos.'}
@@ -220,35 +220,35 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                     ) : (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button className="bg-slate-800 text-slate-200 border border-slate-700 shadow-sm hover:bg-slate-700 hover:text-white">
+                                <Button className="bg-muted text-foreground border border-border shadow-sm hover:bg-accent hover:text-accent-foreground">
                                     <Upload className="w-4 h-4 mr-2" />
                                     Subir / Agregar...
                                 </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48 bg-slate-900 border-slate-800 text-slate-200 z-50">
-                                <DropdownMenuItem onClick={() => { setUploadCategory('all'); setIsUploadModalOpen(true); }} className="hover:bg-slate-800 cursor-pointer focus:bg-slate-800 focus:text-white">
+                            <DropdownMenuContent align="end" className="w-48 bg-card border-border text-foreground z-50">
+                                <DropdownMenuItem onClick={() => { setUploadCategory('all'); setIsUploadModalOpen(true); }} className="hover:bg-accent cursor-pointer focus:bg-accent focus:text-accent-foreground">
                                     <Upload className="w-4 h-4 mr-2" /> Subir Archivo
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setUploadCategory('web'); setIsUploadModalOpen(true); }} className="hover:bg-slate-800 cursor-pointer focus:bg-slate-800 focus:text-white">
+                                <DropdownMenuItem onClick={() => { setUploadCategory('web'); setIsUploadModalOpen(true); }} className="hover:bg-accent cursor-pointer focus:bg-accent focus:text-accent-foreground">
                                     <Globe className="w-4 h-4 mr-2 text-blue-400" /> Agregar Enlace Web
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     )}
-                    <div className="h-8 w-[1px] bg-slate-700 mx-1 hidden sm:block"></div>
+                    <div className="h-8 w-[1px] bg-border mx-1 hidden sm:block"></div>
                     <Button 
                         variant="outline"
-                        className="bg-slate-800 text-slate-200 shadow-sm border-slate-700 hover:bg-slate-700 hover:text-white disabled:opacity-50"
+                        className="bg-muted text-foreground shadow-sm border-border hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
                         disabled={selectedIds.length === 0}
                         onClick={() => setIsMoveModalOpen(true)}
                     >
-                        <Move className="w-4 h-4 mr-2 text-indigo-400" />
+                        <Move className="w-4 h-4 mr-2 text-indigo-500" />
                         Mover
                     </Button>
                     {selectedIds.length > 0 && (
                         <Button 
                             variant="outline"
-                            className="bg-red-950/50 text-red-400 shadow-sm border-red-900 hover:bg-red-900/50 hover:text-red-300"
+                            className="bg-destructive/10 text-destructive shadow-sm border-destructive/20 hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
                             onClick={handleBulkDelete}
                         >
                             <Trash2 className="w-4 h-4 mr-2" />
@@ -266,45 +266,46 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                 </div>
             </div>
 
-            <div className="flex flex-1 overflow-hidden flex-col md:flex-row min-h-0">
-                {/* Left Sidebar - Media Folders */}
-                <div className="hidden md:block shrink-0 h-full">
-                    {commerceId && activeCategory !== 'apps' && (
-                        <MediaFolderSidebar 
-                            commerceId={commerceId}
-                            mediaFiles={mediaFiles}
-                            currentFolder={currentFolder}
-                            onSelectFolder={(path) => {
-                                setCurrentFolder(path);
-                                setSearch('');
-                                setSelectedIds([]);
-                            }}
-                        />
-                    )}
-                </div>
+            <div className="flex flex-1 overflow-hidden flex-col md:flex-row min-h-0 border-t border-border mt-2">
+                {/* Desktop Sidebar */}
+                {activeCategory !== 'apps' && (
+                    <div className="hidden md:flex w-64 shrink-0 border-r border-border bg-card flex-col transition-colors duration-300">
+                        {commerceId && (
+                            <MediaFolderSidebar 
+                                commerceId={commerceId}
+                                mediaFiles={mediaFiles}
+                                currentFolder={currentFolder}
+                                onSelectFolder={(path) => {
+                                    setCurrentFolder(path);
+                                    setSearch('');
+                                    setSelectedIds([]);
+                                }}
+                            />
+                        )}
+                    </div>
+                )}
 
                 {/* Main Content Area */}
-                <div className="flex-1 flex flex-col bg-[#0A101D] min-h-0">
+                <div className="flex-1 flex flex-col bg-background/50 min-h-0">
                     <div className="p-6 flex-1 flex flex-col overflow-hidden min-h-0">
                         
                         {/* Filters and Toolbar */}
                         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-4 shrink-0">
-                            <div className="flex flex-col md:flex-row items-start md:items-center gap-3 flex-1">
-                                <div className="relative w-full md:w-64 shrink-0">
-                                    <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-500" />
+                            <div className="flex items-center gap-3">
+                                <div className="relative w-full md:w-64">
+                                    <Search className="w-4 h-4 absolute left-3 top-2.5 text-muted-foreground" />
                                     <Input 
-                                        placeholder="Buscar..."
-                                        className="pl-9 bg-slate-900 shadow-sm border-slate-800 text-slate-200 placeholder:text-slate-500"
+                                        placeholder="Buscar archivos..."
+                                        className="pl-9 bg-card shadow-sm border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-indigo-500"
                                         value={search}
                                         onChange={(e) => setSearch(e.target.value)}
                                     />
                                 </div>
-
                             </div>
 
                             <div className="flex items-center gap-3 shrink-0">
                                 <select 
-                                    className="h-9 px-3 rounded-md border border-slate-800 bg-slate-900 text-sm text-slate-300 outline-none focus:ring-2 focus:ring-orange-500/50 shadow-sm"
+                                    className="h-9 px-3 rounded-md border border-border bg-card text-sm text-foreground outline-none focus:ring-2 focus:ring-indigo-500/50 shadow-sm"
                                     value={sortMode}
                                     onChange={(e) => setSortMode(e.target.value as any)}
                                 >
@@ -313,17 +314,17 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                                     <option value="az">A-Z</option>
                                     <option value="za">Z-A</option>
                                 </select>
-                                <div className="flex bg-slate-900/50 p-1 rounded-md border border-slate-800 shadow-sm">
+                                <div className="flex bg-muted/50 p-1 rounded-md border border-border shadow-sm">
                                     <Button 
                                         variant="ghost" size="sm" 
-                                        className={`h-8 px-2 ${viewMode === 'grid' ? 'bg-slate-800 text-slate-200 shadow-sm' : 'text-slate-500 hover:text-slate-400'}`}
+                                        className={`h-8 px-2 ${viewMode === 'grid' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
                                         onClick={() => setViewMode('grid')}
                                     >
                                         <LayoutGrid className="w-4 h-4" />
                                     </Button>
                                     <Button 
                                         variant="ghost" size="sm" 
-                                        className={`h-8 px-2 ${viewMode === 'list' ? 'bg-slate-800 text-slate-200 shadow-sm' : 'text-slate-500 hover:text-slate-400'}`}
+                                        className={`h-8 px-2 ${viewMode === 'list' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
                                         onClick={() => setViewMode('list')}
                                     >
                                         <ListIcon className="w-4 h-4" />
@@ -334,85 +335,85 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
 
                         {/* Breadcrumbs */}
                         {!search && (
-                            <div className="mb-4 flex items-center gap-2 text-sm text-slate-400 shrink-0">
+                            <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground shrink-0">
                                 <button 
                                     onClick={() => navigateToBreadcrumb(-1)}
-                                    className="hover:text-orange-400 transition-colors font-medium"
+                                    className="hover:text-indigo-500 transition-colors font-medium"
                                 >
                                     Raíz
                                 </button>
                                 {breadcrumbs.map((crumb, idx) => (
                                     <div key={idx} className="flex items-center gap-2">
-                                        <span className="text-slate-600">/</span>
+                                        <span className="text-border">/</span>
                                         <button
                                             onClick={() => navigateToBreadcrumb(idx)}
-                                            className={`hover:text-orange-400 transition-colors ${idx === breadcrumbs.length - 1 ? 'font-semibold text-slate-200' : 'font-medium'}`}
+                                            className={`hover:text-indigo-500 transition-colors ${idx === breadcrumbs.length - 1 ? 'font-semibold text-foreground' : 'font-medium'}`}
                                         >
                                             {crumb}
                                         </button>
                                     </div>
                                 ))}
-                                <span className="ml-auto text-xs text-slate-500 font-medium">
+                                <span className="ml-auto text-xs text-muted-foreground font-medium">
                                     {isLoading ? 'Cargando...' : `${filteredFiles.length} elemento(s)`}
                                 </span>
                             </div>
                         )}
                         {search && (
                             <div className="mb-4 flex items-center justify-between shrink-0">
-                                <h3 className="text-sm font-medium text-slate-200">Resultados de búsqueda: "{search}"</h3>
-                                <span className="text-xs text-slate-500 font-medium">{filteredFiles.length} elemento(s)</span>
+                                <h3 className="text-sm font-medium text-foreground">Resultados de búsqueda: "{search}"</h3>
+                                <span className="text-xs text-muted-foreground font-medium">{filteredFiles.length} elemento(s)</span>
                             </div>
                         )}
 
                         {/* Data View */}
                         <div className="flex-1 overflow-y-auto pb-6 pr-2 min-h-0">
                             {isLoading ? (
-                                <div className="bg-slate-900/50 rounded-xl shadow-sm border border-slate-800 p-12 flex flex-col items-center justify-center text-slate-500 h-full">
-                                    <p className="text-lg font-medium text-slate-400">Cargando archivos...</p>
+                                <div className="bg-card/50 rounded-xl shadow-sm border border-border p-12 flex flex-col items-center justify-center text-muted-foreground h-full">
+                                    <p className="text-lg font-medium text-muted-foreground">Cargando archivos...</p>
                                 </div>
                             ) : filteredFiles.length === 0 ? (
-                                <div className="bg-slate-900/50 rounded-xl shadow-sm border border-slate-800 p-12 flex flex-col items-center justify-center text-slate-500 h-full">
-                                    <HardDrive className="w-12 h-12 mb-4 text-slate-600" />
-                                    <p className="text-lg font-medium text-slate-400">Carpeta vacía</p>
-                                    <p className="text-sm text-slate-500">Sube archivos a esta ubicación.</p>
+                                <div className="bg-card/50 rounded-xl shadow-sm border border-border p-12 flex flex-col items-center justify-center text-muted-foreground h-full min-h-[300px]">
+                                    <FolderOpen className="w-16 h-16 mb-4 text-muted-foreground/50" />
+                                    <p className="text-lg font-medium text-foreground">No hay archivos</p>
+                                    <p className="text-sm mt-1 text-center max-w-md">Sube archivos, enlaces web o crea carpetas para organizar tu contenido.</p>
                                     <Button className="mt-6 bg-orange-500 hover:bg-orange-600 text-white" onClick={() => setIsUploadModalOpen(true)}>
                                         <Upload className="w-4 h-4 mr-2" /> Subir Archivos
                                     </Button>
                                 </div>
                             ) : viewMode === 'list' ? (
-                                <div className="bg-slate-900 rounded-xl shadow-sm border border-slate-800 overflow-hidden">
-                                    <table className="w-full text-left border-collapse">
+                                <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+                                    <table className="w-full text-left text-sm whitespace-nowrap">
                                         <thead>
-                                            <tr className="bg-slate-950/50 border-b border-slate-800">
-                                                <th className="px-4 py-3 w-12">
+                                            <tr className="bg-muted/50 border-b border-border">
+                                                <th className="w-10 px-4 py-3">
                                                     <input 
                                                         type="checkbox" 
-                                                        className="rounded border-slate-700 text-orange-500 focus:ring-orange-500/20 bg-slate-900" 
+                                                        className="rounded border-border text-indigo-500 focus:ring-indigo-500/20 bg-background" 
                                                         checked={selectedIds.length === filteredFiles.length && filteredFiles.length > 0}
                                                         onChange={handleSelectAll}
                                                     />
                                                 </th>
-                                                <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Nombre</th>
-                                                {search && <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Ubicación</th>}
-                                                <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Modificado</th>
-                                                <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider text-right">Acciones</th>
+                                                <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nombre</th>
+                                                {search && <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ubicación</th>}
+                                                <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Modificado</th>
+                                                <th className="px-4 py-3 font-medium text-muted-foreground w-16"></th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-slate-800/50">
+                                        <tbody className="divide-y divide-border/50">
                                             {filteredFiles.map(file => {
                                                 const FileIcon = getIconForType(file.type);
                                                 const isFolder = file.type === 'folder';
                                                 return (
-                                                <tr key={file.id} className="hover:bg-slate-800/50 transition-colors group">
-                                                    <td className="px-4 py-4">
+                                                <tr key={file.id} className="hover:bg-muted/50 transition-colors group">
+                                                    <td className="px-4 py-3">
                                                         <input 
                                                             type="checkbox" 
-                                                            className="rounded border-slate-700 text-orange-500 focus:ring-orange-500/20 bg-slate-900" 
+                                                            className="rounded border-border text-indigo-500 focus:ring-indigo-500/20 bg-background" 
                                                             checked={selectedIds.includes(file.id)}
                                                             onChange={() => handleToggleSelect(file.id)}
                                                         />
                                                     </td>
-                                                    <td className="px-4 py-4 cursor-pointer" onClick={() => {
+                                                    <td className="px-4 py-3 cursor-pointer" onClick={() => {
                                                         if (isFolder) {
                                                             setCurrentFolder(currentFolder === '/' ? `/${file.name}` : `${currentFolder}/${file.name}`);
                                                             setSearch('');
@@ -421,18 +422,18 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                                                         }
                                                     }}>
                                                         <div className="flex items-center gap-3">
-                                                            <div className="w-10 h-10 rounded bg-slate-950 border border-slate-800 flex items-center justify-center shrink-0 overflow-hidden">
+                                                            <div className="w-10 h-10 rounded bg-muted border border-border flex items-center justify-center shrink-0 overflow-hidden">
                                                                 {file.type === 'image' && file.url ? (
                                                                     <img src={file.url} alt={file.name} className="w-full h-full object-cover" />
                                                                 ) : (
-                                                                    <FileIcon className={`w-5 h-5 ${isFolder ? 'text-orange-400 fill-orange-400/20' : 'text-slate-500'}`} />
+                                                                    <FileIcon className={`w-5 h-5 ${isFolder ? 'text-orange-400' : 'text-muted-foreground'}`} />
                                                                 )}
                                                             </div>
-                                                            <span className="font-medium text-slate-200 truncate max-w-sm" title={file.name}>{file.name}</span>
+                                                            <span className="font-medium text-foreground truncate max-w-sm" title={file.name}>{file.name}</span>
                                                         </div>
                                                     </td>
                                                     {search && (
-                                                        <td className="px-4 py-4 text-xs text-slate-500">
+                                                        <td className="px-4 py-4 text-xs text-muted-foreground">
                                                             {file.folder_path === '/' ? 'Raíz' : file.folder_path}
                                                         </td>
                                                     )}
@@ -511,6 +512,7 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                                                     <input 
                                                         type="checkbox" 
                                                         className="w-4 h-4 rounded border-orange-500 text-orange-500 focus:ring-orange-500/30 shadow-sm bg-slate-900/80 cursor-pointer" 
+                                                        className="w-4 h-4 rounded border-primary text-primary focus:ring-primary/20 shadow-sm bg-background cursor-pointer" 
                                                         checked={true}
                                                         onChange={(e) => { e.stopPropagation(); handleToggleSelect(file.id); }}
                                                     />
@@ -519,53 +521,55 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                                             <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8 bg-slate-900/60 backdrop-blur-md text-slate-300 hover:bg-slate-800 hover:text-white rounded-full shadow-sm border border-slate-700/50" onClick={(e) => e.stopPropagation()}>
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8 bg-background/80 backdrop-blur-md text-foreground hover:bg-muted rounded-full shadow-sm border border-border" onClick={(e) => e.stopPropagation()}>
                                                             <MoreVertical className="w-4 h-4" />
                                                         </Button>
                                                     </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" className="w-48 bg-slate-900 border-slate-800 text-slate-200 z-50">
+                                                    <DropdownMenuContent align="end" className="w-48 bg-card border-border text-foreground z-50">
                                                         {file.type === 'app' && (
-                                                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditingApp(file); }} className="hover:bg-slate-800 cursor-pointer focus:bg-slate-800 focus:text-white">
-                                                                <Edit2 className="w-4 h-4 mr-2 text-indigo-400" /> Editar App
+                                                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditingApp(file); }} className="hover:bg-accent cursor-pointer focus:bg-accent focus:text-accent-foreground">
+                                                                <Edit2 className="w-4 h-4 mr-2 text-primary" /> Editar App
                                                             </DropdownMenuItem>
                                                         )}
                                                         <DropdownMenuItem onClick={(e) => { 
                                                             e.stopPropagation(); 
                                                             setSelectedIds([file.id]);
                                                             setIsSendModalOpen(true);
-                                                        }} className="hover:bg-slate-800 cursor-pointer focus:bg-slate-800 focus:text-white">
-                                                            <Play className="w-4 h-4 mr-2 text-orange-400" /> Enviar a pantallas
+                                                        }} className="hover:bg-accent cursor-pointer focus:bg-accent focus:text-accent-foreground">
+                                                            <Play className="w-4 h-4 mr-2 text-primary" /> Enviar a pantallas
                                                         </DropdownMenuItem>
                                                         <DropdownMenuItem onClick={(e) => { 
                                                             e.stopPropagation(); 
                                                             setSelectedIds([file.id]);
                                                             setIsMoveModalOpen(true);
-                                                        }} className="hover:bg-slate-800 cursor-pointer focus:bg-slate-800 focus:text-white">
+                                                        }} className="hover:bg-accent cursor-pointer focus:bg-accent focus:text-accent-foreground">
                                                             <Move className="w-4 h-4 mr-2 text-blue-400" /> Mover
                                                         </DropdownMenuItem>
-                                                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDelete(file); }} className="hover:bg-red-900/50 cursor-pointer focus:bg-red-900/50 focus:text-red-300 text-red-400">
+                                                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDelete(file); }} className="hover:bg-destructive/10 cursor-pointer focus:bg-destructive/10 focus:text-destructive text-destructive">
                                                             <Trash2 className="w-4 h-4 mr-2" /> Eliminar
                                                         </DropdownMenuItem>
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
                                             </div>
-                                            <div className="aspect-[4/3] bg-slate-950/50 relative overflow-hidden flex items-center justify-center p-4">
+                                            
+                                            {/* Preview Area */}
+                                            <div className="flex-1 bg-muted/50 relative overflow-hidden flex items-center justify-center p-4">
                                                 {file.type === 'image' && file.url ? (
-                                                    <img src={file.url} alt={file.name} className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500 ease-out drop-shadow-md" />
-                                                ) : appData ? (
-                                                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${appData.bg} group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 ease-out shadow-inner`}>
-                                                        <appData.icon className={`w-8 h-8 ${appData.color}`} />
-                                                    </div>
+                                                    <img src={file.url} alt={file.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                                                 ) : (
-                                                    <FileIcon className={`w-14 h-14 ${isFolder ? 'text-orange-400 fill-orange-400/20 group-hover:scale-110 transition-transform duration-500 drop-shadow-md' : 'text-slate-600'}`} />
+                                                    <div className="w-16 h-16 rounded-2xl bg-card border border-border/50 shadow-inner flex items-center justify-center transform transition-transform group-hover:scale-110 group-hover:-rotate-3">
+                                                        <FileIcon className={`w-8 h-8 ${isFolder ? 'text-primary fill-primary/20' : 'text-muted-foreground'}`} />
+                                                    </div>
                                                 )}
                                             </div>
-                                            <div className="p-4 border-t border-slate-800/60 bg-slate-900/40 backdrop-blur-sm flex flex-col justify-center min-h-[4rem]">
-                                                <h4 className="font-semibold text-slate-200 text-sm truncate group-hover:text-white transition-colors" title={file.name}>{file.name}</h4>
+                                            
+                                            {/* Card Details */}
+                                            <div className="p-4 border-t border-border/60 bg-card/40 backdrop-blur-sm flex flex-col justify-center min-h-[4rem] shrink-0">
+                                                <h4 className="font-semibold text-foreground text-sm truncate max-w-full" title={file.name}>{file.name}</h4>
                                                 {search ? (
-                                                    <p className="text-xs font-medium text-orange-400/90 mt-1 truncate">{file.folder_path === '/' ? 'Raíz' : file.folder_path}</p>
+                                                    <p className="text-xs font-medium text-primary mt-1 truncate">{file.folder_path === '/' ? 'Raíz' : file.folder_path}</p>
                                                 ) : (
-                                                    <p className="text-xs text-slate-500 mt-1 truncate flex items-center gap-1.5"><Clock className="w-3 h-3" /> {formatDate(file.created_at).split(',')[0]}</p>
+                                                    <p className="text-xs text-muted-foreground mt-1 truncate flex items-center gap-1.5"><Clock className="w-3 h-3" /> {formatDate(file.created_at).split(',')[0]}</p>
                                                 )}
                                             </div>
                                         </div>

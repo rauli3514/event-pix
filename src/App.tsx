@@ -32,65 +32,69 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { EventProvider } from "./context/EventContext";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
+import { ThemeProvider } from "./components/theme-provider";
+
 const queryClient = new QueryClient();
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+  <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
 
-          <Route path="/kiosco" element={<KioskAI />} />
-          <Route path="/sticker-test" element={<div className="min-h-screen bg-zinc-950 pt-10"><StickerEditor userPhotoUrl="/placeholder-user.jpg" onSave={(url) => console.log(url)} onCancel={() => console.log("cancel")} /></div>} />
+            <Route path="/kiosco" element={<KioskAI />} />
+            <Route path="/sticker-test" element={<div className="min-h-screen bg-zinc-950 pt-10"><StickerEditor userPhotoUrl="/placeholder-user.jpg" onSave={(url) => console.log(url)} onCancel={() => console.log("cancel")} /></div>} />
 
-          <Route element={<EventProvider><Outlet /></EventProvider>}>
-            <Route element={<ProtectedRoute />}>
-              <Route path="/admin" element={<AdminDashboard />} />
-              <Route path="/admin/providers" element={<ProvidersList />} />
-              <Route path="/admin/kiosco-manager" element={<KioskManager />} />
-              <Route path="/admin/display" element={<DisplayHubMain />} />
-              
-              {/* Rutas del Display Workspace */}
-              <Route path="/admin/display/commerce/:commerceId/workspace" element={<DisplayWorkspaceLayout />}>
-                <Route index element={<Navigate to="screens" replace />} />
-                <Route path="dashboard" element={<WorkspaceDashboard />} />
-                <Route path="screens" element={<DisplayHubList />} />
-                <Route path="library" element={<WorkspaceMedia />} />
-                <Route path="playlists" element={<DisplayPlaylists />} />
-                <Route path="apps" element={<WorkspaceMedia initialCategory="apps" />} />
-                <Route path="schedule" element={<WorkspaceSchedule />} />
-                <Route path="analytics" element={<WorkspaceAnalytics />} />
-                <Route path="settings" element={<WorkspaceSettings />} />
+            <Route element={<EventProvider><Outlet /></EventProvider>}>
+              <Route element={<ProtectedRoute />}>
+                <Route path="/admin" element={<AdminDashboard />} />
+                <Route path="/admin/providers" element={<ProvidersList />} />
+                <Route path="/admin/kiosco-manager" element={<KioskManager />} />
+                <Route path="/admin/display" element={<DisplayHubMain />} />
+                
+                {/* Rutas del Display Workspace */}
+                <Route path="/admin/display/commerce/:commerceId/workspace" element={<DisplayWorkspaceLayout />}>
+                  <Route index element={<Navigate to="screens" replace />} />
+                  <Route path="dashboard" element={<WorkspaceDashboard />} />
+                  <Route path="screens" element={<DisplayHubList />} />
+                  <Route path="library" element={<WorkspaceMedia />} />
+                  <Route path="playlists" element={<DisplayPlaylists />} />
+                  <Route path="apps" element={<WorkspaceMedia initialCategory="apps" />} />
+                  <Route path="schedule" element={<WorkspaceSchedule />} />
+                  <Route path="analytics" element={<WorkspaceAnalytics />} />
+                  <Route path="settings" element={<WorkspaceSettings />} />
+                </Route>
+                
+                <Route path="/admin/display/commerce/:commerceId/playlists/:playlistId" element={<PlaylistBuilder />} />
+                <Route path="/admin/display/:id" element={<DisplayDeviceDetail />} />
+                
+                <Route path="/admin/:slug" element={
+                  <ErrorBoundary>
+                    <Admin />
+                  </ErrorBoundary>
+                } />
               </Route>
-              
-              <Route path="/admin/display/commerce/:commerceId/playlists/:playlistId" element={<PlaylistBuilder />} />
-              <Route path="/admin/display/:id" element={<DisplayDeviceDetail />} />
-              
-              <Route path="/admin/:slug" element={
-                <ErrorBoundary>
-                  <Admin />
-                </ErrorBoundary>
-              } />
+
+              {/* TV Player Route (No Layout, Fullscreen) */}
+              <Route path="/tv-boot" element={<TvBootScreen />} />
+              <Route path="/tv/:deviceCode" element={<TvPlayer />} />
+
+              <Route path="/:slug" element={<Index />} />
+              <Route path="/:slug/display" element={<Display />} />
             </Route>
 
-            {/* TV Player Route (No Layout, Fullscreen) */}
-            <Route path="/tv-boot" element={<TvBootScreen />} />
-            <Route path="/tv/:deviceCode" element={<TvPlayer />} />
+            <Route path="/" element={<Navigate to="/login" replace />} />
 
-            <Route path="/:slug" element={<Index />} />
-            <Route path="/:slug/display" element={<Display />} />
-          </Route>
-
-          <Route path="/" element={<Navigate to="/login" replace />} />
-
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ThemeProvider>
 );
 
 export default App;
