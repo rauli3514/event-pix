@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { PlaySquare, Plus, Clock, LayoutDashboard, MoreVertical, Trash2, Edit } from 'lucide-react';
+import { PlaySquare, Plus, Clock, MoreVertical, Trash2, Edit2, FileVideo, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -53,9 +53,7 @@ const DisplayPlaylists = () => {
         });
     };
 
-    const handleDelete = (id: string, name: string) => {
-        if (confirm(`¿Estás seguro de eliminar la playlist "${name}"? Esto detendrá la reproducción en todas las pantallas asignadas a ella.`)) {
-            deleteCampaign.mutate({ id }, {
+
     if (isLoading) return (
         <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -102,13 +100,13 @@ const DisplayPlaylists = () => {
                                 Ingresá un nombre para tu nueva lista de reproducción.
                             </DialogDescription>
                         </DialogHeader>
-                        <form onSubmit={handleCreateCampaign} className="space-y-4 py-4">
+                        <form onSubmit={handleCreateSubmit} className="space-y-4 py-4">
                             <div className="space-y-2">
                                 <Label htmlFor="name" className="text-foreground">Nombre de la Playlist *</Label>
                                 <Input 
                                     id="name" 
-                                    value={newCampaignName} 
-                                    onChange={e => setNewCampaignName(e.target.value)} 
+                                    value={newCampaignData.name} 
+                                    onChange={e => setNewCampaignData({ ...newCampaignData, name: e.target.value })} 
                                     placeholder="Ej: Promociones de Verano"
                                     className="bg-background border-border text-foreground"
                                     required
@@ -118,8 +116,8 @@ const DisplayPlaylists = () => {
                                 <Label htmlFor="desc" className="text-foreground">Descripción (Opcional)</Label>
                                 <Input 
                                     id="desc" 
-                                    value={newCampaignDesc} 
-                                    onChange={e => setNewCampaignDesc(e.target.value)} 
+                                    value={newCampaignData.description} 
+                                    onChange={e => setNewCampaignData({ ...newCampaignData, description: e.target.value })} 
                                     placeholder="Breve descripción del contenido"
                                     className="bg-background border-border text-foreground"
                                 />
@@ -134,7 +132,16 @@ const DisplayPlaylists = () => {
                 {/* Grid of Playlists */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {campaigns?.map(campaign => {
-                        const itemsCount = campaign.items_json?.zones?.[0]?.playlist?.length || 0;
+                        let itemsCount = 0;
+
+                        if (Array.isArray(campaign.items_json)) {
+                            itemsCount = campaign.items_json.length;
+                        } else if (campaign.items_json?.version === '2.0') {
+                            const v2 = campaign.items_json as any;
+                            const playlist = v2.zones?.[0]?.playlist || [];
+                            itemsCount = playlist.length;
+                        }
+                        
                         return (
                             <div key={campaign.id} className="group bg-card border border-border rounded-2xl p-6 hover:border-primary/50 transition-all duration-300 flex flex-col shadow-sm hover:shadow-md">
                                 <div className="flex justify-between items-start mb-4">

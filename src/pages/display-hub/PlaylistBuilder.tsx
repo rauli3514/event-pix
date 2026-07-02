@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { 
     ArrowLeft, Save, Trash2, Clock, Image as ImageIcon, 
     Video, FileAudio, FileText, Globe, GripVertical, Settings2, Folder, LayoutDashboard, Upload

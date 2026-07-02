@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Search, Upload, LayoutGrid, List as ListIcon, Image as ImageIcon, Video, FileAudio, FileText, Globe, ArrowRightCircle, HardDrive, Trash2, Folder, Move, MoreVertical, Edit2, Play, Clock } from 'lucide-react';
+import { Search, Upload, LayoutGrid, List as ListIcon, Image as ImageIcon, Video, FileAudio, FileText, Globe, Trash2, Folder, Move, MoreVertical, Edit2, Clock, ArrowRightCircle, Play } from 'lucide-react';
 import { SendToScreensModal } from '@/components/display/SendToScreensModal';
 import { UploadMediaModal } from '@/components/display/UploadMediaModal';
 import { useDisplayMedia, useUploadDisplayMedia, useDeleteDisplayMedia, useUpdateDisplayMedia } from '@/hooks/use-display-media';
@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { DisplayMedia } from '@/types/display';
 import { MediaFolderSidebar } from '@/components/display/MediaFolderSidebar';
 import { MoveMediaModal } from '@/components/display/MoveMediaModal';
-import { AppCatalogModal, APPS, AppId } from '@/components/display/apps/AppCatalogModal';
+import { AppCatalogModal, AppId } from '@/components/display/apps/AppCatalogModal';
 import { AppEditorModal } from '@/components/display/apps/AppEditorModal';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 
@@ -298,7 +298,7 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                                         placeholder="Buscar archivos..."
                                         className="pl-9 bg-card shadow-sm border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-indigo-500"
                                         value={search}
-                                        onChange={(e) => setSearch(e.target.value)}
+                                        onChange={(e: any) => setSearch(e.target.value)}
                                     />
                                 </div>
                             </div>
@@ -373,7 +373,7 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                                 </div>
                             ) : filteredFiles.length === 0 ? (
                                 <div className="bg-card/50 rounded-xl shadow-sm border border-border p-12 flex flex-col items-center justify-center text-muted-foreground h-full min-h-[300px]">
-                                    <FolderOpen className="w-16 h-16 mb-4 text-muted-foreground/50" />
+                                    <Folder className="w-16 h-16 mb-4 text-muted-foreground/50" />
                                     <p className="text-lg font-medium text-foreground">No hay archivos</p>
                                     <p className="text-sm mt-1 text-center max-w-md">Sube archivos, enlaces web o crea carpetas para organizar tu contenido.</p>
                                     <Button className="mt-6 bg-orange-500 hover:bg-orange-600 text-white" onClick={() => setIsUploadModalOpen(true)}>
@@ -453,7 +453,6 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                                     {filteredFiles.map(file => {
                                         const FileIcon = getIconForType(file.type);
                                         const isFolder = file.type === 'folder';
-                                        const appData = file.type === 'app' ? APPS.find(a => a.id === file.metadata?.appId) : null;
                                         return (
                                         <div 
                                             key={file.id} 
@@ -501,7 +500,7 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                                             <div className="absolute top-3 left-3 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 focus-within:opacity-100">
                                                 <input 
                                                     type="checkbox" 
-                                                    className="w-4 h-4 rounded border-slate-600 text-orange-500 focus:ring-orange-500/30 shadow-sm bg-slate-900/80 backdrop-blur-md cursor-pointer transition-colors" 
+                                                    className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20 shadow-sm bg-background/80 backdrop-blur-md cursor-pointer transition-colors" 
                                                     checked={selectedIds.includes(file.id)}
                                                     onChange={(e) => { e.stopPropagation(); handleToggleSelect(file.id); }}
                                                 />
@@ -511,7 +510,6 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                                                 <div className="absolute top-3 left-3 z-10">
                                                     <input 
                                                         type="checkbox" 
-                                                        className="w-4 h-4 rounded border-orange-500 text-orange-500 focus:ring-orange-500/30 shadow-sm bg-slate-900/80 cursor-pointer" 
                                                         className="w-4 h-4 rounded border-primary text-primary focus:ring-primary/20 shadow-sm bg-background cursor-pointer" 
                                                         checked={true}
                                                         onChange={(e) => { e.stopPropagation(); handleToggleSelect(file.id); }}
