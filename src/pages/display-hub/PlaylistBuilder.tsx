@@ -502,8 +502,6 @@ const PlaylistBuilder = () => {
             <UploadMediaModal 
                 isOpen={isUploadModalOpen} 
                 onClose={() => setIsUploadModalOpen(false)} 
-                commerceId={commerceId || ''} 
-                currentFolder={mediaFolder}
                 activeCategory="images"
                 onUpload={handleUploadFiles}
                 onAddWebLink={handleAddWebLink}

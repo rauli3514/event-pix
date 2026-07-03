@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { X, Play, MonitorPlay } from 'lucide-react';
+import { Play, MonitorPlay } from 'lucide-react';
 import { PlayerRenderer } from '@/components/display/PlayerRenderer';
 
 interface PlaylistPreviewModalProps {
