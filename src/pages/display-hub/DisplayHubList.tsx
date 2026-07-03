@@ -134,25 +134,10 @@ const DisplayHubList = () => {
     );
 
     return (
-        <div className="flex h-[calc(100vh-64px)] w-full overflow-hidden bg-background text-foreground flex-col md:flex-row transition-colors duration-300">
-            
-            {/* Sidebar de Zonas (Desktop) */}
-            <div className="hidden md:block shrink-0 h-full">
-                <ZoneManagerSidebar 
-                    commerceId={effectiveCommerceId}
-                    groups={linkGroups || []}
-                    selectedGroupId={selectedGroupId}
-                    onSelectGroup={setSelectedGroupId}
-                    unassignedCount={unassignedCount}
-                    totalCount={linkedDevices.length}
-                />
-            </div>
-
-            {/* Contenido Principal */}
-            <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6">
-                
-                {/* Descriptive Top Banner */}
-                <div className="relative overflow-hidden rounded-3xl bg-card border border-border shadow-xl flex items-center min-h-[140px] px-8 py-6 mb-6 transition-colors duration-300">
+        <div className="flex h-[calc(100vh-64px)] w-full overflow-hidden bg-background text-foreground flex-col transition-colors duration-300">
+            {/* Descriptive Top Banner */}
+            <div className="p-6 md:px-8 pt-6 pb-2 shrink-0">
+                <div className="relative overflow-hidden rounded-3xl bg-card border border-border shadow-xl flex items-center min-h-[140px] px-8 py-6 transition-colors duration-300">
                     {/* Decorative Background for Banner */}
                     <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-background/20 to-secondary/10 pointer-events-none">
                         <div className="absolute right-10 top-1/2 -translate-y-1/2 w-48 h-48 bg-emerald-500/10 rounded-full blur-[60px]"></div>
@@ -194,10 +179,26 @@ const DisplayHubList = () => {
                         </div>
                     </div>
                 </div>
+            </div>
 
+            {/* Main Content Area: Sidebar + Grid */}
+            <div className="flex-1 flex overflow-hidden">
+                {/* Sidebar de Zonas (Desktop) */}
+                <div className="hidden md:block shrink-0 h-full">
+                    <ZoneManagerSidebar 
+                        commerceId={effectiveCommerceId}
+                        groups={linkGroups || []}
+                        selectedGroupId={selectedGroupId}
+                        onSelectGroup={setSelectedGroupId}
+                        unassignedCount={unassignedCount}
+                        totalCount={linkedDevices.length}
+                    />
+                </div>
 
-                {/* Filters & Search */}
-                <div className="flex flex-col sm:flex-row gap-4 items-center justify-between mt-8">
+                {/* Contenido Principal */}
+                <div className="flex-1 overflow-y-auto p-6 md:px-8 bg-background">
+                    {/* Filters & Search */}
+                    <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
                     <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
                         <div className="flex bg-muted border border-border rounded-lg p-1 w-full sm:w-auto">
                             <button onClick={() => setFilter('all')} className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filter === 'all' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Todas</button>
