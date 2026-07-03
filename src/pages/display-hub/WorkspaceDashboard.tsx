@@ -35,26 +35,26 @@ export default function WorkspaceDashboard() {
     return (
         <div className="p-6 md:p-10 space-y-8 animate-in fade-in duration-500 w-full max-w-7xl mx-auto">
             {/* Top Banner (Hero) */}
-            <div className="relative overflow-hidden rounded-3xl bg-black border border-border shadow-2xl min-h-[200px] md:min-h-[240px] flex items-center">
+            <div className="relative overflow-hidden rounded-3xl bg-black border border-border shadow-2xl min-h-[160px] md:min-h-[240px] flex items-center">
                 {/* Custom Image Background */}
                 <div 
-                    className="absolute inset-0 bg-cover sm:bg-[length:auto_100%] bg-right bg-no-repeat pointer-events-none"
+                    className="absolute inset-0 bg-contain md:bg-cover sm:bg-[length:auto_100%] bg-right bg-no-repeat pointer-events-none opacity-80 sm:opacity-100"
                     style={{ backgroundImage: 'url("/banner-dashboard.PNG")' }}
                 >
                     {/* Dark overlay just in case the image is too bright, so text stays readable */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-black/10 sm:to-transparent"></div>
+                    <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent"></div>
                 </div>
                 
-                <div className="relative z-10 p-8 md:p-12 lg:p-16 flex flex-col items-start w-full">
-                    <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-2 tracking-tight">
+                <div className="relative z-10 p-6 md:p-12 lg:p-16 flex flex-col items-start w-full">
+                    <h1 className="text-2xl md:text-4xl font-extrabold text-white mb-2 tracking-tight">
                         ¡Hola, {greeting}!
                     </h1>
-                    <p className="text-slate-400 mb-6 max-w-md">
+                    <p className="text-gray-300 text-sm md:text-base mb-4 md:mb-6 max-w-md">
                         {commerce?.name || 'Administrador'}
                     </p>
                     <Button 
                         onClick={() => navigate(`/admin/display/commerce/${commerceId}/workspace/playlists`)}
-                        className="bg-white hover:bg-slate-200 text-slate-900 rounded-full px-5 py-5 text-sm md:text-base font-bold shadow-lg shadow-white/10 transition-all hover:scale-105"
+                        className="bg-white hover:bg-gray-200 text-black rounded-full px-4 md:px-5 py-4 md:py-5 text-xs md:text-base font-bold shadow-lg shadow-white/10 transition-all hover:scale-105"
                     >
                         Crear Contenido <Rocket className="w-4 h-4 md:w-5 md:h-5 ml-2 text-indigo-600" />
                     </Button>

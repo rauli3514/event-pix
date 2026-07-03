@@ -124,16 +124,16 @@ const DisplayHubList = () => {
 
 
     if (isLoading) return (
-        <div className="h-full flex items-center justify-center bg-slate-950 text-white">
+        <div className="h-full flex items-center justify-center bg-background text-foreground">
             <div className="flex flex-col items-center gap-4">
-                <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-                <p className="text-slate-400 animate-pulse">Cargando pantallas...</p>
+                <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                <p className="text-muted-foreground animate-pulse">Cargando pantallas...</p>
             </div>
         </div>
     );
 
     return (
-        <div className="flex h-[calc(100vh-64px)] w-full overflow-hidden bg-slate-950 text-white flex-col md:flex-row">
+        <div className="flex h-[calc(100vh-64px)] w-full overflow-hidden bg-background text-foreground flex-col md:flex-row transition-colors duration-300">
             
             {/* Sidebar de Zonas (Desktop) */}
             <div className="hidden md:block shrink-0 h-full">
@@ -151,23 +151,23 @@ const DisplayHubList = () => {
             <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6">
                 
                 {/* Descriptive Top Banner */}
-                <div className="relative overflow-hidden rounded-3xl bg-slate-900 border border-slate-800 shadow-xl flex items-center min-h-[140px] px-8 py-6 mb-6">
+                <div className="relative overflow-hidden rounded-3xl bg-card border border-border shadow-xl flex items-center min-h-[140px] px-8 py-6 mb-6 transition-colors duration-300">
                     {/* Decorative Background for Banner */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-sky-950/40 via-slate-900/20 to-emerald-950/20 pointer-events-none">
+                    <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-background/20 to-secondary/10 pointer-events-none">
                         <div className="absolute right-10 top-1/2 -translate-y-1/2 w-48 h-48 bg-emerald-500/10 rounded-full blur-[60px]"></div>
                         <div className="absolute right-32 bottom-0 w-32 h-32 bg-sky-500/10 rounded-full blur-[40px]"></div>
                     </div>
                     
                     <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between w-full gap-6">
                         <div className="flex flex-col gap-1 w-full max-w-2xl">
-                            <h1 className="text-3xl font-extrabold text-white flex items-center gap-3">
+                            <h1 className="text-3xl font-extrabold text-foreground flex items-center gap-3">
                                 <Sheet>
                                     <SheetTrigger asChild>
-                                        <Button variant="outline" size="icon" className="md:hidden border-slate-700 bg-slate-800/50 text-slate-300 w-10 h-10 shrink-0">
+                                        <Button variant="outline" size="icon" className="md:hidden border-border bg-muted/50 text-muted-foreground w-10 h-10 shrink-0 hover:text-foreground">
                                             <Layers className="w-5 h-5" />
                                         </Button>
                                     </SheetTrigger>
-                                    <SheetContent side="left" className="p-0 bg-slate-900 border-slate-800 w-72 flex flex-col">
+                                    <SheetContent side="left" className="p-0 bg-card border-r-border w-72 flex flex-col transition-colors duration-300">
                                         <SheetTitle className="sr-only">Zonas y Pantallas</SheetTitle>
                                         <ZoneManagerSidebar 
                                             commerceId={effectiveCommerceId}
@@ -181,14 +181,14 @@ const DisplayHubList = () => {
                                 </Sheet>
                                 Tus Pantallas
                             </h1>
-                            <p className="text-slate-400 font-medium max-w-xl mt-1">
+                            <p className="text-muted-foreground font-medium max-w-xl mt-1">
                                 Administrá los dispositivos y el contenido que reproducen, agrupándolos en zonas para un mayor control.
                             </p>
                         </div>
                         
                         <div className="shrink-0">
-                            <Button className="bg-white hover:bg-slate-200 text-slate-900 rounded-full px-6 py-5 text-sm font-bold shadow-lg shadow-white/10 transition-all hover:scale-105" onClick={() => setIsLinkModalOpen(true)}>
-                                <Plus className="w-4 h-4 mr-2 text-indigo-600" /> Agregar Pantalla
+                            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-6 py-5 text-sm font-bold shadow-lg shadow-primary/10 transition-all hover:scale-105" onClick={() => setIsLinkModalOpen(true)}>
+                                <Plus className="w-4 h-4 mr-2" /> Agregar Pantalla
                             </Button>
                         </div>
                     </div>
@@ -198,10 +198,10 @@ const DisplayHubList = () => {
                 {/* Filters & Search */}
                 <div className="flex flex-col sm:flex-row gap-4 items-center justify-between mt-8">
                     <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-                        <div className="flex bg-slate-900 border border-slate-800 rounded-lg p-1 w-full sm:w-auto">
-                            <button onClick={() => setFilter('all')} className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filter === 'all' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'}`}>Todas</button>
-                            <button onClick={() => setFilter('online')} className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filter === 'online' ? 'bg-emerald-900/40 text-emerald-400' : 'text-slate-400 hover:text-emerald-400'}`}>Online</button>
-                            <button onClick={() => setFilter('offline')} className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filter === 'offline' ? 'bg-rose-900/40 text-rose-400' : 'text-slate-400 hover:text-rose-400'}`}>Offline</button>
+                        <div className="flex bg-muted border border-border rounded-lg p-1 w-full sm:w-auto">
+                            <button onClick={() => setFilter('all')} className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filter === 'all' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Todas</button>
+                            <button onClick={() => setFilter('online')} className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filter === 'online' ? 'bg-emerald-500/10 text-emerald-600' : 'text-muted-foreground hover:text-emerald-500'}`}>Online</button>
+                            <button onClick={() => setFilter('offline')} className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filter === 'offline' ? 'bg-destructive/10 text-destructive' : 'text-muted-foreground hover:text-destructive'}`}>Offline</button>
                         </div>
                     </div>
                     
@@ -210,7 +210,7 @@ const DisplayHubList = () => {
                             placeholder="Buscar pantalla..." 
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            className="bg-slate-900 border-slate-800 text-white w-full h-10"
+                            className="bg-card border-border text-foreground w-full h-10 shadow-sm"
                         />
                     </div>
                 </div>
@@ -226,31 +226,31 @@ const DisplayHubList = () => {
                         }, {} as Record<string, typeof filteredLinkedDevices>)
                     ).map(([groupName, groupDevices]) => (
                         <div key={groupName} className="space-y-3">
-                            <div className="flex items-center gap-2 text-slate-300 font-semibold px-2">
+                            <div className="flex items-center gap-2 text-foreground font-semibold px-2">
                                 <ChevronDown className="w-4 h-4" />
-                                {groupName} <span className="text-slate-500 font-normal text-sm ml-1">({groupDevices.length})</span>
+                                {groupName} <span className="text-muted-foreground font-normal text-sm ml-1">({groupDevices.length})</span>
                             </div>
                             
-                            <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden divide-y divide-slate-800/50">
+                            <div className="bg-card border border-border rounded-xl overflow-hidden divide-y divide-border shadow-sm">
                                 {groupDevices.map(device => {
                                     const isOnline = device.derived_status === 'online';
                                     return (
-                                        <div key={device.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 hover:bg-slate-800/30 transition-colors group gap-4 sm:gap-0">
+                                        <div key={device.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 hover:bg-muted/50 transition-colors group gap-4 sm:gap-0">
                                             {/* Izquierda: Checkbox, Estado y Nombre */}
                                             <div className="flex items-center gap-4">
-                                                <input type="checkbox" className="w-4.5 h-4.5 rounded border-slate-700 bg-slate-950 text-emerald-500 focus:ring-emerald-500/20" />
+                                                <input type="checkbox" className="w-4.5 h-4.5 rounded border-border bg-background text-emerald-500 focus:ring-emerald-500/20" />
                                                 
-                                                <div className={`px-2 py-0.5 rounded-full text-[11px] font-bold flex items-center gap-1.5 w-[110px] justify-center ${isOnline ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-800 text-slate-400 border border-slate-700'}`}>
-                                                    {isOnline && <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}
+                                                <div className={`px-2 py-0.5 rounded-full text-[11px] font-bold flex items-center gap-1.5 w-[110px] justify-center ${isOnline ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' : 'bg-muted text-muted-foreground border border-border'}`}>
+                                                    {isOnline && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
                                                     {isOnline ? 'En línea' : 'Desconectado'}
                                                 </div>
                                                 
                                                 <div>
-                                                    <h4 className="font-semibold text-slate-200 cursor-pointer hover:text-indigo-400 transition-colors" onClick={() => { setSelectedDevice(device); setEditModalOpen(true); }}>
+                                                    <h4 className="font-semibold text-foreground cursor-pointer hover:text-primary transition-colors" onClick={() => { setSelectedDevice(device); setEditModalOpen(true); }}>
                                                         {device.name}
                                                     </h4>
-                                                    <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
-                                                        Recurso: <span className="text-slate-400">
+                                                    <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                                                        Recurso: <span className="text-muted-foreground font-medium">
                                                             {device.assignment?.media?.name || device.assignment?.campaign?.name || 'Sin asignar'}
                                                         </span>
                                                         <ChevronDown className="w-3 h-3" />
@@ -263,7 +263,7 @@ const DisplayHubList = () => {
                                                 <Button 
                                                     variant="outline" 
                                                     size="sm" 
-                                                    className="h-8 bg-slate-950 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800"
+                                                    className="h-8 bg-background border-border text-muted-foreground hover:text-foreground hover:bg-muted"
                                                     onClick={() => { setPreviewDevice(device); setPreviewModalOpen(true); }}
                                                 >
                                                     <Eye className="w-3.5 h-3.5 mr-1.5" /> Avance
@@ -271,7 +271,7 @@ const DisplayHubList = () => {
                                                 <Button 
                                                     variant="outline" 
                                                     size="sm" 
-                                                    className="h-8 bg-slate-950 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800"
+                                                    className="h-8 bg-background border-border text-muted-foreground hover:text-foreground hover:bg-muted"
                                                     onClick={() => { setSelectedDevice(device); setEditModalOpen(true); }}
                                                 >
                                                     <Edit2 className="w-3.5 h-3.5 mr-1.5" /> Editar
@@ -279,20 +279,20 @@ const DisplayHubList = () => {
                                                 
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-white">
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
                                                             <MoreVertical className="w-4 h-4" />
                                                         </Button>
                                                     </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" className="w-56 bg-white text-slate-800 border-0 shadow-xl rounded-xl">
-                                                        <DropdownMenuItem className="cursor-pointer py-2 focus:bg-slate-100" onClick={() => { setSelectedDevice(device); setEditModalOpen(true); }}>
-                                                            <Info className="w-4 h-4 mr-2 text-slate-500" /> Ver información del dispositivo
+                                                    <DropdownMenuContent align="end" className="w-56 bg-card text-foreground border border-border shadow-xl rounded-xl">
+                                                        <DropdownMenuItem className="cursor-pointer py-2 focus:bg-accent focus:text-accent-foreground" onClick={() => { setSelectedDevice(device); setEditModalOpen(true); }}>
+                                                            <Info className="w-4 h-4 mr-2 text-muted-foreground" /> Ver información del dispositivo
                                                         </DropdownMenuItem>
-                                                        <DropdownMenuSeparator className="bg-slate-100" />
-                                                        <DropdownMenuItem className="cursor-pointer py-2 focus:bg-slate-100" onClick={() => { setMoveDeviceTarget(device); setMoveDeviceModalOpen(true); }}>
-                                                            <Move className="w-4 h-4 mr-2 text-slate-500" /> Mover
+                                                        <DropdownMenuSeparator className="bg-border" />
+                                                        <DropdownMenuItem className="cursor-pointer py-2 focus:bg-accent focus:text-accent-foreground" onClick={() => { setMoveDeviceTarget(device); setMoveDeviceModalOpen(true); }}>
+                                                            <Move className="w-4 h-4 mr-2 text-muted-foreground" /> Mover
                                                         </DropdownMenuItem>
-                                                        <DropdownMenuSeparator className="bg-slate-100" />
-                                                        <DropdownMenuItem className="cursor-pointer py-2 text-rose-600 focus:bg-rose-50 focus:text-rose-700" onClick={() => handleDeleteDevice(device.id)}>
+                                                        <DropdownMenuSeparator className="bg-border" />
+                                                        <DropdownMenuItem className="cursor-pointer py-2 text-destructive focus:bg-destructive/10 focus:text-destructive" onClick={() => handleDeleteDevice(device.id)}>
                                                             <Trash2 className="w-4 h-4 mr-2" /> Eliminar
                                                         </DropdownMenuItem>
                                                     </DropdownMenuContent>
@@ -306,58 +306,58 @@ const DisplayHubList = () => {
                     ))}
                     
                     {filteredLinkedDevices.length === 0 && (
-                        <div className="py-12 text-center border-2 border-dashed border-slate-800 rounded-2xl">
-                            <Monitor className="w-12 h-12 text-slate-700 mx-auto mb-4" />
-                            <h3 className="text-lg font-bold text-white">No se encontraron pantallas</h3>
-                            <p className="text-slate-400 text-sm mt-2">Prueba cambiando los filtros o agrega una nueva pantalla.</p>
+                        <div className="py-12 text-center border-2 border-dashed border-border rounded-2xl bg-card/50">
+                            <Monitor className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                            <h3 className="text-lg font-bold text-foreground">No se encontraron pantallas</h3>
+                            <p className="text-muted-foreground text-sm mt-2">Prueba cambiando los filtros o agrega una nueva pantalla.</p>
                         </div>
                     )}
                 </div>
 
                 {/* Modal de Vinculación */}
                 <Dialog open={isLinkModalOpen} onOpenChange={setIsLinkModalOpen}>
-                    <DialogContent className="bg-slate-900 border-slate-800 text-white">
+                    <DialogContent className="bg-card border-border text-foreground">
                         <DialogHeader>
                             <DialogTitle className="text-xl">Vincular Nueva Pantalla</DialogTitle>
-                            <DialogDescription className="text-slate-400">
+                            <DialogDescription className="text-muted-foreground">
                                 Abre la aplicación de EventPix en la TV para obtener el código.
                             </DialogDescription>
                         </DialogHeader>
                         <form onSubmit={handleLinkSubmit} className="space-y-4 mt-2">
-                            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
-                                <Label htmlFor="code" className="text-slate-300 font-bold">1. Código de Vinculación *</Label>
+                            <div className="bg-background p-4 rounded-xl border border-border space-y-2">
+                                <Label htmlFor="code" className="text-foreground font-bold">1. Código de Vinculación *</Label>
                                 <div className="relative">
-                                    <Hash className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
+                                    <Hash className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                                     <Input
                                         id="code"
                                         value={linkData.device_code}
                                         onChange={(e) => setLinkData({ ...linkData, device_code: e.target.value.toUpperCase() })}
                                         placeholder="Ej: MX9-K7P2A"
-                                        className="pl-9 bg-slate-900 border-indigo-500/50 text-white font-mono uppercase tracking-widest text-lg h-12"
+                                        className="pl-9 bg-card border-primary/50 text-foreground font-mono uppercase tracking-widest text-lg h-12"
                                         required
                                     />
                                 </div>
                             </div>
 
                             <div className="space-y-2 pt-2">
-                                <Label htmlFor="name" className="text-slate-300">2. Nombre *</Label>
+                                <Label htmlFor="name" className="text-foreground">2. Nombre *</Label>
                                 <Input
                                     id="name"
                                     value={linkData.name}
                                     onChange={(e) => setLinkData({ ...linkData, name: e.target.value })}
                                     placeholder="Ej: TV Salón Principal"
-                                    className="bg-slate-950 border-slate-700 text-white"
+                                    className="bg-card border-border text-foreground"
                                     required
                                 />
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="group" className="text-slate-300">3. Grupo (Opcional)</Label>
+                                <Label htmlFor="group" className="text-foreground">3. Grupo (Opcional)</Label>
                                 <Select value={linkData.group_id} onValueChange={(val) => setLinkData({ ...linkData, group_id: val })}>
-                                    <SelectTrigger className="w-full bg-slate-950 border-slate-700 text-white">
+                                    <SelectTrigger className="w-full bg-card border-border text-foreground">
                                         <SelectValue placeholder="Ninguna zona..." />
                                     </SelectTrigger>
-                                    <SelectContent className="bg-slate-900 border-slate-700 text-white">
+                                    <SelectContent className="bg-card border-border text-foreground">
                                         <SelectItem value="none">Sin Grupo</SelectItem>
                                         {linkGroups?.map(g => (
                                             <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
@@ -366,7 +366,7 @@ const DisplayHubList = () => {
                                 </Select>
                             </div>
 
-                            <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 mt-2 h-12 text-lg" disabled={linkDevice.isPending}>
+                            <Button type="submit" className="w-full bg-primary hover:bg-primary/90 mt-2 h-12 text-lg" disabled={linkDevice.isPending}>
                                 {linkDevice.isPending ? 'Vinculando...' : 'Vincular Pantalla'}
                             </Button>
                         </form>
@@ -411,10 +411,10 @@ const DisplayHubList = () => {
                 />
 
                 <Dialog open={previewModalOpen} onOpenChange={setPreviewModalOpen}>
-                    <DialogContent className="bg-slate-950 border-slate-800 text-white shadow-2xl max-w-4xl p-0 overflow-hidden sm:rounded-2xl h-[80vh] flex flex-col">
-                        <DialogHeader className="px-6 py-4 border-b border-slate-800 bg-slate-900 flex flex-row items-center justify-between shrink-0">
+                    <DialogContent className="bg-card border-border text-foreground shadow-2xl max-w-4xl p-0 overflow-hidden sm:rounded-2xl h-[80vh] flex flex-col">
+                        <DialogHeader className="px-6 py-4 border-b border-border bg-muted flex flex-row items-center justify-between shrink-0">
                             <DialogTitle className="text-xl font-semibold flex items-center gap-2">
-                                <Eye className="w-5 h-5 text-indigo-400" />
+                                <Eye className="w-5 h-5 text-primary" />
                                 Vista Previa: {previewDevice?.name}
                             </DialogTitle>
                         </DialogHeader>
@@ -427,7 +427,7 @@ const DisplayHubList = () => {
                                     allow="autoplay; fullscreen"
                                 />
                             ) : (
-                                <div className="text-slate-500 text-center">
+                                <div className="text-muted-foreground text-center">
                                     <Monitor className="w-16 h-16 mx-auto mb-4 opacity-30" />
                                     <p>Cargando vista previa...</p>
                                 </div>

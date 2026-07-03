@@ -143,44 +143,44 @@ export const ScheduleContentModal = ({ isOpen, onClose, asset, device, commerceI
     if (showConfirmation) {
         return (
             <Dialog open={isOpen} onOpenChange={onClose}>
-                <DialogContent className="bg-white text-slate-900 border-0 shadow-2xl max-w-lg p-0 overflow-hidden sm:rounded-2xl">
+                <DialogContent className="bg-card text-foreground border border-border shadow-2xl max-w-lg p-0 overflow-hidden sm:rounded-2xl">
                     <div className="p-8 flex flex-col items-center text-center gap-4">
                         <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center">
                             <CheckCircle2 className="w-9 h-9 text-emerald-500" />
                         </div>
-                        <h2 className="text-2xl font-bold text-slate-800">¡Programado correctamente!</h2>
-                        <p className="text-slate-500 text-sm">El contenido será enviado automáticamente a la pantalla cuando se cumpla la fecha y hora configurada.</p>
+                        <h2 className="text-2xl font-bold text-foreground">¡Programado correctamente!</h2>
+                        <p className="text-muted-foreground text-sm">El contenido será enviado automáticamente a la pantalla cuando se cumpla la fecha y hora configurada.</p>
 
-                        <div className="w-full bg-slate-50 rounded-xl border border-slate-200 divide-y divide-slate-100 text-left mt-2">
+                        <div className="w-full bg-muted rounded-xl border border-border divide-y divide-border text-left mt-2">
                             <div className="flex justify-between px-4 py-3">
-                                <span className="text-slate-500 text-sm font-medium">Contenido</span>
-                                <span className="text-slate-800 text-sm font-semibold">{asset?.name}</span>
+                                <span className="text-muted-foreground text-sm font-medium">Contenido</span>
+                                <span className="text-foreground text-sm font-semibold">{asset?.name}</span>
                             </div>
                             <div className="flex justify-between px-4 py-3">
-                                <span className="text-slate-500 text-sm font-medium">Pantalla</span>
-                                <span className="text-slate-800 text-sm font-semibold">{device?.name || 'Pantalla'}</span>
+                                <span className="text-muted-foreground text-sm font-medium">Pantalla</span>
+                                <span className="text-foreground text-sm font-semibold">{device?.name || 'Pantalla'}</span>
                             </div>
                             <div className="flex justify-between px-4 py-3">
-                                <span className="text-slate-500 text-sm font-medium">Fecha de publicación</span>
-                                <span className="text-slate-800 text-sm font-semibold">{dateStr}</span>
+                                <span className="text-muted-foreground text-sm font-medium">Fecha de publicación</span>
+                                <span className="text-foreground text-sm font-semibold">{dateStr}</span>
                             </div>
                             <div className="flex justify-between px-4 py-3">
-                                <span className="text-slate-500 text-sm font-medium">Hora de publicación</span>
-                                <span className="text-slate-800 text-sm font-semibold">{timeStr}</span>
+                                <span className="text-muted-foreground text-sm font-medium">Hora de publicación</span>
+                                <span className="text-foreground text-sm font-semibold">{timeStr}</span>
                             </div>
                             {hasExpiry && expiryDateStr && (
                                 <div className="flex justify-between px-4 py-3">
-                                    <span className="text-slate-500 text-sm font-medium">Caducidad</span>
-                                    <span className="text-slate-800 text-sm font-semibold">{expiryDateStr} {expiryTimeStr}</span>
+                                    <span className="text-muted-foreground text-sm font-medium">Caducidad</span>
+                                    <span className="text-foreground text-sm font-semibold">{expiryDateStr} {expiryTimeStr}</span>
                                 </div>
                             )}
                             <div className="flex justify-between px-4 py-3">
-                                <span className="text-slate-500 text-sm font-medium">Formato</span>
-                                <span className="text-slate-800 text-sm font-semibold">{formatLabel(format)}</span>
+                                <span className="text-muted-foreground text-sm font-medium">Formato</span>
+                                <span className="text-foreground text-sm font-semibold">{formatLabel(format)}</span>
                             </div>
                         </div>
 
-                        <p className="text-xs text-slate-400 mt-1">Podés ver y gestionar todas las programaciones en la pestaña <strong>Programación</strong>.</p>
+                        <p className="text-xs text-muted-foreground mt-1">Podés ver y gestionar todas las programaciones en la pestaña <strong>Programación</strong>.</p>
 
                         <Button onClick={() => { onScheduled?.(); onClose(); }} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white mt-2">
                             Aceptar
@@ -193,10 +193,10 @@ export const ScheduleContentModal = ({ isOpen, onClose, asset, device, commerceI
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="bg-white text-slate-900 border-0 shadow-2xl max-w-3xl p-0 overflow-hidden sm:rounded-2xl">
-                <DialogHeader className="px-6 py-4 border-b border-slate-100">
+            <DialogContent className="bg-card text-foreground border border-border shadow-2xl max-w-3xl p-0 overflow-hidden sm:rounded-2xl">
+                <DialogHeader className="px-6 py-4 border-b border-border">
                     <div className="flex items-center gap-2">
-                        <Monitor className="w-5 h-5 text-slate-500" />
+                        <Monitor className="w-5 h-5 text-muted-foreground" />
                         <DialogTitle className="text-xl font-bold">Cronograma</DialogTitle>
                     </div>
                     <p className="text-sm text-emerald-600 font-medium mt-0.5">
@@ -206,45 +206,45 @@ export const ScheduleContentModal = ({ isOpen, onClose, asset, device, commerceI
 
                 <div className="flex flex-col md:flex-row min-h-[400px]">
                     {/* Left: config */}
-                    <div className="flex-1 p-6 space-y-6 border-r border-slate-100">
+                    <div className="flex-1 p-6 space-y-6 border-r border-border">
 
                         {/* Screen info */}
                         <div>
-                            <Label className="text-slate-500 text-xs font-semibold uppercase tracking-wide mb-1 block">Configuración de pantalla</Label>
-                            <div className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2 border border-slate-200">
-                                <Monitor className="w-4 h-4 text-slate-400" />
-                                <span className="text-slate-800 font-medium text-sm">{device?.name || 'Sin seleccionar'}</span>
+                            <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wide mb-1 block">Configuración de pantalla</Label>
+                            <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2 border border-border">
+                                <Monitor className="w-4 h-4 text-muted-foreground" />
+                                <span className="text-foreground font-medium text-sm">{device?.name || 'Sin seleccionar'}</span>
                             </div>
                         </div>
 
                         {/* Go-Live Date & Time */}
                         <div>
-                            <Label className="text-slate-500 text-xs font-semibold uppercase tracking-wide mb-2 block">
+                            <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wide mb-2 block">
                                 Fecha y hora de publicación
                             </Label>
                             <div className="flex gap-2">
-                                <div className="flex items-center gap-2 border border-emerald-400 rounded-lg px-3 py-2 bg-white flex-1 focus-within:ring-2 focus-within:ring-emerald-300">
-                                    <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
+                                <div className="flex items-center gap-2 border border-emerald-400 rounded-lg px-3 py-2 bg-background flex-1 focus-within:ring-2 focus-within:ring-emerald-300">
+                                    <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
                                     <input
                                         type="text"
                                         placeholder="dd/mm/aaaa"
                                         value={dateStr}
                                         onChange={(e) => setDateStr(e.target.value)}
-                                        className="outline-none bg-transparent text-sm text-slate-800 w-full"
+                                        className="outline-none bg-transparent text-sm text-foreground w-full"
                                     />
                                 </div>
-                                <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2 bg-white flex-1 focus-within:ring-2 focus-within:ring-emerald-300">
-                                    <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+                                <div className="flex items-center gap-2 border border-border rounded-lg px-3 py-2 bg-background flex-1 focus-within:ring-2 focus-within:ring-emerald-300">
+                                    <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
                                     <input
                                         type="text"
                                         placeholder="00:00 AM"
                                         value={timeStr}
                                         onChange={(e) => setTimeStr(e.target.value)}
-                                        className="outline-none bg-transparent text-sm text-slate-800 w-full"
+                                        className="outline-none bg-transparent text-sm text-foreground w-full"
                                     />
                                 </div>
                             </div>
-                            <p className="text-xs text-slate-400 mt-1">Formato: dd/mm/aaaa — HH:MM AM/PM</p>
+                            <p className="text-xs text-muted-foreground mt-1">Formato: dd/mm/aaaa — HH:MM AM/PM</p>
                         </div>
 
                         {/* Expiry toggle */}
@@ -255,7 +255,7 @@ export const ScheduleContentModal = ({ isOpen, onClose, asset, device, commerceI
                                     onCheckedChange={setHasExpiry}
                                     className="data-[state=checked]:bg-emerald-500"
                                 />
-                                <Label className="text-sm font-medium text-slate-700 cursor-pointer" onClick={() => setHasExpiry(!hasExpiry)}>
+                                <Label className="text-sm font-medium text-foreground cursor-pointer" onClick={() => setHasExpiry(!hasExpiry)}>
                                     Establecer fecha de caducidad
                                 </Label>
                             </div>
@@ -263,36 +263,36 @@ export const ScheduleContentModal = ({ isOpen, onClose, asset, device, commerceI
                             {hasExpiry && (
                                 <div className="space-y-3 pl-2 border-l-2 border-emerald-200">
                                     <div>
-                                        <Label className="text-slate-500 text-xs font-semibold uppercase tracking-wide mb-2 block">
+                                        <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wide mb-2 block">
                                             Fecha y hora de caducidad
                                         </Label>
                                         <div className="flex gap-2">
-                                            <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2 bg-white flex-1 focus-within:ring-2 focus-within:ring-emerald-300">
-                                                <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
+                                            <div className="flex items-center gap-2 border border-border rounded-lg px-3 py-2 bg-background flex-1 focus-within:ring-2 focus-within:ring-emerald-300">
+                                                <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
                                                 <input
                                                     type="text"
                                                     placeholder="dd/mm/aaaa"
                                                     value={expiryDateStr}
                                                     onChange={(e) => setExpiryDateStr(e.target.value)}
-                                                    className="outline-none bg-transparent text-sm text-slate-800 w-full"
+                                                    className="outline-none bg-transparent text-sm text-foreground w-full"
                                                 />
                                             </div>
-                                            <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2 bg-white flex-1 focus-within:ring-2 focus-within:ring-emerald-300">
-                                                <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+                                            <div className="flex items-center gap-2 border border-border rounded-lg px-3 py-2 bg-background flex-1 focus-within:ring-2 focus-within:ring-emerald-300">
+                                                <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
                                                 <input
                                                     type="text"
                                                     placeholder="00:00 AM"
                                                     value={expiryTimeStr}
                                                     onChange={(e) => setExpiryTimeStr(e.target.value)}
-                                                    className="outline-none bg-transparent text-sm text-slate-800 w-full"
+                                                    className="outline-none bg-transparent text-sm text-foreground w-full"
                                                 />
                                             </div>
                                         </div>
                                     </div>
                                     <div>
-                                        <Label className="text-slate-500 text-xs font-semibold uppercase tracking-wide mb-1 block">Después del vencimiento</Label>
+                                        <Label className="text-muted-foreground text-xs font-semibold uppercase tracking-wide mb-1 block">Después del vencimiento</Label>
                                         <Select value={afterExpiry} onValueChange={setAfterExpiry}>
-                                            <SelectTrigger className="bg-white border-slate-200 text-slate-700">
+                                            <SelectTrigger className="bg-background border-border text-foreground">
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -312,7 +312,7 @@ export const ScheduleContentModal = ({ isOpen, onClose, asset, device, commerceI
                         {/* Format selector */}
                         <div className="flex justify-end">
                             <Select value={format} onValueChange={setFormat}>
-                                <SelectTrigger className="w-44 h-9 bg-white border-slate-200 text-slate-700 text-sm">
+                                <SelectTrigger className="w-44 h-9 bg-background border-border text-foreground text-sm">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -325,38 +325,38 @@ export const ScheduleContentModal = ({ isOpen, onClose, asset, device, commerceI
                         </div>
 
                         {/* Preview */}
-                        <div className="flex-1 bg-slate-100 rounded-xl border border-slate-200 overflow-hidden flex items-center justify-center relative min-h-[180px]">
+                        <div className="flex-1 bg-muted rounded-xl border border-border overflow-hidden flex items-center justify-center relative min-h-[180px]">
                             {asset?.url && asset.type === 'image' ? (
                                 <img src={asset.url} alt={asset.name} className="w-full h-full object-contain" />
                             ) : asset?.url && asset.type === 'video' ? (
                                 <video src={asset.url} className="w-full h-full object-contain bg-black" muted autoPlay loop playsInline />
                             ) : asset?.type === 'campaign' ? (
-                                <div className="flex flex-col items-center text-slate-400 gap-2">
+                                <div className="flex flex-col items-center text-muted-foreground gap-2">
                                     <PlaySquare className="w-12 h-12 text-emerald-400" />
-                                    <span className="text-sm text-slate-500 font-medium">Lista de Reproducción</span>
+                                    <span className="text-sm text-muted-foreground font-medium">Lista de Reproducción</span>
                                 </div>
                             ) : asset?.type === 'web' ? (
-                                <div className="flex flex-col items-center text-slate-400 gap-2">
+                                <div className="flex flex-col items-center text-muted-foreground gap-2">
                                     <Globe className="w-10 h-10 text-blue-400" />
-                                    <span className="text-xs text-slate-500">{asset.url}</span>
+                                    <span className="text-xs text-muted-foreground">{asset.url}</span>
                                 </div>
                             ) : (
-                                <div className="flex flex-col items-center text-slate-300 gap-2">
+                                <div className="flex flex-col items-center text-muted-foreground/50 gap-2">
                                     <ImageIcon className="w-10 h-10" />
-                                    <span className="text-xs text-slate-400">Sin vista previa</span>
+                                    <span className="text-xs text-muted-foreground">Sin vista previa</span>
                                 </div>
                             )}
                         </div>
 
-                        <p className="text-xs text-slate-400 text-center">
+                        <p className="text-xs text-muted-foreground text-center">
                             El contenido no se envía a la pantalla inmediatamente. El sistema lo publicará automáticamente en la fecha y hora indicadas.
                         </p>
                     </div>
                 </div>
 
                 {/* Footer */}
-                <div className="px-6 py-4 border-t border-slate-100 flex justify-between items-center bg-slate-50">
-                    <Button variant="ghost" onClick={onClose} className="text-slate-600 hover:bg-slate-200">
+                <div className="px-6 py-4 border-t border-border flex justify-between items-center bg-muted">
+                    <Button variant="ghost" onClick={onClose} className="text-muted-foreground hover:bg-accent hover:text-foreground">
                         Cancelar
                     </Button>
                     <Button

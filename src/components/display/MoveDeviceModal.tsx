@@ -91,45 +91,45 @@ export const MoveDeviceModal = ({ isOpen, onClose, device, groups, commerceId }:
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="bg-white text-slate-900 border-0 shadow-2xl max-w-md p-0 overflow-hidden sm:rounded-2xl">
+            <DialogContent className="bg-card text-foreground border border-border shadow-2xl max-w-md p-0 overflow-hidden sm:rounded-2xl">
                 
                 {/* Header */}
-                <div className="px-6 py-4 border-b border-slate-100 flex items-start justify-between">
+                <div className="px-6 py-4 border-b border-border flex items-start justify-between">
                     <div>
-                        <h2 className="text-lg font-semibold flex items-center gap-2 text-slate-800">
-                            <MoveIcon className="w-5 h-5 text-slate-400" />
+                        <h2 className="text-lg font-semibold flex items-center gap-2 text-foreground">
+                            <MoveIcon className="w-5 h-5 text-muted-foreground" />
                             Mover "{device.name || device.device_id}"
                         </h2>
-                        <div className="flex items-center gap-2 mt-1 text-sm text-slate-500">
+                        <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
                             <span>Ubicación actual:</span>
-                            <div className="flex items-center gap-1.5 bg-slate-100 px-2 py-0.5 rounded-md text-slate-700 font-medium border border-slate-200">
+                            <div className="flex items-center gap-1.5 bg-muted px-2 py-0.5 rounded-md text-foreground font-medium border border-border">
                                 {device.group_id ? <Folder className="w-3.5 h-3.5" /> : <Home className="w-3.5 h-3.5" />}
                                 <span>{currentLocationName}</span>
                             </div>
                         </div>
                     </div>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-full p-1.5 transition-colors">
+                    <button onClick={onClose} className="text-muted-foreground hover:text-foreground hover:bg-accent rounded-full p-1.5 transition-colors">
                         <X className="w-4 h-4" />
                     </button>
                 </div>
 
                 <div className="p-6 pb-2 space-y-4">
                     {/* Breadcrumbs */}
-                    <div className="flex items-center gap-1.5 text-sm text-slate-600 overflow-x-auto pb-2 scrollbar-hide whitespace-nowrap">
+                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground overflow-x-auto pb-2 scrollbar-hide whitespace-nowrap">
                         <button 
                             onClick={() => setCurrentFolderId(null)}
-                            className="flex items-center gap-1.5 hover:text-indigo-600 hover:bg-indigo-50 px-2 py-1 rounded-md transition-colors"
+                            className="flex items-center gap-1.5 hover:text-primary hover:bg-primary/10 px-2 py-1 rounded-md transition-colors"
                         >
                             <Home className="w-4 h-4" />
-                            <span className={!currentFolderId ? 'font-semibold text-slate-800' : ''}>Hogar</span>
+                            <span className={!currentFolderId ? 'font-semibold text-foreground' : ''}>Hogar</span>
                         </button>
                         
                         {breadcrumbs.map((crumb) => (
                             <div key={crumb.id} className="flex items-center gap-1.5">
-                                <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                                <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
                                 <button
                                     onClick={() => setCurrentFolderId(crumb.id)}
-                                    className={`hover:text-indigo-600 hover:bg-indigo-50 px-2 py-1 rounded-md transition-colors truncate max-w-[120px] ${currentFolderId === crumb.id ? 'font-semibold text-slate-800' : ''}`}
+                                    className={`hover:text-primary hover:bg-primary/10 px-2 py-1 rounded-md transition-colors truncate max-w-[120px] ${currentFolderId === crumb.id ? 'font-semibold text-foreground' : ''}`}
                                 >
                                     {crumb.name}
                                 </button>
@@ -139,19 +139,19 @@ export const MoveDeviceModal = ({ isOpen, onClose, device, groups, commerceId }:
 
                     {/* Search */}
                     <div className="relative">
-                        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
                         <Input 
                             placeholder="Buscar carpetas..." 
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
-                            className="pl-9 h-10 border-slate-200 focus-visible:ring-indigo-500 rounded-xl"
+                            className="pl-9 h-10 border-border focus-visible:ring-primary rounded-xl bg-background text-foreground"
                         />
                     </div>
 
                     {/* Folder List */}
-                    <div className="border border-slate-200 rounded-xl bg-slate-50/50 min-h-[160px] max-h-[240px] overflow-y-auto">
+                    <div className="border border-border rounded-xl bg-muted/30 min-h-[160px] max-h-[240px] overflow-y-auto">
                         {filteredFolders.length === 0 ? (
-                            <div className="h-[160px] flex items-center justify-center text-sm text-slate-400">
+                            <div className="h-[160px] flex items-center justify-center text-sm text-muted-foreground">
                                 {searchQuery ? 'No se encontraron resultados' : 'No se encontraron subcarpetas'}
                             </div>
                         ) : (
@@ -160,11 +160,11 @@ export const MoveDeviceModal = ({ isOpen, onClose, device, groups, commerceId }:
                                     <button
                                         key={folder.id}
                                         onClick={() => setCurrentFolderId(folder.id)}
-                                        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white hover:shadow-sm rounded-lg text-left group transition-all"
+                                        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-accent rounded-lg text-left group transition-all"
                                     >
-                                        <Folder className="w-5 h-5 text-slate-400 group-hover:text-indigo-500 transition-colors" />
-                                        <span className="text-sm font-medium text-slate-700 flex-1 truncate">{folder.name}</span>
-                                        <ChevronRight className="w-4 h-4 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        <Folder className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                                        <span className="text-sm font-medium text-foreground flex-1 truncate">{folder.name}</span>
+                                        <ChevronRight className="w-4 h-4 text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity" />
                                     </button>
                                 ))}
                             </div>
@@ -173,7 +173,7 @@ export const MoveDeviceModal = ({ isOpen, onClose, device, groups, commerceId }:
                 </div>
 
                 {/* Footer */}
-                <div className="px-6 py-4 flex items-center justify-between border-t border-slate-100 bg-slate-50 mt-4">
+                <div className="px-6 py-4 flex items-center justify-between border-t border-border bg-muted mt-4">
                     <div className="flex-1">
                         {isCreatingFolder ? (
                             <div className="flex items-center gap-2">
@@ -195,7 +195,7 @@ export const MoveDeviceModal = ({ isOpen, onClose, device, groups, commerceId }:
                                 variant="outline" 
                                 size="sm" 
                                 onClick={() => setIsCreatingFolder(true)}
-                                className="text-slate-600 border-slate-200 gap-2 hover:bg-slate-100"
+                                className="text-muted-foreground border-border gap-2 hover:bg-accent hover:text-foreground"
                             >
                                 <FolderPlus className="w-4 h-4" />
                                 Nueva carpeta
@@ -205,7 +205,7 @@ export const MoveDeviceModal = ({ isOpen, onClose, device, groups, commerceId }:
 
                     {!isCreatingFolder && (
                         <div className="flex items-center gap-2">
-                            <Button variant="ghost" onClick={onClose} className="text-slate-600 hover:bg-slate-200">
+                            <Button variant="ghost" onClick={onClose} className="text-muted-foreground hover:bg-accent hover:text-foreground">
                                 Cancelar
                             </Button>
                             <Button 

@@ -166,13 +166,13 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
             <div className="p-6 md:px-8 pt-6 pb-2 shrink-0">
                 <div className="relative overflow-hidden rounded-3xl bg-card border border-border shadow-xl flex items-center min-h-[140px] px-8 py-6 transition-colors duration-300">
                     {/* Decorative Background for Banner */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-indigo-950/40 via-slate-900/20 to-orange-950/20 pointer-events-none">
+                    <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-background/20 to-secondary/10 pointer-events-none">
                         <div className="absolute right-10 top-1/2 -translate-y-1/2 w-48 h-48 bg-orange-500/10 rounded-full blur-[60px]"></div>
                         <div className="absolute right-32 bottom-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-[40px]"></div>
                     </div>
                     
                     <div className="relative z-10 flex flex-col gap-1 w-full max-w-3xl">
-                        <h1 className="text-3xl font-extrabold text-white flex items-center gap-3">
+                        <h1 className="text-3xl font-extrabold text-foreground flex items-center gap-3">
                             {activeCategory !== 'apps' && (
                                 <Sheet>
                                     <SheetTrigger asChild>
@@ -437,7 +437,7 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                                                             {file.folder_path === '/' ? 'Raíz' : file.folder_path}
                                                         </td>
                                                     )}
-                                                    <td className="px-4 py-4 text-sm text-slate-400">{formatDate(file.created_at)}</td>
+                                                    <td className="px-4 py-4 text-sm text-muted-foreground">{formatDate(file.created_at)}</td>
                                                     <td className="px-4 py-4 text-right">
                                                         <Button variant="ghost" size="icon" className="text-red-400 hover:text-red-300 hover:bg-red-950/50" onClick={(e) => { e.stopPropagation(); handleDelete(file); }}>
                                                             <Trash2 className="w-4 h-4" />
@@ -495,7 +495,7 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                                                     handleToggleSelect(file.id);
                                                 }
                                             }}
-                                            className={`bg-slate-900/40 backdrop-blur-sm rounded-2xl shadow-lg border overflow-hidden group transition-all duration-300 cursor-pointer flex flex-col relative transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/50 ${selectedIds.includes(file.id) ? 'border-orange-500 ring-2 ring-orange-500/50 bg-orange-500/5' : 'border-slate-800/60'} ${draggedOverFolder === file.id ? 'border-orange-500 ring-2 ring-orange-500 shadow-md bg-orange-500/10' : 'hover:border-slate-700/80 hover:bg-slate-800/60'}`}
+                                            className={`bg-card/40 backdrop-blur-sm rounded-2xl shadow-lg border overflow-hidden group transition-all duration-300 cursor-pointer flex flex-col relative transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/10 ${selectedIds.includes(file.id) ? 'border-orange-500 ring-2 ring-orange-500/50 bg-orange-500/5' : 'border-border/60'} ${draggedOverFolder === file.id ? 'border-orange-500 ring-2 ring-orange-500 shadow-md bg-orange-500/10' : 'hover:border-primary/50 hover:bg-muted/60'}`}
                                         >
                                             <div className="absolute top-3 left-3 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 focus-within:opacity-100">
                                                 <input 

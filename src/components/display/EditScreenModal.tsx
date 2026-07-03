@@ -90,10 +90,10 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, commerceI
     return (
         <>
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="bg-white text-slate-900 border-0 shadow-2xl max-w-2xl p-0 overflow-hidden sm:rounded-2xl">
-                <DialogHeader className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex flex-row items-center justify-between">
+            <DialogContent className="bg-card text-foreground border border-border shadow-2xl max-w-2xl p-0 overflow-hidden sm:rounded-2xl">
+                <DialogHeader className="px-6 py-4 border-b border-border bg-muted flex flex-row items-center justify-between">
                     <DialogTitle className="text-xl font-semibold flex items-center gap-2">
-                        <MonitorPlay className="w-5 h-5 text-slate-500" />
+                        <MonitorPlay className="w-5 h-5 text-muted-foreground" />
                         Editar Pantalla "{device.name}"
                     </DialogTitle>
                 </DialogHeader>
@@ -101,7 +101,7 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, commerceI
                 <div className="p-6 overflow-y-auto max-h-[70vh] space-y-6">
                     {/* General Section */}
                     <div className="grid grid-cols-[160px_1fr] items-center gap-4">
-                        <Label className="text-right text-slate-500 font-medium">Nombre del Dispositivo <span className="text-rose-500">*</span></Label>
+                        <Label className="text-right text-muted-foreground font-medium">Nombre del Dispositivo <span className="text-rose-500">*</span></Label>
                         <Input 
                             value={name} 
                             onChange={(e) => setName(e.target.value)} 
@@ -110,9 +110,9 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, commerceI
                     </div>
 
                     <div className="grid grid-cols-[160px_1fr] items-center gap-4">
-                        <Label className="text-right text-slate-500 font-medium">Etiquetas (Zona)</Label>
+                        <Label className="text-right text-muted-foreground font-medium">Etiquetas (Zona)</Label>
                         <Select value={groupId} onValueChange={setGroupId}>
-                            <SelectTrigger className="w-full shadow-sm bg-white">
+                            <SelectTrigger className="w-full shadow-sm bg-background">
                                 <SelectValue placeholder="Seleccionar zona..." />
                             </SelectTrigger>
                             <SelectContent>
@@ -125,9 +125,9 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, commerceI
                     </div>
 
                     <div className="grid grid-cols-[160px_1fr] items-center gap-4">
-                        <Label className="text-right text-slate-500 font-medium">Tipo de Contenido <span className="text-rose-500">*</span></Label>
+                        <Label className="text-right text-muted-foreground font-medium">Tipo de Contenido <span className="text-rose-500">*</span></Label>
                         <Select value={contentType} onValueChange={(v) => { setContentType(v); setSelectedAsset(null); setSelectedPlaylistId('none'); }}>
-                            <SelectTrigger className="w-full shadow-sm bg-white">
+                            <SelectTrigger className="w-full shadow-sm bg-background">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -141,11 +141,11 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, commerceI
 
                     {/* Contenido - varía según el tipo */}
                     <div className="grid grid-cols-[160px_1fr] items-center gap-4">
-                        <Label className="text-right text-slate-500 font-medium">Contenido Seleccionado <span className="text-rose-500">*</span></Label>
+                        <Label className="text-right text-muted-foreground font-medium">Contenido Seleccionado <span className="text-rose-500">*</span></Label>
                         {contentType === 'playlist' ? (
                             // Playlist: dropdown directo con campañas disponibles
                             <Select value={selectedPlaylistId} onValueChange={handlePlaylistChange}>
-                                <SelectTrigger className="w-full shadow-sm bg-white">
+                                <SelectTrigger className="w-full shadow-sm bg-background">
                                     <SelectValue placeholder="Seleccionar lista..." />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -161,7 +161,7 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, commerceI
                                 <Input 
                                     value={selectedAsset ? selectedAsset.name : "Sin asignar"} 
                                     readOnly 
-                                    className="shadow-sm bg-slate-50 text-slate-600" 
+                                    className="shadow-sm bg-muted text-muted-foreground" 
                                 />
                                 <Button 
                                     onClick={() => setIsAssetModalOpen(true)}
@@ -172,16 +172,16 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, commerceI
                             </div>
                         ) : (
                             // Programación / Detener: mensaje informativo
-                            <div className="text-sm text-slate-400 italic py-2">
+                            <div className="text-sm text-muted-foreground italic py-2">
                                 {contentType === 'stop' ? 'La pantalla dejará de reproducir contenido.' : 'Configura el horario en la sección de abajo.'}
                             </div>
                         )}
                     </div>
 
                     <div className="grid grid-cols-[160px_1fr] items-center gap-4">
-                        <Label className="text-right text-slate-500 font-medium">Rotación de Pantalla (Grados)</Label>
+                        <Label className="text-right text-muted-foreground font-medium">Rotación de Pantalla (Grados)</Label>
                         <Select value={orientation} onValueChange={setOrientation}>
-                            <SelectTrigger className="w-full shadow-sm bg-white">
+                            <SelectTrigger className="w-full shadow-sm bg-background">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -194,53 +194,53 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, commerceI
                     </div>
 
                     {/* Operational Schedule Section */}
-                    <div className="mt-8 border border-slate-200 rounded-xl overflow-hidden">
-                        <button className="w-full px-4 py-3 bg-slate-50 flex items-center gap-2 hover:bg-slate-100 transition-colors">
-                            <ChevronDown className="w-4 h-4 text-slate-500" />
-                            <span className="font-semibold text-slate-700">Horario de Funcionamiento</span>
-                            <div className="w-4 h-4 rounded-full border border-slate-300 flex items-center justify-center ml-1">
-                                <span className="text-[10px] text-slate-400">i</span>
+                    <div className="mt-8 border border-border rounded-xl overflow-hidden">
+                        <button className="w-full px-4 py-3 bg-muted flex items-center gap-2 hover:bg-accent transition-colors">
+                            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                            <span className="font-semibold text-foreground">Horario de Funcionamiento</span>
+                            <div className="w-4 h-4 rounded-full border border-border flex items-center justify-center ml-1">
+                                <span className="text-[10px] text-muted-foreground">i</span>
                             </div>
                         </button>
                     </div>
 
                     {/* Advanced Section */}
-                    <div className="mt-4 border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="mt-4 border border-border rounded-xl overflow-hidden">
                         <button 
                             onClick={() => setShowAdvanced(!showAdvanced)}
-                            className="w-full px-4 py-3 bg-slate-50 flex items-center gap-2 hover:bg-slate-100 transition-colors border-b border-slate-100"
+                            className="w-full px-4 py-3 bg-muted flex items-center gap-2 hover:bg-accent transition-colors border-b border-border"
                         >
-                            {showAdvanced ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
-                            <span className="font-semibold text-slate-700">Avanzado</span>
+                            {showAdvanced ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                            <span className="font-semibold text-foreground">Avanzado</span>
                         </button>
                         
                         {showAdvanced && (
-                            <div className="p-6 space-y-6 bg-white">
+                            <div className="p-6 space-y-6 bg-card">
                                 <div className="grid grid-cols-[160px_1fr] items-center gap-4">
-                                    <Label className="text-right text-slate-500 font-medium">Ubicación Funcional</Label>
+                                    <Label className="text-right text-muted-foreground font-medium">Ubicación Funcional</Label>
                                     <div className="flex gap-2">
-                                        <Input defaultValue="Ubicación Principal" className="shadow-sm" />
-                                        <Button variant="outline" className="shrink-0 bg-white shadow-sm border-slate-200">Cambiar</Button>
+                                        <Input defaultValue="Ubicación Principal" className="shadow-sm bg-background" />
+                                        <Button variant="outline" className="shrink-0 bg-background hover:bg-accent text-foreground shadow-sm border-border">Cambiar</Button>
                                     </div>
                                 </div>
 
                                 <div className="grid grid-cols-[160px_1fr] items-center gap-4">
-                                    <Label className="text-right text-slate-500 font-medium">Ubicación Geográfica</Label>
+                                    <Label className="text-right text-muted-foreground font-medium">Ubicación Geográfica</Label>
                                     <div className="relative">
-                                        <MapPin className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                                        <MapPin className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
                                         <Input 
                                             placeholder="ej. Mendoza, AR" 
                                             value={location}
                                             onChange={(e) => setLocation(e.target.value)}
-                                            className="pl-9 shadow-sm"
+                                            className="pl-9 shadow-sm bg-background"
                                         />
                                     </div>
                                 </div>
 
                                 <div className="grid grid-cols-[160px_1fr] items-center gap-4">
-                                    <Label className="text-right text-slate-500 font-medium">Tipo de Fondo</Label>
+                                    <Label className="text-right text-muted-foreground font-medium">Tipo de Fondo</Label>
                                     <Select defaultValue="default">
-                                        <SelectTrigger className="shadow-sm bg-white">
+                                        <SelectTrigger className="shadow-sm bg-background">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -251,8 +251,8 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, commerceI
                                     </Select>
                                 </div>
 
-                                <div className="grid grid-cols-[160px_1fr] items-center gap-4 pt-4 border-t border-slate-100">
-                                    <Label className="text-right text-slate-500 font-medium leading-tight">Mostrar Estado de Descarga</Label>
+                                <div className="grid grid-cols-[160px_1fr] items-center gap-4 pt-4 border-t border-border">
+                                    <Label className="text-right text-muted-foreground font-medium leading-tight">Mostrar Estado de Descarga</Label>
                                     <Switch 
                                         checked={showDownloading} 
                                         onCheckedChange={setShowDownloading} 
@@ -261,7 +261,7 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, commerceI
                                 </div>
 
                                 <div className="grid grid-cols-[160px_1fr] items-center gap-4">
-                                    <Label className="text-right text-slate-500 font-medium leading-tight">Precargar Archivos en Playlist</Label>
+                                    <Label className="text-right text-muted-foreground font-medium leading-tight">Precargar Archivos en Playlist</Label>
                                     <Switch 
                                         checked={preloadAssets} 
                                         onCheckedChange={setPreloadAssets} 
@@ -273,20 +273,20 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, commerceI
                     </div>
                 </div>
 
-                <DialogFooter className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex sm:justify-between items-center w-full">
-                    <div className="flex items-center text-slate-400 cursor-help hover:text-slate-600">
+                <DialogFooter className="px-6 py-4 border-t border-border bg-muted flex sm:justify-between items-center w-full">
+                    <div className="flex items-center text-muted-foreground cursor-help hover:text-foreground">
                         <div className="w-5 h-5 rounded-full border-2 border-current flex items-center justify-center font-bold text-xs mr-2">
                             ?
                         </div>
                         <Button variant="ghost" size="sm" className="px-0 hover:bg-transparent">Vista Previa</Button>
                     </div>
                     <div className="flex gap-2">
-                        <Button variant="ghost" onClick={onClose} className="text-slate-600 hover:bg-slate-200">
+                        <Button variant="ghost" onClick={onClose} className="text-muted-foreground hover:bg-accent hover:text-foreground">
                             Cerrar
                         </Button>
                         <Button 
                             variant="outline" 
-                            className="border-slate-200 shadow-sm text-slate-600 hover:bg-slate-100 disabled:opacity-40"
+                            className="border-border shadow-sm text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40"
                             disabled={!selectedAsset}
                             onClick={() => setIsScheduleModalOpen(true)}
                         >

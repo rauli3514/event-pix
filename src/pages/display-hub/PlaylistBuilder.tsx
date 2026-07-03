@@ -157,31 +157,50 @@ const PlaylistBuilder = () => {
 
         const updatedZones = [...campaignV2.zones];
         if (!updatedZones[0]) return;
-        updatedZones[0].playlist.push(newItem);
+        updatedZones[0] = { ...updatedZones[0], playlist: [...updatedZones[0].playlist, newItem] };
         setCampaignV2({ ...campaignV2, zones: updatedZones });
         toast.success(`Añadido: ${media.name}`);
     };
 
     const handleRemoveItem = (id: string) => {
         const updatedZones = [...campaignV2.zones];
-        updatedZones[0].playlist = updatedZones[0].playlist.filter(i => i.id !== id);
+        if (!updatedZones[0]) return;
+        updatedZones[0] = { ...updatedZones[0], playlist: updatedZones[0].playlist.filter(i => i.id !== id) };
         setCampaignV2({ ...campaignV2, zones: updatedZones });
     };
 
     const handleUpdateItem = (id: string, updates: Partial<UniversalElement>) => {
         const updatedZones = [...campaignV2.zones];
-        updatedZones[0].playlist = updatedZones[0].playlist.map(i => i.id === id ? { ...i, ...updates } : i);
+        if (!updatedZones[0]) return;
+        updatedZones[0] = { ...updatedZones[0], playlist: updatedZones[0].playlist.map(i => i.id === id ? { ...i, ...updates } : i) };
         setCampaignV2({ ...campaignV2, zones: updatedZones });
     };
     
     // --- Drag and Drop Logic ---
-    const handleDragStart = (index: number) => {
+    const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+    const handleDragStart = (e: React.DragEvent, index: number) => {
         setDraggedIndex(index);
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", index.toString());
     };
 
-    const handleDragOver = (e: React.DragEvent, index: number) => {
+    const handleDragEnter = (index: number) => {
+        setDragOverIndex(index);
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
-        if (draggedIndex === null || draggedIndex === index) return;
+        e.dataTransfer.dropEffect = "move";
+    };
+
+    const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+        e.preventDefault();
+        if (draggedIndex === null || draggedIndex === dropIndex) {
+            setDraggedIndex(null);
+            setDragOverIndex(null);
+            return;
+        }
         
         const updatedZones = [...campaignV2.zones];
         if (!updatedZones[0]) return;
@@ -190,15 +209,18 @@ const PlaylistBuilder = () => {
         const draggedItem = newPlaylist[draggedIndex];
         
         newPlaylist.splice(draggedIndex, 1);
-        newPlaylist.splice(index, 0, draggedItem);
+        newPlaylist.splice(dropIndex, 0, draggedItem);
         
-        updatedZones[0].playlist = newPlaylist;
+        updatedZones[0] = { ...updatedZones[0], playlist: newPlaylist };
         setCampaignV2({ ...campaignV2, zones: updatedZones });
-        setDraggedIndex(index);
+        
+        setDraggedIndex(null);
+        setDragOverIndex(null);
     };
 
     const handleDragEnd = () => {
         setDraggedIndex(null);
+        setDragOverIndex(null);
     };
 
     if (loadingPlaylists) return <div className="min-h-screen bg-background flex items-center justify-center text-foreground">Cargando...</div>;
@@ -333,15 +355,18 @@ const PlaylistBuilder = () => {
                                 {activePlaylist.map((item, index) => {
                                     const TypeIcon = getIconForType(item.type);
                                     const isDragging = draggedIndex === index;
+                                    const isDragOver = dragOverIndex === index && draggedIndex !== index;
                                     
                                     return (
                                         <div 
                                             key={item.id} 
                                             draggable
-                                            onDragStart={() => handleDragStart(index)}
-                                            onDragOver={(e) => handleDragOver(e, index)}
+                                            onDragStart={(e) => handleDragStart(e, index)}
+                                            onDragEnter={() => handleDragEnter(index)}
+                                            onDragOver={handleDragOver}
+                                            onDrop={(e) => handleDrop(e, index)}
                                             onDragEnd={handleDragEnd}
-                                            className={`bg-card border ${isDragging ? 'border-primary shadow-md opacity-70' : 'border-border'} rounded-xl shadow-sm flex flex-col sm:flex-row items-stretch group hover:border-primary/50 transition-colors overflow-hidden cursor-grab active:cursor-grabbing`}
+                                            className={`bg-card border ${isDragging ? 'border-primary shadow-md opacity-70' : isDragOver ? 'border-primary border-t-4 shadow-lg scale-[1.02]' : 'border-border'} rounded-xl shadow-sm flex flex-col sm:flex-row items-stretch group hover:border-primary/50 transition-all overflow-hidden cursor-grab active:cursor-grabbing`}
                                         >
                                             <div className="hidden sm:flex w-10 bg-muted/50 border-r border-border items-center justify-center text-muted-foreground group-hover:text-foreground">
                                                 <GripVertical className="w-4 h-4" />

@@ -34,12 +34,12 @@ const formatLabel = (f: string) => {
 
 const StatusBadge = ({ status }: { status: string }) => {
     if (status === 'published') return (
-        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
             <CheckCircle2 className="w-3 h-3" /> Publicado
         </span>
     );
     if (status === 'expired') return (
-        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-700/50 text-slate-400 border border-slate-700">
+        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-muted text-muted-foreground border border-border">
             <AlertCircle className="w-3 h-3" /> Vencido
         </span>
     );
@@ -76,10 +76,10 @@ const WorkspaceSchedule = () => {
             {/* Header */}
             <div className="flex items-center justify-between mb-8">
                 <div>
-                    <h1 className="text-2xl font-bold text-white font-[Orbitron]">
-                        Programación de <span className="text-indigo-400">Contenido</span>
+                    <h1 className="text-2xl font-bold text-foreground font-[Orbitron]">
+                        Programación de <span className="text-indigo-500">Contenido</span>
                     </h1>
-                    <p className="text-slate-400 text-sm mt-1">
+                    <p className="text-muted-foreground text-sm mt-1">
                         El sistema publica automáticamente cuando se cumple la fecha y hora configurada.
                     </p>
                 </div>
@@ -88,7 +88,7 @@ const WorkspaceSchedule = () => {
                         variant="outline"
                         size="sm"
                         onClick={() => refetch()}
-                        className="border-slate-700 text-slate-300 hover:bg-slate-800 gap-2 h-10"
+                        className="border-border text-foreground hover:bg-muted gap-2 h-10"
                     >
                         <RefreshCw className="w-4 h-4" />
                         Actualizar
@@ -104,17 +104,17 @@ const WorkspaceSchedule = () => {
             </div>
 
             {isLoading ? (
-                <div className="flex justify-center items-center h-40 text-slate-400">
+                <div className="flex justify-center items-center h-40 text-muted-foreground">
                     <div className="flex flex-col items-center gap-3">
-                        <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                         <span>Cargando programaciones...</span>
                     </div>
                 </div>
             ) : schedules.length === 0 ? (
-                <div className="py-20 text-center border-2 border-dashed border-slate-800 rounded-2xl">
-                    <Calendar className="w-12 h-12 text-slate-700 mx-auto mb-4" />
-                    <h3 className="text-lg font-bold text-white">Sin programaciones</h3>
-                    <p className="text-slate-400 text-sm mt-2 max-w-sm mx-auto">
+                <div className="py-20 text-center border-2 border-dashed border-border rounded-2xl bg-card/50">
+                    <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-bold text-foreground">Sin programaciones</h3>
+                    <p className="text-muted-foreground text-sm mt-2 max-w-sm mx-auto">
                         Para crear una programación, abrí "Editar Pantalla", seleccioná un contenido y hacé clic en "Programar".
                     </p>
                 </div>
@@ -151,7 +151,7 @@ const WorkspaceSchedule = () => {
                     {/* Expired */}
                     {expired.length > 0 && (
                         <section>
-                            <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-2">
+                            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
                                 <AlertCircle className="w-4 h-4" /> Vencidas ({expired.length})
                             </h2>
                             <div className="space-y-3">
@@ -189,28 +189,28 @@ const ScheduleCard = ({ schedule: s, onDelete }: { schedule: any; onDelete: (id:
         : <Globe className="w-5 h-5 text-cyan-400" />;
 
     return (
-        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex items-center gap-4 hover:border-slate-700 transition-colors">
+        <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-4 hover:border-primary/50 transition-colors shadow-sm">
             {/* Type icon */}
-            <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
                 {typeIcon}
             </div>
 
             {/* Info */}
             <div className="flex-1 min-w-0">
-                <p className="text-white font-semibold truncate">{s.content_name}</p>
+                <p className="text-foreground font-semibold truncate">{s.content_name}</p>
                 <div className="flex items-center gap-3 mt-1 flex-wrap">
-                    <span className="flex items-center gap-1 text-xs text-slate-400">
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Monitor className="w-3.5 h-3.5" /> {s.device_name}
                     </span>
-                    <span className="flex items-center gap-1 text-xs text-slate-400">
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Calendar className="w-3.5 h-3.5" /> {fmtDate(s.scheduled_at)} — {fmtTime(s.scheduled_at)}
                     </span>
                     {s.expires_at && (
-                        <span className="flex items-center gap-1 text-xs text-rose-400/80">
+                        <span className="flex items-center gap-1 text-xs text-destructive/80">
                             <AlertCircle className="w-3.5 h-3.5" /> Vence: {fmtDate(s.expires_at)} {fmtTime(s.expires_at)}
                         </span>
                     )}
-                    <span className="text-xs text-slate-500">{formatLabel(s.format)}</span>
+                    <span className="text-xs text-muted-foreground">{formatLabel(s.format)}</span>
                 </div>
             </div>
 
@@ -222,7 +222,7 @@ const ScheduleCard = ({ schedule: s, onDelete }: { schedule: any; onDelete: (id:
                 variant="ghost"
                 size="icon"
                 onClick={() => onDelete(s.id, s.content_name)}
-                className="text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 shrink-0"
+                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
             >
                 <Trash2 className="w-4 h-4" />
             </Button>
