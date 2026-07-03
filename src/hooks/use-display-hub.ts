@@ -341,7 +341,7 @@ export const useLinkDevice = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ device_code, name, description, commerce_id, group_id }: { device_code: string; name: string; description?: string; commerce_id: string; group_id?: string }) => {
+        mutationFn: async ({ device_code, name, description, commerce_id, group_id, orientation = 'landscape' }: { device_code: string; name: string; description?: string; commerce_id: string; group_id?: string; orientation?: string }) => {
             
             // First verify that the device exists and is pending
             const { data: pendingDevice, error: findError } = await supabase
@@ -362,7 +362,8 @@ export const useLinkDevice = () => {
                     description,
                     commerce_id,
                     group_id: group_id || null,
-                    pairing_status: 'linked'
+                    pairing_status: 'linked',
+                    orientation
                 })
                 .eq("id", pendingDevice.id)
                 .select()
