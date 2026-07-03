@@ -213,7 +213,7 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                     {activeCategory === 'apps' ? (
-                        <Button variant="outline" className="bg-indigo-900/40 text-indigo-300 border-indigo-500/50 shadow-sm hover:bg-indigo-900/60 hover:text-indigo-200" onClick={() => setIsAppCatalogOpen(true)}>
+                        <Button className="bg-indigo-600 text-white shadow-sm hover:bg-indigo-700 transition-colors" onClick={() => setIsAppCatalogOpen(true)}>
                             <LayoutGrid className="w-4 h-4 mr-2" />
                             Crear App
                         </Button>

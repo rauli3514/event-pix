@@ -127,7 +127,7 @@ export const MediaFolderSidebar = ({ commerceId, mediaFiles, currentFolder, onSe
         if (keys.length === 0 && !Object.values(node).some(v => isCreatingChildFor === v?._path)) return null;
 
         return (
-            <div className={`space-y-0.5 mt-0.5 relative ${depth > 0 ? 'ml-4 border-l border-slate-800' : ''}`}>
+            <div className={`space-y-0.5 mt-0.5 relative ${depth > 0 ? 'ml-4 border-l border-border' : ''}`}>
                 {keys.map(key => {
                     const child = node[key];
                     const fullPath = child._path;
@@ -138,18 +138,18 @@ export const MediaFolderSidebar = ({ commerceId, mediaFiles, currentFolder, onSe
                     return (
                         <div key={fullPath} className="relative">
                             {depth > 0 && (
-                                <div className="absolute w-3 border-t border-slate-800 left-0 top-4" />
+                                <div className="absolute w-3 border-t border-border left-0 top-4" />
                             )}
                             <div 
                                 className={`flex items-center group rounded-lg transition-colors pr-2 py-1 relative ${
                                     depth > 0 ? 'ml-3' : ''
                                 } ${
-                                    isSelected ? 'bg-orange-500/10 text-orange-400' : 'hover:bg-slate-800/50 text-slate-300'
+                                    isSelected ? 'bg-primary/10 text-primary' : 'hover:bg-muted text-foreground'
                                 }`}
                             >
                                 <button 
                                     onClick={() => hasChildren && toggleExpand(fullPath)}
-                                    className={`p-1 rounded-md hover:bg-slate-700 transition-colors ${!hasChildren ? 'opacity-0 cursor-default' : ''}`}
+                                    className={`p-1 rounded-md hover:bg-accent transition-colors ${!hasChildren ? 'opacity-0 cursor-default' : ''}`}
                                 >
                                     {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                                 </button>
@@ -158,7 +158,7 @@ export const MediaFolderSidebar = ({ commerceId, mediaFiles, currentFolder, onSe
                                     onClick={() => onSelectFolder(fullPath)}
                                     className="flex-1 flex items-center gap-2 py-1 text-sm text-left truncate"
                                 >
-                                    {isExpanded ? <FolderOpen className={`w-4 h-4 ${isSelected ? 'text-orange-400' : 'text-slate-400'}`} /> : <Folder className={`w-4 h-4 ${isSelected ? 'text-orange-400' : 'text-slate-400'}`} />}
+                                    {isExpanded ? <FolderOpen className={`w-4 h-4 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} /> : <Folder className={`w-4 h-4 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />}
                                     
                                     {isRenaming === fullPath ? (
                                         <Input 
@@ -167,22 +167,22 @@ export const MediaFolderSidebar = ({ commerceId, mediaFiles, currentFolder, onSe
                                             onChange={e => setInputValue(e.target.value)}
                                             onKeyDown={e => e.key === 'Enter' && handleRename(fullPath)}
                                             onBlur={() => handleRename(fullPath)}
-                                            className="h-7 text-xs px-2 bg-slate-950 border-orange-500 text-white"
+                                            className="h-7 text-xs px-2 bg-background border-primary text-foreground"
                                             onClick={e => e.stopPropagation()}
                                         />
                                     ) : (
-                                        <span className={`truncate font-medium ${isSelected ? 'text-orange-400' : 'text-slate-300'}`}>{key}</span>
+                                        <span className={`truncate font-medium ${isSelected ? 'text-primary' : 'text-foreground'}`}>{key}</span>
                                     )}
                                 </button>
 
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                        <button className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-slate-700 rounded-md transition-all text-slate-400 hover:text-white">
+                                        <button className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-accent rounded-md transition-all text-muted-foreground hover:text-foreground">
                                             <MoreVertical className="w-4 h-4" />
                                         </button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-48 bg-slate-900 border-slate-800 text-slate-200">
-                                        <DropdownMenuItem className="focus:bg-slate-800 focus:text-white cursor-pointer" onClick={() => {
+                                    <DropdownMenuContent align="end" className="w-48 bg-card border-border text-foreground">
+                                        <DropdownMenuItem className="focus:bg-accent focus:text-accent-foreground cursor-pointer" onClick={() => {
                                             setIsCreatingChildFor(fullPath);
                                             setInputValue('');
                                             setExpandedFolders(prev => ({ ...prev, [fullPath]: true }));
@@ -190,14 +190,14 @@ export const MediaFolderSidebar = ({ commerceId, mediaFiles, currentFolder, onSe
                                             <FolderPlus className="w-4 h-4 mr-2" />
                                             Nueva Subcarpeta
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem className="focus:bg-slate-800 focus:text-white cursor-pointer" onClick={() => {
+                                        <DropdownMenuItem className="focus:bg-accent focus:text-accent-foreground cursor-pointer" onClick={() => {
                                             setIsRenaming(fullPath);
                                             setInputValue(key);
                                         }}>
                                             <Edit2 className="w-4 h-4 mr-2" />
                                             Renombrar
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem className="text-red-400 focus:text-red-300 focus:bg-red-950/30 cursor-pointer" onClick={() => handleDelete(fullPath)}>
+                                        <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer" onClick={() => handleDelete(fullPath)}>
                                             <Trash2 className="w-4 h-4 mr-2" />
                                             Eliminar
                                         </DropdownMenuItem>
@@ -209,8 +209,8 @@ export const MediaFolderSidebar = ({ commerceId, mediaFiles, currentFolder, onSe
                             
                             {isCreatingChildFor === fullPath && isExpanded && (
                                 <div className={`flex items-center gap-2 py-1.5 pr-2 relative ml-3 ${depth > -1 ? 'ml-7' : ''}`}>
-                                    <div className="absolute w-3 border-t border-slate-800 left-[-12px] top-1/2" />
-                                    <Folder className="w-4 h-4 text-slate-500" />
+                                    <div className="absolute w-3 border-t border-border left-[-12px] top-1/2" />
+                                    <Folder className="w-4 h-4 text-muted-foreground" />
                                     <Input 
                                         autoFocus
                                         value={inputValue}
@@ -218,7 +218,7 @@ export const MediaFolderSidebar = ({ commerceId, mediaFiles, currentFolder, onSe
                                         onKeyDown={e => e.key === 'Enter' && handleCreate(fullPath)}
                                         onBlur={() => handleCreate(fullPath)}
                                         placeholder="Nombre..."
-                                        className="h-7 text-xs px-2 bg-slate-950 border-orange-500 text-white"
+                                        className="h-7 text-xs px-2 bg-background border-primary text-foreground"
                                     />
                                 </div>
                             )}
@@ -230,15 +230,15 @@ export const MediaFolderSidebar = ({ commerceId, mediaFiles, currentFolder, onSe
     };
 
     return (
-        <div className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col h-full overflow-hidden shrink-0 text-white">
-            <div className="p-4 border-b border-slate-800 flex items-center justify-between">
-                <h2 className="font-semibold text-white flex items-center gap-2">
-                    <Layers className="w-5 h-5 text-orange-400" />
+        <div className="w-64 bg-card border-r border-border flex flex-col h-full overflow-hidden shrink-0 text-foreground transition-colors duration-300">
+            <div className="p-4 border-b border-border flex items-center justify-between">
+                <h2 className="font-semibold text-foreground flex items-center gap-2">
+                    <Layers className="w-5 h-5 text-primary" />
                     Carpetas
                 </h2>
                 <button 
                     onClick={() => { setIsCreatingRoot(true); setInputValue(''); }}
-                    className="p-1.5 hover:bg-slate-800 rounded-md transition-colors text-slate-400 hover:text-orange-400"
+                    className="p-1.5 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-primary"
                     title="Nueva Carpeta Principal"
                 >
                     <FolderPlus className="w-5 h-5" />
@@ -249,21 +249,21 @@ export const MediaFolderSidebar = ({ commerceId, mediaFiles, currentFolder, onSe
                 <button
                     onClick={() => onSelectFolder('/')}
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-left ${
-                        currentFolder === '/' ? 'bg-orange-500/10 text-orange-400 font-semibold' : 'hover:bg-slate-800/50 text-slate-300'
+                        currentFolder === '/' ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-muted text-foreground'
                     }`}
                 >
-                    <HardDrive className={`w-4 h-4 ${currentFolder === '/' ? 'text-orange-400' : 'text-slate-400'}`} />
+                    <HardDrive className={`w-4 h-4 ${currentFolder === '/' ? 'text-primary' : 'text-muted-foreground'}`} />
                     <span className="flex-1 text-sm">Archivos Sueltos (Raíz)</span>
                 </button>
 
                 <div className="pt-4 pb-2">
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider px-3 mb-2">Estructura</p>
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-3 mb-2">Estructura</p>
                     
                     {renderTree(tree, 0)}
 
                     {isCreatingRoot && (
                         <div className="flex items-center gap-2 py-1.5 px-3 ml-2 mt-2 relative">
-                            <Folder className="w-4 h-4 text-slate-500" />
+                            <Folder className="w-4 h-4 text-muted-foreground" />
                             <Input 
                                 autoFocus
                                 value={inputValue}
@@ -271,7 +271,7 @@ export const MediaFolderSidebar = ({ commerceId, mediaFiles, currentFolder, onSe
                                 onKeyDown={e => e.key === 'Enter' && handleCreate('/')}
                                 onBlur={() => handleCreate('/')}
                                 placeholder="Nombre de carpeta..."
-                                className="h-7 text-xs px-2 bg-slate-950 border-orange-500 text-white"
+                                className="h-7 text-xs px-2 bg-background border-primary text-foreground"
                             />
                         </div>
                     )}
