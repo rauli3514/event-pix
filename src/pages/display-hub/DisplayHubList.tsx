@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Monitor, Plus, Hash, Eye, ChevronDown, MoreVertical, Edit2, Info, Move, Trash2, Play, Smartphone } from 'lucide-react';
+import { Monitor, Plus, Hash, Eye, ChevronDown, MoreVertical, Edit2, Info, Move, Trash2, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,7 +24,7 @@ const DisplayHubList = () => {
     const { commerceId } = useParams<{ commerceId: string }>();
     
     // States for linking
-    const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+    const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
     const [linkData, setLinkData] = useState({ device_code: '', name: '', description: '', group_id: 'none', orientation: 'landscape' as 'landscape' | 'portrait' });
     
     // States for filtering & sidebar
@@ -76,7 +76,7 @@ const DisplayHubList = () => {
             description: linkData.description,
             orientation: linkData.orientation,
             commerce_id: effectiveCommerceId,
-            group_id: targetGroup
+            group_id: targetGroup || undefined
         }, {
             onSuccess: () => {
                 setIsLinkModalOpen(false);
