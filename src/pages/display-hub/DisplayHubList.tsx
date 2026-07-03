@@ -492,6 +492,7 @@ const DisplayHubList = () => {
                 />
             </div>
         </div>
+    </div>
     );
 };
 
