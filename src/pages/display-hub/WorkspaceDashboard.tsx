@@ -184,7 +184,7 @@ export default function WorkspaceDashboard() {
                                 </div>
                             ) : (
                                 recentCampaigns.map(playlist => (
-                                    <Link key={playlist.id} to={`/admin/display/commerce/${commerceId}/workspace/playlists/${playlist.id}`} className="flex items-center justify-between p-3 rounded-xl hover:bg-muted transition-colors">
+                                    <Link key={playlist.id} to={`/admin/display/commerce/${commerceId}/playlists/${playlist.id}`} className="flex items-center justify-between p-3 rounded-xl hover:bg-muted transition-colors">
                                         <div className="flex items-center gap-3 overflow-hidden">
                                             <div className="w-8 h-8 rounded-lg bg-fuchsia-500/10 flex items-center justify-center shrink-0">
                                                 <ListVideo className="w-4 h-4 text-fuchsia-500" />
