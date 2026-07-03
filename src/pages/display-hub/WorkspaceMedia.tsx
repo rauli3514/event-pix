@@ -425,6 +425,8 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                                                             <div className="w-10 h-10 rounded bg-muted border border-border flex items-center justify-center shrink-0 overflow-hidden">
                                                                 {file.type === 'image' && file.url ? (
                                                                     <img src={file.url} alt={file.name} className="w-full h-full object-cover" />
+                                                                ) : file.type === 'video' && file.url ? (
+                                                                    <video src={file.url} className="w-full h-full object-cover" muted playsInline preload="metadata" />
                                                                 ) : (
                                                                     <FileIcon className={`w-5 h-5 ${isFolder ? 'text-orange-400' : 'text-muted-foreground'}`} />
                                                                 )}
@@ -554,6 +556,8 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                                             <div className="flex-1 bg-muted/50 relative overflow-hidden flex items-center justify-center p-4">
                                                 {file.type === 'image' && file.url ? (
                                                     <img src={file.url} alt={file.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                                                ) : file.type === 'video' && file.url ? (
+                                                    <video src={file.url} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" muted playsInline preload="metadata" />
                                                 ) : (
                                                     <div className="w-16 h-16 rounded-2xl bg-card border border-border/50 shadow-inner flex items-center justify-center transform transition-transform group-hover:scale-110 group-hover:-rotate-3">
                                                         <FileIcon className={`w-8 h-8 ${isFolder ? 'text-primary fill-primary/20' : 'text-muted-foreground'}`} />

@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
     ArrowLeft, Save, Trash2, Clock, Image as ImageIcon, 
-    Video, FileAudio, FileText, Globe, GripVertical, Settings2, Folder, LayoutDashboard, Upload
+    Video, FileAudio, FileText, Globe, GripVertical, Settings2, Folder, LayoutDashboard, Upload, MonitorPlay
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -16,6 +16,7 @@ import { useDisplayCampaigns, useUpdateCampaign } from "@/hooks/use-display-hub"
 import { useDisplayMedia, useUploadDisplayMedia } from "@/hooks/use-display-media";
 import { DisplayCampaignV2, UniversalElement, DisplayFitMode, DisplayTransition } from '@/types/display';
 import { UploadMediaModal } from '@/components/display/UploadMediaModal';
+import { PlaylistPreviewModal } from '@/components/display/PlaylistPreviewModal';
 
 const migrateToV2 = (data: any): DisplayCampaignV2 => {
     if (data?.version === '2.0') return data as DisplayCampaignV2;
@@ -75,6 +76,7 @@ const PlaylistBuilder = () => {
     const [campaignV2, setCampaignV2] = useState<DisplayCampaignV2>(migrateToV2(null));
     const [mediaFolder, setMediaFolder] = useState<string>('/');
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+    const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
     
     // Drag and Drop state
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -246,6 +248,9 @@ const PlaylistBuilder = () => {
                 </div>
 
                 <div className="flex items-center gap-3">
+                    <Button variant="secondary" className="font-semibold bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 border border-blue-500/20" onClick={() => setIsPreviewModalOpen(true)}>
+                        <MonitorPlay className="w-4 h-4 mr-2" /> Vista Previa
+                    </Button>
                     {/* Settings Gear Modal */}
                     <Dialog>
                         <DialogTrigger asChild>
@@ -466,6 +471,8 @@ const PlaylistBuilder = () => {
                                             <div className="flex-1 bg-muted/50 flex items-center justify-center overflow-hidden">
                                                 {file.type === 'image' && file.url ? (
                                                     <img src={file.url} alt="thumb" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                                ) : file.type === 'video' && file.url ? (
+                                                    <video src={file.url} className="w-full h-full object-cover group-hover:scale-105 transition-transform" muted playsInline preload="metadata" />
                                                 ) : (
                                                     <Icon className="w-6 h-6 md:w-8 md:h-8 text-muted-foreground group-hover:text-foreground transition-colors" />
                                                 )}
@@ -495,9 +502,17 @@ const PlaylistBuilder = () => {
             <UploadMediaModal 
                 isOpen={isUploadModalOpen} 
                 onClose={() => setIsUploadModalOpen(false)} 
+                commerceId={commerceId || ''} 
+                currentFolder={mediaFolder}
+                activeCategory="images"
                 onUpload={handleUploadFiles}
                 onAddWebLink={handleAddWebLink}
-                activeCategory="images"
+            />
+            
+            <PlaylistPreviewModal 
+                isOpen={isPreviewModalOpen}
+                onClose={() => setIsPreviewModalOpen(false)}
+                items={activePlaylist}
             />
         </div>
     );
