@@ -10,6 +10,7 @@ import KioskManager from "./pages/KioskManager";
 import KioskAI from "./pages/KioskAI";
 import Display from "./pages/Display";
 import Login from "./pages/Login";
+import DisplayUserLogin from "./pages/DisplayUserLogin";
 import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
 import DisplayHubMain from "./pages/display-hub/DisplayHubMain";
@@ -44,6 +45,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/usuarios" element={<DisplayUserLogin />} />
             <Route path="/register" element={<Register />} />
 
             <Route path="/kiosco" element={<KioskAI />} />

@@ -15,6 +15,7 @@ const Login = () => {
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
+        localStorage.removeItem('display_user_mode');
 
         // @ts-ignore
         if (supabase.supabaseUrl?.includes('placeholder')) {

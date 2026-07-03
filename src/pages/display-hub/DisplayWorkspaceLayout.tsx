@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, Outlet, useLocation, useParams } from 'react-router-dom';
+import { Link, Outlet, useLocation, useParams, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard,
   Monitor, 
@@ -8,7 +8,8 @@ import {
   Puzzle, 
   Calendar, 
   ArrowLeft,
-  Menu
+  Menu,
+  LogOut
 } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { cn } from '@/lib/utils';
@@ -16,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import { useCommerces, useDisplaySchedules, useUpdateSchedule, useAssignContentToDevice } from '@/hooks/use-display-hub';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabase';
 
 const MENU_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: 'dashboard' },
@@ -29,7 +31,16 @@ const MENU_ITEMS = [
 export default function DisplayWorkspaceLayout() {
   const location = useLocation();
   const { commerceId } = useParams();
+  const navigate = useNavigate();
   const { data: commerces } = useCommerces();
+  
+  const isDisplayUser = localStorage.getItem('display_user_mode') === 'true';
+
+  const handleLogout = async () => {
+      await supabase.auth.signOut();
+      localStorage.removeItem('display_user_mode');
+      navigate('/usuarios');
+  };
   
   const currentCommerce = commerces?.find(c => c.id === commerceId);
   const basePath = `/admin/display/commerce/${commerceId}/workspace`;
@@ -85,10 +96,14 @@ export default function DisplayWorkspaceLayout() {
   const SidebarContent = () => (
     <>
       <div className="h-16 flex items-center px-4 border-b border-border shrink-0 transition-colors duration-300">
-        <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground hover:bg-muted -ml-2 mr-2 px-2">
-          <Link to="/admin/display">
-            <ArrowLeft className="w-4 h-4" />
-          </Link>
+        <Button variant="ghost" size="sm" onClick={isDisplayUser ? handleLogout : undefined} asChild={!isDisplayUser} className="text-muted-foreground hover:text-foreground hover:bg-muted -ml-2 mr-2 px-2">
+          {isDisplayUser ? (
+             <LogOut className="w-4 h-4" />
+          ) : (
+            <Link to="/admin/display">
+              <ArrowLeft className="w-4 h-4" />
+            </Link>
+          )}
         </Button>
         <div className="flex flex-col overflow-hidden">
           <div className="font-bold text-lg font-[Orbitron] text-foreground leading-tight transition-colors duration-300">
@@ -136,10 +151,14 @@ export default function DisplayWorkspaceLayout() {
       {/* Mobile Top Navbar */}
       <div className="md:hidden h-14 shrink-0 bg-card border-b border-border flex items-center justify-between px-4 z-20 transition-colors duration-300">
         <div className="flex items-center gap-2 overflow-hidden">
-            <Button variant="ghost" size="icon" asChild className="text-muted-foreground hover:text-foreground">
-                <Link to="/admin/display">
-                    <ArrowLeft className="w-5 h-5" />
-                </Link>
+            <Button variant="ghost" size="icon" onClick={isDisplayUser ? handleLogout : undefined} asChild={!isDisplayUser} className="text-muted-foreground hover:text-foreground">
+                {isDisplayUser ? (
+                   <LogOut className="w-5 h-5" />
+                ) : (
+                  <Link to="/admin/display">
+                      <ArrowLeft className="w-5 h-5" />
+                  </Link>
+                )}
             </Button>
             <div className="flex flex-col min-w-0">
                 <div className="font-bold text-base font-[Orbitron] text-foreground leading-tight truncate">
