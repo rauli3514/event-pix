@@ -35,7 +35,7 @@ export default function WorkspaceDashboard() {
 
     const activeSchedulesCount = schedules.length;
 
-    const recentCampaigns = [...campaigns].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).slice(0, 3);
+    const recentCampaigns = [...campaigns].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 3);
     const upcomingSchedules = [...schedules].sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()).slice(0, 3);
 
     return (
