@@ -104,22 +104,26 @@ export default function TvBootScreen() {
 
   return (
     <div 
-      className="fixed inset-0 w-full h-full text-white p-8 flex flex-col items-center justify-center bg-black bg-cover bg-center bg-no-repeat"
-      style={{ backgroundImage: 'url(/edm-assets/fondo.PNG)' }}
+      className="fixed inset-0 w-full h-full text-foreground p-8 flex flex-col items-center justify-center bg-black bg-cover bg-center bg-no-repeat"
+      style={{ backgroundImage: 'url(/banner-dashboard.PNG)' }}
     >
-      <div className="bg-zinc-900/80 border border-zinc-800 p-12 rounded-3xl text-center shadow-2xl max-w-lg w-full backdrop-blur-md">
-        <img src="/edm-assets/logo.PNG" alt="EventPix" className="w-48 mx-auto mb-6 drop-shadow-lg" />
-        <p className="text-zinc-300 mb-8 text-lg">Para vincular esta pantalla, ingresa el siguiente código en tu panel de control:</p>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm pointer-events-none"></div>
+
+      <div className="relative z-10 bg-card/95 border border-border p-12 rounded-3xl text-center shadow-2xl max-w-lg w-full backdrop-blur-md">
+        <h1 className="text-4xl font-extrabold text-primary font-[Orbitron] mb-6 tracking-wider drop-shadow-md">
+            Display <span className="text-foreground">Hub</span>
+        </h1>
+        <p className="text-muted-foreground mb-8 text-lg font-medium">Para vincular esta pantalla, ingresa el siguiente código en tu panel de control:</p>
         
-        <div className="bg-zinc-950 px-10 py-6 rounded-2xl border border-zinc-800 inline-block shadow-inner">
-          <p className="text-6xl font-mono tracking-widest text-[#00E5FF] font-bold">
+        <div className="bg-background px-10 py-6 rounded-2xl border border-primary/20 inline-block shadow-inner ring-1 ring-primary/10">
+          <p className="text-6xl font-mono tracking-widest text-primary font-bold">
             {pin || '------'}
           </p>
         </div>
         
-        <div className="mt-12 flex items-center justify-center space-x-3 text-zinc-400">
-          <div className="w-4 h-4 rounded-full border-2 border-zinc-500 border-t-[#00E5FF] animate-spin"></div>
-          <p className="font-medium tracking-wide">Esperando enlace...</p>
+        <div className="mt-12 flex items-center justify-center space-x-3 text-muted-foreground font-medium">
+          <div className="w-4 h-4 rounded-full border-2 border-muted-foreground/30 border-t-primary animate-spin"></div>
+          <p className="tracking-wide">Esperando enlace...</p>
         </div>
       </div>
     </div>
