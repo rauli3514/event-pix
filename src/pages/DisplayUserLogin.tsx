@@ -28,15 +28,30 @@ export default function DisplayUserLogin() {
         }
 
         if (data?.user) {
-            // Find which commerce this user belongs to
+            // Find which commerce this user belongs to by checking assignments
+            const { data: assignments, error: assignError } = await supabase
+                .from('display_commerce_users')
+                .select('commerce_id')
+                .eq('user_id', data.user.id)
+                .limit(1);
+
+            if (assignError || !assignments || assignments.length === 0) {
+                toast.error("No se encontró un negocio asociado a tu cuenta.");
+                await supabase.auth.signOut();
+                setLoading(false);
+                return;
+            }
+
+            const commerceId = assignments[0].commerce_id;
+
             const { data: commerce, error: commerceError } = await supabase
                 .from('display_commerces')
                 .select('id, name')
-                .eq('email', data.user.email)
+                .eq('id', commerceId)
                 .single();
 
             if (commerceError || !commerce) {
-                toast.error("No se encontró un negocio asociado a tu cuenta.");
+                toast.error("Error al cargar los datos de tu negocio.");
                 await supabase.auth.signOut();
                 setLoading(false);
                 return;
