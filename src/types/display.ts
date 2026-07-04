@@ -174,3 +174,16 @@ export interface DisplayHeartbeat {
     ip: string | null;
     metadata: any;
 }
+
+export interface DynamicLabel {
+    id: string;
+    text: string;
+    x: number; // percentage 0-100
+    y: number; // percentage 0-100
+    color: string;
+    fontFamily: string;
+    fontSize: number; // in vw or similar relative unit, or just generic size multiplier 1-10
+    fontWeight: string;
+    fontStyle: string; // normal, italic
+    animation: string;
+}

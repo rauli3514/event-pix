@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, Copy, Save, Database, Edit, ListTree, MoreVertical } from 'lucide-react';
+import { Plus, Trash2, Copy, Database, Edit, ListTree, PenTool } from 'lucide-react';
 import { DynamicLabel } from '@/types/display';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';

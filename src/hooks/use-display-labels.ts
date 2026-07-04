@@ -78,7 +78,7 @@ export const useUpdateLabelGroup = () => {
 export const useDeleteLabelGroup = () => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: async ({ id, commerceId }: { id: string, commerceId: string }) => {
+        mutationFn: async ({ id }: { id: string, commerceId: string }) => {
             const { error } = await supabase
                 .from("display_label_groups")
                 .delete()

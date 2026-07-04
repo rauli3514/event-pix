@@ -1,25 +1,15 @@
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Plus, Trash2, Copy, Image as ImageIcon, Save, FolderOpen, Database } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, Trash2, Copy, Image as ImageIcon, Save, FolderOpen } from 'lucide-react';
 import { MediaPickerModal } from '../../MediaPickerModal';
 import { toast } from 'sonner';
 import { useDisplayLabelGroups, useCreateLabelGroup } from '@/hooks/use-display-labels';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-
-export interface DynamicLabel {
-    id: string;
-    text: string;
-    x: number; // percentage 0-100
-    y: number; // percentage 0-100
-    color: string;
-    fontFamily: string;
-    fontSize: number; // in vw or similar relative unit, or just generic size multiplier 1-10
-    fontWeight: string;
-    fontStyle: string; // normal, italic
-    animation: 'none' | 'fade-in' | 'slide-up' | 'pulse' | 'bounce';
-}
+import { DynamicLabel } from '@/types/display';
 
 export interface DynamicMenuConfig {
     backgroundMediaId?: string;
@@ -42,7 +32,6 @@ const FONTS = [
 export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Partial<DynamicMenuConfig>, onChange: (c: Partial<DynamicMenuConfig>) => void, commerceId: string }) => {
     const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
     const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null);
-    const containerRef = useRef<HTMLDivElement>(null);
 
     const labels = config.labels || [];
     
@@ -257,6 +246,8 @@ export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Part
                         </div>
                     )}
                 </div>
+            </div>
+            
             <MediaPickerModal 
                 isOpen={isMediaPickerOpen}
                 onClose={() => setIsMediaPickerOpen(false)}
