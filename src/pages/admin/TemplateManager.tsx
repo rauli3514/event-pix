@@ -1,49 +1,117 @@
-import { useState } from 'react';
-import { useTemplateCategories, useCreateTemplateCategory, useDeleteTemplateCategory, useTemplates, useCreateTemplate, useDeleteTemplate } from '@/hooks/use-display-templates';
+import { useState, useRef } from 'react';
+import { 
+    useTemplateCategories, 
+    useCreateTemplateCategory, 
+    useDeleteTemplateCategory, 
+    useUpdateTemplateCategory,
+    useTemplates, 
+    useCreateTemplate, 
+    useDeleteTemplate,
+    useUpdateTemplate
+} from '@/hooks/use-display-templates';
+import { useUploadEventImage } from '@/hooks/use-event-settings';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Trash2, Plus, LayoutTemplate, PenTool, ExternalLink } from 'lucide-react';
+import { Trash2, Plus, LayoutTemplate, PenTool, ExternalLink, Edit, Upload } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { toast } from 'sonner';
 
 export default function TemplateManager() {
     const { data: categories = [] } = useTemplateCategories();
     const createCategory = useCreateTemplateCategory();
+    const updateCategory = useUpdateTemplateCategory();
     const deleteCategory = useDeleteTemplateCategory();
+    const uploadImage = useUploadEventImage();
 
-    const [isCreateCatOpen, setIsCreateCatOpen] = useState(false);
-    const [newCat, setNewCat] = useState({ name: '', icon: '' });
+    const [isCatModalOpen, setIsCatModalOpen] = useState(false);
+    const [catForm, setCatForm] = useState({ id: '', name: '', icon: '' });
+    const [isCatEdit, setIsCatEdit] = useState(false);
 
     const [selectedCatId, setSelectedCatId] = useState<string | null>(null);
     const { data: templates = [] } = useTemplates(selectedCatId || undefined);
     const createTemplate = useCreateTemplate();
+    const updateTemplate = useUpdateTemplate();
     const deleteTemplate = useDeleteTemplate();
 
-    const [isCreateTempOpen, setIsCreateTempOpen] = useState(false);
-    const [newTemp, setNewTemp] = useState({ 
-        name: '', description: '', thumbnail_url: '', canva_url: '', orientation: 'vertical', format: '1080x1920'
+    const [isTempModalOpen, setIsTempModalOpen] = useState(false);
+    const [tempForm, setTempForm] = useState({ 
+        id: '', name: '', description: '', thumbnail_url: '', canva_url: '', orientation: 'vertical', format: '1080x1920'
     });
+    const [isTempEdit, setIsTempEdit] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const handleCreateCat = (e: React.FormEvent) => {
-        e.preventDefault();
-        createCategory.mutate(newCat, {
-            onSuccess: () => {
-                setIsCreateCatOpen(false);
-                setNewCat({ name: '', icon: '' });
-            }
-        });
+    // --- Category Actions ---
+    const openCreateCat = () => {
+        setCatForm({ id: '', name: '', icon: '' });
+        setIsCatEdit(false);
+        setIsCatModalOpen(true);
     };
 
-    const handleCreateTemp = (e: React.FormEvent) => {
+    const openEditCat = (cat: any) => {
+        setCatForm({ id: cat.id, name: cat.name, icon: cat.icon });
+        setIsCatEdit(true);
+        setIsCatModalOpen(true);
+    };
+
+    const handleSaveCat = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedCatId) return;
-        createTemplate.mutate({ ...newTemp, category_id: selectedCatId } as any, {
-            onSuccess: () => {
-                setIsCreateTempOpen(false);
-                setNewTemp({ name: '', description: '', thumbnail_url: '', canva_url: '', orientation: 'vertical', format: '1080x1920' });
-            }
+        if (isCatEdit) {
+            updateCategory.mutate({ id: catForm.id, updates: { name: catForm.name, icon: catForm.icon } }, {
+                onSuccess: () => setIsCatModalOpen(false)
+            });
+        } else {
+            createCategory.mutate({ name: catForm.name, icon: catForm.icon }, {
+                onSuccess: () => setIsCatModalOpen(false)
+            });
+        }
+    };
+
+    // --- Template Actions ---
+    const openCreateTemp = () => {
+        setTempForm({ id: '', name: '', description: '', thumbnail_url: '', canva_url: '', orientation: 'vertical', format: '1080x1920' });
+        setIsTempEdit(false);
+        setIsTempModalOpen(true);
+    };
+
+    const openEditTemp = (temp: any) => {
+        setTempForm({ 
+            id: temp.id, name: temp.name, description: temp.description || '', 
+            thumbnail_url: temp.thumbnail_url || '', canva_url: temp.canva_url || '', 
+            orientation: temp.orientation || 'vertical', format: temp.format || '1080x1920' 
         });
+        setIsTempEdit(true);
+        setIsTempModalOpen(true);
+    };
+
+    const handleSaveTemp = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedCatId && !isTempEdit) return;
+        
+        if (isTempEdit) {
+            updateTemplate.mutate({ id: tempForm.id, updates: { ...tempForm } }, {
+                onSuccess: () => setIsTempModalOpen(false)
+            });
+        } else {
+            createTemplate.mutate({ ...tempForm, category_id: selectedCatId } as any, {
+                onSuccess: () => setIsTempModalOpen(false)
+            });
+        }
+    };
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        
+        try {
+            toast.info("Subiendo imagen...");
+            const url = await uploadImage.mutateAsync(file);
+            setTempForm(prev => ({ ...prev, thumbnail_url: url }));
+            toast.success("Imagen subida");
+        } catch (err: any) {
+            toast.error("Error al subir imagen");
+        }
     };
 
     return (
@@ -60,26 +128,28 @@ export default function TemplateManager() {
                 <div className="col-span-1 bg-slate-900/50 backdrop-blur-sm border border-slate-800/80 rounded-2xl p-6">
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="font-semibold text-white">Categorías</h3>
-                        <Dialog open={isCreateCatOpen} onOpenChange={setIsCreateCatOpen}>
+                        <Dialog open={isCatModalOpen} onOpenChange={setIsCatModalOpen}>
                             <DialogTrigger asChild>
-                                <Button size="sm" className="bg-[#00C4CC] hover:bg-[#00B2B9] text-white border-0">
+                                <Button size="sm" onClick={openCreateCat} className="bg-[#00C4CC] hover:bg-[#00B2B9] text-white border-0">
                                     <Plus className="w-4 h-4" />
                                 </Button>
                             </DialogTrigger>
                             <DialogContent className="bg-slate-900 border-slate-800 text-slate-100">
                                 <DialogHeader>
-                                    <DialogTitle>Nueva Categoría</DialogTitle>
+                                    <DialogTitle>{isCatEdit ? 'Editar Categoría' : 'Nueva Categoría'}</DialogTitle>
                                 </DialogHeader>
-                                <form onSubmit={handleCreateCat} className="space-y-4">
+                                <form onSubmit={handleSaveCat} className="space-y-4">
                                     <div className="space-y-2">
                                         <Label>Nombre (Ej: Restaurantes)</Label>
-                                        <Input value={newCat.name} onChange={(e) => setNewCat({...newCat, name: e.target.value})} className="bg-slate-950 border-slate-700 text-white" required />
+                                        <Input value={catForm.name} onChange={(e) => setCatForm({...catForm, name: e.target.value})} className="bg-slate-950 border-slate-700 text-white" required />
                                     </div>
                                     <div className="space-y-2">
                                         <Label>Ícono (Emoji o texto, Ej: 🍔)</Label>
-                                        <Input value={newCat.icon} onChange={(e) => setNewCat({...newCat, icon: e.target.value})} className="bg-slate-950 border-slate-700 text-white" required />
+                                        <Input value={catForm.icon} onChange={(e) => setCatForm({...catForm, icon: e.target.value})} className="bg-slate-950 border-slate-700 text-white" required />
                                     </div>
-                                    <Button type="submit" className="w-full bg-[#00C4CC] hover:bg-[#00B2B9] text-white">Crear</Button>
+                                    <Button type="submit" disabled={createCategory.isPending || updateCategory.isPending} className="w-full bg-[#00C4CC] hover:bg-[#00B2B9] text-white">
+                                        {isCatEdit ? 'Guardar Cambios' : 'Crear'}
+                                    </Button>
                                 </form>
                             </DialogContent>
                         </Dialog>
@@ -92,16 +162,24 @@ export default function TemplateManager() {
                                 onClick={() => setSelectedCatId(cat.id)}
                                 className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${selectedCatId === cat.id ? 'bg-[#00C4CC]/10 border-[#00C4CC]/50' : 'bg-slate-950 border-slate-800 hover:border-slate-700'}`}
                             >
-                                <div className="flex items-center gap-3">
-                                    <span className="text-xl">{cat.icon}</span>
-                                    <span className="text-sm font-medium text-white">{cat.name}</span>
+                                <div className="flex items-center gap-3 truncate">
+                                    <span className="text-xl shrink-0">{cat.icon}</span>
+                                    <span className="text-sm font-medium text-white truncate">{cat.name}</span>
                                 </div>
-                                <Button 
-                                    size="icon" variant="ghost" className="text-red-500 hover:bg-red-950/30 hover:text-red-400 h-8 w-8"
-                                    onClick={(e) => { e.stopPropagation(); if(confirm('¿Eliminar categoría?')) deleteCategory.mutate(cat.id); }}
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </Button>
+                                <div className="flex items-center shrink-0 ml-2">
+                                    <Button 
+                                        size="icon" variant="ghost" className="text-slate-400 hover:bg-slate-800 hover:text-white h-8 w-8"
+                                        onClick={(e) => { e.stopPropagation(); openEditCat(cat); }}
+                                    >
+                                        <Edit className="w-4 h-4" />
+                                    </Button>
+                                    <Button 
+                                        size="icon" variant="ghost" className="text-red-500 hover:bg-red-950/30 hover:text-red-400 h-8 w-8"
+                                        onClick={(e) => { e.stopPropagation(); if(confirm('¿Eliminar categoría?')) deleteCategory.mutate(cat.id); }}
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                </div>
                             </div>
                         ))}
                         {categories.length === 0 && <p className="text-xs text-slate-500 text-center py-4">No hay categorías</p>}
@@ -119,36 +197,53 @@ export default function TemplateManager() {
                         <>
                             <div className="flex justify-between items-center mb-6">
                                 <h3 className="font-semibold text-white">Plantillas en {categories.find(c => c.id === selectedCatId)?.name}</h3>
-                                <Dialog open={isCreateTempOpen} onOpenChange={setIsCreateTempOpen}>
+                                <Dialog open={isTempModalOpen} onOpenChange={setIsTempModalOpen}>
                                     <DialogTrigger asChild>
-                                        <Button size="sm" className="bg-[#00C4CC] hover:bg-[#00B2B9] text-white border-0">
+                                        <Button size="sm" onClick={openCreateTemp} className="bg-[#00C4CC] hover:bg-[#00B2B9] text-white border-0">
                                             <Plus className="w-4 h-4 mr-2" /> Agregar Plantilla
                                         </Button>
                                     </DialogTrigger>
                                     <DialogContent className="bg-slate-900 border-slate-800 text-slate-100 max-h-[90vh] overflow-y-auto">
                                         <DialogHeader>
-                                            <DialogTitle>Nueva Plantilla Canva</DialogTitle>
+                                            <DialogTitle>{isTempEdit ? 'Editar Plantilla' : 'Nueva Plantilla Canva'}</DialogTitle>
                                         </DialogHeader>
-                                        <form onSubmit={handleCreateTemp} className="space-y-4">
+                                        <form onSubmit={handleSaveTemp} className="space-y-4">
                                             <div className="space-y-2">
                                                 <Label>Nombre de la Plantilla</Label>
-                                                <Input value={newTemp.name} onChange={(e) => setNewTemp({...newTemp, name: e.target.value})} className="bg-slate-950 border-slate-700 text-white" required />
+                                                <Input value={tempForm.name} onChange={(e) => setTempForm({...tempForm, name: e.target.value})} className="bg-slate-950 border-slate-700 text-white" required />
                                             </div>
                                             <div className="space-y-2">
-                                                <Label>URL de Miniatura (PNG/JPG)</Label>
-                                                <Input value={newTemp.thumbnail_url} onChange={(e) => setNewTemp({...newTemp, thumbnail_url: e.target.value})} className="bg-slate-950 border-slate-700 text-white" required />
+                                                <Label>Imagen Miniatura</Label>
+                                                <div className="flex gap-2">
+                                                    <Input 
+                                                        value={tempForm.thumbnail_url} 
+                                                        onChange={(e) => setTempForm({...tempForm, thumbnail_url: e.target.value})} 
+                                                        className="bg-slate-950 border-slate-700 text-white flex-1" 
+                                                        placeholder="URL directa o súbela..."
+                                                    />
+                                                    <Button type="button" variant="secondary" className="shrink-0 bg-slate-800 hover:bg-slate-700 text-white" onClick={() => fileInputRef.current?.click()}>
+                                                        <Upload className="w-4 h-4" />
+                                                    </Button>
+                                                    <input 
+                                                        type="file" 
+                                                        ref={fileInputRef} 
+                                                        className="hidden" 
+                                                        accept="image/*" 
+                                                        onChange={handleFileUpload} 
+                                                    />
+                                                </div>
                                             </div>
                                             <div className="space-y-2">
                                                 <Label>Enlace de Plantilla de Canva (URL)</Label>
-                                                <Input value={newTemp.canva_url} onChange={(e) => setNewTemp({...newTemp, canva_url: e.target.value})} className="bg-slate-950 border-slate-700 text-white" required />
+                                                <Input value={tempForm.canva_url} onChange={(e) => setTempForm({...tempForm, canva_url: e.target.value})} className="bg-slate-950 border-slate-700 text-white" required />
                                             </div>
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div className="space-y-2">
                                                     <Label>Orientación</Label>
                                                     <select 
                                                         className="w-full h-10 px-3 rounded-md bg-slate-950 border-slate-700 text-white text-sm"
-                                                        value={newTemp.orientation}
-                                                        onChange={(e) => setNewTemp({...newTemp, orientation: e.target.value})}
+                                                        value={tempForm.orientation}
+                                                        onChange={(e) => setTempForm({...tempForm, orientation: e.target.value})}
                                                     >
                                                         <option value="vertical">Vertical</option>
                                                         <option value="horizontal">Horizontal</option>
@@ -158,9 +253,11 @@ export default function TemplateManager() {
                                             </div>
                                             <div className="space-y-2">
                                                 <Label>Breve Descripción</Label>
-                                                <Input value={newTemp.description} onChange={(e) => setNewTemp({...newTemp, description: e.target.value})} className="bg-slate-950 border-slate-700 text-white" />
+                                                <Input value={tempForm.description} onChange={(e) => setTempForm({...tempForm, description: e.target.value})} className="bg-slate-950 border-slate-700 text-white" />
                                             </div>
-                                            <Button type="submit" className="w-full bg-[#00C4CC] hover:bg-[#00B2B9] text-white mt-4">Crear Plantilla</Button>
+                                            <Button type="submit" disabled={createTemplate.isPending || updateTemplate.isPending || uploadImage.isPending} className="w-full bg-[#00C4CC] hover:bg-[#00B2B9] text-white mt-4">
+                                                {isTempEdit ? 'Guardar Cambios' : 'Crear Plantilla'}
+                                            </Button>
                                         </form>
                                     </DialogContent>
                                 </Dialog>
@@ -177,15 +274,22 @@ export default function TemplateManager() {
                                             )}
                                         </div>
                                         <div className="p-4 flex-1 flex flex-col">
-                                            <h4 className="font-semibold text-white text-sm">{temp.name}</h4>
+                                            <div className="flex justify-between items-start gap-2">
+                                                <h4 className="font-semibold text-white text-sm">{temp.name}</h4>
+                                                <div className="flex -mt-1 -mr-1">
+                                                    <Button size="icon" variant="ghost" className="text-slate-400 hover:text-white hover:bg-slate-800 w-6 h-6" onClick={() => openEditTemp(temp)}>
+                                                        <Edit className="w-3 h-3" />
+                                                    </Button>
+                                                    <Button size="icon" variant="ghost" className="text-red-500 hover:text-red-400 hover:bg-red-950/30 w-6 h-6" onClick={() => { if(confirm('¿Eliminar plantilla?')) deleteTemplate.mutate(temp.id); }}>
+                                                        <Trash2 className="w-3 h-3" />
+                                                    </Button>
+                                                </div>
+                                            </div>
                                             <p className="text-xs text-slate-400 mt-1">{temp.orientation}</p>
                                             
-                                            <div className="mt-4 pt-4 border-t border-slate-800 flex justify-between gap-2 mt-auto">
-                                                <Button size="sm" variant="outline" className="flex-1 bg-transparent border-slate-700 hover:bg-slate-800 text-xs" onClick={() => window.open(temp.canva_url, '_blank')}>
-                                                    <ExternalLink className="w-3 h-3 mr-1" /> Canva
-                                                </Button>
-                                                <Button size="icon" variant="outline" className="text-red-500 border-slate-700 hover:bg-red-950/30 w-8 h-8 shrink-0" onClick={() => { if(confirm('¿Eliminar plantilla?')) deleteTemplate.mutate(temp.id); }}>
-                                                    <Trash2 className="w-3 h-3" />
+                                            <div className="mt-4 pt-4 border-t border-slate-800 flex justify-between mt-auto">
+                                                <Button size="sm" variant="outline" className="w-full bg-slate-900 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 text-xs" onClick={() => window.open(temp.canva_url, '_blank')}>
+                                                    <ExternalLink className="w-3 h-3 mr-2" /> Canva
                                                 </Button>
                                             </div>
                                         </div>
