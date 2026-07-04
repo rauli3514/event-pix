@@ -28,6 +28,7 @@ import {
 } from "./pages/display-hub/WorkspacePlaceholders";
 import { WorkspaceMedia } from "./pages/display-hub/WorkspaceMedia";
 import WorkspaceSchedule from "./pages/display-hub/WorkspaceSchedule";
+import WorkspaceTemplates from "./pages/display-hub/WorkspaceTemplates";
 import { StickerEditor } from "./components/stickers/StickerEditor";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { EventProvider } from "./context/EventContext";
@@ -66,6 +67,7 @@ const App = () => (
                   <Route path="library" element={<WorkspaceMedia />} />
                   <Route path="playlists" element={<DisplayPlaylists />} />
                   <Route path="apps" element={<WorkspaceMedia initialCategory="apps" />} />
+                  <Route path="templates" element={<WorkspaceTemplates />} />
                   <Route path="schedule" element={<WorkspaceSchedule />} />
                   <Route path="analytics" element={<WorkspaceAnalytics />} />
                   <Route path="settings" element={<WorkspaceSettings />} />

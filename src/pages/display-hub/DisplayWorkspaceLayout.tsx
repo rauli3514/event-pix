@@ -9,7 +9,8 @@ import {
   Calendar, 
   ArrowLeft,
   Menu,
-  LogOut
+  LogOut,
+  PenTool
 } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { cn } from '@/lib/utils';
@@ -25,6 +26,7 @@ const MENU_ITEMS = [
   { id: 'library', label: 'Medios', icon: FolderOpen, path: 'library' },
   { id: 'playlists', label: 'Playlists', icon: ListVideo, path: 'playlists' },
   { id: 'apps', label: 'Aplicaciones', icon: Puzzle, path: 'apps' },
+  { id: 'templates', label: 'Plantillas', icon: PenTool, path: 'templates' },
   { id: 'schedule', label: 'Programación', icon: Calendar, path: 'schedule' },
 ];
 

@@ -27,3 +27,6 @@ USING ( bucket_id = 'event-images' );
 
 -- Mensaje de confirmación (aparecerá en los resultados)
 SELECT '✅ Base de datos actualizada correctamente. Ahora puedes usar los Temas.' as status;
+
+-- NOTA IMPORTANTE: Para la funcionalidad de Plantillas Canva (Julio 2026),
+-- debes ejecutar el archivo `templates_db.sql` que se encuentra en la raíz del proyecto.

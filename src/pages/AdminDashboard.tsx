@@ -10,8 +10,9 @@ import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
     Plus, Calendar, ExternalLink, Settings, LogOut, Trash2, Lock, Unlock, 
-    Users, Shield, Sparkles, Monitor, Activity, Tv, ServerCrash, Building2, ChevronRight 
+    Users, Shield, Sparkles, Monitor, Activity, Tv, ServerCrash, Building2, ChevronRight, PenTool 
 } from 'lucide-react';
+import TemplateManager from './admin/TemplateManager';
 
 import { useUserProfile, useIsSuperAdmin } from "@/hooks/use-roles";
 import { useDisplayDevices, useCommerces, useCreateCommerce, useDeleteCommerce } from "@/hooks/use-display-hub";
@@ -277,6 +278,11 @@ const AdminDashboard = () => {
                         <TabsTrigger value="display" className="flex-1 data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
                             <Monitor className="w-4 h-4 mr-2" /> Display Digital (Cartelería)
                         </TabsTrigger>
+                        {isSuperAdmin && (
+                            <TabsTrigger value="templates" className="flex-1 data-[state=active]:bg-[#00C4CC] data-[state=active]:text-white">
+                                <PenTool className="w-4 h-4 mr-2" /> Plantillas Canva
+                            </TabsTrigger>
+                        )}
                     </TabsList>
 
                     <TabsContent value="eventpix" className="space-y-4">
@@ -590,6 +596,12 @@ const AdminDashboard = () => {
                             </div>
                         </div>
                     </TabsContent>
+
+                    {isSuperAdmin && (
+                        <TabsContent value="templates" className="space-y-6 pt-4">
+                            <TemplateManager />
+                        </TabsContent>
+                    )}
                 </Tabs>
             </div>
         </div>
