@@ -1,10 +1,10 @@
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Plus, Trash2, Copy, Image as ImageIcon, Save, FolderOpen } from 'lucide-react';
+import { Plus, Trash2, Copy, Image as ImageIcon, Save, FolderOpen, Database } from 'lucide-react';
 import { MediaPickerModal } from '../../MediaPickerModal';
 import { toast } from 'sonner';
+import { useDisplayLabelGroups, useCreateLabelGroup } from '@/hooks/use-display-labels';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -42,48 +42,38 @@ const FONTS = [
 export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Partial<DynamicMenuConfig>, onChange: (c: Partial<DynamicMenuConfig>) => void, commerceId: string }) => {
     const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
     const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null);
-    const [savedGroups, setSavedGroups] = useState<{id: string, name: string, labels: DynamicLabel[]}[]>([]);
     const containerRef = useRef<HTMLDivElement>(null);
 
     const labels = config.labels || [];
+    
+    // DB Labels Integration
+    const { data: savedGroups = [] } = useDisplayLabelGroups(commerceId);
+    const createGroup = useCreateLabelGroup();
 
-    useEffect(() => {
-        const saved = localStorage.getItem('dynamic-menu-label-groups');
-        if (saved) {
-            try { setSavedGroups(JSON.parse(saved)); } catch (e) {}
-        }
-    }, []);
-
-    const saveGroup = () => {
+    const saveGroup = async () => {
         if (labels.length === 0) {
             toast.error('No hay etiquetas para guardar');
             return;
         }
         const name = prompt('Nombre del grupo de etiquetas (ej: Precios Cafetería):');
         if (!name) return;
-        const newGroup = { id: crypto.randomUUID(), name, labels: [...labels] };
-        const updated = [...savedGroups, newGroup];
-        setSavedGroups(updated);
-        localStorage.setItem('dynamic-menu-label-groups', JSON.stringify(updated));
-        toast.success('Grupo guardado');
+        
+        try {
+            await createGroup.mutateAsync({ commerceId, name, labels });
+            toast.success('Grupo guardado en la base de datos');
+        } catch (e) {
+            toast.error('Error al guardar grupo');
+        }
     };
 
-    const loadGroup = (group: {id: string, name: string, labels: DynamicLabel[]}) => {
+    const loadGroup = (group: any) => {
         if (labels.length > 0) {
             if (!confirm('¿Reemplazar las etiquetas actuales por las del grupo "' + group.name + '"?')) return;
         }
         // Give new IDs to avoid key collisions
-        const newLabels = group.labels.map(l => ({ ...l, id: crypto.randomUUID() }));
+        const newLabels = group.labels.map((l: any) => ({ ...l, id: crypto.randomUUID() }));
         onChange({ ...config, labels: newLabels });
         toast.success('Grupo cargado');
-    };
-    
-    const deleteGroup = (id: string, e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (!confirm('¿Eliminar este grupo guardado?')) return;
-        const updated = savedGroups.filter(g => g.id !== id);
-        setSavedGroups(updated);
-        localStorage.setItem('dynamic-menu-label-groups', JSON.stringify(updated));
     };
 
     const handleBackgroundSelect = (media: any, type: 'media' | 'playlist') => {
@@ -185,12 +175,6 @@ export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Part
                                         {savedGroups.map(g => (
                                             <div key={g.id} className="flex justify-between items-center group">
                                                 <SelectItem value={g.id} className="flex-1 cursor-pointer pr-8">{g.name}</SelectItem>
-                                                <div 
-                                                    className="absolute right-2 opacity-0 group-hover:opacity-100 cursor-pointer p-1 hover:bg-red-900/50 rounded text-slate-400 hover:text-red-400"
-                                                    onClick={(e) => deleteGroup(g.id, e)}
-                                                >
-                                                    <Trash2 className="w-3 h-3" />
-                                                </div>
                                             </div>
                                         ))}
                                     </SelectContent>

@@ -10,7 +10,8 @@ import {
   ArrowLeft,
   Menu,
   LogOut,
-  PenTool
+  PenTool,
+  Database
 } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { cn } from '@/lib/utils';
@@ -26,6 +27,7 @@ const MENU_ITEMS = [
   { id: 'library', label: 'Medios', icon: FolderOpen, path: 'library' },
   { id: 'playlists', label: 'Playlists', icon: ListVideo, path: 'playlists' },
   { id: 'apps', label: 'Aplicaciones', icon: Puzzle, path: 'apps' },
+  { id: 'labels', label: 'Etiquetas', icon: Database, path: 'labels' },
   { id: 'templates', label: 'Plantillas', icon: PenTool, path: 'templates' },
   { id: 'schedule', label: 'Programación', icon: Calendar, path: 'schedule' },
 ];

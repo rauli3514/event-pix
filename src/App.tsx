@@ -21,6 +21,7 @@ import PlaylistBuilder from "./pages/display-hub/PlaylistBuilder";
 import TvPlayer from "./pages/display-hub/TvPlayer";
 import TvBootScreen from "./pages/display-hub/TvBootScreen";
 import DisplayWorkspaceLayout from "./pages/display-hub/DisplayWorkspaceLayout";
+import WorkspaceLabels from "./pages/display-hub/WorkspaceLabels";
 import WorkspaceDashboard from "./pages/display-hub/WorkspaceDashboard";
 import { 
   WorkspaceAnalytics, 
@@ -67,6 +68,7 @@ const App = () => (
                   <Route path="library" element={<WorkspaceMedia />} />
                   <Route path="playlists" element={<DisplayPlaylists />} />
                   <Route path="apps" element={<WorkspaceMedia initialCategory="apps" />} />
+                  <Route path="labels" element={<WorkspaceLabels />} />
                   <Route path="templates" element={<WorkspaceTemplates />} />
                   <Route path="schedule" element={<WorkspaceSchedule />} />
                   <Route path="analytics" element={<WorkspaceAnalytics />} />
