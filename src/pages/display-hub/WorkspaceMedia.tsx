@@ -68,9 +68,13 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
         });
     }, [activeCategory, search, mediaFiles, currentFolder, sortMode]);
 
-    const handleUploadFiles = async (files: FileList | null) => {
-        if (!files || !commerceId) return;
+    const handleUploadFiles = async (fileList: FileList | null) => {
+        if (!fileList || !commerceId) return;
         
+        // Convertir a array inmediatamente para evitar que se pierdan los archivos si el componente se desmonta
+        const files = Array.from(fileList);
+        if (files.length === 0) return;
+
         let successCount = 0;
         let failCount = 0;
         
@@ -90,8 +94,9 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
             toast.error(`Se subieron ${successCount} archivos, pero fallaron ${failCount}.`, { id: toastId });
         } else {
             toast.success(`Se subieron ${successCount} archivo(s) correctamente.`, { id: toastId });
-            setIsUploadModalOpen(false);
         }
+        
+        setIsUploadModalOpen(false);
     };
 
     const handleAddWebLink = async (url: string, name: string) => {
