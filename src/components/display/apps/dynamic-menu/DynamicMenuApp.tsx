@@ -257,11 +257,6 @@ export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Part
                         </div>
                     )}
                 </div>
-            </div>
-
-                </div>
-            </div>
-
             <MediaPickerModal 
                 isOpen={isMediaPickerOpen}
                 onClose={() => setIsMediaPickerOpen(false)}
