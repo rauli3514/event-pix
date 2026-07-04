@@ -52,7 +52,7 @@ export const AppEditorModal = ({ isOpen, onClose, onBack, appId, commerceId, cur
             case 'clock': return <ClockForm config={appConfig} onChange={setAppConfig} />;
             case 'qr': return <QRForm config={appConfig} onChange={setAppConfig} />;
             case 'reviews': return <ReviewsForm config={appConfig} onChange={setAppConfig} />;
-            case 'dynamic-menu': return <DynamicMenuForm config={appConfig} onChange={setAppConfig} commerceId={commerceId} currentFolder={currentFolder} />;
+            case 'dynamic-menu': return <DynamicMenuForm config={appConfig} onChange={setAppConfig} commerceId={commerceId} />;
             default: return <div className="text-slate-500 p-4">App form not implemented yet.</div>;
         }
     };
