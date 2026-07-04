@@ -36,5 +36,6 @@ export const ProtectedRoute = () => {
         return null; // Loading state
     }
 
-    return session ? <Outlet /> : <Navigate to="/login" replace />;
+    const isDisplayUser = localStorage.getItem('display_user_mode') === 'true';
+    return session ? <Outlet /> : <Navigate to={isDisplayUser ? "/usuarios" : "/login"} replace />;
 };

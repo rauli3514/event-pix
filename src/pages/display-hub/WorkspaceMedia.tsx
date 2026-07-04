@@ -161,7 +161,7 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
     };
 
     return (
-        <div className="h-full flex flex-col bg-background text-foreground transition-colors duration-300">
+        <div className="min-h-full md:h-full flex flex-col bg-background text-foreground transition-colors duration-300">
             {/* Descriptive Top Banner */}
             <div className="p-3 md:p-6 md:px-8 pt-3 md:pt-6 pb-2 shrink-0">
                 <div className="relative overflow-hidden rounded-3xl bg-card border border-border shadow-xl flex items-center min-h-[100px] md:min-h-[140px] px-4 md:px-8 py-4 md:py-6 transition-colors duration-300">
@@ -266,7 +266,7 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                 </div>
             </div>
 
-            <div className="flex flex-1 overflow-hidden flex-col md:flex-row min-h-0 border-t border-border mt-2">
+            <div className="flex flex-1 md:overflow-hidden flex-col md:flex-row min-h-0 border-t border-border mt-2">
                 {/* Desktop Sidebar */}
                 {activeCategory !== 'apps' && (
                     <div className="hidden md:flex w-64 shrink-0 border-r border-border bg-card flex-col transition-colors duration-300">
@@ -287,7 +287,7 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
 
                 {/* Main Content Area */}
                 <div className="flex-1 flex flex-col bg-background/50 min-h-0">
-                    <div className="p-6 flex-1 flex flex-col overflow-hidden min-h-0">
+                    <div className="p-3 md:p-6 flex-1 flex flex-col md:overflow-hidden min-h-0">
                         
                         {/* Filters and Toolbar */}
                         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-4 shrink-0">
@@ -366,7 +366,7 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                         )}
 
                         {/* Data View */}
-                        <div className="flex-1 overflow-y-auto pb-6 pr-2 min-h-0">
+                        <div className="flex-1 md:overflow-y-auto pb-6 pr-2 min-h-0">
                             {isLoading ? (
                                 <div className="bg-card/50 rounded-xl shadow-sm border border-border p-12 flex flex-col items-center justify-center text-muted-foreground h-full">
                                     <p className="text-lg font-medium text-muted-foreground">Cargando archivos...</p>

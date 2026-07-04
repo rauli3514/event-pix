@@ -98,7 +98,7 @@ export default function DisplayUserLogin() {
                                 <Input 
                                     type="email" 
                                     placeholder="tu@correo.com" 
-                                    className="pl-9 h-11 bg-muted/50 border-border/50 focus:border-indigo-500 transition-colors rounded-xl"
+                                    className="pl-9 h-11 bg-muted/50 border-border/50 focus:border-indigo-500 transition-colors rounded-xl text-foreground"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
@@ -115,7 +115,7 @@ export default function DisplayUserLogin() {
                                 <Input 
                                     type="password" 
                                     placeholder="••••••••" 
-                                    className="pl-9 h-11 bg-muted/50 border-border/50 focus:border-indigo-500 transition-colors rounded-xl"
+                                    className="pl-9 h-11 bg-muted/50 border-border/50 focus:border-indigo-500 transition-colors rounded-xl text-foreground"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     required

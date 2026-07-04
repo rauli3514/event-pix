@@ -38,7 +38,6 @@ export default function DisplayWorkspaceLayout() {
 
   const handleLogout = async () => {
       await supabase.auth.signOut();
-      localStorage.removeItem('display_user_mode');
       navigate('/usuarios');
   };
   
