@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { CloudRain, LayoutTemplate, Type, DollarSign, X, Clock, QrCode, Star } from 'lucide-react';
+import { CloudRain, LayoutTemplate, Type, DollarSign, X, Clock, QrCode, Star, Tag } from 'lucide-react';
 import { AppEditorModal } from './AppEditorModal';
 
 interface AppCatalogModalProps {
@@ -11,7 +11,7 @@ interface AppCatalogModalProps {
     currentFolder: string;
 }
 
-export type AppId = 'weather' | 'split-screen' | 'ticker' | 'dolar' | 'clock' | 'qr' | 'reviews';
+export type AppId = 'weather' | 'split-screen' | 'ticker' | 'dolar' | 'clock' | 'qr' | 'reviews' | 'dynamic-menu';
 
 export const APPS = [
     {
@@ -29,6 +29,14 @@ export const APPS = [
         icon: LayoutTemplate,
         color: 'text-indigo-400',
         bg: 'bg-indigo-400/10'
+    },
+    {
+        id: 'dynamic-menu' as AppId,
+        name: 'Etiquetas Dinámicas',
+        description: 'Menú dinámico: agrega textos, precios y etiquetas sobre tu propio fondo o video.',
+        icon: Tag,
+        color: 'text-rose-400',
+        bg: 'bg-rose-400/10'
     },
     {
         id: 'ticker' as AppId,
