@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2, Copy, Image as ImageIcon, Move, LayoutTemplate } from 'lucide-react';
 import { MediaPickerModal } from '../../MediaPickerModal';
-import { DisplayMedia } from '@/types/display';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
