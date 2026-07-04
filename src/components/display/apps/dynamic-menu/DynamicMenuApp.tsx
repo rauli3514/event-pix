@@ -2,9 +2,9 @@ import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, Copy, Image as ImageIcon, Move, LayoutTemplate } from 'lucide-react';
+import { Plus, Trash2, Copy, Image as ImageIcon, Save, FolderOpen } from 'lucide-react';
 import { MediaPickerModal } from '../../MediaPickerModal';
+import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -39,12 +39,52 @@ const FONTS = [
     { value: 'Orbitron', label: 'Orbitron' },
 ];
 
-export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Partial<DynamicMenuConfig>, onChange: (c: Partial<DynamicMenuConfig>) => void, commerceId: string, currentFolder?: string }) => {
+export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Partial<DynamicMenuConfig>, onChange: (c: Partial<DynamicMenuConfig>) => void, commerceId: string }) => {
     const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
     const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null);
+    const [savedGroups, setSavedGroups] = useState<{id: string, name: string, labels: DynamicLabel[]}[]>([]);
     const containerRef = useRef<HTMLDivElement>(null);
 
     const labels = config.labels || [];
+
+    useEffect(() => {
+        const saved = localStorage.getItem('dynamic-menu-label-groups');
+        if (saved) {
+            try { setSavedGroups(JSON.parse(saved)); } catch (e) {}
+        }
+    }, []);
+
+    const saveGroup = () => {
+        if (labels.length === 0) {
+            toast.error('No hay etiquetas para guardar');
+            return;
+        }
+        const name = prompt('Nombre del grupo de etiquetas (ej: Precios Cafetería):');
+        if (!name) return;
+        const newGroup = { id: crypto.randomUUID(), name, labels: [...labels] };
+        const updated = [...savedGroups, newGroup];
+        setSavedGroups(updated);
+        localStorage.setItem('dynamic-menu-label-groups', JSON.stringify(updated));
+        toast.success('Grupo guardado');
+    };
+
+    const loadGroup = (group: {id: string, name: string, labels: DynamicLabel[]}) => {
+        if (labels.length > 0) {
+            if (!confirm('¿Reemplazar las etiquetas actuales por las del grupo "' + group.name + '"?')) return;
+        }
+        // Give new IDs to avoid key collisions
+        const newLabels = group.labels.map(l => ({ ...l, id: crypto.randomUUID() }));
+        onChange({ ...config, labels: newLabels });
+        toast.success('Grupo cargado');
+    };
+    
+    const deleteGroup = (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!confirm('¿Eliminar este grupo guardado?')) return;
+        const updated = savedGroups.filter(g => g.id !== id);
+        setSavedGroups(updated);
+        localStorage.setItem('dynamic-menu-label-groups', JSON.stringify(updated));
+    };
 
     const handleBackgroundSelect = (media: any, type: 'media' | 'playlist') => {
         if (type !== 'media') return;
@@ -100,27 +140,12 @@ export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Part
 
     const selectedLabel = labels.find(l => l.id === selectedLabelId);
 
-    // Editor Preview Drag Handling
-    const handleDragEnd = (id: string, _event: any, info: any) => {
-        if (!containerRef.current) return;
-        const rect = containerRef.current.getBoundingClientRect();
-        
-        // Calculate new percentages
-        // Framer motion gives us point.x and point.y relative to the screen. 
-        // We need to find the relative position inside the container.
-        const xPx = info.point.x - rect.left;
-        const yPx = info.point.y - rect.top;
-        
-        const xPct = Math.max(0, Math.min(100, (xPx / rect.width) * 100));
-        const yPct = Math.max(0, Math.min(100, (yPx / rect.height) * 100));
-
-        updateLabel(id, { x: xPct, y: yPct });
-    };
+    // Editor Preview Drag Handling moved to Preview component
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full">
+        <div className="flex flex-col gap-6 h-full pb-10">
             {/* Editor Panel */}
-            <div className="flex flex-col gap-6 h-full overflow-y-auto pr-2">
+            <div className="flex flex-col gap-4 h-full overflow-y-auto pr-2">
                 <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
                     <h3 className="font-semibold text-white mb-4">Fondo del Menú</h3>
                     {config.backgroundMediaUrl ? (
@@ -149,7 +174,33 @@ export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Part
                 <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex-1 flex flex-col">
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="font-semibold text-white">Etiquetas Dinámicas</h3>
-                        <Button size="sm" onClick={addLabel} className="bg-emerald-600 hover:bg-emerald-700 text-white"><Plus className="w-4 h-4 mr-1"/> Añadir</Button>
+                        <div className="flex gap-2">
+                            {savedGroups.length > 0 && (
+                                <Select onValueChange={(v) => loadGroup(savedGroups.find(g => g.id === v)!)}>
+                                    <SelectTrigger className="bg-slate-800 border-slate-700 h-8 text-xs w-[120px]">
+                                        <FolderOpen className="w-3 h-3 mr-2" />
+                                        <span>Librería</span>
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-slate-900 border-slate-800">
+                                        {savedGroups.map(g => (
+                                            <div key={g.id} className="flex justify-between items-center group">
+                                                <SelectItem value={g.id} className="flex-1 cursor-pointer pr-8">{g.name}</SelectItem>
+                                                <div 
+                                                    className="absolute right-2 opacity-0 group-hover:opacity-100 cursor-pointer p-1 hover:bg-red-900/50 rounded text-slate-400 hover:text-red-400"
+                                                    onClick={(e) => deleteGroup(g.id, e)}
+                                                >
+                                                    <Trash2 className="w-3 h-3" />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            )}
+                            <Button size="sm" variant="outline" onClick={saveGroup} className="h-8 text-xs bg-slate-950 border-slate-800 hover:bg-slate-800" title="Guardar como grupo en librería">
+                                <Save className="w-3 h-3" />
+                            </Button>
+                            <Button size="sm" onClick={addLabel} className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white text-xs"><Plus className="w-3 h-3 mr-1"/> Añadir</Button>
+                        </div>
                     </div>
 
                     <div className="flex flex-col gap-2 max-h-[150px] overflow-y-auto mb-4">
@@ -198,13 +249,12 @@ export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Part
                             </div>
                             <div className="space-y-2">
                                 <Label>Tamaño ({selectedLabel.fontSize})</Label>
-                                <input type="range" min="1" max="20" step="0.5" value={selectedLabel.fontSize} onChange={e => updateLabel(selectedLabel.id, { fontSize: parseFloat(e.target.value) })} className="w-full accent-emerald-500" />
+                                <Input type="number" min="1" max="50" step="0.5" value={selectedLabel.fontSize} onChange={e => updateLabel(selectedLabel.id, { fontSize: parseFloat(e.target.value) })} className="bg-slate-950 border-slate-700" />
                             </div>
                             <div className="space-y-2">
                                 <Label>Color</Label>
                                 <div className="flex gap-2">
-                                    <input type="color" value={selectedLabel.color} onChange={e => updateLabel(selectedLabel.id, { color: e.target.value })} className="h-10 w-10 rounded border-0 bg-transparent p-0 cursor-pointer" />
-                                    <Input value={selectedLabel.color} onChange={e => updateLabel(selectedLabel.id, { color: e.target.value })} className="bg-slate-950 border-slate-700 flex-1" />
+                                    <input type="color" value={selectedLabel.color} onChange={e => updateLabel(selectedLabel.id, { color: e.target.value })} className="h-10 w-10 rounded border border-slate-700 bg-transparent p-1 cursor-pointer" />
                                 </div>
                             </div>
                             <div className="space-y-2 col-span-2">
@@ -225,59 +275,6 @@ export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Part
                 </div>
             </div>
 
-            {/* Interactive Preview Canvas */}
-            <div className="bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-center p-4 relative overflow-hidden">
-                <div 
-                    ref={containerRef}
-                    className="relative w-full aspect-video bg-black rounded-lg shadow-2xl overflow-hidden ring-1 ring-slate-800"
-                >
-                    {config.backgroundMediaUrl ? (
-                         config.backgroundMediaType === 'video' ? (
-                            <video src={config.backgroundMediaUrl} className="w-full h-full object-cover" autoPlay loop muted playsInline />
-                        ) : (
-                            <img src={config.backgroundMediaUrl} className="w-full h-full object-cover" />
-                        )
-                    ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-600">
-                            <LayoutTemplate className="w-12 h-12 mb-2 opacity-20" />
-                            <p>Selecciona un fondo para comenzar</p>
-                        </div>
-                    )}
-
-                    {/* Draggable Labels */}
-                    {labels.map(label => (
-                        <motion.div
-                            key={label.id}
-                            drag
-                            dragMomentum={false}
-                            onDragEnd={(e, info) => handleDragEnd(label.id, e, info)}
-                            dragConstraints={containerRef}
-                            onClick={() => setSelectedLabelId(label.id)}
-                            style={{
-                                position: 'absolute',
-                                left: `${label.x}%`,
-                                top: `${label.y}%`,
-                                transform: 'translate(-50%, -50%)', // Center the drag point
-                                color: label.color,
-                                fontFamily: label.fontFamily,
-                                fontSize: `${label.fontSize * 0.5}vw`, // Scaled for preview (assuming preview is roughly 50vw wide)
-                                fontWeight: label.fontWeight,
-                                fontStyle: label.fontStyle,
-                                zIndex: selectedLabelId === label.id ? 10 : 1,
-                                cursor: 'grab'
-                            }}
-                            className={cn(
-                                "whitespace-nowrap px-2 py-1 rounded transition-colors select-none",
-                                selectedLabelId === label.id ? "ring-2 ring-emerald-500 bg-emerald-500/20" : "hover:ring-1 hover:ring-slate-500 hover:bg-white/10"
-                            )}
-                            whileDrag={{ cursor: 'grabbing', scale: 1.05 }}
-                        >
-                            {label.text}
-                        </motion.div>
-                    ))}
-                </div>
-                <div className="absolute bottom-2 right-2 flex items-center gap-2 bg-slate-900/80 px-3 py-1.5 rounded-md text-xs text-slate-400">
-                    <Move className="w-3 h-3" /> Arrastra los textos para posicionarlos
                 </div>
             </div>
 
@@ -291,15 +288,32 @@ export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Part
     );
 };
 
-export const DynamicMenuPreview = ({ config }: { config: Partial<DynamicMenuConfig> }) => {
+export const DynamicMenuPreview = ({ config, onChange, isEditing = false }: { config: Partial<DynamicMenuConfig>, onChange?: (c: Partial<DynamicMenuConfig>) => void, isEditing?: boolean }) => {
     const labels = config.labels || [];
+    const containerRef = useRef<HTMLDivElement>(null);
+    
+    // Editor Preview Drag Handling
+    const handleDragEnd = (id: string, _event: any, info: any) => {
+        if (!containerRef.current || !onChange) return;
+        const rect = containerRef.current.getBoundingClientRect();
+        
+        const xPx = info.point.x - rect.left;
+        const yPx = info.point.y - rect.top;
+        
+        const xPct = Math.max(0, Math.min(100, (xPx / rect.width) * 100));
+        const yPct = Math.max(0, Math.min(100, (yPx / rect.height) * 100));
+
+        const newLabels = labels.map(l => l.id === id ? { ...l, x: xPct, y: yPct } : l);
+        onChange({ ...config, labels: newLabels });
+    };
     
     // Convert animations to CSS classes or motion props if needed
     // For TvPlayer we can just use tailwind animate classes
     const getAnimationClass = (anim: string) => {
+        if (isEditing) return ''; // Disable animations while dragging for better experience
         switch (anim) {
             case 'fade-in': return 'animate-in fade-in duration-1000';
-            case 'slide-up': return 'animate-in fade-in slide-in-from-bottom-10 duration-1000';
+            case 'slide-up': return 'animate-in fade-in slide-in-from-bottom-full duration-1000';
             case 'pulse': return 'animate-pulse';
             case 'bounce': return 'animate-bounce';
             default: return '';
@@ -307,7 +321,7 @@ export const DynamicMenuPreview = ({ config }: { config: Partial<DynamicMenuConf
     };
 
     return (
-        <div className="w-full h-full relative bg-black overflow-hidden">
+        <div ref={containerRef} className="w-full h-full relative bg-black overflow-hidden">
             {config.backgroundMediaUrl && (
                 config.backgroundMediaType === 'video' ? (
                     <video src={config.backgroundMediaUrl} className="w-full h-full object-cover" autoPlay loop muted playsInline />
@@ -316,25 +330,57 @@ export const DynamicMenuPreview = ({ config }: { config: Partial<DynamicMenuConf
                 )
             )}
             
-            {labels.map(label => (
-                <div
-                    key={label.id}
-                    className={cn("absolute whitespace-nowrap", getAnimationClass(label.animation))}
-                    style={{
-                        left: `${label.x}%`,
-                        top: `${label.y}%`,
-                        transform: 'translate(-50%, -50%)',
-                        color: label.color,
-                        fontFamily: label.fontFamily,
-                        fontSize: `${label.fontSize}vw`, // Full TV size (100vw = width)
-                        fontWeight: label.fontWeight,
-                        fontStyle: label.fontStyle,
-                        textShadow: '0px 2px 10px rgba(0,0,0,0.5)' // Basic shadow for legibility
-                    }}
-                >
-                    {label.text}
-                </div>
-            ))}
+            {labels.map(label => {
+                if (isEditing && onChange) {
+                    return (
+                        <motion.div
+                            key={label.id}
+                            drag
+                            dragMomentum={false}
+                            onDragEnd={(e, info) => handleDragEnd(label.id, e, info)}
+                            dragConstraints={containerRef}
+                            style={{
+                                position: 'absolute',
+                                left: `${label.x}%`,
+                                top: `${label.y}%`,
+                                transform: 'translate(-50%, -50%)',
+                                color: label.color,
+                                fontFamily: label.fontFamily,
+                                fontSize: `${label.fontSize}vw`,
+                                fontWeight: label.fontWeight,
+                                fontStyle: label.fontStyle,
+                                textShadow: '0px 2px 10px rgba(0,0,0,0.8)',
+                                zIndex: 10,
+                                cursor: 'grab'
+                            }}
+                            className="whitespace-nowrap select-none hover:ring-2 hover:ring-emerald-500 hover:bg-emerald-500/20 px-2 py-1 rounded"
+                            whileDrag={{ cursor: 'grabbing', scale: 1.05 }}
+                        >
+                            {label.text}
+                        </motion.div>
+                    )
+                }
+
+                return (
+                    <div
+                        key={label.id}
+                        className={cn("absolute whitespace-nowrap", getAnimationClass(label.animation))}
+                        style={{
+                            left: `${label.x}%`,
+                            top: `${label.y}%`,
+                            transform: 'translate(-50%, -50%)',
+                            color: label.color,
+                            fontFamily: label.fontFamily,
+                            fontSize: `${label.fontSize}vw`,
+                            fontWeight: label.fontWeight,
+                            fontStyle: label.fontStyle,
+                            textShadow: '0px 2px 10px rgba(0,0,0,0.8)'
+                        }}
+                    >
+                        {label.text}
+                    </div>
+                )
+            })}
         </div>
     );
 };
