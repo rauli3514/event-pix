@@ -90,7 +90,7 @@ export default function TemplateManager() {
         if (!selectedCatId && !isTempEdit) return;
         
         if (isTempEdit) {
-            updateTemplate.mutate({ id: tempForm.id, updates: { ...tempForm } }, {
+            updateTemplate.mutate({ id: tempForm.id, updates: { ...tempForm } as any }, {
                 onSuccess: () => setIsTempModalOpen(false)
             });
         } else {
