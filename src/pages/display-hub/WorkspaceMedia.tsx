@@ -163,20 +163,20 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
     return (
         <div className="h-full flex flex-col bg-background text-foreground transition-colors duration-300">
             {/* Descriptive Top Banner */}
-            <div className="p-6 md:px-8 pt-6 pb-2 shrink-0">
-                <div className="relative overflow-hidden rounded-3xl bg-card border border-border shadow-xl flex items-center min-h-[140px] px-8 py-6 transition-colors duration-300">
+            <div className="p-3 md:p-6 md:px-8 pt-3 md:pt-6 pb-2 shrink-0">
+                <div className="relative overflow-hidden rounded-3xl bg-card border border-border shadow-xl flex items-center min-h-[100px] md:min-h-[140px] px-4 md:px-8 py-4 md:py-6 transition-colors duration-300">
                     {/* Decorative Background for Banner */}
                     <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-background/20 to-secondary/10 pointer-events-none">
-                        <div className="absolute right-10 top-1/2 -translate-y-1/2 w-48 h-48 bg-orange-500/10 rounded-full blur-[60px]"></div>
-                        <div className="absolute right-32 bottom-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-[40px]"></div>
+                        <div className="absolute right-10 top-1/2 -translate-y-1/2 w-48 h-48 bg-orange-500/10 rounded-full blur-[60px] hidden sm:block"></div>
+                        <div className="absolute right-32 bottom-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-[40px] hidden sm:block"></div>
                     </div>
                     
                     <div className="relative z-10 flex flex-col gap-1 w-full max-w-3xl">
-                        <h1 className="text-3xl font-extrabold text-foreground flex items-center gap-3">
+                        <h1 className="text-2xl md:text-3xl font-extrabold text-foreground flex items-center gap-2 md:gap-3">
                             {activeCategory !== 'apps' && (
                                 <Sheet>
                                     <SheetTrigger asChild>
-                                        <Button variant="outline" size="icon" className="md:hidden border-border bg-muted/50 text-muted-foreground hover:text-foreground w-10 h-10 shrink-0">
+                                        <Button variant="outline" size="icon" className="md:hidden border-border bg-muted/50 text-muted-foreground hover:text-foreground w-8 h-8 md:w-10 md:h-10 shrink-0">
                                             <Folder className="w-5 h-5" />
                                         </Button>
                                     </SheetTrigger>
@@ -197,7 +197,7 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                             )}
                             {activeCategory === 'apps' ? 'Aplicaciones' : 'Medios y Archivos'}
                         </h1>
-                        <p className="text-muted-foreground font-medium max-w-xl">
+                        <p className="text-muted-foreground font-medium max-w-xl text-sm md:text-base">
                             {activeCategory === 'apps' 
                                 ? 'Creá y administrá aplicaciones y widgets dinámicos para tus pantallas.' 
                                 : 'Gestioná tus imágenes, videos y enlaces, agrupándolos en carpetas para un mayor control al enviarlos.'}
@@ -207,7 +207,7 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
             </div>
 
             {/* Action Bar */}
-            <div className="px-6 md:px-8 py-3 flex flex-col md:flex-row md:items-center justify-between z-10 gap-4 shrink-0">
+            <div className="px-3 md:px-8 py-2 md:py-3 flex flex-col sm:flex-row sm:items-center justify-between z-10 gap-3 shrink-0">
                 <div className="flex items-center gap-2">
                     {/* Placeholder for left-side actions in the future, if needed */}
                 </div>

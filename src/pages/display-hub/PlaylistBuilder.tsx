@@ -436,7 +436,7 @@ const PlaylistBuilder = () => {
                 </div>
 
                 {/* RIGHT COLUMN: Media Library Picker */}
-                <div className="w-full lg:w-72 h-[35vh] lg:h-auto bg-card border-t lg:border-t-0 lg:border-l border-border flex flex-col shrink-0 shadow-[-10px_0_30px_-15px_rgba(0,0,0,0.3)] z-10 overflow-hidden transition-colors duration-300">
+                <div className="w-full lg:w-72 h-[50vh] lg:h-auto bg-card border-t lg:border-t-0 lg:border-l border-border flex flex-col shrink-0 shadow-[-10px_0_30px_-15px_rgba(0,0,0,0.3)] z-10 overflow-hidden transition-colors duration-300">
                     <div className="p-3 md:p-4 border-b border-border flex items-center justify-between bg-muted/50 shrink-0">
                         <h3 className="font-bold text-foreground text-sm flex items-center gap-2 truncate">
                             {mediaFolder !== '/' && (
