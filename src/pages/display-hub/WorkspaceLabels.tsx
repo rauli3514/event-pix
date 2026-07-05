@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, Copy, Database, Edit, ListTree, PenTool } from 'lucide-react';
+import { Plus, Trash2, Copy, Database, Edit, Tags, PenTool } from 'lucide-react';
 import { DynamicLabel } from '@/types/display';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -193,15 +193,15 @@ export default function WorkspaceLabels() {
                             groups.map(group => (
                                 <div 
                                     key={group.id} 
-                                    onClick={() => { setActiveGroupId(group.id); setSelectedLabelId(null); }}
+                                    onClick={() => { setSelectedGroupId(group.id); setSelectedLabelId(null); }}
                                     className={cn(
                                         "p-4 rounded-xl cursor-pointer border transition-all duration-200 group relative overflow-hidden",
-                                        activeGroupId === group.id 
+                                        selectedGroupId === group.id 
                                             ? "bg-indigo-50 border-indigo-200 shadow-sm" 
                                             : "bg-background border-border hover:border-indigo-300 hover:shadow-sm"
                                     )}
                                 >
-                                    {activeGroupId === group.id && (
+                                    {selectedGroupId === group.id && (
                                         <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500" />
                                     )}
                                     <div className="flex justify-between items-start">
@@ -214,7 +214,7 @@ export default function WorkspaceLabels() {
                                         </div>
                                     </div>
                                     <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                                        <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={(e) => { e.stopPropagation(); handleDeleteGroup(group.id); }}>
+                                        <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={(e) => { e.stopPropagation(); handleDeleteGroup(group.id, e); }}>
                                             <Trash2 className="w-3 h-3" />
                                         </Button>
                                     </div>
