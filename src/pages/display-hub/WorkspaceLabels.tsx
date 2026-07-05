@@ -396,6 +396,7 @@ export default function WorkspaceLabels() {
                     </div>
                 )}
             </div>
+            </div>
         </div>
     );
 }
