@@ -59,8 +59,13 @@ export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Part
         if (labels.length > 0) {
             if (!confirm('¿Reemplazar las etiquetas actuales por las del grupo "' + group.name + '"?')) return;
         }
-        // Give new IDs to avoid key collisions
-        const newLabels = group.labels.map((l: any) => ({ ...l, id: crypto.randomUUID() }));
+        // Give new IDs to avoid key collisions and stagger them if they are all at 50,50
+        const newLabels = group.labels.map((l: any, i: number) => ({ 
+            ...l, 
+            id: crypto.randomUUID(),
+            x: l.x === 50 && l.y === 50 ? 50 + (i * 3) : l.x,
+            y: l.x === 50 && l.y === 50 ? 50 + (i * 5) : l.y
+        }));
         onChange({ ...config, labels: newLabels });
         toast.success('Grupo cargado');
     };
@@ -76,10 +81,11 @@ export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Part
         setIsMediaPickerOpen(false);
     };
 
+    // Label Management
     const addLabel = () => {
         const newLabel: DynamicLabel = {
             id: crypto.randomUUID(),
-            text: 'Nuevo Precio $0',
+            text: '1000',
             x: 50,
             y: 50,
             color: '#ffffff',

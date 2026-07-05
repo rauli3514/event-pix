@@ -74,7 +74,7 @@ export default function WorkspaceLabels() {
         if (!activeGroup) return;
         const newLabel: DynamicLabel = {
             id: crypto.randomUUID(),
-            text: 'Nuevo Item $0',
+            text: '1000',
             x: 50,
             y: 50,
             color: '#ffffff',
@@ -118,7 +118,26 @@ export default function WorkspaceLabels() {
         if (selectedLabelId === id) setSelectedLabelId(null);
     };
 
+    // Local state for editing without lag
+    const [localLabel, setLocalLabel] = useState<DynamicLabel | null>(null);
+
     const selectedLabel = activeGroup?.labels.find(l => l.id === selectedLabelId);
+
+    // Sync local label when selection changes
+    useEffect(() => {
+        setLocalLabel(selectedLabel || null);
+    }, [selectedLabelId]);
+
+    const handleLocalUpdate = (updates: Partial<DynamicLabel>) => {
+        if (!localLabel) return;
+        setLocalLabel({ ...localLabel, ...updates });
+    };
+
+    const handleSaveLabel = () => {
+        if (!activeGroup || !localLabel) return;
+        const updatedLabels = activeGroup.labels.map(l => l.id === localLabel.id ? localLabel : l);
+        updateGroup.mutate({ id: activeGroup.id, updates: { labels: updatedLabels } });
+    };
 
     return (
         <div className="h-full flex flex-col lg:flex-row bg-background">
@@ -250,35 +269,36 @@ export default function WorkspaceLabels() {
                                         <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
                                             <h3 className="text-lg font-semibold mb-6 flex items-center gap-2"><Edit className="w-5 h-5 text-emerald-500"/> Propiedades de la Etiqueta</h3>
                                             
-                                            <div className="space-y-6">
-                                                <div className="col-span-2 space-y-2">
-                                                    <Label>Identificador (Nombre interno)</Label>
-                                                    <Input placeholder="Ej: Precio Hamburguesa" value={selectedLabel.name || ''} onChange={e => updateLabel(selectedLabel.id, { name: e.target.value })} className="bg-background" />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label>Texto / Precio</Label>
-                                                    <Textarea 
-                                                        value={selectedLabel.text} 
-                                                        onChange={e => updateLabel(selectedLabel.id, { text: e.target.value })} 
-                                                        className="bg-background min-h-[100px] text-lg font-medium" 
-                                                    />
-                                                </div>
+                                            {localLabel && (
+                                                <div className="space-y-6">
+                                                    <div className="col-span-2 space-y-2">
+                                                        <Label>Identificador (Nombre interno)</Label>
+                                                        <Input placeholder="Ej: Precio Hamburguesa" value={localLabel.name || ''} onChange={e => handleLocalUpdate({ name: e.target.value })} className="bg-background" />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label>Texto / Precio</Label>
+                                                        <Textarea 
+                                                            value={localLabel.text} 
+                                                            onChange={e => handleLocalUpdate({ text: e.target.value })}
+                                                            className="bg-background min-h-[100px] resize-none text-lg"
+                                                        />
+                                                    </div>
                                                 
                                                 <div className="grid grid-cols-2 gap-6">
                                                     <div className="space-y-2">
                                                         <Label>Tipografía</Label>
-                                                        <Select value={selectedLabel.fontFamily} onValueChange={(v) => updateLabel(selectedLabel.id, { fontFamily: v })}>
+                                                        <Select value={localLabel.fontFamily} onValueChange={(v) => handleLocalUpdate({ fontFamily: v })}>
                                                             <SelectTrigger className="bg-background"><SelectValue/></SelectTrigger>
-                                                            <SelectContent>
+                                                            <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
                                                                 {FONTS.map(f => <SelectItem key={f.value} value={f.value} style={{fontFamily: f.value}}>{f.label}</SelectItem>)}
                                                             </SelectContent>
                                                         </Select>
                                                     </div>
                                                     <div className="space-y-2">
                                                         <Label>Estilo (Grosor)</Label>
-                                                        <Select value={selectedLabel.fontWeight} onValueChange={(v) => updateLabel(selectedLabel.id, { fontWeight: v })}>
+                                                        <Select value={localLabel.fontWeight} onValueChange={(v) => handleLocalUpdate({ fontWeight: v })}>
                                                             <SelectTrigger className="bg-background"><SelectValue/></SelectTrigger>
-                                                            <SelectContent>
+                                                            <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
                                                                 <SelectItem value="normal">Normal</SelectItem>
                                                                 <SelectItem value="bold">Negrita (Bold)</SelectItem>
                                                                 <SelectItem value="900">Extrabold</SelectItem>
@@ -286,23 +306,23 @@ export default function WorkspaceLabels() {
                                                             </SelectContent>
                                                         </Select>
                                                     </div>
-                                                    
+
                                                     <div className="space-y-2">
-                                                        <Label>Tamaño ({selectedLabel.fontSize})</Label>
-                                                        <Input type="number" min="1" max="50" step="0.5" value={selectedLabel.fontSize} onChange={e => updateLabel(selectedLabel.id, { fontSize: parseFloat(e.target.value) })} className="bg-background" />
+                                                        <Label>Tamaño ({localLabel.fontSize})</Label>
+                                                        <Input type="number" min="1" max="50" step="0.5" value={localLabel.fontSize} onChange={e => handleLocalUpdate({ fontSize: parseFloat(e.target.value) })} className="bg-background" />
                                                     </div>
                                                     
                                                     <div className="space-y-2">
                                                         <Label>Color</Label>
                                                         <div className="flex gap-2">
-                                                            <input type="color" value={selectedLabel.color} onChange={e => updateLabel(selectedLabel.id, { color: e.target.value })} className="h-10 w-10 rounded border border-border bg-transparent p-1 cursor-pointer" />
-                                                            <Input value={selectedLabel.color} onChange={e => updateLabel(selectedLabel.id, { color: e.target.value })} className="bg-background flex-1 uppercase" />
+                                                            <input type="color" value={localLabel.color} onChange={e => handleLocalUpdate({ color: e.target.value })} className="h-10 w-10 rounded border border-border bg-transparent p-1 cursor-pointer" />
+                                                            <Input value={localLabel.color} onChange={e => handleLocalUpdate({ color: e.target.value })} className="bg-background flex-1 uppercase" />
                                                         </div>
                                                     </div>
 
                                                     <div className="space-y-2 col-span-2">
                                                         <Label>Animación</Label>
-                                                        <Select value={selectedLabel.animation} onValueChange={(v: any) => updateLabel(selectedLabel.id, { animation: v })}>
+                                                        <Select value={localLabel.animation} onValueChange={(v: any) => handleLocalUpdate({ animation: v })}>
                                                             <SelectTrigger className="bg-background"><SelectValue/></SelectTrigger>
                                                             <SelectContent>
                                                                 <SelectItem value="none">Sin Animación</SelectItem>
@@ -313,27 +333,40 @@ export default function WorkspaceLabels() {
                                                             </SelectContent>
                                                         </Select>
                                                     </div>
+                                                    
+                                                    <div className="col-span-2 pt-4 border-t border-border flex justify-end">
+                                                        <Button 
+                                                            className="bg-emerald-600 hover:bg-emerald-700 text-white w-full sm:w-auto" 
+                                                            onClick={handleSaveLabel}
+                                                            disabled={updateGroup.isPending}
+                                                        >
+                                                            {updateGroup.isPending ? "Guardando..." : "Guardar Cambios"}
+                                                        </Button>
+                                                    </div>
                                                 </div>
                                             </div>
+                                            )}
                                         </div>
 
                                         {/* Live Text Preview Box */}
-                                        <div className="bg-slate-900 rounded-xl overflow-hidden shadow-inner border border-slate-800 p-12 flex items-center justify-center relative min-h-[300px]">
-                                            <div className="absolute top-4 left-4 text-xs font-mono text-slate-500">Vista Previa (Fondo Neutro)</div>
-                                            <div
-                                                className="whitespace-pre-wrap text-center"
-                                                style={{
-                                                    color: selectedLabel.color,
-                                                    fontFamily: selectedLabel.fontFamily,
-                                                    fontSize: `${selectedLabel.fontSize * 1.5}vw`, // Scaled for preview 
-                                                    fontWeight: selectedLabel.fontWeight,
-                                                    fontStyle: selectedLabel.fontStyle,
-                                                    textShadow: '0px 2px 10px rgba(0,0,0,0.8)'
-                                                }}
-                                            >
-                                                {selectedLabel.text}
+                                        {localLabel && (
+                                            <div className="bg-slate-900 rounded-xl overflow-hidden shadow-inner border border-slate-800 p-12 flex items-center justify-center relative min-h-[300px]">
+                                                <div className="absolute top-4 left-4 text-xs font-mono text-slate-500">Vista Previa (Fondo Neutro)</div>
+                                                <div
+                                                    className="whitespace-pre-wrap text-center"
+                                                    style={{
+                                                        color: localLabel.color,
+                                                        fontFamily: localLabel.fontFamily,
+                                                        fontSize: `${localLabel.fontSize * 1.5}vw`, // Scaled for preview 
+                                                        fontWeight: localLabel.fontWeight,
+                                                        fontStyle: localLabel.fontStyle,
+                                                        textShadow: '0px 2px 10px rgba(0,0,0,0.8)'
+                                                    }}
+                                                >
+                                                    {localLabel.text}
+                                                </div>
                                             </div>
-                                        </div>
+                                        )}
                                     </div>
                                 ) : (
                                     <div className="h-full flex flex-col items-center justify-center text-slate-500">
