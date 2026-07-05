@@ -140,27 +140,28 @@ export default function WorkspaceLabels() {
             
             {/* Descriptive Top Banner */}
             <div className="p-3 md:p-6 md:px-8 pt-3 md:pt-6 pb-2 shrink-0">
-                <div className="relative overflow-hidden rounded-3xl bg-card border border-border shadow-xl flex items-center min-h-[100px] md:min-h-[140px] px-4 md:px-8 py-4 md:py-6 transition-colors duration-300">
-                    <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-background/20 to-secondary/10 pointer-events-none">
-                        <div className="absolute right-10 top-1/2 -translate-y-1/2 w-48 h-48 bg-orange-500/10 rounded-full blur-[60px] hidden sm:block"></div>
-                        <div className="absolute right-32 bottom-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-[40px] hidden sm:block"></div>
-                    </div>
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-indigo-500/5 border border-indigo-500/20 p-4 md:p-6 lg:p-8">
+                    {/* Decorative elements */}
+                    <div className="absolute top-0 right-0 -translate-y-12 translate-x-1/3 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl" />
+                    <div className="absolute bottom-0 left-0 translate-y-1/3 -translate-x-1/3 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl" />
                     
-                    <div className="relative z-10 flex flex-col gap-1 w-full max-w-3xl">
-                        <h1 className="text-2xl md:text-3xl font-extrabold text-foreground flex items-center gap-2 md:gap-3">
-                            <Database className="w-6 h-6 md:w-8 md:h-8 text-indigo-500" />
-                            Fuentes de Datos
-                        </h1>
-                        <p className="text-muted-foreground font-medium max-w-xl text-sm md:text-base">
-                            Administrá tus precios y textos de forma centralizada. Vinculá estos datos a tus aplicaciones para actualizar todas tus pantallas a la vez.
-                        </p>
+                    <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                        <div className="space-y-1 md:space-y-2">
+                            <h1 className="text-2xl md:text-3xl font-extrabold text-foreground flex items-center gap-2 md:gap-3">
+                                <Database className="w-6 h-6 md:w-8 md:h-8 text-indigo-500" />
+                                Fuentes de Datos
+                            </h1>
+                            <p className="text-muted-foreground font-medium max-w-xl text-sm md:text-base">
+                                Administrá tus precios y textos de forma centralizada. Vinculá estos datos a tus aplicaciones para actualizar todas tus pantallas a la vez.
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div className="flex-1 flex flex-col lg:flex-row overflow-hidden border-t border-border">
+            <div className="flex-1 flex flex-col lg:flex-row lg:overflow-hidden border-t border-border min-h-0">
                 {/* Sidebar: Group List */}
-                <div className="w-full lg:w-80 border-r border-border bg-card flex flex-col">
+                <div className="w-full lg:w-80 border-b lg:border-b-0 lg:border-r border-border bg-card flex flex-col shrink-0 lg:shrink h-auto lg:h-full max-h-[50vh] lg:max-h-none">
 
                 <div className="p-4 shrink-0">
                     {isCreatingGroup ? (

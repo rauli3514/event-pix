@@ -620,15 +620,15 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                     currentFolder={currentFolder}
                 />
             )}
-            {commerceId && editingApp && (
+            {commerceId && (
                 <AppEditorModal
                     isOpen={!!editingApp}
                     onClose={() => setEditingApp(null)}
                     onBack={() => setEditingApp(null)}
-                    appId={editingApp.metadata?.appId as AppId}
+                    appId={(editingApp?.metadata?.appId as AppId) || 'dynamic-menu'}
                     commerceId={commerceId}
                     currentFolder={currentFolder}
-                    editingApp={editingApp}
+                    editingApp={editingApp || undefined}
                 />
             )}
         </div>
