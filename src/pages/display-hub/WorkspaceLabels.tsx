@@ -169,112 +169,123 @@ export default function WorkspaceLabels() {
                             <Label>Nombre del grupo</Label>
                             <Input value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="Ej: Precios Hamburguesas" className="bg-background" />
                             <Label>Descripción (opcional)</Label>
-                            <Input value={newGroupDesc} onChange={e => setNewGroupDesc(e.target.value)} placeholder="Ej: Pantalla principal" className="bg-background" />
-                            <div className="flex justify-end gap-2 pt-2">
-                                <Button size="sm" variant="ghost" onClick={() => setIsCreatingGroup(false)}>Cancelar</Button>
-                                <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white" onClick={handleCreateGroup}>Guardar</Button>
+                {/* Sidebar: Groups List */}
+                <div className="w-full lg:w-80 flex-shrink-0 bg-card border-r border-border flex flex-col lg:overflow-y-auto">
+                    <div className="p-4 border-b border-border shrink-0">
+                        {isCreatingGroup ? (
+                            <div className="space-y-3">
+                                <Input value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="Nombre del grupo..." className="bg-background" />
+                                <div className="flex justify-end gap-2">
+                                    <Button size="sm" variant="ghost" onClick={() => setIsCreatingGroup(false)}>Cancelar</Button>
+                                    <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white" onClick={handleCreateGroup}>Guardar</Button>
+                                </div>
                             </div>
-                        </div>
-                    ) : (
-                        <Button className="w-full bg-indigo-600/10 text-indigo-500 hover:bg-indigo-600 hover:text-white" onClick={() => setIsCreatingGroup(true)}>
-                            <Plus className="w-4 h-4 mr-2" />
-                            Nuevo Grupo de Etiquetas
-                        </Button>
-                    )}
+                        ) : (
+                            <Button className="w-full bg-indigo-500/10 text-indigo-600 hover:bg-indigo-500/20 hover:text-indigo-700" variant="ghost" onClick={() => setIsCreatingGroup(true)}>
+                                <Plus className="w-4 h-4 mr-2" />
+                                Nuevo Grupo de Etiquetas
+                            </Button>
+                        )}
+                    </div>
+
+                    <div className="flex-1 p-4 flex flex-col gap-2">
+                        {isLoading ? (
+                             <p className="text-center text-muted-foreground text-sm py-4">Cargando...</p>
+                        ) : groups.length === 0 ? (
+                            <div className="text-center p-8 bg-background border border-dashed rounded-xl">
+                                <Tags className="w-8 h-8 text-muted-foreground mx-auto mb-3 opacity-50" />
+                                <p className="text-muted-foreground font-medium">No hay grupos</p>
+                                <p className="text-xs text-muted-foreground mt-1">Crea tu primer grupo para empezar.</p>
+                            </div>
+                        ) : (
+                            groups.map(group => (
+                                <div 
+                                    key={group.id} 
+                                    onClick={() => { setActiveGroupId(group.id); setSelectedLabelId(null); }}
+                                    className={cn(
+                                        "p-4 rounded-xl cursor-pointer border transition-all duration-200 group relative overflow-hidden",
+                                        activeGroupId === group.id 
+                                            ? "bg-indigo-50 border-indigo-200 shadow-sm" 
+                                            : "bg-background border-border hover:border-indigo-300 hover:shadow-sm"
+                                    )}
+                                >
+                                    {activeGroupId === group.id && (
+                                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500" />
+                                    )}
+                                    <div className="flex justify-between items-start">
+                                        <div className="pr-8">
+                                            <h3 className="font-bold text-foreground truncate">{group.name}</h3>
+                                            <p className="text-xs text-indigo-500 mt-1 font-medium flex items-center gap-1">
+                                                <Database className="w-3 h-3" />
+                                                {group.labels?.length || 0} etiquetas
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                                        <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={(e) => { e.stopPropagation(); handleDeleteGroup(group.id); }}>
+                                            <Trash2 className="w-3 h-3" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                    {isLoading ? (
-                        <p className="text-center text-muted-foreground text-sm py-4">Cargando...</p>
-                    ) : groups.length === 0 ? (
-                        <div className="text-center py-8">
-                            <ListTree className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-                            <p className="text-sm text-muted-foreground">No tienes grupos creados.</p>
-                        </div>
-                    ) : (
-                        groups.map(group => (
-                            <div 
-                                key={group.id}
-                                onClick={() => { setSelectedGroupId(group.id); setSelectedLabelId(null); }}
-                                className={cn(
-                                    "p-3 rounded-xl border transition-all cursor-pointer relative group",
-                                    selectedGroupId === group.id ? "bg-indigo-600/10 border-indigo-500/50" : "bg-card border-border hover:border-slate-500"
-                                )}
-                            >
-                                <h4 className="font-semibold text-foreground text-sm">{group.name}</h4>
-                                {group.description && <p className="text-xs text-muted-foreground mt-1 truncate">{group.description}</p>}
-                                <div className="text-xs text-indigo-400 mt-2 flex items-center gap-1">
-                                    <Database className="w-3 h-3" /> {group.labels?.length || 0} etiquetas
+                {/* Main Area: Label Editor */}
+                <div className="flex-1 bg-background flex flex-col lg:overflow-hidden min-h-0">
+                    {activeGroup ? (
+                        <div className="flex-1 flex flex-col lg:overflow-hidden">
+                            {/* Header */}
+                            <div className="border-b border-border bg-card p-4 lg:px-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between shrink-0">
+                                <div className="min-w-0">
+                                    <h2 className="text-xl font-bold leading-tight truncate">{activeGroup.name}</h2>
+                                    {activeGroup.description && <p className="text-sm text-muted-foreground mt-1 truncate">{activeGroup.description}</p>}
                                 </div>
-
-                                <Button 
-                                    size="icon" 
-                                    variant="ghost" 
-                                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 h-7 w-7 text-red-400 hover:text-red-300 hover:bg-red-950/50"
-                                    onClick={(e) => handleDeleteGroup(group.id, e)}
-                                >
-                                    <Trash2 className="w-3 h-3" />
+                                <Button className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0" onClick={addLabel}>
+                                    <Plus className="w-4 h-4 mr-2" />
+                                    Agregar Etiqueta
                                 </Button>
                             </div>
-                        ))
-                    )}
-                </div>
-            </div>
 
-            {/* Main Area: Label Editor */}
-            <div className="flex-1 bg-background flex flex-col min-h-0">
-                {activeGroup ? (
-                    <div className="flex-1 flex flex-col h-full">
-                        {/* Header */}
-                        <div className="border-b border-border bg-card p-4 lg:px-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between shrink-0">
-                            <div className="min-w-0">
-                                <h2 className="text-xl font-bold leading-tight truncate">{activeGroup.name}</h2>
-                                {activeGroup.description && <p className="text-sm text-muted-foreground mt-1 truncate">{activeGroup.description}</p>}
-                            </div>
-                            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0" onClick={addLabel}>
-                                <Plus className="w-4 h-4 mr-2" />
-                                Agregar Etiqueta
-                            </Button>
-                        </div>
-
-                        {/* Content Split */}
-                        <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-                            {/* List of labels */}
-                            <div className="w-full md:w-1/2 lg:w-1/3 border-r border-border bg-card p-4 overflow-y-auto">
-                                <h3 className="text-sm font-semibold text-muted-foreground mb-4 uppercase tracking-wider">Etiquetas en el grupo</h3>
-                                
-                                <div className="space-y-2">
-                                    {activeGroup.labels.length === 0 ? (
-                                        <p className="text-center text-sm text-muted-foreground py-8 border border-dashed rounded-lg">Este grupo está vacío.<br/>Añade una etiqueta para comenzar.</p>
-                                    ) : (
-                                        activeGroup.labels.map(label => (
-                                            <div 
-                                                key={label.id}
-                                                onClick={() => setSelectedLabelId(label.id)}
-                                                className={cn(
-                                                    "p-3 rounded-lg border cursor-pointer flex justify-between items-center transition-all",
-                                                    selectedLabelId === label.id ? "bg-emerald-500/10 border-emerald-500/50" : "bg-background border-border hover:border-slate-500"
-                                                )}
-                                            >
-                                                <div className="flex-1 min-w-0">
-                                                    <h4 className="font-bold text-foreground truncate text-sm">{label.name || label.text || 'Sin texto'}</h4>
-                                                    <div className="text-xs text-muted-foreground flex gap-2 mt-1">
-                                                        <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full" style={{backgroundColor: label.color}}></div> {label.color}</span>
-                                                        <span>{label.fontSize}px</span>
+                            {/* Content Split */}
+                            <div className="flex-1 flex flex-col md:flex-row lg:overflow-hidden">
+                                {/* List of labels */}
+                                <div className="w-full md:w-1/2 lg:w-1/3 border-r border-border bg-card p-4 lg:overflow-y-auto">
+                                    <h3 className="text-sm font-semibold text-muted-foreground mb-4 uppercase tracking-wider">Etiquetas en el grupo</h3>
+                                    
+                                    <div className="space-y-2">
+                                        {activeGroup.labels.length === 0 ? (
+                                            <p className="text-center text-sm text-muted-foreground py-8 border border-dashed rounded-lg">Este grupo está vacío.<br/>Añade una etiqueta para comenzar.</p>
+                                        ) : (
+                                            activeGroup.labels.map(label => (
+                                                <div 
+                                                    key={label.id}
+                                                    onClick={() => setSelectedLabelId(label.id)}
+                                                    className={cn(
+                                                        "p-3 rounded-lg border cursor-pointer flex justify-between items-center transition-all",
+                                                        selectedLabelId === label.id ? "bg-emerald-500/10 border-emerald-500/50" : "bg-background border-border hover:border-slate-500"
+                                                    )}
+                                                >
+                                                    <div className="flex-1 min-w-0">
+                                                        <h4 className="font-bold text-foreground truncate text-sm">{label.name || label.text || 'Sin texto'}</h4>
+                                                        <div className="text-xs text-muted-foreground flex gap-2 mt-1">
+                                                            <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full" style={{backgroundColor: label.color}}></div> {label.color}</span>
+                                                            <span>{label.fontSize}px</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex gap-1 shrink-0">
+                                                        <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 hover:text-white" onClick={(e) => { e.stopPropagation(); duplicateLabel(label.id); }}><Copy className="w-4 h-4" /></Button>
+                                                        <Button size="icon" variant="ghost" className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-950" onClick={(e) => { e.stopPropagation(); removeLabel(label.id); }}><Trash2 className="w-4 h-4" /></Button>
                                                     </div>
                                                 </div>
-                                                <div className="flex gap-1 shrink-0">
-                                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 hover:text-white" onClick={(e) => { e.stopPropagation(); duplicateLabel(label.id); }}><Copy className="w-4 h-4" /></Button>
-                                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-950" onClick={(e) => { e.stopPropagation(); removeLabel(label.id); }}><Trash2 className="w-4 h-4" /></Button>
-                                                </div>
-                                            </div>
-                                        ))
-                                    )}
+                                            ))
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
 
-                            {/* Label Editor Forms */}
-                            <div className="flex-1 bg-background p-6 overflow-y-auto">
+                                {/* Label Editor Forms */}
+                                <div className="flex-1 bg-background p-6 lg:overflow-y-auto pb-20 lg:pb-6">
                                 {selectedLabel ? (
                                     <div className="max-w-xl mx-auto space-y-8">
                                         <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
