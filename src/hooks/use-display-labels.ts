@@ -46,7 +46,10 @@ export const useCreateLabelGroup = () => {
                 .select()
                 .single();
 
-            if (error) throw error;
+            if (error) {
+                console.error("Supabase insert error:", error);
+                throw error;
+            }
             return data as DisplayLabelGroup;
         },
         onSuccess: (_, variables) => {

@@ -51,8 +51,9 @@ export default function WorkspaceLabels() {
             setNewGroupDesc('');
             setSelectedGroupId(group.id);
             toast.success('Grupo creado correctamente');
-        } catch (error) {
-            toast.error('Error al crear grupo');
+        } catch (error: any) {
+            console.error("Create group error:", error);
+            toast.error(`Error al crear grupo: ${error.message || 'Error desconocido'}`);
         }
     };
 
