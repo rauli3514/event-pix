@@ -11,9 +11,10 @@ import { DynamicMenuPreview } from './apps/dynamic-menu/DynamicMenuApp';
 interface PlayerRendererProps {
     item: any; // Using any to support both CampaignItem (V1) and UniversalElement (V2)
     isActive: boolean;
+    commerceId?: string;
 }
 
-export const PlayerRenderer = ({ item, isActive }: PlayerRendererProps) => {
+export const PlayerRenderer = ({ item, isActive, commerceId }: PlayerRendererProps) => {
     const iframeRef = useRef<HTMLIFrameElement>(null);
 
     // Si es un iframe, forzar una recarga suave cuando se vuelve activo (opcional, depende de si queremos resetear el estado de la web externa)
@@ -83,7 +84,7 @@ export const PlayerRenderer = ({ item, isActive }: PlayerRendererProps) => {
                         ) : appId === 'reviews' ? (
                             <ReviewsPreview config={metadata.config || {}} />
                         ) : appId === 'dynamic-menu' ? (
-                            <DynamicMenuPreview config={metadata.config || {}} />
+                            <DynamicMenuPreview config={metadata.config || {}} commerceId={commerceId} />
                         ) : (
                             <div className="w-full h-full flex items-center justify-center text-white bg-slate-900 flex-col gap-4">
                                 <span className="text-2xl font-bold">App: {appId}</span>

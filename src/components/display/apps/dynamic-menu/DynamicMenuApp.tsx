@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
+import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -268,9 +269,33 @@ export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Part
     );
 };
 
-export const DynamicMenuPreview = ({ config, onChange, isEditing = false }: { config: Partial<DynamicMenuConfig>, onChange?: (c: Partial<DynamicMenuConfig>) => void, isEditing?: boolean }) => {
+export const DynamicMenuPreview = ({ config, onChange, isEditing = false, commerceId }: { config: Partial<DynamicMenuConfig>, onChange?: (c: Partial<DynamicMenuConfig>) => void, isEditing?: boolean, commerceId?: string }) => {
     const labels = config.labels || [];
     const containerRef = useRef<HTMLDivElement>(null);
+    const params = useParams<{ commerceId: string }>();
+    const effectiveCommerceId = commerceId || params.commerceId || '';
+    const { data: savedGroups = [] } = useDisplayLabelGroups(effectiveCommerceId);
+
+    const displayLabels = useMemo(() => {
+        if (!labels.length || !savedGroups.length) return labels;
+        
+        const liveTextMap = new Map();
+        savedGroups.forEach(g => {
+            g.labels.forEach((l: any) => {
+                if (l.name) liveTextMap.set(l.name.toLowerCase().trim(), l.text);
+            });
+        });
+
+        return labels.map(label => {
+            if (label.name) {
+                const liveText = liveTextMap.get(label.name.toLowerCase().trim());
+                if (liveText !== undefined) {
+                    return { ...label, text: liveText };
+                }
+            }
+            return label;
+        });
+    }, [labels, savedGroups]);
     
     // Editor Preview Drag Handling
     const handleDragEnd = (id: string, _event: any, info: any) => {
@@ -318,7 +343,7 @@ export const DynamicMenuPreview = ({ config, onChange, isEditing = false }: { co
                 )
             )}
             
-            {labels.map(label => {
+            {displayLabels.map(label => {
                 if (isEditing && onChange) {
                     return (
                         <motion.div
@@ -342,7 +367,7 @@ export const DynamicMenuPreview = ({ config, onChange, isEditing = false }: { co
                                 zIndex: 10,
                                 cursor: 'grab'
                             }}
-                            className={cn("whitespace-nowrap select-none hover:ring-2 hover:ring-emerald-500 hover:bg-emerald-500/20 px-2 py-1 rounded", getAnimationClass(label.animation))}
+                            className="whitespace-nowrap select-none hover:outline hover:outline-2 hover:outline-emerald-500 hover:outline-offset-4 rounded cursor-grab"
                             whileDrag={{ cursor: 'grabbing', scale: 1.05 }}
                         >
                             {label.text}

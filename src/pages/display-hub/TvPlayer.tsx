@@ -15,6 +15,7 @@ const TvPlayer = () => {
     const [deviceSettings, setDeviceSettings] = useState({ scale: 'fit', orientation: 'landscape' });
     const [isSyncing, setIsSyncing] = useState(false);
     const [localRotation, setLocalRotation] = useState<number | null>(null);
+    const [deviceCommerceId, setDeviceCommerceId] = useState<string>('');
     
     // Referencias para limpiar timeouts e intervalos
     const rotationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -29,7 +30,7 @@ const TvPlayer = () => {
             // 1. Obtener UUID del dispositivo y configuración
             const { data: device, error: deviceError } = await supabase
                 .from('display_devices')
-                .select('id, group_id, pairing_status, scale, orientation')
+                .select('id, group_id, pairing_status, scale, orientation, commerce_id')
                 .eq('device_id', deviceCode)
                 .single();
 
@@ -44,6 +45,7 @@ const TvPlayer = () => {
                 scale: device.scale || 'fit',
                 orientation: device.orientation || 'landscape'
             });
+            if (device.commerce_id) setDeviceCommerceId(device.commerce_id);
 
             // 2. Buscar asignaciones para el dispositivo o su zona
             let orQuery = `device_id.eq.${device.id}`;
@@ -383,6 +385,7 @@ const TvPlayer = () => {
                     key={`${item.id}-${index}`} 
                     item={item} 
                     isActive={index === currentIndex} 
+                    commerceId={deviceCommerceId}
                 />
             ))}
 
