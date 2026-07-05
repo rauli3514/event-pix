@@ -177,6 +177,7 @@ export interface DisplayHeartbeat {
 
 export interface DynamicLabel {
     id: string;
+    name?: string; // Optional name to identify the label
     text: string;
     x: number; // percentage 0-100
     y: number; // percentage 0-100

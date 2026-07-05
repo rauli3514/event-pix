@@ -184,7 +184,7 @@ export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Part
                                 onClick={() => setSelectedLabelId(label.id)}
                                 className={cn("flex justify-between items-center p-2 rounded-md border cursor-pointer", selectedLabelId === label.id ? "bg-emerald-500/10 border-emerald-500/50" : "bg-slate-950 border-slate-800 hover:border-slate-700")}
                             >
-                                <span className="text-sm text-white truncate flex-1" style={{ fontFamily: label.fontFamily }}>{label.text || 'Sin texto'}</span>
+                                <span className="text-sm text-white truncate flex-1 font-bold">{label.name || label.text || 'Sin texto'}</span>
                                 <div className="flex gap-1">
                                     <Button size="icon" variant="ghost" className="h-7 w-7 text-slate-400 hover:text-white" onClick={(e) => { e.stopPropagation(); duplicateLabel(label.id); }}><Copy className="w-3 h-3" /></Button>
                                     <Button size="icon" variant="ghost" className="h-7 w-7 text-red-400 hover:text-red-300 hover:bg-red-950" onClick={(e) => { e.stopPropagation(); removeLabel(label.id); }}><Trash2 className="w-3 h-3" /></Button>
@@ -196,14 +196,18 @@ export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Part
                     {selectedLabel && (
                         <div className="mt-4 pt-4 border-t border-slate-800 grid grid-cols-2 gap-4">
                             <div className="col-span-2 space-y-2">
+                                <Label>Identificador (Opcional)</Label>
+                                <Input placeholder="Ej: Precio Hamburguesa" value={selectedLabel.name || ''} onChange={e => updateLabel(selectedLabel.id, { name: e.target.value })} className="bg-slate-950 border-slate-700" />
+                            </div>
+                            <div className="col-span-2 space-y-2">
                                 <Label>Texto / Precio</Label>
                                 <Input value={selectedLabel.text} onChange={e => updateLabel(selectedLabel.id, { text: e.target.value })} className="bg-slate-950 border-slate-700" />
                             </div>
                             <div className="space-y-2">
                                 <Label>Tipografía</Label>
                                 <Select value={selectedLabel.fontFamily} onValueChange={(v) => updateLabel(selectedLabel.id, { fontFamily: v })}>
-                                    <SelectTrigger className="bg-slate-950 border-slate-700"><SelectValue/></SelectTrigger>
-                                    <SelectContent className="bg-slate-900 border-slate-800">
+                                    <SelectTrigger className="bg-slate-950 border-slate-700 text-white"><SelectValue/></SelectTrigger>
+                                    <SelectContent className="bg-slate-900 border-slate-800 text-white">
                                         {FONTS.map(f => <SelectItem key={f.value} value={f.value} style={{fontFamily: f.value}}>{f.label}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
@@ -211,8 +215,8 @@ export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Part
                             <div className="space-y-2">
                                 <Label>Estilo</Label>
                                 <Select value={selectedLabel.fontWeight} onValueChange={(v) => updateLabel(selectedLabel.id, { fontWeight: v })}>
-                                    <SelectTrigger className="bg-slate-950 border-slate-700"><SelectValue/></SelectTrigger>
-                                    <SelectContent className="bg-slate-900 border-slate-800">
+                                    <SelectTrigger className="bg-slate-950 border-slate-700 text-white"><SelectValue/></SelectTrigger>
+                                    <SelectContent className="bg-slate-900 border-slate-800 text-white">
                                         <SelectItem value="normal">Normal</SelectItem>
                                         <SelectItem value="bold">Negrita (Bold)</SelectItem>
                                         <SelectItem value="900">Extrabold</SelectItem>
@@ -233,8 +237,8 @@ export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Part
                             <div className="space-y-2 col-span-2">
                                 <Label>Animación</Label>
                                 <Select value={selectedLabel.animation} onValueChange={(v: any) => updateLabel(selectedLabel.id, { animation: v })}>
-                                    <SelectTrigger className="bg-slate-950 border-slate-700"><SelectValue/></SelectTrigger>
-                                    <SelectContent className="bg-slate-900 border-slate-800">
+                                    <SelectTrigger className="bg-slate-950 border-slate-700 text-white"><SelectValue/></SelectTrigger>
+                                    <SelectContent className="bg-slate-900 border-slate-800 text-white">
                                         <SelectItem value="none">Sin Animación</SelectItem>
                                         <SelectItem value="fade-in">Fade In</SelectItem>
                                         <SelectItem value="slide-up">Slide Up</SelectItem>
@@ -265,13 +269,22 @@ export const DynamicMenuPreview = ({ config, onChange, isEditing = false }: { co
     // Editor Preview Drag Handling
     const handleDragEnd = (id: string, _event: any, info: any) => {
         if (!containerRef.current || !onChange) return;
+        
+        const label = labels.find(l => l.id === id);
+        if (!label) return;
+
         const rect = containerRef.current.getBoundingClientRect();
         
-        const xPx = info.point.x - rect.left;
-        const yPx = info.point.y - rect.top;
+        // Convert original percentage to pixels
+        const startXPx = (label.x / 100) * rect.width;
+        const startYPx = (label.y / 100) * rect.height;
         
-        const xPct = Math.max(0, Math.min(100, (xPx / rect.width) * 100));
-        const yPct = Math.max(0, Math.min(100, (yPx / rect.height) * 100));
+        // Add the drag offset (how many pixels the user moved it)
+        const newXPx = startXPx + info.offset.x;
+        const newYPx = startYPx + info.offset.y;
+        
+        const xPct = Math.max(0, Math.min(100, (newXPx / rect.width) * 100));
+        const yPct = Math.max(0, Math.min(100, (newYPx / rect.height) * 100));
 
         const newLabels = labels.map(l => l.id === id ? { ...l, x: xPct, y: yPct } : l);
         onChange({ ...config, labels: newLabels });

@@ -226,8 +226,8 @@ export default function WorkspaceLabels() {
                                                     selectedLabelId === label.id ? "bg-emerald-500/10 border-emerald-500/50" : "bg-background border-border hover:border-slate-500"
                                                 )}
                                             >
-                                                <div className="flex-1 truncate">
-                                                    <span className="text-sm font-medium" style={{ fontFamily: label.fontFamily }}>{label.text}</span>
+                                                <div className="flex-1 min-w-0">
+                                                    <h4 className="font-bold text-foreground truncate text-sm">{label.name || label.text || 'Sin texto'}</h4>
                                                     <div className="text-xs text-muted-foreground flex gap-2 mt-1">
                                                         <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full" style={{backgroundColor: label.color}}></div> {label.color}</span>
                                                         <span>{label.fontSize}px</span>
@@ -251,6 +251,10 @@ export default function WorkspaceLabels() {
                                             <h3 className="text-lg font-semibold mb-6 flex items-center gap-2"><Edit className="w-5 h-5 text-emerald-500"/> Propiedades de la Etiqueta</h3>
                                             
                                             <div className="space-y-6">
+                                                <div className="col-span-2 space-y-2">
+                                                    <Label>Identificador (Nombre interno)</Label>
+                                                    <Input placeholder="Ej: Precio Hamburguesa" value={selectedLabel.name || ''} onChange={e => updateLabel(selectedLabel.id, { name: e.target.value })} className="bg-background" />
+                                                </div>
                                                 <div className="space-y-2">
                                                     <Label>Texto / Precio</Label>
                                                     <Textarea 
