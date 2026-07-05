@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useDisplayLabelGroups, useCreateLabelGroup, useUpdateLabelGroup, useDeleteLabelGroup } from '@/hooks/use-display-labels';
 import { Button } from '@/components/ui/button';
@@ -89,11 +89,7 @@ export default function WorkspaceLabels() {
         setSelectedLabelId(newLabel.id);
     };
 
-    const updateLabel = (id: string, updates: Partial<DynamicLabel>) => {
-        if (!activeGroup) return;
-        const updatedLabels = activeGroup.labels.map(l => l.id === id ? { ...l, ...updates } : l);
-        updateGroup.mutate({ id: activeGroup.id, updates: { labels: updatedLabels } });
-    };
+
 
     const duplicateLabel = (id: string) => {
         if (!activeGroup) return;
