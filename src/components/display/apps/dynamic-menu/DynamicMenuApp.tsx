@@ -280,7 +280,6 @@ export const DynamicMenuPreview = ({ config, onChange, isEditing = false }: { co
     // Convert animations to CSS classes or motion props if needed
     // For TvPlayer we can just use tailwind animate classes
     const getAnimationClass = (anim: string) => {
-        if (isEditing) return ''; // Disable animations while dragging for better experience
         switch (anim) {
             case 'fade-in': return 'animate-in fade-in duration-1000';
             case 'slide-up': return 'animate-in fade-in slide-in-from-bottom-full duration-1000';
@@ -304,10 +303,10 @@ export const DynamicMenuPreview = ({ config, onChange, isEditing = false }: { co
                 if (isEditing && onChange) {
                     return (
                         <motion.div
-                            key={label.id}
+                            key={`${label.id}-${label.x}-${label.y}`} // Force remount on drop to reset transform
                             drag
                             dragMomentum={false}
-                            onDragEnd={(e, info) => handleDragEnd(label.id, e, info)}
+                            onDragEnd={(_e, info) => handleDragEnd(label.id, _e, info)}
                             dragConstraints={containerRef}
                             style={{
                                 position: 'absolute',
@@ -319,11 +318,12 @@ export const DynamicMenuPreview = ({ config, onChange, isEditing = false }: { co
                                 fontSize: `${label.fontSize}vw`,
                                 fontWeight: label.fontWeight,
                                 fontStyle: label.fontStyle,
-                                textShadow: '0px 2px 10px rgba(0,0,0,0.8)',
+                                textShadow: '0px 4px 15px rgba(0,0,0,0.9), 0px 0px 8px rgba(0,0,0,0.8)',
+                                WebkitTextStroke: '1px rgba(0,0,0,0.3)',
                                 zIndex: 10,
                                 cursor: 'grab'
                             }}
-                            className="whitespace-nowrap select-none hover:ring-2 hover:ring-emerald-500 hover:bg-emerald-500/20 px-2 py-1 rounded"
+                            className={cn("whitespace-nowrap select-none hover:ring-2 hover:ring-emerald-500 hover:bg-emerald-500/20 px-2 py-1 rounded", getAnimationClass(label.animation))}
                             whileDrag={{ cursor: 'grabbing', scale: 1.05 }}
                         >
                             {label.text}
