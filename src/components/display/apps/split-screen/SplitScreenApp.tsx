@@ -13,6 +13,7 @@ import { TickerPreview } from '../ticker/TickerApp';
 import { ClockPreview } from '../clock/ClockApp';
 import { QRPreview } from '../qr/QRApp';
 import { ReviewsPreview } from '../reviews/ReviewsApp';
+import { DynamicMenuPreview } from '../dynamic-menu/DynamicMenuApp';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -526,9 +527,9 @@ export const SplitScreenPreview = ({ config, onChange, commerceId }: { config: P
                             }}
                         >
                             {zone.playlistObj ? (
-                                <NestedPlaylistRunner playlist={zone.playlistObj} />
+                                <NestedPlaylistRunner playlist={zone.playlistObj} commerceId={commerceId} />
                             ) : zone.mediaObj ? (
-                                <ZoneRenderer media={zone.mediaObj} />
+                                <ZoneRenderer media={zone.mediaObj} commerceId={commerceId} />
                             ) : (
                                 <div className="text-white/80 text-center flex flex-col items-center p-4 pointer-events-none select-none">
                                     <LayoutTemplate className="w-8 h-8 mb-2 opacity-50" />
@@ -586,7 +587,7 @@ export const SplitScreenPreview = ({ config, onChange, commerceId }: { config: P
     );
 };
 
-const NestedPlaylistRunner = ({ playlist }: { playlist: any }) => {
+const NestedPlaylistRunner = ({ playlist, commerceId }: { playlist: any, commerceId?: string }) => {
     const items = Array.isArray(playlist.items_json) ? playlist.items_json : (playlist.items_json?.zones?.[0]?.playlist || []);
     const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -617,10 +618,10 @@ const NestedPlaylistRunner = ({ playlist }: { playlist: any }) => {
         size_bytes: 0
     };
 
-    return <ZoneRenderer media={fakeMedia} />;
+    return <ZoneRenderer media={fakeMedia} commerceId={commerceId} />;
 };
 
-const ZoneRenderer = ({ media }: { media: DisplayMedia }) => {
+const ZoneRenderer = ({ media, commerceId }: { media: DisplayMedia, commerceId?: string }) => {
     if (media.type === 'image') {
         return (
             <div className="relative w-full h-full flex items-center justify-center pointer-events-none">
