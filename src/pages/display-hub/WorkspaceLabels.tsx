@@ -136,17 +136,31 @@ export default function WorkspaceLabels() {
     };
 
     return (
-        <div className="h-full flex flex-col lg:flex-row bg-background">
+        <div className="h-full flex flex-col bg-background">
             
-            {/* Sidebar: Group List */}
-            <div className="w-full lg:w-80 border-r border-border bg-card flex flex-col">
-                <div className="p-4 border-b border-border shrink-0">
-                    <h2 className="text-lg font-semibold flex items-center gap-2">
-                        <Database className="w-5 h-5 text-indigo-500" />
-                        Fuentes de Datos
-                    </h2>
-                    <p className="text-sm text-muted-foreground mt-1">Administra tus etiquetas y precios globalmente.</p>
+            {/* Descriptive Top Banner */}
+            <div className="p-3 md:p-6 md:px-8 pt-3 md:pt-6 pb-2 shrink-0">
+                <div className="relative overflow-hidden rounded-3xl bg-card border border-border shadow-xl flex items-center min-h-[100px] md:min-h-[140px] px-4 md:px-8 py-4 md:py-6 transition-colors duration-300">
+                    <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-background/20 to-secondary/10 pointer-events-none">
+                        <div className="absolute right-10 top-1/2 -translate-y-1/2 w-48 h-48 bg-orange-500/10 rounded-full blur-[60px] hidden sm:block"></div>
+                        <div className="absolute right-32 bottom-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-[40px] hidden sm:block"></div>
+                    </div>
+                    
+                    <div className="relative z-10 flex flex-col gap-1 w-full max-w-3xl">
+                        <h1 className="text-2xl md:text-3xl font-extrabold text-foreground flex items-center gap-2 md:gap-3">
+                            <Database className="w-6 h-6 md:w-8 md:h-8 text-indigo-500" />
+                            Fuentes de Datos
+                        </h1>
+                        <p className="text-muted-foreground font-medium max-w-xl text-sm md:text-base">
+                            Administrá tus precios y textos de forma centralizada. Vinculá estos datos a tus aplicaciones para actualizar todas tus pantallas a la vez.
+                        </p>
+                    </div>
                 </div>
+            </div>
+
+            <div className="flex-1 flex flex-col lg:flex-row overflow-hidden border-t border-border">
+                {/* Sidebar: Group List */}
+                <div className="w-full lg:w-80 border-r border-border bg-card flex flex-col">
 
                 <div className="p-4 shrink-0">
                     {isCreatingGroup ? (

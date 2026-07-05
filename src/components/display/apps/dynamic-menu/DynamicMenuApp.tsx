@@ -281,9 +281,11 @@ export const DynamicMenuPreview = ({ config, onChange, isEditing = false, commer
         
         const liveTextMap = new Map();
         savedGroups.forEach(g => {
-            g.labels.forEach((l: any) => {
-                if (l.name) liveTextMap.set(l.name.toLowerCase().trim(), l.text);
-            });
+            if (Array.isArray(g.labels)) {
+                g.labels.forEach((l: any) => {
+                    if (l.name) liveTextMap.set(l.name.toLowerCase().trim(), l.text);
+                });
+            }
         });
 
         return labels.map(label => {
