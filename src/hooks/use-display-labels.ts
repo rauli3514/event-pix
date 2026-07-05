@@ -28,6 +28,7 @@ export const useDisplayLabelGroups = (commerceId?: string) => {
             return data as DisplayLabelGroup[];
         },
         enabled: !!commerceId,
+        refetchInterval: 30000, // Refetch every 30s so the TV player gets live updates
     });
 };
 

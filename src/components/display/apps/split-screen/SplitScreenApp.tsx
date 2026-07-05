@@ -398,7 +398,7 @@ export const SplitScreenForm = ({ config, onChange, commerceId, appName, setAppN
     );
 };
 
-export const SplitScreenPreview = ({ config, onChange }: { config: Partial<SplitScreenConfig>, onChange?: (c: Partial<SplitScreenConfig>) => void }) => {
+export const SplitScreenPreview = ({ config, onChange, commerceId }: { config: Partial<SplitScreenConfig>, onChange?: (c: Partial<SplitScreenConfig>) => void, commerceId?: string }) => {
     const zones = config.zones || [];
     const orientation = config.orientation || 'landscape';
     const [hydratedZones, setHydratedZones] = useState<SplitZone[]>(zones);
@@ -658,6 +658,9 @@ const ZoneRenderer = ({ media }: { media: DisplayMedia }) => {
         }
         if (media.metadata?.appId === 'reviews') {
             return <ReviewsPreview config={media.metadata.config || {}} />;
+        }
+        if (media.metadata?.appId === 'dynamic-menu') {
+            return <DynamicMenuPreview config={media.metadata.config || {}} commerceId={commerceId} />;
         }
         return <div className="text-white w-full h-full flex items-center justify-center pointer-events-none">App: {media.metadata?.appId}</div>;
     }

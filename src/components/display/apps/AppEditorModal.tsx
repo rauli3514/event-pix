@@ -60,13 +60,13 @@ export const AppEditorModal = ({ isOpen, onClose, onBack, appId, commerceId, cur
     const renderPreview = () => {
         switch (appId) {
             case 'weather': return <WeatherPreview config={appConfig} />;
-            case 'split-screen': return <SplitScreenPreview config={appConfig} />;
+            case 'split-screen': return <SplitScreenPreview config={appConfig} commerceId={commerceId} />;
             case 'dolar': return <DolarPreview config={appConfig} />;
             case 'ticker': return <TickerPreview config={appConfig} />;
             case 'clock': return <ClockPreview config={appConfig} />;
             case 'qr': return <QRPreview config={appConfig} />;
             case 'reviews': return <ReviewsPreview config={appConfig} />;
-            case 'dynamic-menu': return <DynamicMenuPreview config={appConfig} onChange={setAppConfig} isEditing={true} />;
+            case 'dynamic-menu': return <DynamicMenuPreview config={appConfig} onChange={setAppConfig} isEditing={true} commerceId={commerceId} />;
             default: return <div className="text-slate-500 flex items-center justify-center h-full">App preview not implemented yet.</div>;
         }
     };

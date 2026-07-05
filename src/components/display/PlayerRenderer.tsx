@@ -72,7 +72,7 @@ export const PlayerRenderer = ({ item, isActive, commerceId }: PlayerRendererPro
                         appId === 'weather' ? (
                             <WeatherPreview config={metadata.config || {}} />
                         ) : appId === 'split-screen' ? (
-                            <SplitScreenPreview config={metadata.config || {}} />
+                            <SplitScreenPreview config={metadata.config || {}} commerceId={commerceId} />
                         ) : appId === 'dolar' ? (
                             <DolarPreview config={metadata.config || {}} />
                         ) : appId === 'ticker' ? (
