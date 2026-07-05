@@ -60,13 +60,27 @@ export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Part
         if (labels.length > 0) {
             if (!confirm('¿Reemplazar las etiquetas actuales por las del grupo "' + group.name + '"?')) return;
         }
-        // Give new IDs to avoid key collisions and stagger them if they are all at 50,50
-        const newLabels = group.labels.map((l: any, i: number) => ({ 
-            ...l, 
-            id: crypto.randomUUID(),
-            x: l.x === 50 && l.y === 50 ? 50 + (i * 3) : l.x,
-            y: l.x === 50 && l.y === 50 ? 50 + (i * 5) : l.y
-        }));
+        
+        // Detect if this group comes from WorkspaceLabels (all labels clustered around the center)
+        const isRawGroup = group.labels.every((l: any) => l.x >= 40 && l.x <= 60 && l.y >= 40 && l.y <= 60);
+
+        const newLabels = group.labels.map((l: any, i: number) => {
+            if (isRawGroup) {
+                // Auto-layout as a neat vertical list
+                return {
+                    ...l,
+                    id: crypto.randomUUID(),
+                    x: 20,
+                    y: Math.min(15 + (i * 10), 85) // 10% vertical spacing
+                };
+            }
+            // Preserve carefully saved positions
+            return {
+                ...l, 
+                id: crypto.randomUUID()
+            };
+        });
+        
         onChange({ ...config, labels: newLabels });
         toast.success('Grupo cargado');
     };

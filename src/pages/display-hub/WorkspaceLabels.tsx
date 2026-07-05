@@ -226,12 +226,12 @@ export default function WorkspaceLabels() {
                 {activeGroup ? (
                     <div className="flex-1 flex flex-col h-full">
                         {/* Header */}
-                        <div className="h-16 border-b border-border bg-card px-6 flex items-center justify-between shrink-0">
-                            <div>
-                                <h2 className="text-xl font-bold">{activeGroup.name}</h2>
-                                {activeGroup.description && <p className="text-sm text-muted-foreground">{activeGroup.description}</p>}
+                        <div className="border-b border-border bg-card p-4 lg:px-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between shrink-0">
+                            <div className="min-w-0">
+                                <h2 className="text-xl font-bold leading-tight truncate">{activeGroup.name}</h2>
+                                {activeGroup.description && <p className="text-sm text-muted-foreground mt-1 truncate">{activeGroup.description}</p>}
                             </div>
-                            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={addLabel}>
+                            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0" onClick={addLabel}>
                                 <Plus className="w-4 h-4 mr-2" />
                                 Agregar Etiqueta
                             </Button>
