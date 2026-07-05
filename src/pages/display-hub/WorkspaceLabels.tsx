@@ -159,16 +159,8 @@ export default function WorkspaceLabels() {
                 </div>
             </div>
 
+            {/* Main Workspace Area (Split) */}
             <div className="flex-1 flex flex-col lg:flex-row lg:overflow-hidden border-t border-border min-h-0">
-                {/* Sidebar: Group List */}
-                <div className="w-full lg:w-80 border-b lg:border-b-0 lg:border-r border-border bg-card flex flex-col shrink-0 lg:shrink h-auto lg:h-full max-h-[50vh] lg:max-h-none">
-
-                <div className="p-4 shrink-0">
-                    {isCreatingGroup ? (
-                        <div className="bg-muted p-4 rounded-lg space-y-3 border border-border">
-                            <Label>Nombre del grupo</Label>
-                            <Input value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="Ej: Precios Hamburguesas" className="bg-background" />
-                            <Label>Descripción (opcional)</Label>
                 {/* Sidebar: Groups List */}
                 <div className="w-full lg:w-80 flex-shrink-0 bg-card border-r border-border flex flex-col lg:overflow-y-auto">
                     <div className="p-4 border-b border-border shrink-0">
