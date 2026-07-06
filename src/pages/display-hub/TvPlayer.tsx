@@ -83,6 +83,11 @@ const TvPlayer = () => {
 
                 if (assignment) {
                     let compiledItems: any[] = [];
+                    
+                    // Fallback para obtener commerceId si el device no lo tiene guardado
+                    if (!device.commerce_id && assignment.campaign && assignment.campaign.commerce_id) {
+                        setDeviceCommerceId(assignment.campaign.commerce_id);
+                    }
 
                 if (assignment.campaign && assignment.campaign.items_json) {
                     const rawItems = assignment.campaign.items_json;
@@ -102,6 +107,9 @@ const TvPlayer = () => {
                         compiledItems = rawItems;
                     }
                 } else if (assignment.media) {
+                    if (!device.commerce_id && assignment.media.commerce_id) {
+                        setDeviceCommerceId(assignment.media.commerce_id);
+                    }
                     compiledItems = [{
                         id: assignment.media.id,
                         type: assignment.media.type === 'web' ? 'url' : (assignment.media.type || 'image'),
