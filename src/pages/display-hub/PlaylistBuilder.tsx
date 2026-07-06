@@ -234,22 +234,22 @@ const PlaylistBuilder = () => {
     return (
         <div className="h-screen bg-background flex flex-col font-sans overflow-hidden text-foreground transition-colors duration-300">
             {/* Topbar */}
-            <header className="h-14 bg-card/80 backdrop-blur-md border-b border-border flex items-center justify-between px-4 shrink-0 transition-colors duration-300">
-                <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground -ml-2 hover:bg-accent">
+            <header className="h-14 bg-card/80 backdrop-blur-md border-b border-border flex items-center justify-between px-2 md:px-4 shrink-0 transition-colors duration-300">
+                <div className="flex items-center gap-2 md:gap-4 min-w-0">
+                    <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground -ml-1 md:-ml-2 hover:bg-accent shrink-0 px-2 md:px-3">
                         <Link to={`/admin/display/commerce/${commerceId}/workspace/playlists`}>
-                            <ArrowLeft className="w-4 h-4 mr-2" /> Volver
+                            <ArrowLeft className="w-4 h-4 md:mr-2" /> <span className="hidden md:inline">Volver</span>
                         </Link>
                     </Button>
-                    <div className="h-4 w-px bg-border" />
-                    <h1 className="font-bold text-foreground text-lg flex items-center gap-2">
+                    <div className="h-4 w-px bg-border shrink-0" />
+                    <h1 className="font-bold text-foreground text-sm md:text-lg flex items-center gap-2 truncate">
                         {playlistRecord.name}
                     </h1>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <Button variant="secondary" className="font-semibold bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 border border-blue-500/20" onClick={() => setIsPreviewModalOpen(true)}>
-                        <MonitorPlay className="w-4 h-4 mr-2" /> Vista Previa
+                <div className="flex items-center gap-1 md:gap-3 shrink-0 ml-2">
+                    <Button variant="secondary" size="sm" className="font-semibold bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 border border-blue-500/20 px-2 md:px-3" onClick={() => setIsPreviewModalOpen(true)}>
+                        <MonitorPlay className="w-4 h-4 md:mr-2" /> <span className="hidden md:inline">Vista Previa</span>
                     </Button>
                     {/* Settings Gear Modal */}
                     <Dialog>
@@ -303,8 +303,8 @@ const PlaylistBuilder = () => {
                         </DialogContent>
                     </Dialog>
 
-                    <Button onClick={handleSave} disabled={updateCampaign.isPending} className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-md font-medium">
-                        <Save className="w-4 h-4 mr-2" /> Guardar y Enviar
+                    <Button onClick={handleSave} disabled={updateCampaign.isPending} size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-md font-medium px-2 md:px-3">
+                        <Save className="w-4 h-4 md:mr-2" /> <span className="hidden md:inline">Guardar y Enviar</span>
                     </Button>
                 </div>
             </header>
