@@ -94,7 +94,8 @@ export default function TemplateManager() {
                 onSuccess: () => setIsTempModalOpen(false)
             });
         } else {
-            createTemplate.mutate({ ...tempForm, category_id: selectedCatId } as any, {
+            const { id, ...newTemplateData } = tempForm;
+            createTemplate.mutate({ ...newTemplateData, category_id: selectedCatId } as any, {
                 onSuccess: () => setIsTempModalOpen(false)
             });
         }
