@@ -310,7 +310,7 @@ export const DynamicMenuPreview = ({ config, onChange, isEditing = false, commer
     const containerRef = useRef<HTMLDivElement>(null);
     const params = useParams<{ commerceId: string }>();
     const effectiveCommerceId = commerceId || params.commerceId || '';
-    const { data: savedGroups = [], error: labelsError } = useDisplayLabelGroups(effectiveCommerceId);
+    const { data: savedGroups = [] } = useDisplayLabelGroups(effectiveCommerceId);
 
     const displayLabels = useMemo(() => {
         if (!labels.length || !savedGroups.length) return labels;
