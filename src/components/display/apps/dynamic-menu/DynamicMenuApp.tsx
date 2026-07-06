@@ -38,6 +38,17 @@ export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Part
     
     // DB Labels Integration
     const { data: savedGroups = [] } = useDisplayLabelGroups(commerceId);
+    
+    const liveTextMap = useMemo(() => {
+        const map: Record<string, string> = {};
+        savedGroups.forEach(g => {
+            g.labels?.forEach((l: any) => {
+                if (l.name) map[l.name] = l.text;
+            });
+        });
+        return map;
+    }, [savedGroups]);
+
     const createGroup = useCreateLabelGroup();
 
     const saveGroup = async () => {
@@ -222,7 +233,18 @@ export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Part
                             </div>
                             <div className="col-span-2 space-y-2">
                                 <Label>Texto / Precio</Label>
-                                <Input value={selectedLabel.text} onChange={e => updateLabel(selectedLabel.id, { text: e.target.value })} className="bg-slate-950 border-slate-700" />
+                                {selectedLabel.name && liveTextMap[selectedLabel.name] !== undefined ? (
+                                    <div className="space-y-1">
+                                        <Input 
+                                            value={liveTextMap[selectedLabel.name]} 
+                                            disabled 
+                                            className="bg-slate-900 border-emerald-500/50 text-emerald-400 font-bold" 
+                                        />
+                                        <p className="text-xs text-emerald-500">Este precio se sincroniza en vivo desde la pestaña "Etiquetas"</p>
+                                    </div>
+                                ) : (
+                                    <Input value={selectedLabel.text} onChange={e => updateLabel(selectedLabel.id, { text: e.target.value })} className="bg-slate-950 border-slate-700" />
+                                )}
                             </div>
                             <div className="space-y-2">
                                 <Label>Tipografía</Label>
