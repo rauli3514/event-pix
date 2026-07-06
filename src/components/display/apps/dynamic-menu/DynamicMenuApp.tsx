@@ -288,7 +288,16 @@ export const DynamicMenuPreview = ({ config, onChange, isEditing = false, commer
     const containerRef = useRef<HTMLDivElement>(null);
     const params = useParams<{ commerceId: string }>();
     const effectiveCommerceId = commerceId || params.commerceId || '';
-    const { data: savedGroups = [] } = useDisplayLabelGroups(effectiveCommerceId);
+    const { data: savedGroups = [], error: labelsError } = useDisplayLabelGroups(effectiveCommerceId);
+
+    // DEBUG UI
+    const debugUI = (
+        <div className="absolute top-0 left-0 bg-black/80 text-green-400 text-xs z-[9999] p-2 max-w-full overflow-hidden">
+            <div>effectiveCommerceId: {effectiveCommerceId || 'EMPTY'}</div>
+            {labelsError && <div className="text-red-400">Error: {(labelsError as any)?.message || 'Unknown error'}</div>}
+            <div>savedGroups: {savedGroups?.length || 0}</div>
+        </div>
+    );
 
     const displayLabels = useMemo(() => {
         if (!labels.length || !savedGroups.length) return labels;
