@@ -97,10 +97,8 @@ const TvPlayer = () => {
                         // Extraer playlist de la primera zona (por simplicidad en la TV temporalmente)
                         compiledItems = rawItems.zones[0].playlist || [];
                         
-                        // Aplicar Shuffle si está activado en settings
-                        if (rawItems.settings?.shuffle) {
-                            compiledItems = [...compiledItems].sort(() => Math.random() - 0.5);
-                        }
+                        // NOTA: El shuffle no se puede aplicar aquí porque causaría que JSON.stringify cambie cada 5 segundos 
+                        // y reinicie la TV infinitamente. Para implementar shuffle, debería hacerse en el estado de rotación.
                     } 
                     // Si es V1 (Array directo)
                     else if (Array.isArray(rawItems)) {
