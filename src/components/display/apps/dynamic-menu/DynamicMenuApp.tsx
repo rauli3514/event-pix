@@ -360,6 +360,7 @@ export const DynamicMenuPreview = ({ config, onChange, isEditing = false, commer
 
     return (
         <div ref={containerRef} className="w-full h-full relative bg-black overflow-hidden">
+            {debugUI}
             {config.backgroundMediaUrl && (
                 config.backgroundMediaType === 'video' ? (
                     <video src={config.backgroundMediaUrl} className="w-full h-full object-cover" autoPlay loop muted playsInline />
