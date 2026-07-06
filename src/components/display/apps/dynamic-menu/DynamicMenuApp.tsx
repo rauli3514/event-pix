@@ -385,7 +385,7 @@ export const DynamicMenuPreview = ({ config, onChange, isEditing = false, commer
                 if (isEditing && onChange) {
                     return (
                         <motion.div
-                            key={`${label.id}-${label.x}-${label.y}`} // Force remount on drop to reset transform
+                            key={label.id}
                             drag
                             dragMomentum={false}
                             onDragEnd={(_e, info) => handleDragEnd(label.id, _e, info)}
@@ -394,21 +394,45 @@ export const DynamicMenuPreview = ({ config, onChange, isEditing = false, commer
                                 position: 'absolute',
                                 left: `${label.x}%`,
                                 top: `${label.y}%`,
-                                transform: 'translate(-50%, -50%)',
-                                color: label.color,
-                                fontFamily: label.fontFamily,
-                                fontSize: `${label.fontSize}vw`,
-                                fontWeight: label.fontWeight,
-                                fontStyle: label.fontStyle,
-                                textShadow: '0px 4px 15px rgba(0,0,0,0.9), 0px 0px 8px rgba(0,0,0,0.8)',
-                                WebkitTextStroke: '1px rgba(0,0,0,0.3)',
                                 zIndex: 10,
                                 cursor: 'grab'
                             }}
-                            className="whitespace-nowrap select-none hover:outline hover:outline-2 hover:outline-emerald-500 hover:outline-offset-4 rounded cursor-grab"
+                            className="group hover:z-50"
                             whileDrag={{ cursor: 'grabbing', scale: 1.05 }}
                         >
-                            {label.text}
+                            {/* Inner wrapper to handle centering without fighting framer-motion's drag transform */}
+                            <div 
+                                className="relative whitespace-nowrap select-none group-hover:outline group-hover:outline-2 group-hover:outline-emerald-500 group-hover:outline-offset-4 rounded"
+                                style={{
+                                    transform: 'translate(-50%, -50%)',
+                                    color: label.color,
+                                    fontFamily: label.fontFamily,
+                                    fontSize: `${label.fontSize}vw`,
+                                    fontWeight: label.fontWeight,
+                                    fontStyle: label.fontStyle,
+                                    textShadow: '0px 4px 15px rgba(0,0,0,0.9), 0px 0px 8px rgba(0,0,0,0.8)',
+                                    WebkitTextStroke: '1px rgba(0,0,0,0.3)',
+                                }}
+                            >
+                                {label.text}
+                                
+                                {/* Resize Handle */}
+                                <motion.div 
+                                    className="absolute -right-4 -bottom-4 w-6 h-6 bg-emerald-500 rounded-full opacity-0 group-hover:opacity-100 cursor-nwse-resize flex items-center justify-center shadow-lg border-2 border-white"
+                                    drag
+                                    dragMomentum={false}
+                                    onDrag={(_e, info) => {
+                                        // Calculate font size change based on x-axis drag
+                                        // 1px drag = ~0.05vw change (makes it smooth)
+                                        const deltaVw = info.delta.x * 0.05;
+                                        const newSize = Math.max(1, Math.min(50, label.fontSize + deltaVw));
+                                        
+                                        const newLabels = labels.map(l => l.id === label.id ? { ...l, fontSize: newSize } : l);
+                                        onChange({ ...config, labels: newLabels });
+                                    }}
+                                    onPointerDown={(e) => e.stopPropagation()} // Prevent triggering parent drag
+                                />
+                            </div>
                         </motion.div>
                     )
                 }

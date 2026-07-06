@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,13 @@ export const AssetSelectorModal = ({ isOpen, onClose, onSelect }: AssetSelectorM
     const [selectedAsset, setSelectedAsset] = useState<any>(null);
     const [isCreatingFolder, setIsCreatingFolder] = useState(false);
     const [newFolderName, setNewFolderName] = useState('');
+
+    useEffect(() => {
+        if (!isOpen) {
+            setSelectedAsset(null);
+            setSearch('');
+        }
+    }, [isOpen]);
 
     const uploadMedia = useUploadDisplayMedia();
     const createCampaign = useCreateCampaign();
@@ -265,8 +272,15 @@ export const AssetSelectorModal = ({ isOpen, onClose, onSelect }: AssetSelectorM
                                     </div>
                                     
                                     <div className="flex-1 w-full space-y-2 md:space-y-4">
-                                        <h3 className="font-bold text-foreground text-sm md:text-lg truncate block md:hidden" title={selectedAsset.name}>{selectedAsset.name}</h3>
-                                        <div className="grid grid-cols-2 gap-y-3 text-sm">
+                                        <div className="flex justify-between items-center md:hidden">
+                                            <h3 className="font-bold text-foreground text-sm truncate" title={selectedAsset.name}>{selectedAsset.name}</h3>
+                                            <Button variant="ghost" size="icon" className="h-6 w-6 -mr-2" onClick={(e) => { e.stopPropagation(); setSelectedAsset(null); }}>
+                                                <X className="w-4 h-4" />
+                                            </Button>
+                                        </div>
+                                        <h3 className="font-bold text-foreground text-lg truncate hidden md:block" title={selectedAsset.name}>{selectedAsset.name}</h3>
+                                        
+                                        <div className="grid grid-cols-2 gap-y-3 text-sm mt-2 md:mt-0">
                                             <div className="text-muted-foreground">Tipo</div>
                                             <div className="font-medium text-foreground capitalize">{selectedAsset.type === 'campaign' ? 'Lista de Rep.' : selectedAsset.type}</div>
                                             
