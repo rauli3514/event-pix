@@ -146,7 +146,7 @@ const PlaylistBuilder = () => {
         const defaultDuration = campaignV2.settings.defaultDuration || 15;
         const defaultTransition = campaignV2.settings.transition || 'fade';
 
-        const newItem: UniversalElement = {
+        const newItem = {
             id: crypto.randomUUID(),
             type: media.type,
             url: media.url,
@@ -155,7 +155,8 @@ const PlaylistBuilder = () => {
             duration: defaultDuration,
             transition: defaultTransition,
             fitMode: 'contain',
-        };
+            source_id: media.id
+        } as any;
 
         const updatedZones = [...campaignV2.zones];
         if (!updatedZones[0]) return;

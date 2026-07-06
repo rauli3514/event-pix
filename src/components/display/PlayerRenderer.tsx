@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useDisplayMedia } from '@/hooks/use-display-media';
 import { WeatherPreview } from './apps/weather/WeatherApp';
 import { SplitScreenPreview } from './apps/split-screen/SplitScreenApp';
 import { DolarPreview } from './apps/dolar/DolarApp';
@@ -15,6 +16,9 @@ interface PlayerRendererProps {
 }
 
 export const PlayerRenderer = ({ item, isActive, commerceId }: PlayerRendererProps) => {
+    // Attempt to fetch live media to keep apps synchronized with recent edits without reloading the playlist
+    const { data: mediaList = [] } = useDisplayMedia(commerceId || '');
+
     const iframeRef = useRef<HTMLIFrameElement>(null);
 
     // Si es un iframe, forzar una recarga suave cuando se vuelve activo (opcional, depende de si queremos resetear el estado de la web externa)
@@ -63,7 +67,22 @@ export const PlayerRenderer = ({ item, isActive, commerceId }: PlayerRendererPro
         case 'app':
         case 'widget':
         case 'layout':
-            const metadata = item.metadata || {};
+            let metadata = item.metadata || {};
+            
+            // Sync with live app config if available (fixes playlist caching old app configs)
+            if (mediaList.length > 0) {
+                let liveMedia = null;
+                if (item.source_id) {
+                    liveMedia = mediaList.find((m: any) => m.id === item.source_id);
+                } else if (item.content) {
+                    // Fallback for old items that didn't save source_id
+                    liveMedia = mediaList.find((m: any) => m.type === 'app' && m.name === item.content);
+                }
+                if (liveMedia && liveMedia.metadata) {
+                    metadata = liveMedia.metadata;
+                }
+            }
+            
             const appId = metadata.appId || (item.url?.startsWith('app://') ? item.url.replace('app://', '') : null);
             
             return (
