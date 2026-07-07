@@ -136,6 +136,9 @@ export const GlobalScheduleModal = ({ isOpen, onClose, commerceId, onScheduled }
                 }
             }
         } else {
+            // For recurring schedules, we use a dummy scheduledAt to satisfy the database NOT NULL constraint
+            finalScheduledAt = new Date().toISOString();
+            
             if (daysOfWeek.length === 0) {
                 toast.error('Debe seleccionar al menos un día de la semana');
                 return;
