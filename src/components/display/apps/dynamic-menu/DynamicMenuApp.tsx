@@ -335,30 +335,6 @@ export const DynamicMenuPreview = ({ config, onChange, isEditing = false, commer
         });
     }, [labels, savedGroups]);
     
-    // Editor Preview Drag Handling
-    const handleDragEnd = (id: string, _event: any, info: any) => {
-        if (!containerRef.current || !onChange) return;
-        
-        const label = labels.find(l => l.id === id);
-        if (!label) return;
-
-        const rect = containerRef.current.getBoundingClientRect();
-        
-        // Convert original percentage to pixels
-        const startXPx = (label.x / 100) * rect.width;
-        const startYPx = (label.y / 100) * rect.height;
-        
-        // Add the drag offset (how many pixels the user moved it)
-        const newXPx = startXPx + info.offset.x;
-        const newYPx = startYPx + info.offset.y;
-        
-        const xPct = Math.max(0, Math.min(100, (newXPx / rect.width) * 100));
-        const yPct = Math.max(0, Math.min(100, (newYPx / rect.height) * 100));
-
-        const newLabels = labels.map(l => l.id === id ? { ...l, x: xPct, y: yPct } : l);
-        onChange({ ...config, labels: newLabels });
-    };
-    
     // Convert animations to CSS classes or motion props if needed
     // For TvPlayer we can just use tailwind animate classes
     const getAnimationClass = (anim: string) => {
