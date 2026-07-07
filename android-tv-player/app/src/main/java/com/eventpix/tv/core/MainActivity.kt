@@ -125,6 +125,9 @@ class MainActivity : AppCompatActivity() {
             Log.e("MainActivity", "CRITICAL UNCAUGHT EXCEPTION", exception)
             
             val prefs = getSharedPreferences("TvSettings", Context.MODE_PRIVATE)
+            val currentCrashCount = prefs.getInt("crashCount", 0)
+            prefs.edit().putInt("crashCount", currentCrashCount + 1).apply()
+            
             if (prefs.getBoolean("watchdogEnabled", true)) {
                 Log.e("MainActivity", "Watchdog enabled. Scheduling emergency restart...")
                 val intent = Intent(this@MainActivity, AppRestartReceiver::class.java).apply {

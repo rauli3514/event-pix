@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Monitor, Save, HardDrive, Clock, Smartphone, Activity, Cpu, PlaySquare, Trash2 } from 'lucide-react';
+import { ArrowLeft, Monitor, Save, HardDrive, Clock, Smartphone, Activity, Cpu, PlaySquare, Trash2, Server, AlertTriangle, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -121,6 +121,17 @@ const DisplayDeviceDetail = () => {
             payload: { action: 'clear_cache' },
         });
         toast.success("Comando de limpieza de caché enviado a la pantalla");
+    };
+
+    const handleResetTelemetry = async () => {
+        if (!deviceData?.device_id) return;
+        const channel = supabase.channel(`device:${deviceData.device_id}`);
+        await channel.send({
+            type: 'broadcast',
+            event: 'command',
+            payload: { action: 'reset_telemetry' },
+        });
+        toast.success("Comando de reseteo de telemetría enviado a la pantalla");
     };
 
     const handleSaveInfo = () => {
@@ -398,6 +409,9 @@ const DisplayDeviceDetail = () => {
                                             <Button onClick={handleClearCache} variant="outline" className="w-full justify-start border-slate-700 bg-slate-950 text-slate-300 hover:text-white hover:bg-slate-800">
                                                 <Trash2 className="w-4 h-4 mr-2 text-rose-400" /> Limpiar Caché Remotamente
                                             </Button>
+                                            <Button onClick={handleResetTelemetry} variant="outline" className="w-full justify-start border-slate-700 bg-slate-950 text-slate-300 hover:text-white hover:bg-slate-800">
+                                                <RotateCcw className="w-4 h-4 mr-2 text-amber-400" /> Resetear Contadores (Crash/Reinicio)
+                                            </Button>
                                         </div>
                                         <p className="text-xs text-slate-500 mt-3">
                                             Las acciones remotas se ejecutan instantáneamente si la pantalla está online.
@@ -450,6 +464,63 @@ const DisplayDeviceDetail = () => {
                                 </div>
                             </div>
                         </div>
+
+                        {/* Telemetry Status */}
+                        {deviceData.telemetry && (
+                            <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl p-6">
+                                <h2 className="text-lg font-bold text-white mb-4">Rendimiento y Diagnóstico</h2>
+                                
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <RotateCcw className="w-4 h-4 text-slate-400" />
+                                                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Reinicios Totales</p>
+                                            </div>
+                                            <p className="text-2xl font-bold text-white">{deviceData.telemetry.boot_count || 0}</p>
+                                        </div>
+                                        
+                                        <div className="bg-slate-950 p-4 rounded-xl border border-rose-900/50">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <AlertTriangle className={`w-4 h-4 ${(deviceData.telemetry.crash_count || 0) > 0 ? 'text-rose-500' : 'text-slate-400'}`} />
+                                                <p className={`text-xs font-medium uppercase tracking-wider ${(deviceData.telemetry.crash_count || 0) > 0 ? 'text-rose-400' : 'text-slate-400'}`}>Fallos (Crashes)</p>
+                                            </div>
+                                            <p className={`text-2xl font-bold ${(deviceData.telemetry.crash_count || 0) > 0 ? 'text-rose-400' : 'text-white'}`}>{deviceData.telemetry.crash_count || 0}</p>
+                                        </div>
+                                    </div>
+
+                                    {deviceData.telemetry.memory && (
+                                        <div className="flex items-start gap-3 pt-2">
+                                            <Cpu className="w-5 h-5 text-indigo-400 mt-0.5" />
+                                            <div className="flex-1">
+                                                <div className="flex justify-between items-center mb-1">
+                                                    <p className="text-sm font-medium text-slate-300">Memoria RAM (Usada / Libre)</p>
+                                                    <p className="text-xs text-slate-400">{deviceData.telemetry.memory.used_mb}MB / {deviceData.telemetry.memory.free_mb}MB</p>
+                                                </div>
+                                                <div className="w-full bg-slate-800 rounded-full h-1.5">
+                                                    <div className="bg-indigo-500 h-1.5 rounded-full" style={{ width: `${Math.min(100, Math.max(0, (deviceData.telemetry.memory.used_mb / deviceData.telemetry.memory.max_mb) * 100))}%` }}></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {deviceData.telemetry.storage && (
+                                        <div className="flex items-start gap-3 pt-2">
+                                            <HardDrive className="w-5 h-5 text-emerald-400 mt-0.5" />
+                                            <div className="flex-1">
+                                                <div className="flex justify-between items-center mb-1">
+                                                    <p className="text-sm font-medium text-slate-300">Almacenamiento Libre</p>
+                                                    <p className="text-xs text-slate-400">{deviceData.telemetry.storage.free_mb}MB / {deviceData.telemetry.storage.total_mb}MB</p>
+                                                </div>
+                                                <div className="w-full bg-slate-800 rounded-full h-1.5">
+                                                    <div className="bg-emerald-500 h-1.5 rounded-full" style={{ width: `${Math.min(100, Math.max(0, ((deviceData.telemetry.storage.total_mb - deviceData.telemetry.storage.free_mb) / deviceData.telemetry.storage.total_mb) * 100))}%` }}></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
                     </div>
                 </div>

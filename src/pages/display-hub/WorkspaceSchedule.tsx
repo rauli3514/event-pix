@@ -32,7 +32,12 @@ const formatLabel = (f: string) => {
     return map[f] || f;
 };
 
-const StatusBadge = ({ status }: { status: string }) => {
+const StatusBadge = ({ status, isRecurring }: { status: string, isRecurring?: boolean }) => {
+    if (isRecurring) return (
+        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
+            <RefreshCw className="w-3 h-3" /> Recurrente
+        </span>
+    );
     if (status === 'published') return (
         <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
             <CheckCircle2 className="w-3 h-3" /> Publicado
@@ -202,9 +207,16 @@ const ScheduleCard = ({ schedule: s, onDelete }: { schedule: any; onDelete: (id:
                     <span className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Monitor className="w-3.5 h-3.5" /> {s.device_name}
                     </span>
-                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Calendar className="w-3.5 h-3.5" /> {fmtDate(s.scheduled_at)} — {fmtTime(s.scheduled_at)}
-                    </span>
+                    {s.is_recurring ? (
+                        <span className="flex items-center gap-1 text-xs text-indigo-400 font-medium">
+                            <Clock className="w-3.5 h-3.5" /> 
+                            {['D', 'L', 'M', 'X', 'J', 'V', 'S'].filter((_, i) => (s.days_of_week || []).includes(i)).join(', ')} — {s.start_time} a {s.end_time}
+                        </span>
+                    ) : (
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Calendar className="w-3.5 h-3.5" /> {fmtDate(s.scheduled_at)} — {fmtTime(s.scheduled_at)}
+                        </span>
+                    )}
                     {s.expires_at && (
                         <span className="flex items-center gap-1 text-xs text-destructive/80">
                             <AlertCircle className="w-3.5 h-3.5" /> Vence: {fmtDate(s.expires_at)} {fmtTime(s.expires_at)}
@@ -215,7 +227,7 @@ const ScheduleCard = ({ schedule: s, onDelete }: { schedule: any; onDelete: (id:
             </div>
 
             {/* Status */}
-            <StatusBadge status={s.status} />
+            <StatusBadge status={s.status} isRecurring={s.is_recurring} />
 
             {/* Actions */}
             <Button

@@ -23,6 +23,7 @@ export interface DisplayDevice {
     device_model: string | null;
     app_version: string | null;
     android_version: string | null;
+    telemetry: any | null;
     scale: string;
     orientation: string;
     pairing_status: 'pending' | 'linked';
@@ -140,6 +141,31 @@ export interface DisplayCampaignV2 {
 export type CampaignDataPayload = CampaignItem[] | DisplayCampaignV2;
 
 // ---------------------------------------------------------
+
+export interface DisplaySchedule {
+    id: string;
+    commerce_id: string;
+    device_id: string;
+    media_id: string | null;
+    campaign_id: string | null;
+    scheduled_at: string | null;
+    expires_at: string | null;
+    after_expiry: string | null;
+    format: string;
+    content_name: string;
+    device_name: string;
+    status: string;
+    is_recurring: boolean;
+    days_of_week: number[];
+    start_time: string | null;
+    end_time: string | null;
+    created_at: string;
+    
+    // Relations
+    device?: any;
+    media?: DisplayMedia;
+    campaign?: DisplayCampaign;
+}
 
 export interface DisplayCampaign {
     id: string;

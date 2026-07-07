@@ -76,6 +76,12 @@ export const GlobalScheduleModal = ({ isOpen, onClose, commerceId, onScheduled }
     const [expiryTimeStr, setExpiryTimeStr] = useState('09:00 AM');
     const [afterExpiry, setAfterExpiry] = useState('last_played');
     
+    // Recurring State
+    const [isRecurring, setIsRecurring] = useState(false);
+    const [daysOfWeek, setDaysOfWeek] = useState<number[]>([]);
+    const [startTimeStr, setStartTimeStr] = useState('11:00 AM');
+    const [endTimeStr, setEndTimeStr] = useState('02:00 PM');
+    
     const [selectedAsset, setSelectedAsset] = useState<any | null>(null);
     const [selectedDeviceIds, setSelectedDeviceIds] = useState<string[]>([]);
     
@@ -93,6 +99,10 @@ export const GlobalScheduleModal = ({ isOpen, onClose, commerceId, onScheduled }
             setHasExpiry(false);
             setExpiryDateStr('');
             setExpiryTimeStr('09:00 AM');
+            setIsRecurring(false);
+            setDaysOfWeek([]);
+            setStartTimeStr('11:00 AM');
+            setEndTimeStr('02:00 PM');
             setShowConfirmation(false);
             setSelectedAsset(null);
             setSelectedDeviceIds([]);
@@ -109,17 +119,29 @@ export const GlobalScheduleModal = ({ isOpen, onClose, commerceId, onScheduled }
             return;
         }
 
-        const scheduledAt = toISO(dateStr, timeStr);
-        if (!scheduledAt) {
-            toast.error('Fecha u hora de inicio inválida. Usa el formato dd/mm/aaaa - HH:MM AM/PM');
-            return;
-        }
+        let finalScheduledAt: string | null = null;
+        let finalExpiresAt: string | null = null;
 
-        let expiresAt: string | null = null;
-        if (hasExpiry && expiryDateStr && expiryTimeStr) {
-            expiresAt = toISO(expiryDateStr, expiryTimeStr);
-            if (!expiresAt) {
-                toast.error('Fecha u hora de caducidad inválida');
+        if (!isRecurring) {
+            finalScheduledAt = toISO(dateStr, timeStr);
+            if (!finalScheduledAt) {
+                toast.error('Fecha u hora de inicio inválida. Usa el formato dd/mm/aaaa - HH:MM AM/PM');
+                return;
+            }
+            if (hasExpiry && expiryDateStr && expiryTimeStr) {
+                finalExpiresAt = toISO(expiryDateStr, expiryTimeStr);
+                if (!finalExpiresAt) {
+                    toast.error('Fecha u hora de caducidad inválida');
+                    return;
+                }
+            }
+        } else {
+            if (daysOfWeek.length === 0) {
+                toast.error('Debe seleccionar al menos un día de la semana');
+                return;
+            }
+            if (!parseTime(startTimeStr) || !parseTime(endTimeStr)) {
+                toast.error('Horario de inicio o fin inválido');
                 return;
             }
         }
@@ -133,12 +155,16 @@ export const GlobalScheduleModal = ({ isOpen, onClose, commerceId, onScheduled }
                     deviceId,
                     mediaId: selectedAsset.type !== 'campaign' ? selectedAsset.id : null,
                     campaignId: selectedAsset.type === 'campaign' ? selectedAsset.id : null,
-                    scheduledAt,
-                    expiresAt,
-                    afterExpiry: hasExpiry ? afterExpiry : null,
+                    scheduledAt: finalScheduledAt,
+                    expiresAt: finalExpiresAt,
+                    afterExpiry: (!isRecurring && hasExpiry) ? afterExpiry : null,
                     format,
                     contentName: selectedAsset.name,
                     deviceName: device?.name || 'Pantalla',
+                    isRecurring,
+                    daysOfWeek,
+                    startTime: isRecurring ? startTimeStr : null,
+                    endTime: isRecurring ? endTimeStr : null,
                 });
             }));
 
@@ -304,32 +330,85 @@ export const GlobalScheduleModal = ({ isOpen, onClose, commerceId, onScheduled }
                             3. Configuración de Tiempos
                         </Label>
 
-                        {/* Fecha de Publicación */}
-                        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-                            <Label className="text-slate-700 font-medium mb-3 block">Publicar en fecha y hora</Label>
-                            <div className="flex gap-2">
-                                <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 flex-1 focus-within:ring-2 focus-within:ring-indigo-300 focus-within:bg-white transition-all">
-                                    <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
-                                    <input
-                                        type="text"
-                                        placeholder="dd/mm/aaaa"
-                                        value={dateStr}
-                                        onChange={(e) => setDateStr(e.target.value)}
-                                        className="outline-none bg-transparent text-sm text-slate-800 w-full"
-                                    />
+                        {/* Tipo de Programación */}
+                        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <Label className="text-slate-700 font-medium cursor-pointer" onClick={() => setIsRecurring(!isRecurring)}>
+                                        Programación Recurrente
+                                    </Label>
+                                    <p className="text-xs text-slate-500">Repetir contenido ciertos días y horas</p>
                                 </div>
-                                <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 flex-1 focus-within:ring-2 focus-within:ring-indigo-300 focus-within:bg-white transition-all">
-                                    <Clock className="w-4 h-4 text-slate-400 shrink-0" />
-                                    <input
-                                        type="text"
-                                        placeholder="00:00 AM"
-                                        value={timeStr}
-                                        onChange={(e) => setTimeStr(e.target.value)}
-                                        className="outline-none bg-transparent text-sm text-slate-800 w-full"
-                                    />
-                                </div>
+                                <Switch
+                                    checked={isRecurring}
+                                    onCheckedChange={setIsRecurring}
+                                    className="data-[state=checked]:bg-indigo-500"
+                                />
                             </div>
-                            <p className="text-xs text-slate-400 mt-2">Formato: dd/mm/aaaa — HH:MM AM/PM</p>
+
+                            {isRecurring ? (
+                                <div className="pt-4 border-t border-slate-100 space-y-4 animate-in fade-in slide-in-from-top-2">
+                                    <div>
+                                        <Label className="text-slate-700 text-sm mb-2 block">Días de la semana</Label>
+                                        <div className="flex gap-2">
+                                            {['D', 'L', 'M', 'X', 'J', 'V', 'S'].map((day, idx) => (
+                                                <button
+                                                    key={idx}
+                                                    onClick={() => {
+                                                        setDaysOfWeek(prev => prev.includes(idx) ? prev.filter(d => d !== idx) : [...prev, idx]);
+                                                    }}
+                                                    className={`w-8 h-8 rounded-full text-xs font-bold transition-colors ${daysOfWeek.includes(idx) ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                                                >
+                                                    {day}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <div className="flex-1">
+                                            <Label className="text-slate-700 text-sm mb-1 block">Hora Inicio</Label>
+                                            <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 focus-within:ring-2 focus-within:ring-indigo-300 focus-within:bg-white transition-all">
+                                                <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+                                                <input type="text" placeholder="11:00 AM" value={startTimeStr} onChange={(e) => setStartTimeStr(e.target.value)} className="outline-none bg-transparent text-sm text-slate-800 w-full" />
+                                            </div>
+                                        </div>
+                                        <div className="flex-1">
+                                            <Label className="text-slate-700 text-sm mb-1 block">Hora Fin</Label>
+                                            <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 focus-within:ring-2 focus-within:ring-indigo-300 focus-within:bg-white transition-all">
+                                                <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+                                                <input type="text" placeholder="02:00 PM" value={endTimeStr} onChange={(e) => setEndTimeStr(e.target.value)} className="outline-none bg-transparent text-sm text-slate-800 w-full" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="pt-4 border-t border-slate-100 animate-in fade-in slide-in-from-top-2">
+                                    <Label className="text-slate-700 font-medium mb-3 block">Publicar en fecha y hora (1 sola vez)</Label>
+                                    <div className="flex gap-2">
+                                        <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 flex-1 focus-within:ring-2 focus-within:ring-indigo-300 focus-within:bg-white transition-all">
+                                            <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
+                                            <input
+                                                type="text"
+                                                placeholder="dd/mm/aaaa"
+                                                value={dateStr}
+                                                onChange={(e) => setDateStr(e.target.value)}
+                                                className="outline-none bg-transparent text-sm text-slate-800 w-full"
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 flex-1 focus-within:ring-2 focus-within:ring-indigo-300 focus-within:bg-white transition-all">
+                                            <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+                                            <input
+                                                type="text"
+                                                placeholder="00:00 AM"
+                                                value={timeStr}
+                                                onChange={(e) => setTimeStr(e.target.value)}
+                                                className="outline-none bg-transparent text-sm text-slate-800 w-full"
+                                            />
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-slate-400 mt-2">Formato: dd/mm/aaaa — HH:MM AM/PM</p>
+                                </div>
+                            )}
                         </div>
 
                         {/* Caducidad */}

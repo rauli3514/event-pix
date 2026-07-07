@@ -131,4 +131,57 @@ class TvBridge(private val activity: MainActivity) {
     fun getRebootMinute(): Int {
         return prefs.getInt("rebootMinute", 0)
     }
+
+    @JavascriptInterface
+    fun getTelemetry(): String {
+        val bootCount = prefs.getInt("bootCount", 0)
+        val crashCount = prefs.getInt("crashCount", 0)
+        
+        val runtime = Runtime.getRuntime()
+        val maxMemory = runtime.maxMemory()
+        val totalMemory = runtime.totalMemory()
+        val freeMemory = runtime.freeMemory()
+        val usedMemory = totalMemory - freeMemory
+        
+        val stat = android.os.StatFs(android.os.Environment.getDataDirectory().path)
+        val bytesAvailable = stat.blockSizeLong * stat.availableBlocksLong
+        val bytesTotal = stat.blockSizeLong * stat.blockCountLong
+        
+        val appVersionName = try {
+            activity.packageManager.getPackageInfo(activity.packageName, 0).versionName
+        } catch (e: Exception) {
+            "Unknown"
+        }
+        
+        val androidVersion = android.os.Build.VERSION.RELEASE
+        val sdkVersion = android.os.Build.VERSION.SDK_INT
+        
+        val json = """
+        {
+            "boot_count": $bootCount,
+            "crash_count": $crashCount,
+            "memory": {
+                "max_mb": ${maxMemory / 1048576},
+                "used_mb": ${usedMemory / 1048576},
+                "free_mb": ${freeMemory / 1048576}
+            },
+            "storage": {
+                "total_mb": ${bytesTotal / 1048576},
+                "free_mb": ${bytesAvailable / 1048576}
+            },
+            "app_version": "$appVersionName",
+            "android_version": "$androidVersion (SDK $sdkVersion)"
+        }
+        """.trimIndent()
+        
+        return json
+    }
+    
+    @JavascriptInterface
+    fun resetTelemetry() {
+        prefs.edit()
+            .putInt("bootCount", 0)
+            .putInt("crashCount", 0)
+            .apply()
+    }
 }

@@ -16,6 +16,9 @@ class BootReceiver : BroadcastReceiver() {
             val prefs = context.getSharedPreferences("TvSettings", Context.MODE_PRIVATE)
             val autoBoot = prefs.getBoolean("autoBoot", true)
             
+            val currentBootCount = prefs.getInt("bootCount", 0)
+            prefs.edit().putInt("bootCount", currentBootCount + 1).apply()
+            
             if (autoBoot) {
                 Log.d("BootReceiver", "autoBoot is enabled. Starting EventPix TV...")
                 val launchIntent = Intent(context, MainActivity::class.java).apply {

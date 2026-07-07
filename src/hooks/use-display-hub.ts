@@ -497,12 +497,16 @@ export const useCreateSchedule = () => {
             deviceId: string;
             mediaId?: string | null;
             campaignId?: string | null;
-            scheduledAt: string;   // ISO string
+            scheduledAt: string | null;   // ISO string (can be null if recurring)
             expiresAt?: string | null;
             afterExpiry?: string | null;
             format?: string | null;
             contentName: string;
             deviceName: string;
+            isRecurring?: boolean;
+            daysOfWeek?: number[];
+            startTime?: string | null;
+            endTime?: string | null;
         }) => {
             const { data, error } = await supabase
                 .from("display_schedules")
@@ -518,6 +522,10 @@ export const useCreateSchedule = () => {
                     content_name: payload.contentName,
                     device_name: payload.deviceName,
                     status: 'pending',
+                    is_recurring: payload.isRecurring || false,
+                    days_of_week: payload.daysOfWeek || [],
+                    start_time: payload.startTime || null,
+                    end_time: payload.endTime || null,
                 })
                 .select()
                 .single();

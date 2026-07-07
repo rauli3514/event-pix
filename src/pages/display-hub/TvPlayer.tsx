@@ -63,10 +63,63 @@ const TvPlayer = () => {
                 .or(orQuery)
                 .order('created_at', { ascending: false });
 
-            if (assignments && assignments.length > 0) {
-                const now = new Date();
-                
-                // 1. Buscar una programación vigente (start_time y end_time definidos y dentro del rango)
+            // 3. Buscar programaciones avanzadas (Schedules)
+            const { data: schedules } = await supabase
+                .from('display_schedules')
+                .select(`
+                  *,
+                  campaign:display_campaigns(*),
+                  media:display_media(*)
+                `)
+                .eq('device_id', device.id)
+                .order('created_at', { ascending: false });
+
+            const now = new Date();
+            const currentDay = now.getDay();
+            const currentTimeStr = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+
+            let activeContent: any = null;
+
+            // Primero buscar si hay un schedule activo (tiene mayor prioridad)
+            if (schedules && schedules.length > 0) {
+                activeContent = schedules.find(s => {
+                    if (s.status === 'expired') return false;
+                    if (s.expires_at && new Date(s.expires_at) < now) return false;
+                    
+                    if (s.is_recurring) {
+                        const days = s.days_of_week || [];
+                        if (days.length > 0 && !days.includes(currentDay)) return false;
+                        
+                        if (s.start_time && s.end_time) {
+                            // Convert both to HH:MM format if they are like 11:00 AM
+                            // Wait, startTime and endTime are stored in whatever format the input has, e.g., "11:00 AM".
+                            // I need a quick parser for 12h to 24h
+                            const parse12hTo24h = (timeStr: string) => {
+                                const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+                                if (!match) return timeStr; // might already be 24h
+                                let [_, hStr, m, ampm] = match;
+                                let h = parseInt(hStr, 10);
+                                if (ampm.toUpperCase() === 'PM' && h < 12) h += 12;
+                                if (ampm.toUpperCase() === 'AM' && h === 12) h = 0;
+                                return `${h.toString().padStart(2, '0')}:${m}`;
+                            };
+                            
+                            const start24 = parse12hTo24h(s.start_time);
+                            const end24 = parse12hTo24h(s.end_time);
+                            
+                            return currentTimeStr >= start24 && currentTimeStr <= end24;
+                        }
+                        return true;
+                    } else {
+                        if (!s.scheduled_at) return false;
+                        return now >= new Date(s.scheduled_at);
+                    }
+                });
+            }
+
+            // Si no hay schedule activo, buscar la asignación por defecto (assignments)
+            if (!activeContent && assignments && assignments.length > 0) {
+                // Retrocompatibilidad: buscar una vigencia en assignments
                 const scheduledAssignment = assignments.find(a => {
                     if (a.start_time && a.end_time) {
                         const start = new Date(a.start_time);
@@ -75,22 +128,20 @@ const TvPlayer = () => {
                     }
                     return false;
                 });
-
-                // 2. Si no hay programación vigente, buscar la asignación por defecto (sin start_time)
                 const defaultAssignment = assignments.find(a => !a.start_time);
+                activeContent = scheduledAssignment || defaultAssignment;
+            }
 
-                const assignment = scheduledAssignment || defaultAssignment;
-
-                if (assignment) {
-                    let compiledItems: any[] = [];
+            if (activeContent) {
+                let compiledItems: any[] = [];
                     
                     // Fallback para obtener commerceId si el device no lo tiene guardado
-                    if (!device.commerce_id && assignment.campaign && assignment.campaign.commerce_id) {
-                        setDeviceCommerceId(assignment.campaign.commerce_id);
+                    if (!device.commerce_id && activeContent.campaign && activeContent.campaign.commerce_id) {
+                        setDeviceCommerceId(activeContent.campaign.commerce_id);
                     }
 
-                if (assignment.campaign && assignment.campaign.items_json) {
-                    const rawItems = assignment.campaign.items_json;
+                if (activeContent.campaign && activeContent.campaign.items_json) {
+                    const rawItems = activeContent.campaign.items_json;
                     
                     // Si es V2 (Objeto con version 2.0 y zones)
                     if (rawItems.version === '2.0' && Array.isArray(rawItems.zones) && rawItems.zones.length > 0) {
@@ -104,17 +155,17 @@ const TvPlayer = () => {
                     else if (Array.isArray(rawItems)) {
                         compiledItems = rawItems;
                     }
-                } else if (assignment.media) {
-                    if (!device.commerce_id && assignment.media.commerce_id) {
-                        setDeviceCommerceId(assignment.media.commerce_id);
+                } else if (activeContent.media) {
+                    if (!device.commerce_id && activeContent.media.commerce_id) {
+                        setDeviceCommerceId(activeContent.media.commerce_id);
                     }
                     compiledItems = [{
-                        id: assignment.media.id,
-                        type: assignment.media.type === 'web' ? 'url' : (assignment.media.type || 'image'),
-                        url: assignment.media.url,
-                        metadata: assignment.media.metadata,
+                        id: activeContent.media.id,
+                        type: activeContent.media.type === 'web' ? 'url' : (activeContent.media.type || 'image'),
+                        url: activeContent.media.url,
+                        metadata: activeContent.media.metadata,
                         duration: 0, // 0 = infinito / loop
-                        title: assignment.media.name
+                        title: activeContent.media.name
                     }];
                 }
 
@@ -133,7 +184,6 @@ const TvPlayer = () => {
                         setStatus('playing');
                     }
                     return;
-                }
                 }
             }
 
@@ -177,10 +227,35 @@ const TvPlayer = () => {
                 .single();
                 
             if (device) {
-                // Actualizamos el last_seen del device (o insertamos en heartbeats)
+                let telemetry = null;
+                let appVersion = null;
+                let androidVersion = null;
+                
+                // Intentar leer telemetría del bridge nativo de Android
+                if ((window as any).TvBridge && typeof (window as any).TvBridge.getTelemetry === 'function') {
+                    try {
+                        const telemetryJson = (window as any).TvBridge.getTelemetry();
+                        telemetry = JSON.parse(telemetryJson);
+                        if (telemetry.app_version) appVersion = telemetry.app_version;
+                        if (telemetry.android_version) androidVersion = telemetry.android_version;
+                    } catch (e) {
+                        console.error('Error parsing telemetry from TvBridge', e);
+                    }
+                }
+
+                // Prepare update payload
+                const updates: any = { 
+                    last_seen: new Date().toISOString() 
+                };
+                
+                if (telemetry) updates.telemetry = telemetry;
+                if (appVersion) updates.app_version = appVersion;
+                if (androidVersion) updates.android_version = androidVersion;
+
+                // Actualizamos el device
                 await supabase
                     .from('display_devices')
-                    .update({ last_seen: new Date().toISOString() })
+                    .update(updates)
                     .eq('id', device.id);
             }
         } catch (error) {
@@ -223,12 +298,30 @@ const TvPlayer = () => {
         };
         window.addEventListener('local_rotation_changed', handleRotationChange);
 
+        // Escuchar comandos remotos
+        const commandChannel = supabase.channel(`device:${deviceCode}`)
+            .on('broadcast', { event: 'command' }, (payload) => {
+                if (payload.payload?.action === 'reload') {
+                    window.location.reload();
+                } else if (payload.payload?.action === 'clear_cache') {
+                    localStorage.removeItem(`tv_cache_${deviceCode}`);
+                    window.location.reload();
+                } else if (payload.payload?.action === 'reset_telemetry') {
+                    if ((window as any).TvBridge && typeof (window as any).TvBridge.resetTelemetry === 'function') {
+                        (window as any).TvBridge.resetTelemetry();
+                        sendHeartbeat(); // Force send heartbeat to update Supabase immediately
+                    }
+                }
+            })
+            .subscribe();
+
         return () => {
             if (rotationTimeoutRef.current) clearTimeout(rotationTimeoutRef.current);
             if (heartbeatIntervalRef.current) clearTimeout(heartbeatIntervalRef.current);
             if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
             window.removeEventListener('online', handleOnline);
             window.removeEventListener('local_rotation_changed', handleRotationChange);
+            supabase.removeChannel(commandChannel);
         };
     }, [deviceCode, status]);
 
