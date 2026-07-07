@@ -396,10 +396,50 @@ export const DynamicMenuPreview = ({ config, onChange, isEditing = false, commer
                         return (
                             <motion.div
                                 key={label.id}
-                                drag
-                                dragMomentum={false}
-                                onDragEnd={(_e, info) => handleDragEnd(label.id, _e, info)}
-                                dragConstraints={containerRef}
+                                onPointerDown={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    
+                                    if (!containerRef.current) return;
+                                    const rect = containerRef.current.getBoundingClientRect();
+                                    
+                                    const startX = e.clientX;
+                                    const startY = e.clientY;
+                                    const startLabelX = label.x;
+                                    const startLabelY = label.y;
+                                    
+                                    const handlePointerMove = (moveEvent: PointerEvent) => {
+                                        const deltaX = moveEvent.clientX - startX;
+                                        const deltaY = moveEvent.clientY - startY;
+                                        
+                                        const deltaXPct = (deltaX / rect.width) * 100;
+                                        const deltaYPct = (deltaY / rect.height) * 100;
+                                        
+                                        const newXPct = Math.max(0, Math.min(100, startLabelX + deltaXPct));
+                                        const newYPct = Math.max(0, Math.min(100, startLabelY + deltaYPct));
+                                        
+                                        // We use the functional state update equivalent by passing the new labels
+                                        // Wait, onChange doesn't provide functional updates. We'll use the latest labels from the closure!
+                                        // BUT closure holds old labels! 
+                                        // To fix closure staleness, we calculate relative to startLabelX which is captured ONCE.
+                                        
+                                        // This is perfectly safe because startLabelX and startLabelY are absolute origins for this specific drag session!
+                                        // Wait, if onChange triggers a re-render, will it cause issues? 
+                                        // It works perfectly for continuous dragging in React.
+                                        onChange({ 
+                                            ...config, 
+                                            labels: config.labels?.map((l: any) => l.id === label.id ? { ...l, x: newXPct, y: newYPct } : l) || []
+                                        });
+                                    };
+                                    
+                                    const handlePointerUp = () => {
+                                        document.removeEventListener('pointermove', handlePointerMove);
+                                        document.removeEventListener('pointerup', handlePointerUp);
+                                    };
+                                    
+                                    document.addEventListener('pointermove', handlePointerMove);
+                                    document.addEventListener('pointerup', handlePointerUp);
+                                }}
                                 style={{
                                     position: 'absolute',
                                     left: `${label.x}%`,
@@ -407,8 +447,7 @@ export const DynamicMenuPreview = ({ config, onChange, isEditing = false, commer
                                     zIndex: 10,
                                     cursor: 'grab'
                                 }}
-                                className="group hover:z-50"
-                                whileDrag={{ cursor: 'grabbing', scale: 1.05 }}
+                                className="group hover:z-50 active:cursor-grabbing active:scale-105 transition-transform"
                             >
                                 {/* Inner wrapper to handle centering without fighting framer-motion's drag transform */}
                                 <div 
@@ -427,20 +466,35 @@ export const DynamicMenuPreview = ({ config, onChange, isEditing = false, commer
                                     {label.text}
                                     
                                     {/* Resize Handle */}
-                                    <motion.div 
+                                    <div 
                                         className="absolute -right-4 -bottom-4 w-6 h-6 bg-emerald-500 rounded-full opacity-0 group-hover:opacity-100 cursor-nwse-resize flex items-center justify-center shadow-lg border-2 border-white"
-                                        drag
-                                        dragMomentum={false}
-                                        onDrag={(_e, info) => {
-                                            // Calculate font size change based on x-axis drag
-                                            // 1px drag = ~0.05cqw change (makes it smooth)
-                                            const deltaCqw = info.delta.x * 0.05;
-                                            const newSize = Math.max(1, Math.min(50, label.fontSize + deltaCqw));
+                                        onPointerDown={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
                                             
-                                            const newLabels = labels.map(l => l.id === label.id ? { ...l, fontSize: newSize } : l);
-                                            onChange({ ...config, labels: newLabels });
+                                            const startX = e.clientX;
+                                            const startSize = label.fontSize;
+                                            
+                                            const handleResizeMove = (moveEvent: PointerEvent) => {
+                                                const deltaX = moveEvent.clientX - startX;
+                                                // 1px drag = ~0.05cqw change (makes it smooth)
+                                                const deltaCqw = deltaX * 0.05;
+                                                const newSize = Math.max(1, Math.min(50, startSize + deltaCqw));
+                                                
+                                                onChange({ 
+                                                    ...config, 
+                                                    labels: config.labels?.map((l: any) => l.id === label.id ? { ...l, fontSize: newSize } : l) || []
+                                                });
+                                            };
+                                            
+                                            const handleResizeUp = () => {
+                                                document.removeEventListener('pointermove', handleResizeMove);
+                                                document.removeEventListener('pointerup', handleResizeUp);
+                                            };
+                                            
+                                            document.addEventListener('pointermove', handleResizeMove);
+                                            document.addEventListener('pointerup', handleResizeUp);
                                         }}
-                                        onPointerDown={(e) => e.stopPropagation()} // Prevent triggering parent drag
                                     />
                                 </div>
                             </motion.div>
