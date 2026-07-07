@@ -17,52 +17,37 @@ interface ScheduleContentModalProps {
     onScheduled?: () => void;
 }
 
-// Format a Date to dd/mm/aaaa
+// Format a Date to yyyy-mm-dd for input type="date"
 function formatDate(date: Date): string {
     const d = date.getDate().toString().padStart(2, '0');
     const m = (date.getMonth() + 1).toString().padStart(2, '0');
     const y = date.getFullYear();
-    return `${d}/${m}/${y}`;
+    return `${y}-${m}-${d}`;
 }
 
-// Format time to HH:MM AM/PM
+// Format time to HH:mm for input type="time"
 function formatTime(date: Date): string {
-    let h = date.getHours();
+    const h = date.getHours().toString().padStart(2, '0');
     const min = date.getMinutes().toString().padStart(2, '0');
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    h = h % 12 || 12;
-    return `${h.toString().padStart(2, '0')}:${min} ${ampm}`;
+    return `${h}:${min}`;
 }
 
-// Parse dd/mm/aaaa to Date
-function parseDate(str: string): Date | null {
-    const parts = str.split('/');
-    if (parts.length !== 3) return null;
-    const d = parseInt(parts[0]);
-    const m = parseInt(parts[1]) - 1;
-    const y = parseInt(parts[2]);
-    if (isNaN(d) || isNaN(m) || isNaN(y)) return null;
-    return new Date(y, m, d);
-}
-
-// Parse HH:MM AM/PM to {h, min}
-function parseTime(str: string): { h: number; min: number } | null {
-    const match = str.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-    if (!match) return null;
-    let h = parseInt(match[1]);
-    const min = parseInt(match[2]);
-    const ampm = match[3].toUpperCase();
-    if (ampm === 'PM' && h !== 12) h += 12;
-    if (ampm === 'AM' && h === 12) h = 0;
-    return { h, min };
-}
-
-// Combine date string and time string to ISO
+// Combine yyyy-mm-dd string and HH:mm string to ISO
 function toISO(dateStr: string, timeStr: string): string | null {
-    const date = parseDate(dateStr);
-    const time = parseTime(timeStr);
-    if (!date || !time) return null;
-    date.setHours(time.h, time.min, 0, 0);
+    if (!dateStr || !timeStr) return null;
+    const dateParts = dateStr.split('-');
+    const timeParts = timeStr.split(':');
+    if (dateParts.length !== 3 || timeParts.length !== 2) return null;
+    
+    const y = parseInt(dateParts[0]);
+    const m = parseInt(dateParts[1]) - 1;
+    const d = parseInt(dateParts[2]);
+    const h = parseInt(timeParts[0]);
+    const min = parseInt(timeParts[1]);
+    
+    if (isNaN(y) || isNaN(m) || isNaN(d) || isNaN(h) || isNaN(min)) return null;
+    
+    const date = new Date(y, m, d, h, min, 0, 0);
     return date.toISOString();
 }
 
@@ -226,25 +211,23 @@ export const ScheduleContentModal = ({ isOpen, onClose, asset, device, commerceI
                                 <div className="flex items-center gap-2 border border-emerald-400 rounded-lg px-3 py-2 bg-background flex-1 focus-within:ring-2 focus-within:ring-emerald-300">
                                     <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
                                     <input
-                                        type="text"
-                                        placeholder="dd/mm/aaaa"
+                                        type="date"
                                         value={dateStr}
                                         onChange={(e) => setDateStr(e.target.value)}
-                                        className="outline-none bg-transparent text-sm text-foreground w-full"
+                                        className="outline-none bg-transparent text-sm text-foreground w-full [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute"
                                     />
                                 </div>
                                 <div className="flex items-center gap-2 border border-border rounded-lg px-3 py-2 bg-background flex-1 focus-within:ring-2 focus-within:ring-emerald-300">
                                     <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
                                     <input
-                                        type="text"
-                                        placeholder="00:00 AM"
+                                        type="time"
                                         value={timeStr}
                                         onChange={(e) => setTimeStr(e.target.value)}
-                                        className="outline-none bg-transparent text-sm text-foreground w-full"
+                                        className="outline-none bg-transparent text-sm text-foreground w-full [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute"
                                     />
                                 </div>
                             </div>
-                            <p className="text-xs text-muted-foreground mt-1">Formato: dd/mm/aaaa — HH:MM AM/PM</p>
+                            <p className="text-xs text-muted-foreground mt-1">Seleccioná la fecha y hora de inicio</p>
                         </div>
 
                         {/* Expiry toggle */}
@@ -270,21 +253,19 @@ export const ScheduleContentModal = ({ isOpen, onClose, asset, device, commerceI
                                             <div className="flex items-center gap-2 border border-border rounded-lg px-3 py-2 bg-background flex-1 focus-within:ring-2 focus-within:ring-emerald-300">
                                                 <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
                                                 <input
-                                                    type="text"
-                                                    placeholder="dd/mm/aaaa"
+                                                    type="date"
                                                     value={expiryDateStr}
                                                     onChange={(e) => setExpiryDateStr(e.target.value)}
-                                                    className="outline-none bg-transparent text-sm text-foreground w-full"
+                                                    className="outline-none bg-transparent text-sm text-foreground w-full [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute"
                                                 />
                                             </div>
                                             <div className="flex items-center gap-2 border border-border rounded-lg px-3 py-2 bg-background flex-1 focus-within:ring-2 focus-within:ring-emerald-300">
                                                 <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
                                                 <input
-                                                    type="text"
-                                                    placeholder="00:00 AM"
+                                                    type="time"
                                                     value={expiryTimeStr}
                                                     onChange={(e) => setExpiryTimeStr(e.target.value)}
-                                                    className="outline-none bg-transparent text-sm text-foreground w-full"
+                                                    className="outline-none bg-transparent text-sm text-foreground w-full [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute"
                                                 />
                                             </div>
                                         </div>
