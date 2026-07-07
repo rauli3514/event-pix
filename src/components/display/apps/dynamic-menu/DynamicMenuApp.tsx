@@ -290,6 +290,14 @@ export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Part
                                     </SelectContent>
                                 </Select>
                             </div>
+                            <div className="space-y-2">
+                                <Label>Posición X (%)</Label>
+                                <Input type="number" min="0" max="100" step="1" value={Math.round(selectedLabel.x)} onChange={e => updateLabel(selectedLabel.id, { x: parseFloat(e.target.value) })} className="bg-slate-950 border-slate-700" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Posición Y (%)</Label>
+                                <Input type="number" min="0" max="100" step="1" value={Math.round(selectedLabel.y)} onChange={e => updateLabel(selectedLabel.id, { y: parseFloat(e.target.value) })} className="bg-slate-950 border-slate-700" />
+                            </div>
                         </div>
                     )}
                 </div>
