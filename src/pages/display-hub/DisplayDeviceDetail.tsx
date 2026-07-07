@@ -37,10 +37,13 @@ const DisplayDeviceDetail = () => {
     const [name, setName] = useState('');
     const [desc, setDesc] = useState('');
 
-    if (isSuperAdmin === false) {
-        navigate('/admin', { replace: true });
-        return null;
-    }
+    useEffect(() => {
+        if (isSuperAdmin === false) {
+            navigate('/admin', { replace: true });
+        }
+    }, [isSuperAdmin, navigate]);
+
+    if (isSuperAdmin === false) return null;
 
     useEffect(() => {
         if (deviceData) {
