@@ -128,7 +128,7 @@ export const GlobalScheduleModal = ({ isOpen, onClose, commerceId, onScheduled }
                 toast.error('Debe seleccionar al menos un día de la semana');
                 return;
             }
-            if (!parseTime(startTimeStr) || !parseTime(endTimeStr)) {
+            if (!startTimeStr || !endTimeStr) {
                 toast.error('Horario de inicio o fin inválido');
                 return;
             }
