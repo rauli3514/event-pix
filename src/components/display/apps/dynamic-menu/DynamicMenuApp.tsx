@@ -378,6 +378,10 @@ export const DynamicMenuPreview = ({ config, onChange, isEditing = false, commer
                                     
                                     if (!containerRef.current) return;
                                     const rect = containerRef.current.getBoundingClientRect();
+                                    const target = e.currentTarget;
+                                    
+                                    // Capture the pointer to receive all global events until release
+                                    target.setPointerCapture(e.pointerId);
                                     
                                     const startX = e.clientX;
                                     const startY = e.clientY;
@@ -394,40 +398,36 @@ export const DynamicMenuPreview = ({ config, onChange, isEditing = false, commer
                                         const newXPct = Math.max(0, Math.min(100, startLabelX + deltaXPct));
                                         const newYPct = Math.max(0, Math.min(100, startLabelY + deltaYPct));
                                         
-                                        // We use the functional state update equivalent by passing the new labels
-                                        // Wait, onChange doesn't provide functional updates. We'll use the latest labels from the closure!
-                                        // BUT closure holds old labels! 
-                                        // To fix closure staleness, we calculate relative to startLabelX which is captured ONCE.
-                                        
-                                        // This is perfectly safe because startLabelX and startLabelY are absolute origins for this specific drag session!
-                                        // Wait, if onChange triggers a re-render, will it cause issues? 
-                                        // It works perfectly for continuous dragging in React.
                                         onChange({ 
                                             ...config, 
                                             labels: config.labels?.map((l: any) => l.id === label.id ? { ...l, x: newXPct, y: newYPct } : l) || []
                                         });
                                     };
                                     
-                                    const handlePointerUp = () => {
-                                        document.removeEventListener('pointermove', handlePointerMove);
-                                        document.removeEventListener('pointerup', handlePointerUp);
+                                    const handlePointerUp = (upEvent: PointerEvent) => {
+                                        target.releasePointerCapture(upEvent.pointerId);
+                                        target.removeEventListener('pointermove', handlePointerMove);
+                                        target.removeEventListener('pointerup', handlePointerUp);
+                                        target.removeEventListener('pointercancel', handlePointerUp);
                                     };
                                     
-                                    document.addEventListener('pointermove', handlePointerMove);
-                                    document.addEventListener('pointerup', handlePointerUp);
+                                    target.addEventListener('pointermove', handlePointerMove);
+                                    target.addEventListener('pointerup', handlePointerUp);
+                                    target.addEventListener('pointercancel', handlePointerUp);
                                 }}
                                 style={{
                                     position: 'absolute',
                                     left: `${label.x}%`,
                                     top: `${label.y}%`,
                                     zIndex: 10,
-                                    cursor: 'grab'
+                                    cursor: 'grab',
+                                    touchAction: 'none' // Prevent mobile scrolling while dragging
                                 }}
-                                className="group hover:z-50 active:cursor-grabbing active:scale-105 transition-transform"
+                                className="group hover:z-50 active:z-50 active:cursor-grabbing active:scale-105 transition-transform"
                             >
                                 {/* Inner wrapper to handle centering without fighting framer-motion's drag transform */}
                                 <div 
-                                    className="relative whitespace-nowrap select-none group-hover:outline group-hover:outline-2 group-hover:outline-emerald-500 group-hover:outline-offset-4 rounded"
+                                    className="relative whitespace-nowrap select-none group-hover:outline group-hover:outline-2 group-hover:outline-emerald-500 group-hover:outline-offset-4 rounded p-1"
                                     style={{
                                         transform: 'translate(-50%, -50%)',
                                         color: label.color,
@@ -443,17 +443,19 @@ export const DynamicMenuPreview = ({ config, onChange, isEditing = false, commer
                                     
                                     {/* Resize Handle */}
                                     <div 
-                                        className="absolute -right-4 -bottom-4 w-6 h-6 bg-emerald-500 rounded-full opacity-0 group-hover:opacity-100 cursor-nwse-resize flex items-center justify-center shadow-lg border-2 border-white"
+                                        className="absolute -right-3 -bottom-3 w-8 h-8 bg-emerald-500 rounded-full opacity-0 group-hover:opacity-100 cursor-nwse-resize flex items-center justify-center shadow-lg border-2 border-white"
                                         onPointerDown={(e) => {
                                             e.preventDefault();
                                             e.stopPropagation();
+                                            
+                                            const target = e.currentTarget;
+                                            target.setPointerCapture(e.pointerId);
                                             
                                             const startX = e.clientX;
                                             const startSize = label.fontSize;
                                             
                                             const handleResizeMove = (moveEvent: PointerEvent) => {
                                                 const deltaX = moveEvent.clientX - startX;
-                                                // 1px drag = ~0.05cqw change (makes it smooth)
                                                 const deltaCqw = deltaX * 0.05;
                                                 const newSize = Math.max(1, Math.min(50, startSize + deltaCqw));
                                                 
@@ -463,14 +465,18 @@ export const DynamicMenuPreview = ({ config, onChange, isEditing = false, commer
                                                 });
                                             };
                                             
-                                            const handleResizeUp = () => {
-                                                document.removeEventListener('pointermove', handleResizeMove);
-                                                document.removeEventListener('pointerup', handleResizeUp);
+                                            const handleResizeUp = (upEvent: PointerEvent) => {
+                                                target.releasePointerCapture(upEvent.pointerId);
+                                                target.removeEventListener('pointermove', handleResizeMove);
+                                                target.removeEventListener('pointerup', handleResizeUp);
+                                                target.removeEventListener('pointercancel', handleResizeUp);
                                             };
                                             
-                                            document.addEventListener('pointermove', handleResizeMove);
-                                            document.addEventListener('pointerup', handleResizeUp);
+                                            target.addEventListener('pointermove', handleResizeMove);
+                                            target.addEventListener('pointerup', handleResizeUp);
+                                            target.addEventListener('pointercancel', handleResizeUp);
                                         }}
+                                        style={{ touchAction: 'none' }}
                                     />
                                 </div>
                             </motion.div>
