@@ -165,8 +165,8 @@ const DisplayDeviceDetail = () => {
                 <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
                         <Button variant="ghost" asChild className="mb-2 text-slate-400 hover:text-white hover:bg-slate-800 -ml-4">
-                            <Link to={`/admin/display/commerce/${deviceData.commerce_id}`}>
-                                <ArrowLeft className="w-4 h-4 mr-2" /> Volver al Comercio
+                            <Link to={`/admin/display/commerce/${deviceData.commerce_id}/workspace/screens`}>
+                                <ArrowLeft className="w-4 h-4 mr-2" /> Volver a las Pantallas
                             </Link>
                         </Button>
                         <div className="flex items-center gap-3">

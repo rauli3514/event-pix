@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Monitor, Plus, Hash, Eye, ChevronDown, MoreVertical, Edit2, Info, Move, Trash2, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,7 @@ import { DisplayDevice } from '@/types/display';
 
 const DisplayHubList = () => {
     const { commerceId } = useParams<{ commerceId: string }>();
+    const navigate = useNavigate();
     
     // States for linking
     const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
@@ -288,6 +289,9 @@ const DisplayHubList = () => {
                                                     <DropdownMenuContent align="end" className="w-56 bg-card text-foreground border border-border shadow-xl rounded-xl">
                                                         <DropdownMenuItem className="cursor-pointer py-2 focus:bg-accent focus:text-accent-foreground" onClick={() => { setSelectedDevice(device); setEditModalOpen(true); }}>
                                                             <Info className="w-4 h-4 mr-2 text-muted-foreground" /> Ver información del dispositivo
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem className="cursor-pointer py-2 focus:bg-accent focus:text-accent-foreground" onClick={() => navigate(`/admin/display/${device.id}`)}>
+                                                            <Monitor className="w-4 h-4 mr-2 text-muted-foreground" /> Rendimiento y Diagnóstico
                                                         </DropdownMenuItem>
                                                         <DropdownMenuSeparator className="bg-border" />
                                                         <DropdownMenuItem className="cursor-pointer py-2 focus:bg-accent focus:text-accent-foreground" onClick={() => { setMoveDeviceTarget(device); setMoveDeviceModalOpen(true); }}>
