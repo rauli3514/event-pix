@@ -407,13 +407,13 @@ export const useAssignContentToDevice = () => {
         mutationFn: async ({ deviceId, campaignId, mediaId, startTime, endTime }: { deviceId: string; campaignId?: string | null; mediaId?: string | null; startTime?: string | null; endTime?: string | null }) => {
             const { data, error } = await supabase
                 .from("display_assignments")
-                .insert({
+                .upsert({
                     device_id: deviceId,
                     campaign_id: campaignId || null,
                     media_id: mediaId || null,
                     start_time: startTime || null,
                     end_time: endTime || null
-                })
+                }, { onConflict: 'device_id' })
                 .select()
                 .single();
 

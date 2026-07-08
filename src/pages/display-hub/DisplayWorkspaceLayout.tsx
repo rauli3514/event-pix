@@ -139,13 +139,19 @@ export default function DisplayWorkspaceLayout() {
                 await updateSchedule.mutateAsync({ id: schedule.id, updates: { status: nextStatus } });
                 
                 // Revert to previous content if required
-                if (schedule.after_expiry === 'last_played' && (schedule.previous_campaign_id || schedule.previous_media_id)) {
-                    await assignContent.mutateAsync({
-                        deviceId: schedule.device_id,
-                        campaignId: schedule.previous_campaign_id || undefined,
-                        mediaId: schedule.previous_media_id || undefined
-                    });
-                    toast.success(`🔄 Contenido original restaurado en ${schedule.device_name}`);
+                if (schedule.after_expiry === 'last_played') {
+                    if (schedule.previous_campaign_id || schedule.previous_media_id) {
+                        await assignContent.mutateAsync({
+                            deviceId: schedule.device_id,
+                            campaignId: schedule.previous_campaign_id || undefined,
+                            mediaId: schedule.previous_media_id || undefined
+                        });
+                        toast.success(`🔄 Contenido original restaurado en ${schedule.device_name}`);
+                    } else {
+                        // Revert to empty (no content before)
+                        await supabase.from('display_assignments').delete().eq('device_id', schedule.device_id);
+                        toast.success(`⬛ Contenido removido (volviendo a estado inicial) en ${schedule.device_name}`);
+                    }
                 } else if (schedule.after_expiry === 'black_screen') {
                     await supabase.from('display_assignments').delete().eq('device_id', schedule.device_id);
                     toast.success(`⬛ Pantalla en negro en ${schedule.device_name}`);
