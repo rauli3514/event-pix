@@ -87,12 +87,26 @@ export default function DisplayWorkspaceLayout() {
 
         for (const schedule of pending) {
             try {
+                // Fetch current assignment for device to save as 'previous'
+                const { data: currentAssignment } = await supabase
+                    .from('display_assignments')
+                    .select('campaign_id, media_id')
+                    .eq('device_id', schedule.device_id)
+                    .maybeSingle();
+
                 await assignContent.mutateAsync({
                     deviceId: schedule.device_id,
                     mediaId: schedule.media_id || undefined,
                     campaignId: schedule.campaign_id || undefined,
                 });
-                await updateSchedule.mutateAsync({ id: schedule.id, updates: { status: 'published' } });
+                await updateSchedule.mutateAsync({ 
+                    id: schedule.id, 
+                    updates: { 
+                        status: 'published',
+                        previous_campaign_id: currentAssignment?.campaign_id || null,
+                        previous_media_id: currentAssignment?.media_id || null
+                    } 
+                });
                 toast.success(`✅ Contenido "${schedule.content_name}" publicado automáticamente en ${schedule.device_name}`);
             } catch (err) {
                 console.error('Auto-publish error:', err);
@@ -123,6 +137,20 @@ export default function DisplayWorkspaceLayout() {
                 // For one-off schedules, mark as 'expired'.
                 const nextStatus = schedule.is_recurring ? 'pending' : 'expired';
                 await updateSchedule.mutateAsync({ id: schedule.id, updates: { status: nextStatus } });
+                
+                // Revert to previous content if required
+                if (schedule.after_expiry === 'last_played' && (schedule.previous_campaign_id || schedule.previous_media_id)) {
+                    await assignContent.mutateAsync({
+                        deviceId: schedule.device_id,
+                        campaignId: schedule.previous_campaign_id || undefined,
+                        mediaId: schedule.previous_media_id || undefined
+                    });
+                    toast.success(`🔄 Contenido original restaurado en ${schedule.device_name}`);
+                } else if (schedule.after_expiry === 'black_screen') {
+                    await supabase.from('display_assignments').delete().eq('device_id', schedule.device_id);
+                    toast.success(`⬛ Pantalla en negro en ${schedule.device_name}`);
+                }
+
                 if (nextStatus === 'pending') {
                     console.log(`Resetting recurring schedule ${schedule.id} to pending for next cycle`);
                 }
