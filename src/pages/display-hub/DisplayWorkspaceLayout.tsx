@@ -17,8 +17,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
-import { useCommerces, useDisplaySchedules, useUpdateSchedule, useAssignContentToDevice } from '@/hooks/use-display-hub';
-import { toast } from 'sonner';
+import { useCommerces } from '@/hooks/use-display-hub';
 import { supabase } from '@/lib/supabase';
 
 const MENU_ITEMS = [
@@ -56,10 +55,7 @@ export default function DisplayWorkspaceLayout() {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
-  // Global Auto-publish Logic
-  const { data: schedules = [] } = useDisplaySchedules(commerceId);
-  const updateSchedule = useUpdateSchedule();
-  const assignContent = useAssignContentToDevice();
+
 
   // checkAndPublish removed as Schedules V2 are evaluated locally by the TvPlayer.
 

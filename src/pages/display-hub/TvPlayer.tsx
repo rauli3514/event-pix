@@ -53,15 +53,6 @@ const TvPlayer = () => {
                 orQuery += `,group_id.eq.${device.group_id}`;
             }
 
-            const { data: assignments } = await supabase
-                .from('display_assignments')
-                .select(`
-                  *,
-                  campaign:display_campaigns(*),
-                  media:display_media(*)
-                `)
-                .or(orQuery)
-                .order('created_at', { ascending: false });
 
             const { data: assignments } = await supabase
                 .from('display_assignments')

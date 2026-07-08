@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Calendar, Clock, PlaySquare, Globe, Plus, Trash2, LayoutGrid, Image as ImageIcon } from 'lucide-react';
+import { Calendar, Clock, PlaySquare, Globe, Plus, Trash2, LayoutGrid } from 'lucide-react';
 import { useCreateSchedule, useUpdateSchedule } from '@/hooks/use-display-hub';
 import { toast } from 'sonner';
 import { AssetSelectorModal } from './AssetSelectorModal';
@@ -299,7 +299,6 @@ export const ScheduleBuilderModal = ({ isOpen, onClose, commerceId, existingSche
             <AssetSelectorModal 
                 isOpen={isAssetModalOpen} 
                 onClose={() => setIsAssetModalOpen(false)} 
-                commerceId={commerceId} 
                 onSelect={handleAssetSelect}
             />
         </Dialog>
