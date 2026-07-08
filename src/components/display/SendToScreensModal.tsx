@@ -32,6 +32,7 @@ export const SendToScreensModal = ({ isOpen, onClose, selectedAssets, commerceId
         const isMultiple = selectedAssets.length > 1;
         let campaignIdToAssign: string | null = null;
         let mediaIdToAssign: string | null = null;
+        let scheduleIdToAssign: string | null = null;
 
         setIsSubmitting(true);
 
@@ -75,7 +76,13 @@ export const SendToScreensModal = ({ isOpen, onClose, selectedAssets, commerceId
                 
                 campaignIdToAssign = campaign.id;
             } else {
-                mediaIdToAssign = selectedAssets[0].id;
+                if (selectedAssets[0].type === 'schedule') {
+                    scheduleIdToAssign = selectedAssets[0].id;
+                } else if (selectedAssets[0].type === 'campaign') {
+                    campaignIdToAssign = selectedAssets[0].id;
+                } else {
+                    mediaIdToAssign = selectedAssets[0].id;
+                }
             }
 
             // Asignar
@@ -93,7 +100,8 @@ export const SendToScreensModal = ({ isOpen, onClose, selectedAssets, commerceId
                 assignContent.mutateAsync({
                     deviceId: device.id,
                     mediaId: mediaIdToAssign,
-                    campaignId: campaignIdToAssign
+                    campaignId: campaignIdToAssign,
+                    scheduleId: scheduleIdToAssign
                 })
             );
 
