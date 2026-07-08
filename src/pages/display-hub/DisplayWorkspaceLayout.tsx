@@ -101,12 +101,21 @@ export default function DisplayWorkspaceLayout() {
                     mediaId: schedule.media_id || undefined,
                     campaignId: schedule.campaign_id || undefined,
                 });
+                const isAlreadyPlayingScheduledContent = 
+                    (currentAssignment?.campaign_id === schedule.campaign_id && schedule.campaign_id != null) ||
+                    (currentAssignment?.media_id === schedule.media_id && schedule.media_id != null);
+
+                // If for some reason the screen is already playing this schedule's exact content (e.g. from a retry or manual assignment),
+                // we SHOULD NOT overwrite the true previous content, otherwise it will revert to itself.
+                const newPrevCampaign = isAlreadyPlayingScheduledContent ? schedule.previous_campaign_id : (currentAssignment?.campaign_id || null);
+                const newPrevMedia = isAlreadyPlayingScheduledContent ? schedule.previous_media_id : (currentAssignment?.media_id || null);
+
                 await updateSchedule.mutateAsync({ 
                     id: schedule.id, 
                     updates: { 
                         status: 'published',
-                        previous_campaign_id: currentAssignment?.campaign_id || null,
-                        previous_media_id: currentAssignment?.media_id || null
+                        previous_campaign_id: newPrevCampaign,
+                        previous_media_id: newPrevMedia
                     } 
                 });
                 toast.success(`✅ Contenido "${schedule.content_name}" publicado automáticamente en ${schedule.device_name}`);
