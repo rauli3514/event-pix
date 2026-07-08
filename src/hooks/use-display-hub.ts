@@ -569,13 +569,22 @@ export const useUpdateSchedule = () => {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: async ({ id, updates, newEvents }: { id: string; updates: any, newEvents?: any[] }) => {
-            const { data, error } = await supabase
-                .from("display_schedules")
-                .update(updates)
-                .eq("id", id)
-                .select()
-                .single();
-            if (error) throw error;
+            let data = null;
+            if (updates && Object.keys(updates).length > 0) {
+                const result = await supabase
+                    .from("display_schedules")
+                    .update(updates)
+                    .eq("id", id)
+                    .select()
+                    .single();
+                if (result.error) throw result.error;
+                data = result.data;
+            } else {
+                // Si no hay updates al schedule, solo devolvemos los datos basicos que necesitamos
+                const result = await supabase.from("display_schedules").select("*").eq("id", id).single();
+                if (result.error) throw result.error;
+                data = result.data;
+            }
             
             // Si mandamos nuevos eventos, borramos los viejos y ponemos los nuevos (simplificación de edición)
             if (newEvents) {
