@@ -66,7 +66,7 @@ export default function DisplayWorkspaceLayout() {
     
     const checkAndPublish = async () => {
         const now = new Date();
-        const currentDay = now.getDay() === 0 ? 7 : now.getDay(); // 1 (Mon) - 7 (Sun)
+        const currentDay = now.getDay(); // 0 (Sun) - 6 (Sat)
         const currentTime = now.toTimeString().substring(0, 5); // "HH:mm"
 
         const pending = (schedules as any[]).filter(s => {
