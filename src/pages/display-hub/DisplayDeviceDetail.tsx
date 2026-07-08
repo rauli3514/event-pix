@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useIsSuperAdmin } from "@/hooks/use-roles";
 import { useDisplayDevice, useAssignContentToDevice, useUpdateDisplayDevice, useDisplayCampaigns, useDeleteAssignment } from "@/hooks/use-display-hub";
 import { useDisplayMedia } from "@/hooks/use-display-media";
 import { supabase } from "@/lib/supabase";
@@ -15,7 +14,6 @@ import { supabase } from "@/lib/supabase";
 const DisplayDeviceDetail = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const isSuperAdmin = useIsSuperAdmin();
 
     const { data: deviceData, isLoading } = useDisplayDevice(id);
     const assignContent = useAssignContentToDevice();
@@ -36,14 +34,6 @@ const DisplayDeviceDetail = () => {
     const [endTime, setEndTime] = useState('');
     const [name, setName] = useState('');
     const [desc, setDesc] = useState('');
-
-    useEffect(() => {
-        if (isSuperAdmin === false) {
-            navigate('/admin', { replace: true });
-        }
-    }, [isSuperAdmin, navigate]);
-
-    if (isSuperAdmin === false) return null;
 
     useEffect(() => {
         if (deviceData) {
