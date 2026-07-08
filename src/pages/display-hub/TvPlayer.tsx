@@ -68,8 +68,8 @@ const TvPlayer = () => {
                 .from('display_schedules')
                 .select(`
                   *,
-                  campaign:display_campaigns(*),
-                  media:display_media(*)
+                  campaign:display_campaigns!campaign_id(*),
+                  media:display_media!media_id(*)
                 `)
                 .eq('device_id', device.id)
                 .order('created_at', { ascending: false });

@@ -477,8 +477,8 @@ export const useDisplaySchedules = (commerceId?: string) => {
                 .select(`
                     *,
                     device:display_devices(id, name),
-                    media:display_media(id, name, type, url),
-                    campaign:display_campaigns(id, name)
+                    media:display_media!media_id(id, name, type, url),
+                    campaign:display_campaigns!campaign_id(id, name)
                 `)
                 .eq("commerce_id", commerceId)
                 .order("scheduled_at", { ascending: true });
