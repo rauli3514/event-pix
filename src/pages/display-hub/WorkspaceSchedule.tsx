@@ -5,6 +5,9 @@ import { Button } from '@/components/ui/button';
 import { useDisplaySchedules, useDeleteSchedule } from '@/hooks/use-display-hub';
 import { toast } from 'sonner';
 import { ScheduleBuilderModal } from '@/components/display/ScheduleBuilderModal';
+import { SendToScreensModal } from '@/components/display/SendToScreensModal';
+import { WeeklyCalendar } from '@/components/display/WeeklyCalendar';
+import { ArrowLeft, MonitorUp } from 'lucide-react';
 
 const WorkspaceSchedule = () => {
     const { commerceId } = useParams<{ commerceId: string }>();
@@ -13,6 +16,8 @@ const WorkspaceSchedule = () => {
     
     const [isBuilderOpen, setIsBuilderOpen] = useState(false);
     const [editingSchedule, setEditingSchedule] = useState<any>(null);
+    const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);
+    const [isSendModalOpen, setIsSendModalOpen] = useState(false);
 
     const handleDelete = async (id: string, name: string) => {
         if (!confirm(`¿Eliminar el horario "${name}"? Las pantallas que lo tengan asignado dejarán de usarlo.`)) return;
@@ -34,57 +39,93 @@ const WorkspaceSchedule = () => {
         setIsBuilderOpen(true);
     };
 
+    const selectedSchedule = schedules.find(s => s.id === selectedScheduleId);
+
     return (
         <div className="p-6 md:p-8 max-w-5xl mx-auto h-full flex flex-col">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 shrink-0">
-                <div>
-                    <h1 className="text-2xl font-bold text-foreground font-[Orbitron]">
-                        Horarios <span className="text-indigo-500">Inteligentes</span>
-                    </h1>
-                    <p className="text-muted-foreground text-sm mt-1">
-                        Crea horarios con eventos recurrentes y asígnalos a tus pantallas.
-                    </p>
-                </div>
-                <Button
-                    onClick={handleCreateNew}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 h-10 shadow-lg shadow-indigo-900/20"
-                >
-                    <Plus className="w-4 h-4" />
-                    Nuevo Horario
-                </Button>
-            </div>
-
-            {/* List */}
-            <div className="flex-1 overflow-y-auto min-h-0">
-                {isLoading ? (
-                    <div className="flex justify-center items-center h-40 text-muted-foreground">
-                        <div className="flex flex-col items-center gap-3">
-                            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                            <span>Cargando horarios...</span>
+            {selectedSchedule ? (
+                // Detailed Calendar View
+                <div className="flex-1 flex flex-col min-h-0">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 shrink-0">
+                        <div className="flex items-center gap-3">
+                            <Button variant="ghost" size="icon" onClick={() => setSelectedScheduleId(null)} className="h-9 w-9 text-muted-foreground hover:text-foreground shrink-0">
+                                <ArrowLeft className="w-5 h-5" />
+                            </Button>
+                            <div>
+                                <h1 className="text-2xl font-bold text-foreground leading-tight">{selectedSchedule.name}</h1>
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            <Button variant="outline" onClick={() => handleEdit(selectedSchedule)} className="gap-2 bg-background">
+                                <Edit2 className="w-4 h-4" />
+                                Editar Horario
+                            </Button>
+                            <Button onClick={() => setIsSendModalOpen(true)} className="gap-2 bg-emerald-500 hover:bg-emerald-600 text-white">
+                                <MonitorUp className="w-4 h-4" />
+                                Empujar a la Pantalla
+                            </Button>
                         </div>
                     </div>
-                ) : schedules.length === 0 ? (
-                    <div className="py-20 text-center border-2 border-dashed border-border rounded-2xl bg-card/50">
-                        <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                        <h3 className="text-lg font-bold text-foreground">Sin horarios</h3>
-                        <p className="text-muted-foreground text-sm mt-2 max-w-sm mx-auto">
-                            Crea un Horario para programar contenido dinámico durante la semana y asígnalo a tus pantallas.
-                        </p>
+                    
+                    <div className="flex-1 overflow-hidden rounded-xl border border-border shadow-sm">
+                        <WeeklyCalendar schedule={selectedSchedule} />
                     </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {schedules.map((s: any) => (
-                            <ScheduleCard 
-                                key={s.id} 
-                                schedule={s} 
-                                onEdit={() => handleEdit(s)}
-                                onDelete={() => handleDelete(s.id, s.name)} 
-                            />
-                        ))}
+                </div>
+            ) : (
+                // List View
+                <>
+                    {/* Header */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 shrink-0">
+                        <div>
+                            <h1 className="text-2xl font-bold text-foreground font-[Orbitron]">
+                                Horarios <span className="text-indigo-500">Inteligentes</span>
+                            </h1>
+                            <p className="text-muted-foreground text-sm mt-1">
+                                Crea horarios con eventos recurrentes y asígnalos a tus pantallas.
+                            </p>
+                        </div>
+                        <Button
+                            onClick={handleCreateNew}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 h-10 shadow-lg shadow-indigo-900/20"
+                        >
+                            <Plus className="w-4 h-4" />
+                            Nuevo Horario
+                        </Button>
                     </div>
-                )}
-            </div>
+
+                    {/* List */}
+                    <div className="flex-1 overflow-y-auto min-h-0">
+                        {isLoading ? (
+                            <div className="flex justify-center items-center h-40 text-muted-foreground">
+                                <div className="flex flex-col items-center gap-3">
+                                    <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                                    <span>Cargando horarios...</span>
+                                </div>
+                            </div>
+                        ) : schedules.length === 0 ? (
+                            <div className="py-20 text-center border-2 border-dashed border-border rounded-2xl bg-card/50">
+                                <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                                <h3 className="text-lg font-bold text-foreground">Sin horarios</h3>
+                                <p className="text-muted-foreground text-sm mt-2 max-w-sm mx-auto">
+                                    Crea un Horario para programar contenido dinámico durante la semana y asígnalo a tus pantallas.
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {schedules.map((s: any) => (
+                                    <ScheduleCard 
+                                        key={s.id} 
+                                        schedule={s} 
+                                        onClick={() => setSelectedScheduleId(s.id)}
+                                        onEdit={(e) => { e.stopPropagation(); handleEdit(s); }}
+                                        onDelete={(e) => { e.stopPropagation(); handleDelete(s.id, s.name); }} 
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </>
+            )}
 
             {commerceId && isBuilderOpen && (
                 <ScheduleBuilderModal 
@@ -92,18 +133,38 @@ const WorkspaceSchedule = () => {
                     onClose={() => setIsBuilderOpen(false)}
                     commerceId={commerceId}
                     existingSchedule={editingSchedule}
-                    onSaved={() => refetch()}
+                    onSaved={() => {
+                        refetch();
+                        if (editingSchedule && editingSchedule.id === selectedScheduleId) {
+                            // If we were editing the selected schedule, just refetch
+                        } else {
+                            // If it was a new schedule, we could theoretically set it, but refetch might lose it. Let's just go back to list.
+                            setSelectedScheduleId(null);
+                        }
+                    }}
+                />
+            )}
+            
+            {commerceId && isSendModalOpen && selectedSchedule && (
+                <SendToScreensModal
+                    isOpen={isSendModalOpen}
+                    onClose={() => setIsSendModalOpen(false)}
+                    commerceId={commerceId}
+                    asset={{ ...selectedSchedule, type: 'schedule' }}
                 />
             )}
         </div>
     );
 };
 
-const ScheduleCard = ({ schedule: s, onEdit, onDelete }: { schedule: any; onEdit: () => void; onDelete: () => void }) => {
+const ScheduleCard = ({ schedule: s, onEdit, onDelete, onClick }: { schedule: any; onEdit: (e: any) => void; onDelete: (e: any) => void; onClick: () => void }) => {
     const defaultAsset = s.default_campaign || s.default_media;
     
     return (
-        <div className="bg-card border border-border rounded-xl p-5 flex flex-col gap-4 hover:border-indigo-500/50 transition-colors shadow-sm relative group">
+        <div 
+            onClick={onClick}
+            className="bg-card border border-border rounded-xl p-5 flex flex-col gap-4 hover:border-indigo-500/50 transition-colors shadow-sm relative group cursor-pointer"
+        >
             {/* Header */}
             <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3">

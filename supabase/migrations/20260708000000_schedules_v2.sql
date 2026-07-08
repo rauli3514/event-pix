@@ -4,7 +4,7 @@ DROP TABLE IF EXISTS public.display_schedules CASCADE;
 -- Create the new display_schedules table (The "Schedule Object")
 CREATE TABLE public.display_schedules (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    commerce_id UUID NOT NULL REFERENCES public.commerces(id) ON DELETE CASCADE,
+    commerce_id UUID NOT NULL REFERENCES public.display_commerces(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     default_campaign_id UUID REFERENCES public.display_campaigns(id) ON DELETE SET NULL,
     default_media_id UUID REFERENCES public.display_media(id) ON DELETE SET NULL,
