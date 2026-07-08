@@ -433,9 +433,14 @@ const DisplayHubList = () => {
                         updateDevice.mutate({ id, updates }, {
                             onSuccess: () => {
                                 if (asset) {
-                                    const payload = asset.type === 'campaign' 
-                                        ? { deviceId: id, campaignId: asset.id, mediaId: null }
-                                        : { deviceId: id, mediaId: asset.id, campaignId: null };
+                                    let payload: any = { deviceId: id, mediaId: null, campaignId: null, scheduleId: null };
+                                    if (asset.type === 'campaign') {
+                                        payload.campaignId = asset.id;
+                                    } else if (asset.type === 'schedule') {
+                                        payload.scheduleId = asset.id;
+                                    } else {
+                                        payload.mediaId = asset.id;
+                                    }
 
                                     assignContent.mutate(payload, {
                                         onSuccess: () => {

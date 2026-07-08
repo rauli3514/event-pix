@@ -233,7 +233,7 @@ export const useDisplayDevices = (commerceId?: string | null) => {
                     *,
                     commerce:display_commerces(name, email),
                     group:display_groups(*),
-                    assignment:display_assignments(*, campaign:display_campaigns(*), media:display_media(*))
+                    assignment:display_assignments(*, campaign:display_campaigns(*), media:display_media(*), schedule:display_schedules(*, events:display_schedule_events(*, campaign:display_campaigns!campaign_id(*), media:display_media!media_id(*)), default_campaign:display_campaigns!default_campaign_id(*), default_media:display_media!default_media_id(*)))
                 `)
                 .order("created_at", { ascending: false });
 
@@ -248,7 +248,7 @@ export const useDisplayDevices = (commerceId?: string | null) => {
             // Fetch all assignments manually to ensure we get group assignments and bypass relation quirks
             const { data: allAssignments } = await supabase
                 .from('display_assignments')
-                .select('*, campaign:display_campaigns(*), media:display_media(*)');
+                .select('*, campaign:display_campaigns(*), media:display_media(*), schedule:display_schedules(*, events:display_schedule_events(*, campaign:display_campaigns!campaign_id(*), media:display_media!media_id(*)), default_campaign:display_campaigns!default_campaign_id(*), default_media:display_media!default_media_id(*))');
             
             const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
             

@@ -7,7 +7,9 @@ import { toast } from 'sonner';
 import { ScheduleBuilderModal } from '@/components/display/ScheduleBuilderModal';
 import { SendToScreensModal } from '@/components/display/SendToScreensModal';
 import { WeeklyCalendar } from '@/components/display/WeeklyCalendar';
+import { ScheduleEventModal } from '@/components/display/ScheduleEventModal';
 import { ArrowLeft, MonitorUp } from 'lucide-react';
+import { useUpdateSchedule } from '@/hooks/use-display-hub';
 
 const WorkspaceSchedule = () => {
     const { commerceId } = useParams<{ commerceId: string }>();
@@ -18,6 +20,13 @@ const WorkspaceSchedule = () => {
     const [editingSchedule, setEditingSchedule] = useState<any>(null);
     const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);
     const [isSendModalOpen, setIsSendModalOpen] = useState(false);
+    
+    // Event Modal State
+    const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+    const [selectedEvent, setSelectedEvent] = useState<any>(null);
+    const [selectedDay, setSelectedDay] = useState<number | null>(null);
+    const [selectedHour, setSelectedHour] = useState<string | null>(null);
+    const updateSchedule = useUpdateSchedule();
 
     const handleDelete = async (id: string, name: string) => {
         if (!confirm(`¿Eliminar el horario "${name}"? Las pantallas que lo tengan asignado dejarán de usarlo.`)) return;
@@ -39,7 +48,83 @@ const WorkspaceSchedule = () => {
         setIsBuilderOpen(true);
     };
 
+    const handleOpenEventModal = (event?: any, day?: number, hour?: string) => {
+        setSelectedEvent(event || null);
+        setSelectedDay(day !== undefined ? day : null);
+        setSelectedHour(hour || null);
+        setIsEventModalOpen(true);
+    };
+
     const selectedSchedule = schedules.find(s => s.id === selectedScheduleId);
+
+    const handleSaveEvent = async (eventData: any) => {
+        if (!selectedSchedule) return;
+        try {
+            let currentEvents = selectedSchedule.events ? [...selectedSchedule.events] : [];
+            const newEventPayload = {
+                mediaId: eventData.asset.type !== 'campaign' ? eventData.asset.id : null,
+                campaignId: eventData.asset.type === 'campaign' ? eventData.asset.id : null,
+                startTime: eventData.startTime,
+                endTime: eventData.endTime,
+                daysOfWeek: eventData.daysOfWeek
+            };
+
+            if (selectedEvent) {
+                // Update existing event
+                const eventIndex = currentEvents.findIndex(e => e.id === selectedEvent.id);
+                if (eventIndex !== -1) {
+                    currentEvents[eventIndex] = { ...currentEvents[eventIndex], ...newEventPayload };
+                }
+            } else {
+                // Add new event
+                currentEvents.push(newEventPayload);
+            }
+
+            // We must format existing events correctly for useUpdateSchedule which expects camelCase for API
+            const formattedEvents = currentEvents.map(e => ({
+                mediaId: e.mediaId !== undefined ? e.mediaId : e.media_id,
+                campaignId: e.campaignId !== undefined ? e.campaignId : e.campaign_id,
+                startTime: e.startTime || e.start_time,
+                endTime: e.endTime || e.end_time,
+                daysOfWeek: e.daysOfWeek || e.days_of_week
+            }));
+
+            await updateSchedule.mutateAsync({
+                id: selectedSchedule.id,
+                updates: {},
+                newEvents: formattedEvents
+            });
+            toast.success(selectedEvent ? 'Evento actualizado' : 'Evento añadido');
+            setIsEventModalOpen(false);
+        } catch (err: any) {
+            toast.error('Error al guardar: ' + err.message);
+        }
+    };
+
+    const handleDeleteEvent = async () => {
+        if (!selectedSchedule || !selectedEvent) return;
+        if (!confirm('¿Eliminar este evento?')) return;
+        try {
+            const currentEvents = selectedSchedule.events.filter((e: any) => e.id !== selectedEvent.id);
+            const formattedEvents = currentEvents.map((e: any) => ({
+                mediaId: e.media_id,
+                campaignId: e.campaign_id,
+                startTime: e.start_time,
+                endTime: e.end_time,
+                daysOfWeek: e.days_of_week
+            }));
+
+            await updateSchedule.mutateAsync({
+                id: selectedSchedule.id,
+                updates: {},
+                newEvents: formattedEvents
+            });
+            toast.success('Evento eliminado');
+            setIsEventModalOpen(false);
+        } catch (err: any) {
+            toast.error('Error al eliminar: ' + err.message);
+        }
+    };
 
     return (
         <div className="p-6 md:p-8 max-w-5xl mx-auto h-full flex flex-col">
@@ -56,11 +141,15 @@ const WorkspaceSchedule = () => {
                             </div>
                         </div>
                         <div className="flex gap-2">
-                            <Button variant="outline" onClick={() => handleEdit(selectedSchedule)} className="gap-2 bg-background">
-                                <Edit2 className="w-4 h-4" />
-                                Editar Horario
+                            <Button onClick={() => handleOpenEventModal()} className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white">
+                                <Plus className="w-4 h-4" />
+                                Añadir Evento
                             </Button>
-                            <Button onClick={() => setIsSendModalOpen(true)} className="gap-2 bg-emerald-500 hover:bg-emerald-600 text-white">
+                            <Button variant="outline" onClick={() => handleEdit(selectedSchedule)} className="gap-2 bg-background border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:text-indigo-800">
+                                <Edit2 className="w-4 h-4" />
+                                Ajustes
+                            </Button>
+                            <Button onClick={() => setIsSendModalOpen(true)} className="gap-2 bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm">
                                 <MonitorUp className="w-4 h-4" />
                                 Empujar a la Pantalla
                             </Button>
@@ -68,7 +157,17 @@ const WorkspaceSchedule = () => {
                     </div>
                     
                     <div className="flex-1 overflow-hidden rounded-xl border border-border shadow-sm">
-                        <WeeklyCalendar schedule={selectedSchedule} />
+                        <WeeklyCalendar 
+                            schedule={selectedSchedule} 
+                            onSlotClick={(day, hour) => handleOpenEventModal(null, day, hour)}
+                            onEventClick={(event) => handleOpenEventModal({
+                                id: event.id,
+                                asset: event.campaign ? { ...event.campaign, type: 'campaign' } : { ...event.media, type: event.media?.type || 'asset' },
+                                startTime: event.start_time,
+                                endTime: event.end_time,
+                                daysOfWeek: event.days_of_week
+                            })}
+                        />
                     </div>
                 </div>
             ) : (
@@ -152,6 +251,18 @@ const WorkspaceSchedule = () => {
                     commerceId={commerceId}
                     selectedAssets={[{ ...selectedSchedule, type: 'schedule' }]}
                     onSuccess={() => setIsSendModalOpen(false)}
+                />
+            )}
+
+            {isEventModalOpen && selectedSchedule && (
+                <ScheduleEventModal
+                    isOpen={isEventModalOpen}
+                    onClose={() => setIsEventModalOpen(false)}
+                    onSave={handleSaveEvent}
+                    onDelete={selectedEvent ? handleDeleteEvent : undefined}
+                    initialEvent={selectedEvent}
+                    initialDay={selectedDay}
+                    initialHour={selectedHour}
                 />
             )}
         </div>

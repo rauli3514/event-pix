@@ -5,6 +5,8 @@ import { getIconForType } from '@/pages/display-hub/WorkspaceMedia';
 
 interface WeeklyCalendarProps {
     schedule: any;
+    onSlotClick?: (day: number, hour: string) => void;
+    onEventClick?: (event: any) => void;
 }
 
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
@@ -21,8 +23,9 @@ const JS_DAY_TO_GRID_COL = {
 };
 
 const PIXELS_PER_HOUR = 60; // 60px per hour
+const HOURS = Array.from({ length: 24 }, (_, i) => `${i.toString().padStart(2, '0')}:00`);
 
-export const WeeklyCalendar = ({ schedule }: WeeklyCalendarProps) => {
+export const WeeklyCalendar = ({ schedule, onSlotClick, onEventClick }: WeeklyCalendarProps) => {
     
     // Parse time like "14:30" or "02:30 PM" to decimal hours
     const parseTimeToDecimal = (timeStr: string) => {
@@ -78,8 +81,12 @@ export const WeeklyCalendar = ({ schedule }: WeeklyCalendarProps) => {
         return (
             <div 
                 key={`${event.id}-${dayIndex}`}
-                className={cn("absolute left-1 right-1 rounded-md shadow-sm border border-white/20 p-2 overflow-hidden flex flex-col group transition-all", bgClass, "text-white")}
+                className={cn("absolute left-1 right-1 rounded-md shadow-sm border border-white/20 p-2 overflow-hidden flex flex-col group transition-all cursor-pointer hover:ring-2 hover:ring-indigo-500/50 hover:z-10", bgClass, "text-white")}
                 style={{ top: `${top}px`, height: `${height}px` }}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    if (onEventClick) onEventClick(event);
+                }}
             >
                 <div className="flex items-center gap-1.5 text-xs font-semibold mb-1 opacity-90 truncate">
                     <Clock className="w-3 h-3 shrink-0" />
@@ -156,9 +163,24 @@ export const WeeklyCalendar = ({ schedule }: WeeklyCalendarProps) => {
                         {/* Day Columns */}
                         {DAYS.map((_, colIndex) => (
                             <div key={`col-${colIndex}`} className="flex-1 border-r border-border/50 relative">
+                                {HOURS.map((hourStr, hourIdx) => (
+                                    <div
+                                        key={hourIdx}
+                                        className="absolute w-full h-[60px] hover:bg-slate-50/50 cursor-pointer group z-0"
+                                        style={{ top: `${hourIdx * PIXELS_PER_HOUR}px` }}
+                                        onClick={() => {
+                                            const jsDay = colIndex === 6 ? 0 : colIndex + 1;
+                                            if (onSlotClick) onSlotClick(jsDay, hourStr);
+                                        }}
+                                    >
+                                        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 flex items-center justify-center">
+                                            <span className="text-indigo-500 font-medium text-xs">+</span>
+                                        </div>
+                                    </div>
+                                ))}
                                 {schedule.events?.map((ev: any) => {
                                     if (ev.days_of_week && ev.days_of_week.includes(Object.keys(JS_DAY_TO_GRID_COL).find(k => (JS_DAY_TO_GRID_COL as any)[k] === colIndex) ? parseInt(Object.keys(JS_DAY_TO_GRID_COL).find(k => (JS_DAY_TO_GRID_COL as any)[k] === colIndex)!) : -1)) {
-                                        return renderEventBlock(ev, ev.days_of_week[0]); // The day index isn't super critical for the key here since we're mapping inside the col
+                                        return renderEventBlock(ev, ev.days_of_week[0]); 
                                     }
                                     return null;
                                 })}

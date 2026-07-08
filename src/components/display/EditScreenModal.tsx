@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { ChevronDown, ChevronUp, MapPin, MonitorPlay } from 'lucide-react';
-import { DisplayDeviceWithStatus, useDisplayCampaigns } from '@/hooks/use-display-hub';
+import { DisplayDeviceWithStatus, useDisplayCampaigns, useDisplaySchedules } from '@/hooks/use-display-hub';
 import { AssetSelectorModal } from './AssetSelectorModal';
 
 import { toast } from 'sonner';
@@ -27,6 +27,7 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, commerceI
     
     const [contentType, setContentType] = useState('asset');
     const [selectedPlaylistId, setSelectedPlaylistId] = useState('none');
+    const [selectedScheduleId, setSelectedScheduleId] = useState<string>('none');
     const [orientation, setOrientation] = useState('0');
     const [location, setLocation] = useState('');
     const [showDownloading, setShowDownloading] = useState(true);
@@ -37,6 +38,7 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, commerceI
 
     // Load campaigns for playlist dropdown
     const { data: campaigns } = useDisplayCampaigns(commerceId || device?.commerce_id || '');
+    const { data: schedules } = useDisplaySchedules(commerceId || device?.commerce_id || '');
 
     useEffect(() => {
         if (device) {
@@ -46,13 +48,19 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, commerceI
                 setSelectedAsset({ ...device.assignment.campaign, type: 'campaign' });
                 setSelectedPlaylistId(device.assignment.campaign.id);
                 setContentType('playlist');
+            } else if (device.assignment?.schedule) {
+                setSelectedAsset({ ...device.assignment.schedule, type: 'schedule' });
+                setSelectedScheduleId(device.assignment.schedule.id);
+                setContentType('schedule');
             } else if (device.assignment?.media) {
                 setSelectedAsset({ ...device.assignment.media, type: device.assignment.media.type || 'asset' });
                 setSelectedPlaylistId('none');
+                setSelectedScheduleId('none');
                 setContentType('asset');
             } else {
                 setSelectedAsset(null);
                 setSelectedPlaylistId('none');
+                setSelectedScheduleId('none');
                 setContentType('asset');
             }
             setOrientation(device.orientation || '0');
@@ -67,6 +75,16 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, commerceI
         } else {
             const campaign = campaigns?.find(c => c.id === id);
             if (campaign) setSelectedAsset({ ...campaign, type: 'campaign' });
+        }
+    };
+
+    const handleScheduleChange = (id: string) => {
+        setSelectedScheduleId(id);
+        if (id === 'none') {
+            setSelectedAsset(null);
+        } else {
+            const schedule = schedules?.find(s => s.id === id);
+            if (schedule) setSelectedAsset({ ...schedule, type: 'schedule' });
         }
     };
 
@@ -132,7 +150,7 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, commerceI
                             <SelectContent>
                                 <SelectItem value="asset">Archivo</SelectItem>
                                 <SelectItem value="playlist">Lista de Reproducción</SelectItem>
-                                <SelectItem value="schedule">Programación</SelectItem>
+                                <SelectItem value="schedule">Horario Inteligente</SelectItem>
                                 <SelectItem value="stop">Detener Reproducción</SelectItem>
                             </SelectContent>
                         </Select>
@@ -169,10 +187,22 @@ export const EditScreenModal = ({ isOpen, onClose, device, linkGroups, commerceI
                                     Cambiar
                                 </Button>
                             </div>
+                        ) : contentType === 'schedule' ? (
+                            <Select value={selectedScheduleId} onValueChange={handleScheduleChange}>
+                                <SelectTrigger className="w-full shadow-sm bg-background">
+                                    <SelectValue placeholder="Seleccionar horario..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">-- Sin Asignar --</SelectItem>
+                                    {schedules?.map(s => (
+                                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         ) : (
-                            // Programación / Detener: mensaje informativo
+                            // Detener: mensaje informativo
                             <div className="text-sm text-muted-foreground italic py-2">
-                                {contentType === 'stop' ? 'La pantalla dejará de reproducir contenido.' : 'Configura el horario en la sección de abajo.'}
+                                La pantalla dejará de reproducir contenido.
                             </div>
                         )}
                     </div>
