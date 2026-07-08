@@ -110,8 +110,9 @@ export default function DisplayWorkspaceLayout() {
                     } 
                 });
                 toast.success(`✅ Contenido "${schedule.content_name}" publicado automáticamente en ${schedule.device_name}`);
-            } catch (err) {
+            } catch (err: any) {
                 console.error('Auto-publish error:', err);
+                toast.error(`Error publicando programación: ${err.message || err.toString()}`);
             }
         }
 
@@ -163,8 +164,9 @@ export default function DisplayWorkspaceLayout() {
                 if (nextStatus === 'pending') {
                     console.log(`Resetting recurring schedule ${schedule.id} to pending for next cycle`);
                 }
-            } catch (err) {
+            } catch (err: any) {
                 console.error('Expiry error:', err);
+                toast.error(`Error finalizando programación: ${err.message || err.toString()}`);
             }
         }
     };
