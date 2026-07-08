@@ -145,7 +145,7 @@ export const GlobalScheduleModal = ({ isOpen, onClose, commerceId, onScheduled }
                     campaignId: selectedAsset.type === 'campaign' ? selectedAsset.id : null,
                     scheduledAt: finalScheduledAt,
                     expiresAt: finalExpiresAt,
-                    afterExpiry: (!isRecurring && hasExpiry) ? afterExpiry : null,
+                    afterExpiry: (isRecurring || hasExpiry) ? afterExpiry : null,
                     format,
                     contentName: selectedAsset.name,
                     deviceName: device?.name || 'Pantalla',

@@ -15,10 +15,12 @@ interface AssetSelectorModalProps {
     onSelect: (asset: any) => void;
 }
 
+import { useDisplaySchedules } from '@/hooks/use-display-hub';
+
 export const AssetSelectorModal = ({ isOpen, onClose, onSelect }: AssetSelectorModalProps) => {
     const { commerceId } = useParams<{ commerceId: string }>();
     const [search, setSearch] = useState('');
-    const [activeTab, setActiveTab] = useState<'archivos' | 'listas'>('archivos');
+    const [activeTab, setActiveTab] = useState<'archivos' | 'listas' | 'horarios'>('archivos');
     const [selectedAsset, setSelectedAsset] = useState<any>(null);
     const [isCreatingFolder, setIsCreatingFolder] = useState(false);
     const [newFolderName, setNewFolderName] = useState('');
@@ -35,8 +37,9 @@ export const AssetSelectorModal = ({ isOpen, onClose, onSelect }: AssetSelectorM
 
     const { data: mediaFiles = [], isLoading: isLoadingMedia } = useDisplayMedia(commerceId);
     const { data: campaigns = [], isLoading: isLoadingCampaigns } = useDisplayCampaigns(commerceId);
+    const { data: schedules = [], isLoading: isLoadingSchedules } = useDisplaySchedules(commerceId);
     
-    const isLoading = activeTab === 'archivos' ? isLoadingMedia : isLoadingCampaigns;
+    const isLoading = activeTab === 'archivos' ? isLoadingMedia : activeTab === 'listas' ? isLoadingCampaigns : isLoadingSchedules;
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
@@ -66,15 +69,22 @@ export const AssetSelectorModal = ({ isOpen, onClose, onSelect }: AssetSelectorM
     const filteredAssets = useMemo(() => {
         if (activeTab === 'archivos') {
             return mediaFiles.filter(a => a.name.toLowerCase().includes(search.toLowerCase()));
-        } else {
+        } else if (activeTab === 'listas') {
             return campaigns.filter(c => c.name.toLowerCase().includes(search.toLowerCase())).map(c => ({
                 ...c,
                 type: 'campaign',
                 url: null,
                 size_bytes: 0
             }));
+        } else {
+            return schedules.filter(s => s.name.toLowerCase().includes(search.toLowerCase())).map(s => ({
+                ...s,
+                type: 'schedule',
+                url: null,
+                size_bytes: 0
+            }));
         }
-    }, [mediaFiles, campaigns, search, activeTab]);
+    }, [mediaFiles, campaigns, schedules, search, activeTab]);
 
     const formatBytes = (bytes: number) => {
         if (bytes === 0) return '0 Bytes';
@@ -102,9 +112,10 @@ export const AssetSelectorModal = ({ isOpen, onClose, onSelect }: AssetSelectorM
                     <div className="flex-1 flex flex-col md:border-r border-b md:border-b-0 border-border bg-muted/30 min-h-0 overflow-hidden">
                         {/* Toolbar */}
                         <div className="p-4 flex gap-3 items-center border-b border-border bg-card">
-                            <div className="flex bg-muted p-1 rounded-md">
+                            <div className="flex bg-muted p-1 rounded-md overflow-x-auto">
                                 <Button variant="ghost" size="sm" className={`h-8 px-4 ${activeTab === 'archivos' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`} onClick={() => { setActiveTab('archivos'); setSelectedAsset(null); }}>Archivos</Button>
-                                <Button variant="ghost" size="sm" className={`h-8 px-4 ${activeTab === 'listas' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`} onClick={() => { setActiveTab('listas'); setSelectedAsset(null); }}>Listas de Reproducción</Button>
+                                <Button variant="ghost" size="sm" className={`h-8 px-4 ${activeTab === 'listas' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`} onClick={() => { setActiveTab('listas'); setSelectedAsset(null); }}>Listas</Button>
+                                <Button variant="ghost" size="sm" className={`h-8 px-4 ${activeTab === 'horarios' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`} onClick={() => { setActiveTab('horarios'); setSelectedAsset(null); }}>Horarios</Button>
                             </div>
                             
                             <div className="flex-1 relative mt-2 sm:mt-0 min-w-0">

@@ -404,7 +404,7 @@ export const useAssignContentToDevice = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ deviceId, campaignId, mediaId, startTime, endTime }: { deviceId: string; campaignId?: string | null; mediaId?: string | null; startTime?: string | null; endTime?: string | null }) => {
+        mutationFn: async ({ deviceId, campaignId, mediaId, scheduleId, startTime, endTime }: { deviceId: string; campaignId?: string | null; mediaId?: string | null; scheduleId?: string | null; startTime?: string | null; endTime?: string | null }) => {
             await supabase.from("display_assignments").delete().eq("device_id", deviceId);
 
             const { data, error } = await supabase
@@ -413,6 +413,7 @@ export const useAssignContentToDevice = () => {
                     device_id: deviceId,
                     campaign_id: campaignId || null,
                     media_id: mediaId || null,
+                    schedule_id: scheduleId || null,
                     start_time: startTime || null,
                     end_time: endTime || null
                 })
@@ -478,12 +479,16 @@ export const useDisplaySchedules = (commerceId?: string) => {
                 .from("display_schedules")
                 .select(`
                     *,
-                    device:display_devices(id, name),
-                    media:display_media!media_id(id, name, type, url),
-                    campaign:display_campaigns!campaign_id(id, name)
+                    default_media:display_media!default_media_id(id, name, type, url),
+                    default_campaign:display_campaigns!default_campaign_id(id, name),
+                    events:display_schedule_events(
+                        *,
+                        media:display_media!media_id(id, name, type, url),
+                        campaign:display_campaigns!campaign_id(id, name)
+                    )
                 `)
                 .eq("commerce_id", commerceId)
-                .order("scheduled_at", { ascending: true });
+                .order("created_at", { ascending: false });
             if (error) throw error;
             return data;
         },
@@ -496,43 +501,47 @@ export const useCreateSchedule = () => {
     return useMutation({
         mutationFn: async (payload: {
             commerceId: string;
-            deviceId: string;
-            mediaId?: string | null;
-            campaignId?: string | null;
-            scheduledAt: string | null;   // ISO string (can be null if recurring)
-            expiresAt?: string | null;
-            afterExpiry?: string | null;
-            format?: string | null;
-            contentName: string;
-            deviceName: string;
-            isRecurring?: boolean;
-            daysOfWeek?: number[];
-            startTime?: string | null;
-            endTime?: string | null;
+            name: string;
+            defaultMediaId?: string | null;
+            defaultCampaignId?: string | null;
+            events: {
+                mediaId?: string | null;
+                campaignId?: string | null;
+                startTime: string;
+                endTime: string;
+                daysOfWeek: number[];
+            }[];
         }) => {
-            const { data, error } = await supabase
+            // 1. Create Schedule
+            const { data: schedule, error: scheduleError } = await supabase
                 .from("display_schedules")
                 .insert({
                     commerce_id: payload.commerceId,
-                    device_id: payload.deviceId,
-                    media_id: payload.mediaId || null,
-                    campaign_id: payload.campaignId || null,
-                    scheduled_at: payload.scheduledAt,
-                    expires_at: payload.expiresAt || null,
-                    after_expiry: payload.afterExpiry || null,
-                    format: payload.format || 'landscape_16_9',
-                    content_name: payload.contentName,
-                    device_name: payload.deviceName,
-                    status: 'pending',
-                    is_recurring: payload.isRecurring || false,
-                    days_of_week: payload.daysOfWeek || [],
-                    start_time: payload.startTime || null,
-                    end_time: payload.endTime || null,
+                    name: payload.name,
+                    default_media_id: payload.defaultMediaId || null,
+                    default_campaign_id: payload.defaultCampaignId || null,
                 })
                 .select()
                 .single();
-            if (error) throw error;
-            return data;
+            if (scheduleError) throw scheduleError;
+
+            // 2. Create Events
+            if (payload.events.length > 0) {
+                const eventsToInsert = payload.events.map(ev => ({
+                    schedule_id: schedule.id,
+                    media_id: ev.mediaId || null,
+                    campaign_id: ev.campaignId || null,
+                    start_time: ev.startTime,
+                    end_time: ev.endTime,
+                    days_of_week: ev.daysOfWeek,
+                }));
+                const { error: eventsError } = await supabase
+                    .from("display_schedule_events")
+                    .insert(eventsToInsert);
+                if (eventsError) throw eventsError;
+            }
+
+            return schedule;
         },
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ["display_schedules", data.commerce_id] });
@@ -559,7 +568,7 @@ export const useDeleteSchedule = () => {
 export const useUpdateSchedule = () => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: async ({ id, updates }: { id: string; updates: any }) => {
+        mutationFn: async ({ id, updates, newEvents }: { id: string; updates: any, newEvents?: any[] }) => {
             const { data, error } = await supabase
                 .from("display_schedules")
                 .update(updates)
@@ -567,10 +576,28 @@ export const useUpdateSchedule = () => {
                 .select()
                 .single();
             if (error) throw error;
+            
+            // Si mandamos nuevos eventos, borramos los viejos y ponemos los nuevos (simplificación de edición)
+            if (newEvents) {
+                await supabase.from("display_schedule_events").delete().eq("schedule_id", id);
+                if (newEvents.length > 0) {
+                    const eventsToInsert = newEvents.map(ev => ({
+                        schedule_id: id,
+                        media_id: ev.mediaId || null,
+                        campaign_id: ev.campaignId || null,
+                        start_time: ev.startTime,
+                        end_time: ev.endTime,
+                        days_of_week: ev.daysOfWeek,
+                    }));
+                    await supabase.from("display_schedule_events").insert(eventsToInsert);
+                }
+            }
+            
             return data;
         },
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ["display_schedules", data.commerce_id] });
+            queryClient.invalidateQueries({ queryKey: ["display_devices"] }); // Schedules might be assigned to devices
         }
     });
 };

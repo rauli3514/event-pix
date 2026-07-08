@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Search, Upload, LayoutGrid, List as ListIcon, Image as ImageIcon, Video, FileAudio, FileText, Globe, Trash2, Folder, Move, MoreVertical, Edit2, Clock, ArrowRightCircle, Play } from 'lucide-react';
+import { Search, Upload, LayoutGrid, List as ListIcon, Image as ImageIcon, Video, FileAudio, FileText, Globe, Trash2, Folder, Move, MoreVertical, Edit2, Clock, ArrowRightCircle, Play, Calendar } from 'lucide-react';
 import { SendToScreensModal } from '@/components/display/SendToScreensModal';
 import { UploadMediaModal } from '@/components/display/UploadMediaModal';
 import { useDisplayMedia, useUploadDisplayMedia, useDeleteDisplayMedia, useUpdateDisplayMedia } from '@/hooks/use-display-media';
@@ -646,6 +646,7 @@ export function getIconForType(type: string) {
         case 'app': 
         case 'widget': 
         case 'layout': return LayoutGrid;
+        case 'schedule': return Calendar;
         default: return FileText;
     }
 }

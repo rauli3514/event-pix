@@ -63,15 +63,24 @@ const TvPlayer = () => {
                 .or(orQuery)
                 .order('created_at', { ascending: false });
 
-            // 3. Buscar programaciones avanzadas (Schedules)
-            const { data: schedules } = await supabase
-                .from('display_schedules')
+            const { data: assignments } = await supabase
+                .from('display_assignments')
                 .select(`
                   *,
-                  campaign:display_campaigns!campaign_id(*),
-                  media:display_media!media_id(*)
+                  campaign:display_campaigns(*),
+                  media:display_media(*),
+                  schedule:display_schedules(
+                      *,
+                      default_campaign:display_campaigns!default_campaign_id(*),
+                      default_media:display_media!default_media_id(*),
+                      events:display_schedule_events(
+                          *,
+                          campaign:display_campaigns!campaign_id(*),
+                          media:display_media!media_id(*)
+                      )
+                  )
                 `)
-                .eq('device_id', device.id)
+                .or(orQuery)
                 .order('created_at', { ascending: false });
 
             const now = new Date();
@@ -80,23 +89,22 @@ const TvPlayer = () => {
 
             let activeContent: any = null;
 
-            // Primero buscar si hay un schedule activo (tiene mayor prioridad)
-            if (schedules && schedules.length > 0) {
-                activeContent = schedules.find(s => {
-                    if (s.status === 'expired') return false;
-                    if (s.expires_at && new Date(s.expires_at) < now) return false;
+            if (assignments && assignments.length > 0) {
+                // La asignación más reciente tiene prioridad
+                const assignment = assignments[0];
+                
+                if (assignment.schedule) {
+                    const schedule = assignment.schedule;
+                    let activeEvent = null;
                     
-                    if (s.is_recurring) {
-                        const days = s.days_of_week || [];
-                        if (days.length > 0 && !days.includes(currentDay)) return false;
-                        
-                        if (s.start_time && s.end_time) {
-                            // Convert both to HH:MM format if they are like 11:00 AM
-                            // Wait, startTime and endTime are stored in whatever format the input has, e.g., "11:00 AM".
-                            // I need a quick parser for 12h to 24h
+                    // Evaluar los eventos de la programación
+                    for (const ev of schedule.events || []) {
+                        if (ev.days_of_week && ev.days_of_week.includes(currentDay)) {
+                            // Parse HH:mm if needed, though they should be stored as HH:mm
                             const parse12hTo24h = (timeStr: string) => {
+                                if (!timeStr) return '00:00';
                                 const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
-                                if (!match) return timeStr; // might already be 24h
+                                if (!match) return timeStr.substring(0, 5); // Take HH:mm
                                 let [_, hStr, m, ampm] = match;
                                 let h = parseInt(hStr, 10);
                                 if (ampm.toUpperCase() === 'PM' && h < 12) h += 12;
@@ -104,32 +112,35 @@ const TvPlayer = () => {
                                 return `${h.toString().padStart(2, '0')}:${m}`;
                             };
                             
-                            const start24 = parse12hTo24h(s.start_time);
-                            const end24 = parse12hTo24h(s.end_time);
+                            const start24 = parse12hTo24h(ev.start_time);
+                            const end24 = parse12hTo24h(ev.end_time);
                             
-                            return currentTimeStr >= start24 && currentTimeStr <= end24;
+                            if (currentTimeStr >= start24 && currentTimeStr <= end24) {
+                                activeEvent = ev;
+                                break;
+                            }
                         }
-                        return true;
+                    }
+                    
+                    if (activeEvent) {
+                        activeContent = {
+                            campaign: activeEvent.campaign,
+                            media: activeEvent.media
+                        };
                     } else {
-                        if (!s.scheduled_at) return false;
-                        return now >= new Date(s.scheduled_at);
+                        // Caer en el contenido predeterminado del horario
+                        activeContent = {
+                            campaign: schedule.default_campaign,
+                            media: schedule.default_media
+                        };
                     }
-                });
-            }
-
-            // Si no hay schedule activo, buscar la asignación por defecto (assignments)
-            if (!activeContent && assignments && assignments.length > 0) {
-                // Retrocompatibilidad: buscar una vigencia en assignments
-                const scheduledAssignment = assignments.find(a => {
-                    if (a.start_time && a.end_time) {
-                        const start = new Date(a.start_time);
-                        const end = new Date(a.end_time);
-                        return now >= start && now <= end;
-                    }
-                    return false;
-                });
-                const defaultAssignment = assignments.find(a => !a.start_time);
-                activeContent = scheduledAssignment || defaultAssignment;
+                } else {
+                    // Es un contenido estático (lista o archivo)
+                    activeContent = {
+                        campaign: assignment.campaign,
+                        media: assignment.media
+                    };
+                }
             }
 
             if (activeContent) {

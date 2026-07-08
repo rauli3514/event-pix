@@ -1,243 +1,170 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Calendar, Clock, Monitor, Trash2, CheckCircle2, AlertCircle, RefreshCw, PlaySquare, Image as ImageIcon, Globe, Plus } from 'lucide-react';
+import { Calendar, Clock, Monitor, Trash2, Edit2, PlaySquare, Image as ImageIcon, Globe, Plus, LayoutGrid } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDisplaySchedules, useDeleteSchedule } from '@/hooks/use-display-hub';
 import { toast } from 'sonner';
-import { GlobalScheduleModal } from '@/components/display/GlobalScheduleModal';
-
-// Format ISO to dd/mm/aaaa
-function fmtDate(iso: string): string {
-    const d = new Date(iso);
-    return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
-}
-
-// Format ISO to HH:MM AM/PM
-function fmtTime(iso: string): string {
-    const d = new Date(iso);
-    let h = d.getHours();
-    const min = d.getMinutes().toString().padStart(2, '0');
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    h = h % 12 || 12;
-    return `${h.toString().padStart(2, '0')}:${min} ${ampm}`;
-}
-
-const formatLabel = (f: string) => {
-    const map: Record<string, string> = {
-        landscape_16_9: 'Paisaje (16:9)',
-        portrait_9_16: 'Vertical (9:16)',
-        square_1_1: 'Cuadrado (1:1)',
-        landscape_4_3: 'Paisaje (4:3)',
-    };
-    return map[f] || f;
-};
-
-const StatusBadge = ({ status, isRecurring }: { status: string, isRecurring?: boolean }) => {
-    if (isRecurring) return (
-        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
-            <RefreshCw className="w-3 h-3" /> Recurrente
-        </span>
-    );
-    if (status === 'published') return (
-        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-            <CheckCircle2 className="w-3 h-3" /> Publicado
-        </span>
-    );
-    if (status === 'expired') return (
-        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-muted text-muted-foreground border border-border">
-            <AlertCircle className="w-3 h-3" /> Vencido
-        </span>
-    );
-    // pending
-    return (
-        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-            <Clock className="w-3 h-3" /> Programado
-        </span>
-    );
-};
+import { ScheduleBuilderModal } from '@/components/display/ScheduleBuilderModal';
 
 const WorkspaceSchedule = () => {
     const { commerceId } = useParams<{ commerceId: string }>();
     const { data: schedules = [], isLoading, refetch } = useDisplaySchedules(commerceId);
     const deleteSchedule = useDeleteSchedule();
-    const [isGlobalModalOpen, setIsGlobalModalOpen] = useState(false);
+    
+    const [isBuilderOpen, setIsBuilderOpen] = useState(false);
+    const [editingSchedule, setEditingSchedule] = useState<any>(null);
 
-    const handleDelete = async (id: string, contentName: string) => {
-        if (!confirm(`¿Eliminar la programación "${contentName}"?`)) return;
+    const handleDelete = async (id: string, name: string) => {
+        if (!confirm(`¿Eliminar el horario "${name}"? Las pantallas que lo tengan asignado dejarán de usarlo.`)) return;
         try {
             await deleteSchedule.mutateAsync(id);
-            toast.success('Programación eliminada');
+            toast.success('Horario eliminado');
         } catch (err: any) {
             toast.error('Error al eliminar: ' + err.message);
         }
     };
 
-    const pending = (schedules as any[]).filter(s => s.status === 'pending');
-    const published = (schedules as any[]).filter(s => s.status === 'published');
-    const expired = (schedules as any[]).filter(s => s.status === 'expired');
+    const handleEdit = (schedule: any) => {
+        setEditingSchedule(schedule);
+        setIsBuilderOpen(true);
+    };
+
+    const handleCreateNew = () => {
+        setEditingSchedule(null);
+        setIsBuilderOpen(true);
+    };
 
     return (
-        <div className="p-6 md:p-8 max-w-5xl mx-auto">
+        <div className="p-6 md:p-8 max-w-5xl mx-auto h-full flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 shrink-0">
                 <div>
                     <h1 className="text-2xl font-bold text-foreground font-[Orbitron]">
-                        Programación de <span className="text-indigo-500">Contenido</span>
+                        Horarios <span className="text-indigo-500">Inteligentes</span>
                     </h1>
                     <p className="text-muted-foreground text-sm mt-1">
-                        El sistema publica automáticamente cuando se cumple la fecha y hora configurada.
+                        Crea horarios con eventos recurrentes y asígnalos a tus pantallas.
                     </p>
                 </div>
-                <div className="flex gap-3">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => refetch()}
-                        className="border-border text-foreground hover:bg-muted gap-2 h-10"
-                    >
-                        <RefreshCw className="w-4 h-4" />
-                        Actualizar
-                    </Button>
-                    <Button
-                        onClick={() => setIsGlobalModalOpen(true)}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 h-10 shadow-lg shadow-indigo-900/20"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Nueva Programación
-                    </Button>
-                </div>
+                <Button
+                    onClick={handleCreateNew}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 h-10 shadow-lg shadow-indigo-900/20"
+                >
+                    <Plus className="w-4 h-4" />
+                    Nuevo Horario
+                </Button>
             </div>
 
-            {isLoading ? (
-                <div className="flex justify-center items-center h-40 text-muted-foreground">
-                    <div className="flex flex-col items-center gap-3">
-                        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                        <span>Cargando programaciones...</span>
+            {/* List */}
+            <div className="flex-1 overflow-y-auto min-h-0">
+                {isLoading ? (
+                    <div className="flex justify-center items-center h-40 text-muted-foreground">
+                        <div className="flex flex-col items-center gap-3">
+                            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                            <span>Cargando horarios...</span>
+                        </div>
                     </div>
-                </div>
-            ) : schedules.length === 0 ? (
-                <div className="py-20 text-center border-2 border-dashed border-border rounded-2xl bg-card/50">
-                    <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-lg font-bold text-foreground">Sin programaciones</h3>
-                    <p className="text-muted-foreground text-sm mt-2 max-w-sm mx-auto">
-                        Para crear una programación, abrí "Editar Pantalla", seleccioná un contenido y hacé clic en "Programar".
-                    </p>
-                </div>
-            ) : (
-                <div className="space-y-8">
-                    {/* Pending */}
-                    {pending.length > 0 && (
-                        <section>
-                            <h2 className="text-sm font-semibold uppercase tracking-wider text-amber-400 mb-3 flex items-center gap-2">
-                                <Clock className="w-4 h-4" /> Programadas ({pending.length})
-                            </h2>
-                            <div className="space-y-3">
-                                {pending.map((s: any) => (
-                                    <ScheduleCard key={s.id} schedule={s} onDelete={handleDelete} />
-                                ))}
-                            </div>
-                        </section>
-                    )}
+                ) : schedules.length === 0 ? (
+                    <div className="py-20 text-center border-2 border-dashed border-border rounded-2xl bg-card/50">
+                        <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                        <h3 className="text-lg font-bold text-foreground">Sin horarios</h3>
+                        <p className="text-muted-foreground text-sm mt-2 max-w-sm mx-auto">
+                            Crea un Horario para programar contenido dinámico durante la semana y asígnalo a tus pantallas.
+                        </p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {schedules.map((s: any) => (
+                            <ScheduleCard 
+                                key={s.id} 
+                                schedule={s} 
+                                onEdit={() => handleEdit(s)}
+                                onDelete={() => handleDelete(s.id, s.name)} 
+                            />
+                        ))}
+                    </div>
+                )}
+            </div>
 
-                    {/* Published */}
-                    {published.length > 0 && (
-                        <section>
-                            <h2 className="text-sm font-semibold uppercase tracking-wider text-emerald-400 mb-3 flex items-center gap-2">
-                                <CheckCircle2 className="w-4 h-4" /> Publicadas ({published.length})
-                            </h2>
-                            <div className="space-y-3">
-                                {published.map((s: any) => (
-                                    <ScheduleCard key={s.id} schedule={s} onDelete={handleDelete} />
-                                ))}
-                            </div>
-                        </section>
-                    )}
-
-                    {/* Expired */}
-                    {expired.length > 0 && (
-                        <section>
-                            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
-                                <AlertCircle className="w-4 h-4" /> Vencidas ({expired.length})
-                            </h2>
-                            <div className="space-y-3">
-                                {expired.map((s: any) => (
-                                    <ScheduleCard key={s.id} schedule={s} onDelete={handleDelete} />
-                                ))}
-                            </div>
-                        </section>
-                    )}
-                </div>
-            )}
-
-            {commerceId && (
-                <GlobalScheduleModal 
-                    isOpen={isGlobalModalOpen}
-                    onClose={() => setIsGlobalModalOpen(false)}
+            {commerceId && isBuilderOpen && (
+                <ScheduleBuilderModal 
+                    isOpen={isBuilderOpen}
+                    onClose={() => setIsBuilderOpen(false)}
                     commerceId={commerceId}
-                    onScheduled={() => {
-                        setIsGlobalModalOpen(false);
-                        refetch();
-                    }}
+                    existingSchedule={editingSchedule}
+                    onSaved={() => refetch()}
                 />
             )}
         </div>
     );
 };
 
-const ScheduleCard = ({ schedule: s, onDelete }: { schedule: any; onDelete: (id: string, name: string) => void }) => {
-    const typeIcon = s.campaign_id
-        ? <PlaySquare className="w-5 h-5 text-emerald-400" />
-        : s.media?.type === 'image'
-        ? <ImageIcon className="w-5 h-5 text-blue-400" />
-        : s.media?.type === 'video'
-        ? <PlaySquare className="w-5 h-5 text-violet-400" />
-        : <Globe className="w-5 h-5 text-cyan-400" />;
-
+const ScheduleCard = ({ schedule: s, onEdit, onDelete }: { schedule: any; onEdit: () => void; onDelete: () => void }) => {
+    const defaultAsset = s.default_campaign || s.default_media;
+    
     return (
-        <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-4 hover:border-primary/50 transition-colors shadow-sm">
-            {/* Type icon */}
-            <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                {typeIcon}
-            </div>
-
-            {/* Info */}
-            <div className="flex-1 min-w-0">
-                <p className="text-foreground font-semibold truncate">{s.content_name}</p>
-                <div className="flex items-center gap-3 mt-1 flex-wrap">
-                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Monitor className="w-3.5 h-3.5" /> {s.device_name}
-                    </span>
-                    {s.is_recurring ? (
-                        <span className="flex items-center gap-1 text-xs text-indigo-400 font-medium">
-                            <Clock className="w-3.5 h-3.5" /> 
-                            {['D', 'L', 'M', 'X', 'J', 'V', 'S'].filter((_, i) => (s.days_of_week || []).includes(i)).join(', ')} — {s.start_time} a {s.end_time}
-                        </span>
-                    ) : (
-                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <Calendar className="w-3.5 h-3.5" /> {fmtDate(s.scheduled_at)} — {fmtTime(s.scheduled_at)}
-                        </span>
-                    )}
-                    {s.expires_at && (
-                        <span className="flex items-center gap-1 text-xs text-destructive/80">
-                            <AlertCircle className="w-3.5 h-3.5" /> Vence: {fmtDate(s.expires_at)} {fmtTime(s.expires_at)}
-                        </span>
-                    )}
-                    <span className="text-xs text-muted-foreground">{formatLabel(s.format)}</span>
+        <div className="bg-card border border-border rounded-xl p-5 flex flex-col gap-4 hover:border-indigo-500/50 transition-colors shadow-sm relative group">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center shrink-0">
+                        <Calendar className="w-5 h-5 text-indigo-500" />
+                    </div>
+                    <div>
+                        <h3 className="text-foreground font-bold text-lg leading-tight">{s.name}</h3>
+                        <p className="text-xs text-muted-foreground">{s.events?.length || 0} eventos configurados</p>
+                    </div>
+                </div>
+                
+                {/* Actions (visible on hover) */}
+                <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity bg-card rounded-lg">
+                    <Button variant="ghost" size="icon" onClick={onEdit} className="h-8 w-8 text-muted-foreground hover:text-indigo-500 hover:bg-indigo-50">
+                        <Edit2 className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={onDelete} className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10">
+                        <Trash2 className="w-4 h-4" />
+                    </Button>
                 </div>
             </div>
 
-            {/* Status */}
-            <StatusBadge status={s.status} isRecurring={s.is_recurring} />
+            {/* Default Content */}
+            <div className="bg-muted/50 rounded-lg p-3 flex items-center gap-3 border border-border/50">
+                <div className="w-8 h-8 rounded bg-background flex items-center justify-center shrink-0 border border-border">
+                    {!defaultAsset ? <LayoutGrid className="w-4 h-4 text-muted-foreground" /> :
+                     defaultAsset.type === 'campaign' || s.default_campaign ? <PlaySquare className="w-4 h-4 text-emerald-500" /> :
+                     defaultAsset.type === 'video' ? <PlaySquare className="w-4 h-4 text-violet-500" /> :
+                     defaultAsset.type === 'web' ? <Globe className="w-4 h-4 text-blue-500" /> :
+                     <ImageIcon className="w-4 h-4 text-blue-500" />}
+                </div>
+                <div className="min-w-0">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-0.5">Predeterminado</p>
+                    <p className="text-sm font-medium truncate">{defaultAsset ? defaultAsset.name : 'Ninguno (Pantalla Negra)'}</p>
+                </div>
+            </div>
 
-            {/* Actions */}
-            <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onDelete(s.id, s.content_name)}
-                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
-            >
-                <Trash2 className="w-4 h-4" />
-            </Button>
+            {/* Events Preview */}
+            {s.events && s.events.length > 0 && (
+                <div className="space-y-2 mt-1">
+                    {s.events.slice(0, 3).map((ev: any, i: number) => {
+                        const days = ['D', 'L', 'M', 'X', 'J', 'V', 'S'].filter((_, i) => ev.days_of_week.includes(i)).join(', ');
+                        const itemName = ev.campaign?.name || ev.media?.name || 'Desconocido';
+                        return (
+                            <div key={i} className="flex items-center justify-between text-xs">
+                                <span className="text-muted-foreground flex items-center gap-1.5 min-w-0 truncate">
+                                    <Clock className="w-3 h-3 shrink-0" />
+                                    <span className="truncate">{itemName}</span>
+                                </span>
+                                <span className="font-medium text-foreground shrink-0 pl-2">
+                                    {days} ({ev.start_time}-{ev.end_time})
+                                </span>
+                            </div>
+                        );
+                    })}
+                    {s.events.length > 3 && (
+                        <p className="text-xs text-muted-foreground italic text-center pt-1">+ {s.events.length - 3} eventos más</p>
+                    )}
+                </div>
+            )}
         </div>
     );
 };
