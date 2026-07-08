@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { Calendar, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getIconForType } from '@/pages/display-hub/WorkspaceMedia';
@@ -54,7 +54,7 @@ export const WeeklyCalendar = ({ schedule }: WeeklyCalendarProps) => {
         return `${h.toString().padStart(2, '0')}:${mStr} ${ampmStr}`;
     };
 
-    const renderEventBlock = (event: any, dayIndex: number, colIndex: number) => {
+    const renderEventBlock = (event: any, dayIndex: number) => {
         const startDecimal = parseTimeToDecimal(event.start_time);
         const endDecimal = parseTimeToDecimal(event.end_time);
         let duration = endDecimal - startDecimal;
@@ -135,7 +135,7 @@ export const WeeklyCalendar = ({ schedule }: WeeklyCalendarProps) => {
                 <div className="flex-1 min-w-[700px]">
                     {/* Days Header */}
                     <div className="h-12 border-b border-border bg-muted/50 flex sticky top-0 z-20">
-                        {DAYS.map((day, i) => (
+                        {DAYS.map((day) => (
                             <div key={day} className="flex-1 border-r border-border flex items-center justify-center font-semibold text-sm text-foreground">
                                 {day}
                             </div>
@@ -158,7 +158,7 @@ export const WeeklyCalendar = ({ schedule }: WeeklyCalendarProps) => {
                             <div key={`col-${colIndex}`} className="flex-1 border-r border-border/50 relative">
                                 {schedule.events?.map((ev: any) => {
                                     if (ev.days_of_week && ev.days_of_week.includes(Object.keys(JS_DAY_TO_GRID_COL).find(k => (JS_DAY_TO_GRID_COL as any)[k] === colIndex) ? parseInt(Object.keys(JS_DAY_TO_GRID_COL).find(k => (JS_DAY_TO_GRID_COL as any)[k] === colIndex)!) : -1)) {
-                                        return renderEventBlock(ev, ev.days_of_week[0], colIndex); // The day index isn't super critical for the key here since we're mapping inside the col
+                                        return renderEventBlock(ev, ev.days_of_week[0]); // The day index isn't super critical for the key here since we're mapping inside the col
                                     }
                                     return null;
                                 })}

@@ -150,7 +150,8 @@ const WorkspaceSchedule = () => {
                     isOpen={isSendModalOpen}
                     onClose={() => setIsSendModalOpen(false)}
                     commerceId={commerceId}
-                    asset={{ ...selectedSchedule, type: 'schedule' }}
+                    selectedAssets={[{ ...selectedSchedule, type: 'schedule' }]}
+                    onSuccess={() => setIsSendModalOpen(false)}
                 />
             )}
         </div>
