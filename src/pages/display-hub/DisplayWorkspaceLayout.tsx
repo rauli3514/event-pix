@@ -75,7 +75,9 @@ export default function DisplayWorkspaceLayout() {
             if (s.is_recurring) {
                 if (s.days_of_week && s.days_of_week.includes(currentDay)) {
                      // Trigger if current time is within the start-end window
-                     if (currentTime >= s.start_time && currentTime < s.end_time) {
+                     const st = s.start_time ? s.start_time.substring(0, 5) : '';
+                     const et = s.end_time ? s.end_time.substring(0, 5) : '';
+                     if (currentTime >= st && currentTime < et) {
                          return true;
                      }
                 }
@@ -119,7 +121,8 @@ export default function DisplayWorkspaceLayout() {
             if (s.is_recurring) {
                 // If it's a recurring schedule, check if the window has passed
                 if (s.days_of_week && s.days_of_week.includes(currentDay)) {
-                    if (currentTime >= s.end_time) {
+                    const et = s.end_time ? s.end_time.substring(0, 5) : '';
+                    if (currentTime >= et) {
                         return true; // Window ended today
                     }
                 } else {
