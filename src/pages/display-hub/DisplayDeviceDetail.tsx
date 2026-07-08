@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Monitor, Save, HardDrive, Clock, Smartphone, Activity, Cpu, PlaySquare, Trash2, AlertTriangle, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -13,7 +13,6 @@ import { supabase } from "@/lib/supabase";
 
 const DisplayDeviceDetail = () => {
     const { id } = useParams<{ id: string }>();
-    const navigate = useNavigate();
 
     const { data: deviceData, isLoading } = useDisplayDevice(id);
     const assignContent = useAssignContentToDevice();
