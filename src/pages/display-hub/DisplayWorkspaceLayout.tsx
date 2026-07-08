@@ -66,7 +66,25 @@ export default function DisplayWorkspaceLayout() {
     
     const checkAndPublish = async () => {
         const now = new Date();
-        const pending = (schedules as any[]).filter(s => s.status === 'pending' && new Date(s.scheduled_at) <= now);
+        const currentDay = now.getDay() === 0 ? 7 : now.getDay(); // 1 (Mon) - 7 (Sun)
+        const currentTime = now.toTimeString().substring(0, 5); // "HH:mm"
+
+        const pending = (schedules as any[]).filter(s => {
+            if (s.status !== 'pending') return false;
+            
+            if (s.is_recurring) {
+                if (s.days_of_week && s.days_of_week.includes(currentDay)) {
+                     // Trigger if current time is within the start-end window
+                     if (currentTime >= s.start_time && currentTime < s.end_time) {
+                         return true;
+                     }
+                }
+                return false;
+            }
+            
+            return s.scheduled_at && new Date(s.scheduled_at) <= now;
+        });
+
         for (const schedule of pending) {
             try {
                 await assignContent.mutateAsync({
@@ -81,10 +99,33 @@ export default function DisplayWorkspaceLayout() {
             }
         }
 
-        const published = (schedules as any[]).filter(s => s.status === 'published' && s.expires_at && new Date(s.expires_at) <= now);
+        const published = (schedules as any[]).filter(s => {
+            if (s.status !== 'published') return false;
+            
+            if (s.is_recurring) {
+                // If it's a recurring schedule, check if the window has passed
+                if (s.days_of_week && s.days_of_week.includes(currentDay)) {
+                    if (currentTime >= s.end_time) {
+                        return true; // Window ended today
+                    }
+                } else {
+                    return true; // Not even the right day
+                }
+                return false;
+            }
+            
+            return s.expires_at && new Date(s.expires_at) <= now;
+        });
+
         for (const schedule of published) {
             try {
-                await updateSchedule.mutateAsync({ id: schedule.id, updates: { status: 'expired' } });
+                // For recurring schedules, reset to 'pending' so they can run again next time.
+                // For one-off schedules, mark as 'expired'.
+                const nextStatus = schedule.is_recurring ? 'pending' : 'expired';
+                await updateSchedule.mutateAsync({ id: schedule.id, updates: { status: nextStatus } });
+                if (nextStatus === 'pending') {
+                    console.log(`Resetting recurring schedule ${schedule.id} to pending for next cycle`);
+                }
             } catch (err) {
                 console.error('Expiry error:', err);
             }
