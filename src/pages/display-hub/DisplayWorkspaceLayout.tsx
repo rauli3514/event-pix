@@ -84,7 +84,7 @@ export default function DisplayWorkspaceLayout() {
       </div>
 
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-        {MENU_ITEMS.map((item) => {
+        {MENU_ITEMS.filter(item => !(item.id === 'ai-knowledge' && isDisplayUser)).map((item) => {
           const itemPath = `${basePath}/${item.path}`;
           const isActive = location.pathname.includes(itemPath);
 
