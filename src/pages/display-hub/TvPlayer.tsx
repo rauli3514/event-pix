@@ -94,12 +94,13 @@ const TvPlayer = () => {
                             // Parse HH:mm if needed, though they should be stored as HH:mm
                             const parse12hTo24h = (timeStr: string) => {
                                 if (!timeStr) return '00:00';
-                                const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+                                const match = timeStr.match(/(\d+):(\d+)\s*(a\.?m\.?|p\.?m\.?)/i);
                                 if (!match) return timeStr.substring(0, 5); // Take HH:mm
                                 let [_, hStr, m, ampm] = match;
                                 let h = parseInt(hStr, 10);
-                                if (ampm.toUpperCase() === 'PM' && h < 12) h += 12;
-                                if (ampm.toUpperCase() === 'AM' && h === 12) h = 0;
+                                const cleanAmPm = ampm.replace(/\./g, '').toUpperCase();
+                                if (cleanAmPm === 'PM' && h < 12) h += 12;
+                                if (cleanAmPm === 'AM' && h === 12) h = 0;
                                 return `${h.toString().padStart(2, '0')}:${m}`;
                             };
                             
