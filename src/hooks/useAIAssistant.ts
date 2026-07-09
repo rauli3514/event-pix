@@ -53,7 +53,7 @@ export function useAIAssistant() {
             setMessages(prev => [...prev, {
                 id: Date.now().toString(),
                 role: 'assistant',
-                content: 'Lo siento, hubo un error al conectarme con la IA. Asegúrate de tener la API Key configurada.',
+                content: 'Error de IA: ' + (error.message || 'Error desconocido al conectar con el servidor.'),
                 timestamp: new Date()
             }]);
         } finally {

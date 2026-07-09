@@ -29,6 +29,7 @@ import {
 } from "./pages/display-hub/WorkspacePlaceholders";
 import { WorkspaceMedia } from "./pages/display-hub/WorkspaceMedia";
 import WorkspaceSchedule from "./pages/display-hub/WorkspaceSchedule";
+import AIKnowledgeManager from "@/pages/display-hub/AIKnowledgeManager";
 import WorkspaceTemplates from "./pages/display-hub/WorkspaceTemplates";
 import { StickerEditor } from "./components/stickers/StickerEditor";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -71,6 +72,7 @@ const App = () => (
                   <Route path="labels" element={<WorkspaceLabels />} />
                   <Route path="templates" element={<WorkspaceTemplates />} />
                   <Route path="schedule" element={<WorkspaceSchedule />} />
+                  <Route path="ai-knowledge" element={<AIKnowledgeManager />} />
                   <Route path="analytics" element={<WorkspaceAnalytics />} />
                   <Route path="settings" element={<WorkspaceSettings />} />
                 </Route>

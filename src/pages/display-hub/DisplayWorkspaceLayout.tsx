@@ -31,6 +31,7 @@ const MENU_ITEMS = [
   { id: 'labels', label: 'Etiquetas', icon: Database, path: 'labels' },
   { id: 'templates', label: 'Plantillas', icon: PenTool, path: 'templates' },
   { id: 'schedule', label: 'Programación', icon: Calendar, path: 'schedule' },
+  { id: 'ai-knowledge', label: 'Conocimiento IA', icon: Bot, path: 'ai-knowledge' },
 ];
 
 export default function DisplayWorkspaceLayout() {

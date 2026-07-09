@@ -1,7 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0"
 import { corsHeaders } from "../_shared/cors.ts"
 
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -16,19 +19,58 @@ serve(async (req) => {
       throw new Error("OPENAI_API_KEY no está configurada en los secrets de Supabase.")
     }
 
-    const SYSTEM_PROMPT = "Eres el 'Asistente IA' de Display Digital by eventpix, una plataforma de cartelería digital.\n" +
-    "Tu objetivo es ayudar al usuario a gestionar sus pantallas, medios, playlists, programaciones y campañas.\n\n" +
-    "CONOCIMIENTO DE LA PLATAFORMA:\n" +
-    "- Playlists: Colecciones de medios (imágenes/videos) que se reproducen en secuencia.\n" +
-    "- Campañas: Layouts avanzados que pueden contener múltiples zonas (ej. zona principal y un ticker de texto).\n" +
-    "- Horarios (Schedules): Programaciones semanales que asignan contenido a horas y días específicos.\n" +
-    "- Dispositivos (Pantallas): TVs o tablets conectadas mediante la app 'TvPlayer'. Pueden agruparse.\n\n" +
-    "REGLAS DE INTERACCIÓN:\n" +
-    "1. Eres proactivo, amable, y conciso. Hablas español de Argentina (tuteo/voseo amigable).\n" +
-    "2. Tienes acceso al contexto del comercio actual (se te proveerá en cada mensaje).\n" +
-    "3. NO inventes IDs o datos que no estén en el contexto.\n" +
-    "4. Cuando el usuario te pida CREAR algo (ej. una playlist, una promo, una campaña), usa las 'Tools/Functions' para proponer la acción estructurada. No respondas que no puedes hacerlo.\n" +
-    "5. Si el usuario pide generar un texto publicitario, hazlo directamente en tu respuesta con formato Markdown.\n";
+    // Connect to Supabase using the user's Auth Header to respect RLS
+    const authHeader = req.headers.get('Authorization')
+    const supabase = createClient(
+      SUPABASE_URL ?? '',
+      SUPABASE_ANON_KEY ?? '',
+      { global: { headers: { Authorization: authHeader || '' } } }
+    )
+
+    const commerceId = contextData?.commerce?.id;
+
+    let systemPromptBase = "Eres el 'Asistente IA' de Display Digital by eventpix, una plataforma de cartelería digital.\n" +
+    "Tu objetivo es ayudar al usuario a gestionar sus pantallas, medios, playlists, programaciones y campañas.\n\n";
+
+    if (commerceId) {
+        // Fetch Personality
+        const { data: personality } = await supabase
+            .from('ai_personality')
+            .select('system_prompt')
+            .eq('commerce_id', commerceId)
+            .eq('is_active', true)
+            .single();
+
+        if (personality?.system_prompt) {
+            systemPromptBase = personality.system_prompt + "\n\n";
+        }
+
+        // Fetch FAQs
+        const { data: faqs } = await supabase
+            .from('ai_faq')
+            .select('question, answer')
+            .eq('commerce_id', commerceId);
+            
+        if (faqs && faqs.length > 0) {
+            systemPromptBase += "PREGUNTAS FRECUENTES (RESPONDE USANDO ESTA INFORMACIÓN):\n";
+            faqs.forEach(faq => {
+                systemPromptBase += `Q: ${faq.question}\nA: ${faq.answer}\n\n`;
+            });
+        }
+
+        // Fetch Knowledge
+        const { data: knowledge } = await supabase
+            .from('ai_knowledge')
+            .select('title, content')
+            .eq('commerce_id', commerceId);
+
+        if (knowledge && knowledge.length > 0) {
+            systemPromptBase += "BASE DE CONOCIMIENTO TÉCNICO (REGLAS Y MANUALES):\n";
+            knowledge.forEach(doc => {
+                systemPromptBase += `--- ${doc.title} ---\n${doc.content}\n\n`;
+            });
+        }
+    }
 
     const TOOLS = [
       {
@@ -70,7 +112,7 @@ serve(async (req) => {
         "Campañas existentes: " + (contextData?.campaigns?.map((c:any) => c.name).join(', ') || 'Ninguna') + "\n";
 
     const apiMessages = [
-        { role: 'system', content: SYSTEM_PROMPT + contextString },
+        { role: 'system', content: systemPromptBase + contextString },
         ...messages.filter((m:any) => m.role !== 'system').map((m:any) => ({ role: m.role, content: m.content }))
     ];
 
