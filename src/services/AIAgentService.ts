@@ -2,17 +2,32 @@ import OpenAI from 'openai';
 
 let openaiClient: OpenAI | null = null;
 
+export const saveOpenAIKey = (key: string) => {
+    localStorage.setItem('OPENAI_RAW_KEY', key);
+    openaiClient = null; // force reload
+};
+
 export const getOpenAIClient = () => {
     if (openaiClient) return openaiClient;
     
     const b64Key = import.meta.env.VITE_OPENAI_KEY_B64;
-    if (!b64Key) {
-        console.error("OpenAI key not configured in VITE_OPENAI_KEY_B64");
+    const rawKey = localStorage.getItem('OPENAI_RAW_KEY');
+    
+    let apiKey = rawKey || '';
+    if (!apiKey && b64Key) {
+        try {
+            apiKey = atob(b64Key);
+        } catch (e) {
+            console.error("Failed to decode VITE_OPENAI_KEY_B64");
+        }
+    }
+
+    if (!apiKey) {
+        console.error("OpenAI key not configured");
         return null;
     }
     
     try {
-        const apiKey = atob(b64Key);
         openaiClient = new OpenAI({
             apiKey,
             dangerouslyAllowBrowser: true 
