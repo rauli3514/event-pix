@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Bot, X, Send, Sparkles, AlertCircle } from 'lucide-react';
 import { useAIAssistant } from '@/hooks/useAIAssistant';
-import { AIAgentService, saveOpenAIKey } from '@/services/AIAgentService';
 import { AIActionCard } from './AIActionCard';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -20,8 +19,6 @@ const SUGGESTIONS = [
 export function AIAssistantPanel({ isOpen, onClose }: AIAssistantPanelProps) {
     const { messages, isLoading, sendMessage, executeAction, cancelAction } = useAIAssistant();
     const [input, setInput] = useState('');
-    const [apiKeyInput, setApiKeyInput] = useState('');
-    const [isConfigured, setIsConfigured] = useState(AIAgentService.isConfigured());
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const scrollToBottom = () => {
@@ -41,12 +38,6 @@ export function AIAssistantPanel({ isOpen, onClose }: AIAssistantPanelProps) {
         if (!input.trim() || isLoading) return;
         sendMessage(input);
         setInput('');
-    };
-
-    const handleSaveKey = () => {
-        if (!apiKeyInput.trim()) return;
-        saveOpenAIKey(apiKeyInput.trim());
-        setIsConfigured(AIAgentService.isConfigured());
     };
 
     return (
@@ -144,27 +135,10 @@ export function AIAssistantPanel({ isOpen, onClose }: AIAssistantPanelProps) {
                     </div>
                 )}
                 
-                {!isConfigured && (
-                    <div className="mb-3 text-xs bg-amber-50 text-amber-700 border border-amber-200 p-3 rounded-lg flex flex-col gap-2">
-                        <div className="flex gap-2 items-start">
-                            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                            <span>Para usar la IA, ingresa tu API Key de OpenAI:</span>
-                        </div>
-                        <div className="flex gap-2 mt-1">
-                            <input 
-                                type="password" 
-                                placeholder="sk-..." 
-                                value={apiKeyInput}
-                                onChange={(e) => setApiKeyInput(e.target.value)}
-                                className="flex-1 bg-white border border-amber-300 rounded px-2 py-1 focus:outline-none focus:border-amber-500"
-                            />
-                            <button 
-                                onClick={handleSaveKey}
-                                className="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1 rounded transition-colors"
-                            >
-                                Guardar
-                            </button>
-                        </div>
+                {!import.meta.env.VITE_OPENAI_KEY_B64 && (
+                    <div className="mb-3 text-xs bg-rose-50 text-rose-600 p-2 rounded flex gap-2 items-start">
+                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                        <span>Para que el asistente funcione necesitas configurar una API Key de OpenAI (VITE_OPENAI_KEY_B64) en tus variables de entorno.</span>
                     </div>
                 )}
 
