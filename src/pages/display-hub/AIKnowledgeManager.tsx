@@ -17,10 +17,10 @@ export default function AIKnowledgeManager() {
     const { commerceId } = useParams();
     const queryClient = useQueryClient();
 
-    const { data: personality, isLoading: pLoading } = useAIPersonality(commerceId);
+    const { data: personality } = useAIPersonality(commerceId);
     const { data: faqs, isLoading: fLoading } = useAIFaqs(commerceId);
     const { data: knowledge, isLoading: kLoading } = useAIKnowledge(commerceId);
-    const { data: prompts, isLoading: prLoading } = useAIPrompts(commerceId);
+    useAIPrompts(commerceId); // Just fetching, not using vars yet
 
     // --- PERSONALITY STATE ---
     const [pName, setPName] = useState('');
