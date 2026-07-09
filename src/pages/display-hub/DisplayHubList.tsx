@@ -254,7 +254,7 @@ const DisplayHubList = () => {
                                                     </h4>
                                                     <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
                                                         Recurso: <span className="text-muted-foreground font-medium">
-                                                            {device.assignment?.media?.name || device.assignment?.campaign?.name || 'Sin asignar'}
+                                                            {device.assignment?.schedule?.name || device.assignment?.media?.name || device.assignment?.campaign?.name || 'Sin asignar'}
                                                         </span>
                                                         <ChevronDown className="w-3 h-3" />
                                                     </p>
