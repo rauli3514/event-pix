@@ -76,7 +76,9 @@ const TvPlayer = () => {
 
             const now = new Date();
             const currentDay = now.getDay();
-            const currentTimeStr = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+            const h = now.getHours().toString().padStart(2, '0');
+            const m = now.getMinutes().toString().padStart(2, '0');
+            const currentTimeStr = `${h}:${m}`;
 
             let activeContent: any = null;
 
@@ -94,11 +96,11 @@ const TvPlayer = () => {
                             // Parse HH:mm if needed, though they should be stored as HH:mm
                             const parse12hTo24h = (timeStr: string) => {
                                 if (!timeStr) return '00:00';
-                                const match = timeStr.match(/(\d+):(\d+)\s*(a\.?m\.?|p\.?m\.?)/i);
+                                const match = timeStr.match(/(\d+):(\d+)\s*(a\.?\s*m\.?|p\.?\s*m\.?)/i);
                                 if (!match) return timeStr.substring(0, 5); // Take HH:mm
                                 let [_, hStr, m, ampm] = match;
                                 let h = parseInt(hStr, 10);
-                                const cleanAmPm = ampm.replace(/\./g, '').toUpperCase();
+                                const cleanAmPm = ampm.replace(/[\.\s]/g, '').toUpperCase();
                                 if (cleanAmPm === 'PM' && h < 12) h += 12;
                                 if (cleanAmPm === 'AM' && h === 12) h = 0;
                                 return `${h.toString().padStart(2, '0')}:${m}`;
