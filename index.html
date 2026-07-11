@@ -10,6 +10,16 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;600;700&family=Orbitron:wght@400;700&family=Pinyon+Script&family=Montserrat:wght@400;700&display=swap"
     rel="stylesheet">
+  <script>
+    if (typeof globalThis === 'undefined') {
+      Object.defineProperty(Object.prototype, 'globalThis', {
+        get: function () {
+          return this;
+        },
+        configurable: true
+      });
+    }
+  </script>
   <!-- Start Single Page Apps for GitHub Pages -->
   <script type="text/javascript">
     // Single Page Apps for GitHub Pages

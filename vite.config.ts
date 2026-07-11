@@ -19,7 +19,7 @@ export default defineConfig({
   plugins: [
     react(),
     legacy({
-      targets: ['defaults', 'not IE 11', 'chrome >= 61'],
+      targets: ['chrome >= 49', 'android >= 5', 'safari >= 9'],
       additionalLegacyPolyfills: ['regenerator-runtime/runtime']
     }),
     VitePWA({
