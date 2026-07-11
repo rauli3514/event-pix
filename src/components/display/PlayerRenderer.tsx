@@ -177,14 +177,21 @@ export const PlayerRenderer = ({ item, isActive, commerceId }: PlayerRendererPro
         case 'video_ad':
             return (
                 <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: '#000', alignItems: 'center', justifyContent: 'center', ...displayStyle }}>
-                    {item.url ? (
+                    {item.url && isActive ? (
                         <video 
                             src={item.url} 
                             style={{ width: '100%', height: '100%', objectFit: objectFitValue }}
-                            autoPlay={isActive}
+                            autoPlay={true}
                             muted={item.mute !== false}
                             loop={item.loop !== false}
                             playsInline
+                            onEnded={(e) => {
+                                if (item.loop !== false) {
+                                    const video = e.target as HTMLVideoElement;
+                                    video.currentTime = 0;
+                                    video.play().catch(() => {});
+                                }
+                            }}
                         />
                     ) : (
                         <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '1.5rem' }}>
