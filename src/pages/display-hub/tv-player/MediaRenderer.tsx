@@ -1,4 +1,4 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { Component, ErrorInfo, ReactNode } from 'react';
 import { PlayerRenderer } from '@/components/display/PlayerRenderer';
 import { CampaignItem } from '@/types/display';
 
