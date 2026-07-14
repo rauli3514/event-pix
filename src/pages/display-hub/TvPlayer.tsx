@@ -4,7 +4,6 @@ import { supabase } from '@/lib/supabase';
 import { CampaignItem } from '@/types/display';
 import { PlayerRenderer } from '@/components/display/PlayerRenderer';
 import { TvSettingsMenu } from '@/components/display/TvSettingsMenu';
-import { WifiOff } from 'lucide-react';
 
 const TvPlayer = () => {
     const { deviceCode } = useParams<{ deviceCode: string }>();
@@ -13,21 +12,55 @@ const TvPlayer = () => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [status, setStatus] = useState<'loading' | 'playing' | 'offline_playing' | 'no_content' | 'error'>('loading');
     const [deviceSettings, setDeviceSettings] = useState({ scale: 'fit', orientation: 'landscape' });
-    const [isSyncing, setIsSyncing] = useState(false);
     const [localRotation, setLocalRotation] = useState<number | null>(null);
     const [deviceCommerceId, setDeviceCommerceId] = useState<string>('');
+    const [preloadProgress, setPreloadProgress] = useState<{ current: number, total: number } | null>(null);
     
-    // Referencias para limpiar timeouts e intervalos
     const rotationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
-    const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-    // 1. Fetching and Caching Logic
+    // --- Preload Engine ---
+    const preloadAssets = async (itemsToPreload: CampaignItem[]) => {
+        const assets = itemsToPreload.filter(item => item.type === 'image' || item.type === 'video');
+        if (assets.length === 0) return true;
+
+        setPreloadProgress({ current: 0, total: assets.length });
+
+        let loadedCount = 0;
+        const promises = assets.map(item => {
+            return new Promise<void>((resolve) => {
+                if (item.type === 'image' && item.url) {
+                    const img = new Image();
+                    img.onload = () => { loadedCount++; setPreloadProgress({ current: loadedCount, total: assets.length }); resolve(); };
+                    img.onerror = () => { loadedCount++; setPreloadProgress({ current: loadedCount, total: assets.length }); resolve(); };
+                    img.src = item.url;
+                } else if (item.type === 'video' && item.url) {
+                    const req = new XMLHttpRequest();
+                    req.open('GET', item.url, true);
+                    req.responseType = 'blob';
+                    req.onload = function() {
+                        loadedCount++; setPreloadProgress({ current: loadedCount, total: assets.length }); resolve();
+                    };
+                    req.onerror = function() {
+                        loadedCount++; setPreloadProgress({ current: loadedCount, total: assets.length }); resolve();
+                    };
+                    req.send();
+                } else {
+                    loadedCount++; setPreloadProgress({ current: loadedCount, total: assets.length }); resolve();
+                }
+            });
+        });
+
+        await Promise.all(promises);
+        setPreloadProgress(null);
+        return true;
+    };
+
+    // --- Fetching Logic ---
     const fetchCampaign = async () => {
         if (!deviceCode) return;
 
         try {
-            // 1. Obtener UUID del dispositivo y configuración
             const { data: device, error: deviceError } = await supabase
                 .from('display_devices')
                 .select('id, group_id, pairing_status, scale, orientation, commerce_id')
@@ -47,12 +80,10 @@ const TvPlayer = () => {
             });
             if (device.commerce_id) setDeviceCommerceId(device.commerce_id);
 
-            // 2. Buscar asignaciones para el dispositivo o su zona
             let orQuery = `device_id.eq.${device.id}`;
             if (device.group_id) {
                 orQuery += `,group_id.eq.${device.group_id}`;
             }
-
 
             const { data: assignments } = await supabase
                 .from('display_assignments')
@@ -83,27 +114,24 @@ const TvPlayer = () => {
             let activeContent: any = null;
 
             if (assignments && assignments.length > 0) {
-                // La asignación más reciente tiene prioridad
                 const assignment = assignments[0];
                 
                 if (assignment.schedule) {
                     const schedule = assignment.schedule;
                     let activeEvent = null;
                     
-                    // Evaluar los eventos de la programación
                     for (const ev of schedule.events || []) {
                         if (ev.days_of_week && ev.days_of_week.includes(currentDay)) {
-                            // Parse HH:mm if needed, though they should be stored as HH:mm
                             const parse12hTo24h = (timeStr: string) => {
                                 if (!timeStr) return '00:00';
                                 const match = timeStr.match(/(\d+):(\d+)\s*(a\.?\s*m\.?|p\.?\s*m\.?)/i);
-                                if (!match) return timeStr.substring(0, 5); // Take HH:mm
-                                let [_, hStr, m, ampm] = match;
-                                let h = parseInt(hStr, 10);
+                                if (!match) return timeStr.substring(0, 5);
+                                let [_, hStr, ms, ampm] = match;
+                                let hr = parseInt(hStr, 10);
                                 const cleanAmPm = ampm.replace(/[\.\s]/g, '').toUpperCase();
-                                if (cleanAmPm === 'PM' && h < 12) h += 12;
-                                if (cleanAmPm === 'AM' && h === 12) h = 0;
-                                return `${h.toString().padStart(2, '0')}:${m}`;
+                                if (cleanAmPm === 'PM' && hr < 12) hr += 12;
+                                if (cleanAmPm === 'AM' && hr === 12) hr = 0;
+                                return `${hr.toString().padStart(2, '0')}:${ms}`;
                             };
                             
                             const start24 = parse12hTo24h(ev.start_time);
@@ -117,47 +145,26 @@ const TvPlayer = () => {
                     }
                     
                     if (activeEvent) {
-                        activeContent = {
-                            campaign: activeEvent.campaign,
-                            media: activeEvent.media
-                        };
+                        activeContent = { campaign: activeEvent.campaign, media: activeEvent.media };
                     } else {
-                        // Caer en el contenido predeterminado del horario
-                        activeContent = {
-                            campaign: schedule.default_campaign,
-                            media: schedule.default_media
-                        };
+                        activeContent = { campaign: schedule.default_campaign, media: schedule.default_media };
                     }
                 } else {
-                    // Es un contenido estático (lista o archivo)
-                    activeContent = {
-                        campaign: assignment.campaign,
-                        media: assignment.media
-                    };
+                    activeContent = { campaign: assignment.campaign, media: assignment.media };
                 }
             }
 
             if (activeContent) {
                 let compiledItems: any[] = [];
-                    
-                    // Fallback para obtener commerceId si el device no lo tiene guardado
-                    if (!device.commerce_id && activeContent.campaign && activeContent.campaign.commerce_id) {
-                        setDeviceCommerceId(activeContent.campaign.commerce_id);
-                    }
+                if (!device.commerce_id && activeContent.campaign && activeContent.campaign.commerce_id) {
+                    setDeviceCommerceId(activeContent.campaign.commerce_id);
+                }
 
                 if (activeContent.campaign && activeContent.campaign.items_json) {
                     const rawItems = activeContent.campaign.items_json;
-                    
-                    // Si es V2 (Objeto con version 2.0 y zones)
                     if (rawItems.version === '2.0' && Array.isArray(rawItems.zones) && rawItems.zones.length > 0) {
-                        // Extraer playlist de la primera zona (por simplicidad en la TV temporalmente)
                         compiledItems = rawItems.zones[0].playlist || [];
-                        
-                        // NOTA: El shuffle no se puede aplicar aquí porque causaría que JSON.stringify cambie cada 5 segundos 
-                        // y reinicie la TV infinitamente. Para implementar shuffle, debería hacerse en el estado de rotación.
-                    } 
-                    // Si es V1 (Array directo)
-                    else if (Array.isArray(rawItems)) {
+                    } else if (Array.isArray(rawItems)) {
                         compiledItems = rawItems;
                     }
                 } else if (activeContent.media) {
@@ -169,7 +176,7 @@ const TvPlayer = () => {
                         type: activeContent.media.type === 'web' ? 'url' : (activeContent.media.type || 'image'),
                         url: activeContent.media.url,
                         metadata: activeContent.media.metadata,
-                        duration: 0, // 0 = infinito / loop
+                        duration: 0,
                         title: activeContent.media.name
                     }];
                 }
@@ -179,11 +186,12 @@ const TvPlayer = () => {
                     const oldItemsString = localStorage.getItem(`tv_cache_${deviceCode}`);
                     
                     if (oldItemsString !== newItemsString) {
-                        setIsSyncing(true);
+                        setStatus('loading'); // Show preload screen
+                        await preloadAssets(compiledItems);
                         localStorage.setItem(`tv_cache_${deviceCode}`, newItemsString);
                         setItems(compiledItems);
+                        setCurrentIndex(0); // Reset index on new content
                         setStatus('playing');
-                        setTimeout(() => setIsSyncing(false), 3000);
                     } else if (status !== 'playing') {
                         setItems(compiledItems);
                         setStatus('playing');
@@ -192,15 +200,11 @@ const TvPlayer = () => {
                 }
             }
 
-            // Si llega aquí, no hay contenido válido
             setStatus('no_content');
 
         } catch (error: any) {
             console.error('Error fetching campaign from Supabase:', error);
-            
-            // Si el error es PGRST116 (No rows found), significa que el dispositivo fue eliminado de la base de datos
             if (error.code === 'PGRST116') {
-                console.log('El dispositivo ha sido eliminado. Desvinculando...');
                 localStorage.removeItem('device_id');
                 window.location.href = '/';
                 return;
@@ -221,7 +225,7 @@ const TvPlayer = () => {
         }
     };
 
-    // 2. Heartbeat Logic (Ping to Supabase)
+    // --- Heartbeat Logic ---
     const sendHeartbeat = async () => {
         if (!deviceCode) return;
         try {
@@ -232,67 +236,56 @@ const TvPlayer = () => {
                 .single();
                 
             if (device) {
-                let telemetry = null;
+                let telemetry: any = {};
                 let appVersion = null;
                 let androidVersion = null;
                 
-                // Intentar leer telemetría del bridge nativo de Android
                 if ((window as any).TvBridge && typeof (window as any).TvBridge.getTelemetry === 'function') {
                     try {
                         const telemetryJson = (window as any).TvBridge.getTelemetry();
-                        telemetry = JSON.parse(telemetryJson);
-                        if (telemetry.app_version) appVersion = telemetry.app_version;
-                        if (telemetry.android_version) androidVersion = telemetry.android_version;
-                    } catch (e) {
-                        console.error('Error parsing telemetry from TvBridge', e);
-                    }
+                        const bridgeTelemetry = JSON.parse(telemetryJson);
+                        if (bridgeTelemetry.app_version) appVersion = bridgeTelemetry.app_version;
+                        if (bridgeTelemetry.android_version) androidVersion = bridgeTelemetry.android_version;
+                        telemetry = { ...bridgeTelemetry };
+                    } catch (e) {}
                 }
 
-                // Prepare update payload
+                // Add Chromium JS memory if available
+                if ((window.performance as any).memory) {
+                    telemetry.jsHeapSizeLimit = (window.performance as any).memory.jsHeapSizeLimit;
+                    telemetry.totalJSHeapSize = (window.performance as any).memory.totalJSHeapSize;
+                    telemetry.usedJSHeapSize = (window.performance as any).memory.usedJSHeapSize;
+                }
+
                 const updates: any = { 
                     last_seen: new Date().toISOString() 
                 };
                 
-                if (telemetry) updates.telemetry = telemetry;
+                if (Object.keys(telemetry).length > 0) updates.telemetry = telemetry;
                 if (appVersion) updates.app_version = appVersion;
                 if (androidVersion) updates.android_version = androidVersion;
 
-                // Actualizamos el device
-                await supabase
-                    .from('display_devices')
-                    .update(updates)
-                    .eq('id', device.id);
+                await supabase.from('display_devices').update(updates).eq('id', device.id);
             }
-        } catch (error) {
-            // Silently fail if offline, the player should keep running
-        }
+        } catch (error) {}
     };
 
-    // Initialization
+    // --- Initialization & Realtime Subscriptions ---
     useEffect(() => {
-        // Primera carga
         fetchCampaign();
         sendHeartbeat();
 
-        // Sincronización rápida cada 5 segundos para que los cambios se sientan instantáneos
-        syncIntervalRef.current = setInterval(() => {
-            fetchCampaign();
-        }, 5 * 1000);
-
-        // Heartbeat (cada 60 segundos)
+        // Optimización: El Heartbeat ahora es cada 3 minutos (180 segundos)
         heartbeatIntervalRef.current = setInterval(() => {
             sendHeartbeat();
-        }, 60 * 1000);
+        }, 180 * 1000);
 
-        // Recuperación automática cuando vuelve el internet
         const handleOnline = () => {
-            console.log('Internet restaurado. Intentando reconectar...');
             setStatus('loading');
             fetchCampaign();
         };
         window.addEventListener('online', handleOnline);
 
-        // Leer rotación local
         const storedRotation = localStorage.getItem('local_rotation');
         if (storedRotation !== null) {
             setLocalRotation(parseInt(storedRotation, 10));
@@ -303,7 +296,8 @@ const TvPlayer = () => {
         };
         window.addEventListener('local_rotation_changed', handleRotationChange);
 
-        // Escuchar comandos remotos
+        // WebSockets: Escuchar cambios de asignación para ESTE device o grupo
+        // y comandos en tiempo real. Esto REEMPLAZA al viejo setInterval de 5 segundos.
         const commandChannel = supabase.channel(`device:${deviceCode}`)
             .on('broadcast', { event: 'command' }, (payload) => {
                 if (payload.payload?.action === 'reload') {
@@ -314,27 +308,32 @@ const TvPlayer = () => {
                 } else if (payload.payload?.action === 'reset_telemetry') {
                     if ((window as any).TvBridge && typeof (window as any).TvBridge.resetTelemetry === 'function') {
                         (window as any).TvBridge.resetTelemetry();
-                        sendHeartbeat(); // Force send heartbeat to update Supabase immediately
+                        sendHeartbeat();
                     }
+                } else if (payload.payload?.action === 'sync') {
+                    // Triggered by backend when assignments/campaigns change
+                    fetchCampaign();
                 }
+            })
+            // También escuchamos a nivel tabla por las dudas
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'display_assignments' }, () => {
+                fetchCampaign();
             })
             .subscribe();
 
         return () => {
             if (rotationTimeoutRef.current) clearTimeout(rotationTimeoutRef.current);
             if (heartbeatIntervalRef.current) clearTimeout(heartbeatIntervalRef.current);
-            if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
             window.removeEventListener('online', handleOnline);
             window.removeEventListener('local_rotation_changed', handleRotationChange);
             supabase.removeChannel(commandChannel);
         };
     }, [deviceCode, status]);
 
-    // 3. Rotation Logic
+    // --- Rotation Logic ---
     useEffect(() => {
         if (items.length === 0 || (status !== 'playing' && status !== 'offline_playing')) return;
 
-        // Limpiar el timeout anterior si existe
         if (rotationTimeoutRef.current) clearTimeout(rotationTimeoutRef.current);
 
         const currentItem = items[currentIndex];
@@ -342,7 +341,7 @@ const TvPlayer = () => {
             setCurrentIndex(0);
             return;
         }
-        // Si la duración es inválida, usar 10 segundos por defecto
+        
         const durationMs = (currentItem.duration && currentItem.duration > 0 ? currentItem.duration : 10) * 1000;
 
         rotationTimeoutRef.current = setTimeout(() => {
@@ -355,56 +354,55 @@ const TvPlayer = () => {
     }, [currentIndex, items, status]);
 
 
-    // -- Renders --
+    // --- Renders Optimizados y Limpios ---
+    
+    const getRotationStyle = (orientation: string | undefined): React.CSSProperties => {
+        let degreeStr = orientation === 'portrait' ? '90' : (orientation === 'landscape' ? '0' : (orientation || '0'));
+        if (localRotation !== null) degreeStr = String(localRotation);
+        const isVertical = degreeStr === '90' || degreeStr === '270';
+        
+        if (isVertical) {
+            return {
+                position: 'fixed', transform: `rotate(${degreeStr}deg)`, transformOrigin: 'center center',
+                width: '100vh', height: '100vw', top: 'calc(50vh - 50vw)', left: 'calc(50vw - 50vh)',
+                backgroundColor: '#111', overflow: 'hidden'
+            };
+        }
+        return {
+            position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', 
+            transform: `rotate(${degreeStr}deg)`, transformOrigin: 'center center',
+            backgroundColor: '#111', overflow: 'hidden'
+        };
+    };
+
+    const containerStyle = getRotationStyle(deviceSettings.orientation);
 
     if (status === 'loading') {
         return (
-            <div className="fixed inset-0 w-full h-full bg-[#050505] flex flex-col items-center justify-center text-white">
-                <div className="relative">
-                    <div className="w-24 h-24 border-4 border-slate-800 rounded-full"></div>
-                    <div className="w-24 h-24 border-4 border-orange-500 border-t-transparent rounded-full animate-spin absolute top-0 left-0"></div>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                        <img src="/edm-assets/logo.PNG" alt="Logo" className="w-12 h-12 object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]" />
+            <div className="fixed inset-0 w-full h-full bg-[#111] flex flex-col items-center justify-center text-white">
+                <div className="text-4xl font-bold mb-4 tracking-wider text-[#00C4CC]">Cargando...</div>
+                {preloadProgress && (
+                    <div className="w-64">
+                        <div className="text-sm text-center mb-2 text-zinc-400">
+                            Descargando {preloadProgress.current} de {preloadProgress.total} activos
+                        </div>
+                        <div className="h-2 w-full bg-zinc-800 rounded-full overflow-hidden">
+                            <div 
+                                className="h-full bg-[#00C4CC] transition-all duration-300"
+                                style={{ width: `${(preloadProgress.current / preloadProgress.total) * 100}%` }}
+                            ></div>
+                        </div>
                     </div>
-                </div>
-                <h1 className="text-3xl font-bold mt-8 mb-2 tracking-wide text-white">Descargando Contenido</h1>
-                <p className="text-slate-400 text-lg">Por favor espere mientras recibimos los nuevos datos...</p>
-                <div className="w-64 h-2 bg-slate-800 rounded-full mt-6 overflow-hidden">
-                    <div className="h-full bg-orange-500 rounded-full animate-pulse w-full"></div>
-                </div>
-                <TvSettingsMenu deviceCode={deviceCode!} onRefresh={() => fetchCampaign()} />
+                )}
             </div>
         );
     }
 
     if (status === 'no_content') {
         return (
-            <div className="fixed inset-0 w-full h-full bg-[#050505] flex flex-col items-center justify-center text-white p-10 text-center overflow-hidden">
-                {/* Background decorative elements */}
-                <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl animate-pulse"></div>
-                <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
-                
-                <div className="relative z-10 flex flex-col items-center">
-                    <div className="relative w-40 h-40 mb-10 flex items-center justify-center">
-                        <div className="absolute inset-0 bg-slate-800/50 rounded-3xl animate-ping opacity-20"></div>
-                        <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl relative z-10">
-                            <img src="/edm-assets/logo.PNG" alt="Logo" className="w-32 object-contain" />
-                        </div>
-                    </div>
-                    
-                    <h1 className="text-5xl font-black tracking-tight mb-4 bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">Display Digital by eventpix</h1>
-                    
-                    <div className="flex items-center gap-3 mt-4 mb-12 bg-slate-900/50 border border-slate-800 px-6 py-3 rounded-full backdrop-blur-md">
-                        <div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse"></div>
-                        <span className="text-emerald-400 font-medium">Vinculado y Listo</span>
-                    </div>
-
-                    <p className="text-2xl text-slate-400 max-w-2xl font-light">
-                        Esta pantalla está conectada a la red.
-                        <br/>
-                        Envía contenido desde tu panel de control para comenzar la reproducción.
-                    </p>
-                </div>
+            <div className="fixed inset-0 w-full h-full bg-[#111] flex flex-col items-center justify-center text-white">
+                <div className="text-6xl font-bold text-[#00C4CC] mb-4">Paired</div>
+                <div className="text-xl text-zinc-500">{deviceCode}</div>
                 <TvSettingsMenu deviceCode={deviceCode!} onRefresh={() => fetchCampaign()} />
             </div>
         );
@@ -412,78 +410,22 @@ const TvPlayer = () => {
 
     if (status === 'error') {
         return (
-            <div className="fixed inset-0 w-full h-full bg-[#050505] flex flex-col items-center justify-center text-white p-10 text-center">
-                <div className="relative mb-8">
-                    <WifiOff className="w-32 h-32 text-rose-600 relative z-10 animate-pulse" />
-                    <div className="absolute inset-0 bg-rose-600/20 blur-2xl rounded-full"></div>
-                </div>
-                <h1 className="text-5xl font-black mb-4">Sin Conexión</h1>
-                <p className="text-2xl text-slate-400 max-w-2xl mb-8 font-light">
-                    La pantalla no tiene conexión a Internet o no puede alcanzar los servidores.
-                    Revisa tu conexión WiFi o cable de red.
-                </p>
+            <div className="fixed inset-0 w-full h-full bg-[#111] flex flex-col items-center justify-center text-white">
+                <div className="text-4xl font-bold text-rose-500 mb-4">Error de Conexión</div>
+                <div className="text-lg text-zinc-500 mb-8">Revisando red...</div>
                 <button 
-                    onClick={() => {
-                        setStatus('loading');
-                        fetchCampaign();
-                    }}
-                    className="px-8 py-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-full text-xl font-medium transition-all shadow-xl"
+                    onClick={() => { setStatus('loading'); fetchCampaign(); }}
+                    className="px-6 py-2 bg-zinc-800 text-white rounded-md hover:bg-zinc-700"
                 >
-                    Reintentar Conexión
+                    Reintentar
                 </button>
                 <TvSettingsMenu deviceCode={deviceCode!} onRefresh={() => fetchCampaign()} />
             </div>
         );
     }
 
-    const getRotationStyle = (orientation: string | undefined): React.CSSProperties => {
-        let degreeStr = orientation === 'portrait' ? '90' : (orientation === 'landscape' ? '0' : (orientation || '0'));
-        
-        if (localRotation !== null) {
-            degreeStr = String(localRotation);
-        }
-        
-        const isVertical = degreeStr === '90' || degreeStr === '270';
-        
-        if (isVertical) {
-            return {
-                position: 'fixed',
-                transform: `rotate(${degreeStr}deg)`,
-                transformOrigin: 'center center',
-                width: '100vh',
-                height: '100vw',
-                top: 'calc(50vh - 50vw)',
-                left: 'calc(50vw - 50vh)',
-                backgroundColor: '#000',
-                overflow: 'hidden'
-            };
-        }
-        
-        return {
-            position: 'fixed', 
-            top: 0, 
-            left: 0, 
-            width: '100vw', 
-            height: '100vh', 
-            transform: `rotate(${degreeStr}deg)`,
-            transformOrigin: 'center center',
-            backgroundColor: '#000', 
-            overflow: 'hidden'
-        };
-    };
-
-    const containerStyle = getRotationStyle(deviceSettings.orientation);
-
     return (
         <div style={containerStyle}>
-            {/* Indicador de modo offline invisible a simple vista, pero útil para debugear */}
-            {status === 'offline_playing' && (
-                <div className="absolute top-2 right-2 z-50 bg-rose-600 text-white text-[10px] px-2 py-1 rounded opacity-30">
-                    Modo Offline
-                </div>
-            )}
-
-            {/* Renderizamos todos los iframes/imagenes, pero solo hacemos visible el "activo" */}
             {items.map((item, index) => (
                 <PlayerRenderer 
                     key={`${item.id}-${index}`} 
@@ -492,15 +434,7 @@ const TvPlayer = () => {
                     commerceId={deviceCommerceId}
                 />
             ))}
-
-            {/* Menú de configuración lateral oculto */}
             <TvSettingsMenu deviceCode={deviceCode!} onRefresh={() => fetchCampaign()} />
-            {isSyncing && (
-                <div className="absolute top-8 right-8 bg-zinc-900/90 border border-indigo-500/50 text-white px-6 py-3 rounded-full flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-500 z-50 shadow-2xl backdrop-blur-md">
-                    <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-                    <span className="font-medium">Sincronizando caché...</span>
-                </div>
-            )}
         </div>
     );
 };
