@@ -9,6 +9,9 @@ import android.util.Log
 import android.view.WindowManager
 import android.webkit.JavascriptInterface
 import java.util.Calendar
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.net.wifi.WifiManager
 
 class TvBridge(private val activity: MainActivity) {
     
@@ -156,6 +159,31 @@ class TvBridge(private val activity: MainActivity) {
         val androidVersion = android.os.Build.VERSION.RELEASE
         val sdkVersion = android.os.Build.VERSION.SDK_INT
         
+        // WiFi and Network Telemetry
+        var networkType = "offline"
+        var wifiSignal = 0
+        
+        try {
+            val cm = activity.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            val activeNetwork = cm.activeNetwork
+            val capabilities = cm.getNetworkCapabilities(activeNetwork)
+            
+            if (capabilities != null) {
+                if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                    networkType = "wifi"
+                    val wifiManager = activity.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+                    val info = wifiManager.connectionInfo
+                    wifiSignal = info.rssi
+                } else if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
+                    networkType = "ethernet"
+                } else if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
+                    networkType = "cellular"
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("TvBridge", "Error reading network state", e)
+        }
+        
         val json = """
         {
             "boot_count": $bootCount,
@@ -168,6 +196,10 @@ class TvBridge(private val activity: MainActivity) {
             "storage": {
                 "total_mb": ${bytesTotal / 1048576},
                 "free_mb": ${bytesAvailable / 1048576}
+            },
+            "network": {
+                "type": "$networkType",
+                "wifi_rssi_dbm": $wifiSignal
             },
             "app_version": "$appVersionName",
             "android_version": "$androidVersion (SDK $sdkVersion)"

@@ -76,37 +76,17 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun startBootSequence() {
-        // Use ExoPlayer for boot animation
-        val videoUri = Uri.parse("android.resource://$packageName/${R.raw.boot_animation}")
-        playerManager.initializePlayer()
-        playerView.visibility = View.VISIBLE
+        // Transition to WebView for the actual Display App UI immediately
+        diagnosticPanel.visibility = View.GONE
+        playerView.visibility = View.GONE
         logoImageView.visibility = View.GONE
-        playerManager.playMedia(videoUri)
+        webView.visibility = View.VISIBLE
         
-        // Run diagnostic checks in background while video plays
-        scope.launch {
-            updateStatus("Verificando almacenamiento local...")
-            delay(3000) // Simulating work
-            
-            updateStatus("Inicializando motor multimedia...")
-            delay(3000)
-            
-            updateStatus("Conectando a EventPix...")
-            delay(4000)
-            
-            // Transition to WebView for the actual Display App UI
-            diagnosticPanel.visibility = View.GONE
-            playerView.visibility = View.GONE
-            webView.visibility = View.VISIBLE
-            
-            // Set WebView background to black to prevent white flash
-            webView.setBackgroundColor(android.graphics.Color.BLACK)
-            
-            // INSTRUCCIÓN PARA PRODUCCIÓN:
-            // Reemplaza esta URL por la dirección real de tu web en Vercel/hosting
-            // Ej: "https://event-pix.vercel.app/tv-boot"
-            webViewManager.loadUrl("https://app.event-pix.com.ar/tv-boot")
-        }
+        // Set WebView background to black to prevent white flash
+        webView.setBackgroundColor(android.graphics.Color.BLACK)
+        
+        // Carga la app
+        webViewManager.loadUrl("https://app.event-pix.com.ar/tv-boot")
     }
     
     private fun updateStatus(message: String) {

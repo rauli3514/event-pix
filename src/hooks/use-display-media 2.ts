@@ -1,0 +1,263 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
+import { DisplayMedia } from '@/types/display';
+
+
+export const useDisplayMedia = (commerceId?: string) => {
+    return useQuery({
+        queryKey: ['display_media', commerceId],
+        queryFn: async () => {
+            if (!commerceId) return [];
+            
+            const { data, error } = await supabase
+                .from('display_media')
+                .select('*')
+                .eq('commerce_id', commerceId)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            return data as DisplayMedia[];
+        },
+        enabled: !!commerceId
+    });
+};
+
+export const useUploadDisplayMedia = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ commerceId, file, webUrl, webName, folderPath = '/', isFolder = false, type: overrideType, metadata }: { commerceId: string; file?: File; webUrl?: string; webName?: string; folderPath?: string; isFolder?: boolean; type?: string; metadata?: any }) => {
+            let type = overrideType || 'docs';
+            let publicUrl = '';
+            let storagePath = overrideType === 'app' ? `app://${webName?.replace(/[^a-z0-9]/gi, '_').toLowerCase()}` : 'web_link';
+            let name = webName || '';
+            let size = 0;
+
+            if (isFolder) {
+                type = 'folder';
+                name = webName || 'Nueva Carpeta';
+            } else if (file) {
+                if (file.type.startsWith('image/')) type = 'image';
+                else if (file.type.startsWith('video/')) type = 'video';
+                else if (file.type.startsWith('audio/')) type = 'audio';
+
+                const fileExt = file.name.split('.').pop();
+                const uniqueFilename = `${crypto.randomUUID()}.${fileExt}`;
+                storagePath = `${commerceId}/${uniqueFilename}`;
+                name = file.name;
+                size = file.size;
+
+                const { error: uploadError } = await supabase.storage
+                    .from('display-media')
+                    .upload(storagePath, file, {
+                        cacheControl: '3600',
+                        upsert: false
+                    });
+
+                if (uploadError) throw uploadError;
+
+                const { data } = supabase.storage
+                    .from('display-media')
+                    .getPublicUrl(storagePath);
+                
+                publicUrl = data.publicUrl;
+            } else if (webUrl) {
+                if (!overrideType) type = 'web';
+                publicUrl = webUrl;
+            } else if (overrideType === 'app') {
+                type = 'app';
+                publicUrl = `app://${metadata?.appId || 'unknown'}`;
+            } else {
+                throw new Error("No file, web URL, or app config provided");
+            }
+
+            const { data: mediaRecord, error: dbError } = await supabase
+                .from('display_media')
+                .insert({
+                    commerce_id: commerceId,
+                    name: name,
+                    type: type,
+                    url: publicUrl,
+                    storage_path: storagePath,
+                    size_bytes: size,
+                    folder_path: folderPath,
+                    metadata: metadata || {}
+                })
+                .select()
+                .single();
+
+            if (dbError) {
+                if (file) {
+                    await supabase.storage.from('display-media').remove([storagePath]);
+                }
+                throw dbError;
+            }
+
+            return mediaRecord as DisplayMedia;
+        },
+        onSuccess: (_, { commerceId }) => {
+            queryClient.invalidateQueries({ queryKey: ['display_media', commerceId] });
+        }
+    });
+};
+
+export const useDeleteDisplayMedia = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (media: DisplayMedia) => {
+            // 1. Delete from storage
+            const { error: storageError } = await supabase.storage
+                .from('display-media')
+                .remove([media.storage_path]);
+                
+            if (storageError) throw storageError;
+
+            // 2. Delete from DB
+            const { error: dbError } = await supabase
+                .from('display_media')
+                .delete()
+                .eq('id', media.id);
+
+            if (dbError) throw dbError;
+        },
+        onSuccess: (_, media) => {
+            queryClient.invalidateQueries({ queryKey: ['display_media', media.commerce_id] });
+        }
+    });
+};
+
+export const useUpdateDisplayMedia = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ id, updates }: { id: string; updates: Partial<DisplayMedia> }) => {
+            const { data, error } = await supabase
+                .from('display_media')
+                .update(updates)
+                .eq('id', id)
+                .select()
+                .single();
+
+            if (error) throw error;
+            return data as DisplayMedia;
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ['display_media', data.commerce_id] });
+        }
+    });
+};
+
+export const useUpdateMediaFolder = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ commerceId, oldPath, newPath }: { commerceId: string; oldPath: string; newPath: string }) => {
+            // First update the folder item itself (type: 'folder')
+            await supabase
+                .from('display_media')
+                .update({ name: newPath.split('/').pop(), folder_path: newPath.substring(0, newPath.lastIndexOf('/')) || '/' })
+                .eq('commerce_id', commerceId)
+                .eq('type', 'folder')
+                .eq('folder_path', oldPath.substring(0, oldPath.lastIndexOf('/')) || '/')
+                .eq('name', oldPath.split('/').pop());
+
+            // Then update all children (files and subfolders)
+            // We fetch all items where folder_path exactly is oldPath or starts with oldPath/
+            const { data: children, error: fetchError } = await supabase
+                .from('display_media')
+                .select('*')
+                .eq('commerce_id', commerceId)
+                .or(`folder_path.eq.${oldPath},folder_path.like.${oldPath}/*`);
+
+            if (fetchError) throw fetchError;
+
+            if (children && children.length > 0) {
+                const updates = children.map(child => ({
+                    ...child,
+                    folder_path: child.folder_path === oldPath 
+                        ? newPath 
+                        : newPath + child.folder_path.substring(oldPath.length)
+                }));
+
+                const { error: updateError } = await supabase
+                    .from('display_media')
+                    .upsert(updates);
+
+                if (updateError) throw updateError;
+            }
+        },
+        onSuccess: (_, { commerceId }) => {
+            queryClient.invalidateQueries({ queryKey: ['display_media', commerceId] });
+        }
+    });
+};
+
+export const useDeleteMediaFolder = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ commerceId, folderPath }: { commerceId: string; folderPath: string }) => {
+            // Fetch all items in this folder or subfolders
+            const { data: itemsToDelete, error: fetchError } = await supabase
+                .from('display_media')
+                .select('*')
+                .eq('commerce_id', commerceId)
+                .or(`folder_path.eq.${folderPath},folder_path.like.${folderPath}/*`);
+
+            if (fetchError) throw fetchError;
+
+            if (itemsToDelete && itemsToDelete.length > 0) {
+                // Delete actual files from storage if not folders
+                const storagePaths = itemsToDelete
+                    .filter(item => item.type !== 'folder' && item.type !== 'web')
+                    .map(item => item.storage_path);
+
+                if (storagePaths.length > 0) {
+                    await supabase.storage.from('display-media').remove(storagePaths);
+                }
+
+                // Delete records from DB
+                const idsToDelete = itemsToDelete.map(item => item.id);
+                
+                // Also need to find the folder record itself (if the user clicks delete on it)
+                const folderName = folderPath.split('/').pop();
+                const parentPath = folderPath.substring(0, folderPath.lastIndexOf('/')) || '/';
+                const { data: folderRecord } = await supabase
+                    .from('display_media')
+                    .select('id')
+                    .eq('commerce_id', commerceId)
+                    .eq('type', 'folder')
+                    .eq('folder_path', parentPath)
+                    .eq('name', folderName)
+                    .single();
+
+                if (folderRecord) {
+                    idsToDelete.push(folderRecord.id);
+                }
+
+                // Chunk deletion because of limits if many files
+                const chunkSize = 100;
+                for (let i = 0; i < idsToDelete.length; i += chunkSize) {
+                    const chunk = idsToDelete.slice(i, i + chunkSize);
+                    await supabase.from('display_media').delete().in('id', chunk);
+                }
+            } else {
+                // Just delete the empty folder record
+                const folderName = folderPath.split('/').pop();
+                const parentPath = folderPath.substring(0, folderPath.lastIndexOf('/')) || '/';
+                await supabase
+                    .from('display_media')
+                    .delete()
+                    .eq('commerce_id', commerceId)
+                    .eq('type', 'folder')
+                    .eq('folder_path', parentPath)
+                    .eq('name', folderName);
+            }
+        },
+        onSuccess: (_, { commerceId }) => {
+            queryClient.invalidateQueries({ queryKey: ['display_media', commerceId] });
+        }
+    });
+};
+

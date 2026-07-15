@@ -180,11 +180,15 @@ export const PlayerRenderer = ({ item, isActive, commerceId }: PlayerRendererPro
                     {item.url && isActive ? (
                         <video 
                             src={item.url} 
-                            style={{ width: '100%', height: '100%', objectFit: objectFitValue }}
+                            style={{ width: '100%', height: '100%', objectFit: objectFitValue, pointerEvents: 'none' }}
                             autoPlay={true}
                             muted={item.mute !== false}
                             loop={item.loop !== false}
                             playsInline
+                            preload="auto"
+                            disablePictureInPicture
+                            controls={false}
+                            className="[&::-webkit-media-controls-play-button]:hidden [&::-webkit-media-controls-start-playback-button]:hidden [&::-webkit-media-controls]:hidden"
                             onEnded={(e) => {
                                 if (item.loop !== false) {
                                     const video = e.target as HTMLVideoElement;

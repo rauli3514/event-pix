@@ -1,0 +1,1 @@
+ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS ai_moderation_enabled BOOLEAN DEFAULT FALSE;

@@ -62,7 +62,13 @@ class WebViewManager(private val webView: WebView) {
             ) {
                 super.onReceivedError(view, request, error)
                 Log.e("WebViewManager", "Error loading web content: ${error?.description}")
-                // TODO: Watchdog should detect this and retry
+            }
+
+            override fun onRenderProcessGone(view: WebView?, detail: android.webkit.RenderProcessGoneDetail?): Boolean {
+                Log.e("WebViewManager", "Render process gone (OOM or crash). Reloading WebView...")
+                view?.destroy()
+                // Let the activity handle the recreation if needed, or we just return true to prevent app crash
+                return true
             }
         }
     }

@@ -211,6 +211,12 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
             .on('postgres_changes', { event: '*', schema: 'public', table: 'display_campaigns' }, () => {
                 fetchCampaign();
             })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'display_media' }, () => {
+                fetchCampaign();
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'display_schedules' }, () => {
+                fetchCampaign();
+            })
             .subscribe();
             
         // Watchdog Fallback (10 minutes)

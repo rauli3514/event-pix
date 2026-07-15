@@ -37,22 +37,22 @@ export class MediaErrorBoundary extends Component<{children: ReactNode, onError:
 }
 
 export function MediaRenderer({ items, currentIndex, deviceCommerceId }: Props) {
+    const activeItem = items[currentIndex];
+
+    if (!activeItem) return null;
+
     return (
-        <>
-            {items.map((item, index) => (
-                <MediaErrorBoundary 
-                    key={`${item.id}-${index}`}
-                    onError={() => {
-                        console.log(`Error in item ${item.id}. Watchdog will skip.`);
-                    }}
-                >
-                    <PlayerRenderer 
-                        item={item} 
-                        isActive={index === currentIndex} 
-                        commerceId={deviceCommerceId}
-                    />
-                </MediaErrorBoundary>
-            ))}
-        </>
+        <MediaErrorBoundary 
+            key={`${activeItem.id}-${currentIndex}`}
+            onError={() => {
+                console.log(`Error in item ${activeItem.id}. Watchdog will skip.`);
+            }}
+        >
+            <PlayerRenderer 
+                item={activeItem} 
+                isActive={true} 
+                commerceId={deviceCommerceId}
+            />
+        </MediaErrorBoundary>
     );
 }
