@@ -200,6 +200,20 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
                         (window as any).TvBridge.resetTelemetry();
                         forceHeartbeat();
                     }
+                } else if (payload.payload?.action === 'set_volume') {
+                    const vol = payload.payload?.volume;
+                    if (vol !== undefined && (window as any).TvBridge && typeof (window as any).TvBridge.setVolume === 'function') {
+                        (window as any).TvBridge.setVolume(vol);
+                        forceHeartbeat();
+                    }
+                } else if (payload.payload?.action === 'connect_wifi') {
+                    const ssid = payload.payload?.ssid;
+                    const password = payload.payload?.password;
+                    if (ssid && password && (window as any).TvBridge && typeof (window as any).TvBridge.connectToWifi === 'function') {
+                        (window as any).TvBridge.connectToWifi(ssid, password);
+                        // Wait a few seconds for network to reconnect then heartbeat
+                        setTimeout(() => forceHeartbeat(), 5000);
+                    }
                 } else if (payload.payload?.action === 'sync') {
                     fetchCampaign();
                 }

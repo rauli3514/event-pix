@@ -12,6 +12,15 @@ import java.util.Calendar
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
+import android.net.wifi.WifiConfiguration
+import android.media.AudioManager
+import android.os.SystemClock
+import android.os.Build
+import android.app.ActivityManager
+import android.util.DisplayMetrics
+import java.io.File
+import java.net.InetAddress
+import java.net.NetworkInterface
 
 class TvBridge(private val activity: MainActivity) {
     
@@ -136,16 +145,94 @@ class TvBridge(private val activity: MainActivity) {
     }
 
     @JavascriptInterface
+    fun setVolume(volumePercent: Int) {
+        try {
+            val audioManager = activity.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+            val newVolume = (maxVolume * volumePercent) / 100
+            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, newVolume, 0)
+            Log.d("TvBridge", "Set volume to $volumePercent% ($newVolume/$maxVolume)")
+        } catch (e: Exception) {
+            Log.e("TvBridge", "Failed to set volume", e)
+        }
+    }
+    
+    @JavascriptInterface
+    fun connectToWifi(ssid: String, psk: String): Boolean {
+        try {
+            Log.d("TvBridge", "Attempting to connect to WiFi: $ssid")
+            val wifiManager = activity.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            if (!wifiManager.isWifiEnabled) {
+                wifiManager.isWifiEnabled = true
+            }
+            
+            // For Android < 10 (API 29), we can use addNetwork
+            val conf = WifiConfiguration()
+            conf.SSID = "\"" + ssid + "\""
+            conf.preSharedKey = "\"" + psk + "\""
+            
+            val netId = wifiManager.addNetwork(conf)
+            if (netId != -1) {
+                wifiManager.disconnect()
+                val success = wifiManager.enableNetwork(netId, true)
+                wifiManager.reconnect()
+                return success
+            }
+        } catch (e: Exception) {
+            Log.e("TvBridge", "Failed to connect to WiFi", e)
+        }
+        return false
+    }
+
+    private fun getCpuTemperature(): Double {
+        return try {
+            val file = File("/sys/class/thermal/thermal_zone0/temp")
+            if (file.exists()) {
+                val tempStr = file.readText().trim()
+                val temp = tempStr.toDouble()
+                if (temp > 1000) temp / 1000.0 else temp
+            } else {
+                -1.0
+            }
+        } catch (e: Exception) {
+            -1.0
+        }
+    }
+    
+    private fun getLocalIpAddress(): String {
+        try {
+            val interfaces = NetworkInterface.getNetworkInterfaces()
+            for (intf in interfaces) {
+                val addrs = intf.inetAddresses
+                for (addr in addrs) {
+                    if (!addr.isLoopbackAddress) {
+                        val sAddr = addr.hostAddress
+                        if (sAddr != null && sAddr.indexOf(':') < 0) { // is IPv4
+                            return sAddr
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {}
+        return "Unknown"
+    }
+
+    @JavascriptInterface
     fun getTelemetry(): String {
         val bootCount = prefs.getInt("bootCount", 0)
         val crashCount = prefs.getInt("crashCount", 0)
         
-        val runtime = Runtime.getRuntime()
-        val maxMemory = runtime.maxMemory()
-        val totalMemory = runtime.totalMemory()
-        val freeMemory = runtime.freeMemory()
+        // Accurate OS RAM
+        val activityManager = activity.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        val memoryInfo = ActivityManager.MemoryInfo()
+        activityManager.getMemoryInfo(memoryInfo)
+        
+        // Use totalMem if available (API 16+), else fallback to runtime memory
+        val totalMemory = memoryInfo.totalMem
+        val freeMemory = memoryInfo.availMem
         val usedMemory = totalMemory - freeMemory
         
+        // Accurate physical storage
         val stat = android.os.StatFs(android.os.Environment.getDataDirectory().path)
         val bytesAvailable = stat.blockSizeLong * stat.availableBlocksLong
         val bytesTotal = stat.blockSizeLong * stat.blockCountLong
@@ -158,6 +245,15 @@ class TvBridge(private val activity: MainActivity) {
         
         val androidVersion = android.os.Build.VERSION.RELEASE
         val sdkVersion = android.os.Build.VERSION.SDK_INT
+        
+        // Display info
+        val displayMetrics = DisplayMetrics()
+        activity.windowManager.defaultDisplay.getMetrics(displayMetrics)
+        val resolution = "${displayMetrics.widthPixels}x${displayMetrics.heightPixels}"
+        
+        val uptimeHours = SystemClock.elapsedRealtime() / (1000 * 60 * 60)
+        val cpuTemp = getCpuTemperature()
+        val localIp = getLocalIpAddress()
         
         // WiFi and Network Telemetry
         var networkType = "offline"
@@ -189,7 +285,7 @@ class TvBridge(private val activity: MainActivity) {
             "boot_count": $bootCount,
             "crash_count": $crashCount,
             "memory": {
-                "max_mb": ${maxMemory / 1048576},
+                "max_mb": ${totalMemory / 1048576},
                 "used_mb": ${usedMemory / 1048576},
                 "free_mb": ${freeMemory / 1048576}
             },
@@ -199,7 +295,14 @@ class TvBridge(private val activity: MainActivity) {
             },
             "network": {
                 "type": "$networkType",
-                "wifi_rssi_dbm": $wifiSignal
+                "wifi_rssi_dbm": $wifiSignal,
+                "ip": "$localIp"
+            },
+            "hardware": {
+                "resolution": "$resolution",
+                "uptime_hours": $uptimeHours,
+                "cpu_temp_c": $cpuTemp,
+                "model": "${Build.MANUFACTURER} ${Build.MODEL}"
             },
             "app_version": "$appVersionName",
             "android_version": "$androidVersion (SDK $sdkVersion)"

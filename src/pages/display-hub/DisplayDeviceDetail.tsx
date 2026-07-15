@@ -33,6 +33,9 @@ const DisplayDeviceDetail = () => {
     const [endTime, setEndTime] = useState('');
     const [name, setName] = useState('');
     const [desc, setDesc] = useState('');
+    const [wifiSsid, setWifiSsid] = useState('');
+    const [wifiPass, setWifiPass] = useState('');
+    const [volume, setVolume] = useState('50');
 
     useEffect(() => {
         if (deviceData) {
@@ -113,6 +116,33 @@ const DisplayDeviceDetail = () => {
             payload: { action: 'clear_cache' },
         });
         toast.success("Comando de limpieza de caché enviado a la pantalla");
+    };
+
+    const handleConnectWifi = async () => {
+        if (!deviceData?.device_id || !wifiSsid || !wifiPass) {
+            toast.error("Ingresa el SSID y la contraseña");
+            return;
+        }
+        const channel = supabase.channel(`device:${deviceData.device_id}`);
+        await channel.send({
+            type: 'broadcast',
+            event: 'command',
+            payload: { action: 'connect_wifi', ssid: wifiSsid, password: wifiPass },
+        });
+        toast.success(`Comando para conectar a ${wifiSsid} enviado`);
+        setWifiSsid('');
+        setWifiPass('');
+    };
+
+    const handleSetVolume = async () => {
+        if (!deviceData?.device_id) return;
+        const channel = supabase.channel(`device:${deviceData.device_id}`);
+        await channel.send({
+            type: 'broadcast',
+            event: 'command',
+            payload: { action: 'set_volume', volume: parseInt(volume, 10) },
+        });
+        toast.success(`Comando de volumen (${volume}%) enviado`);
     };
 
     const handleResetTelemetry = async () => {
@@ -393,7 +423,47 @@ const DisplayDeviceDetail = () => {
                                     </div>
 
                                     <div className="pt-4 border-t border-slate-800">
-                                        <h3 className="text-sm font-medium text-slate-300 mb-4">Acciones Remotas</h3>
+                                        <h3 className="text-sm font-medium text-slate-300 mb-4">Control de Red (Wi-Fi)</h3>
+                                        <div className="grid grid-cols-2 gap-3 mb-3">
+                                            <Input 
+                                                placeholder="Nombre de red (SSID)" 
+                                                value={wifiSsid} 
+                                                onChange={e => setWifiSsid(e.target.value)}
+                                                className="bg-slate-950 border-slate-700 text-white text-sm"
+                                            />
+                                            <Input 
+                                                placeholder="Contraseña" 
+                                                type="password"
+                                                value={wifiPass} 
+                                                onChange={e => setWifiPass(e.target.value)}
+                                                className="bg-slate-950 border-slate-700 text-white text-sm"
+                                            />
+                                        </div>
+                                        <Button onClick={handleConnectWifi} variant="outline" className="w-full justify-center border-slate-700 bg-slate-950 text-indigo-400 hover:text-white hover:bg-slate-800">
+                                            Cambiar Red Wi-Fi Remotamente
+                                        </Button>
+                                    </div>
+
+                                    <div className="pt-4 border-t border-slate-800">
+                                        <h3 className="text-sm font-medium text-slate-300 mb-4">Control de Volumen</h3>
+                                        <div className="flex gap-3 mb-3">
+                                            <Input 
+                                                type="range"
+                                                min="0"
+                                                max="100"
+                                                value={volume}
+                                                onChange={e => setVolume(e.target.value)}
+                                                className="flex-1"
+                                            />
+                                            <span className="text-slate-300 w-12 text-right">{volume}%</span>
+                                        </div>
+                                        <Button onClick={handleSetVolume} variant="outline" className="w-full justify-center border-slate-700 bg-slate-950 text-emerald-400 hover:text-white hover:bg-slate-800">
+                                            Establecer Volumen
+                                        </Button>
+                                    </div>
+
+                                    <div className="pt-4 border-t border-slate-800">
+                                        <h3 className="text-sm font-medium text-slate-300 mb-4">Acciones del Sistema</h3>
                                         <div className="flex flex-col gap-3">
                                             <Button onClick={handleForceReload} variant="outline" className="w-full justify-start border-slate-700 bg-slate-950 text-slate-300 hover:text-white hover:bg-slate-800">
                                                 <Activity className="w-4 h-4 mr-2 text-indigo-400" /> Forzar Recarga de la App
@@ -454,6 +524,36 @@ const DisplayDeviceDetail = () => {
                                         <p className="text-sm text-slate-500">{deviceData.app_version || 'Desconocida'}</p>
                                     </div>
                                 </div>
+                                {deviceData.telemetry?.hardware && (
+                                    <>
+                                        <div className="flex items-start gap-3">
+                                            <Monitor className="w-5 h-5 text-slate-500 mt-0.5" />
+                                            <div>
+                                                <p className="text-sm font-medium text-slate-300">Resolución Nativa</p>
+                                                <p className="text-sm text-slate-500">{deviceData.telemetry.hardware.resolution}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-start gap-3">
+                                            <Activity className="w-5 h-5 text-slate-500 mt-0.5" />
+                                            <div>
+                                                <p className="text-sm font-medium text-slate-300">Uptime (Tiempo Encendido)</p>
+                                                <p className="text-sm text-slate-500">{Math.floor(deviceData.telemetry.hardware.uptime_hours)} horas</p>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                                {deviceData.telemetry?.network && (
+                                    <div className="flex items-start gap-3">
+                                        <Activity className="w-5 h-5 text-slate-500 mt-0.5" />
+                                        <div>
+                                            <p className="text-sm font-medium text-slate-300">Red Activa</p>
+                                            <p className="text-sm text-slate-500">
+                                                {deviceData.telemetry.network.type === 'wifi' ? `Wi-Fi (${deviceData.telemetry.network.wifi_rssi_dbm} dBm)` : deviceData.telemetry.network.type}
+                                                {deviceData.telemetry.network.ip ? ` - IP: ${deviceData.telemetry.network.ip}` : ''}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
