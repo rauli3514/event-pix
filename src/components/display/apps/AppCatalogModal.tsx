@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { CloudRain, LayoutTemplate, Type, DollarSign, X, Clock, QrCode, Star, Tag } from 'lucide-react';
+import { CloudRain, LayoutTemplate, Type, DollarSign, X, Clock, QrCode, Star, Tag, Youtube } from 'lucide-react';
 import { AppEditorModal } from './AppEditorModal';
 
 interface AppCatalogModalProps {
@@ -11,7 +11,7 @@ interface AppCatalogModalProps {
     currentFolder: string;
 }
 
-export type AppId = 'weather' | 'split-screen' | 'ticker' | 'dolar' | 'clock' | 'qr' | 'reviews' | 'dynamic-menu';
+export type AppId = 'weather' | 'split-screen' | 'ticker' | 'dolar' | 'clock' | 'qr' | 'reviews' | 'dynamic-menu' | 'youtube';
 
 export const APPS = [
     {
@@ -76,7 +76,14 @@ export const APPS = [
         description: 'Carrusel con opiniones de clientes y calificaciones.',
         icon: Star,
         color: 'text-yellow-400',
-        bg: 'bg-yellow-400/10'
+    },
+    {
+        id: 'youtube' as AppId,
+        name: 'YouTube',
+        description: 'Reproduce un video o playlist directamente desde YouTube.',
+        icon: Youtube,
+        color: 'text-red-500',
+        bg: 'bg-red-500/10'
     }
 ];
 

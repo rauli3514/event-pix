@@ -8,6 +8,7 @@ import { ClockPreview } from './apps/clock/ClockApp';
 import { QRPreview } from './apps/qr/QRApp';
 import { ReviewsPreview } from './apps/reviews/ReviewsApp';
 import { DynamicMenuPreview } from './apps/dynamic-menu/DynamicMenuApp';
+import { YoutubePreview } from './apps/youtube/YoutubeApp';
 
 interface PlayerRendererProps {
     item: any; // Using any to support both CampaignItem (V1) and UniversalElement (V2)
@@ -104,6 +105,8 @@ export const PlayerRenderer = ({ item, isActive, commerceId }: PlayerRendererPro
                             <ReviewsPreview config={metadata.config || {}} />
                         ) : appId === 'dynamic-menu' ? (
                             <DynamicMenuPreview config={metadata.config || {}} commerceId={commerceId} />
+                        ) : appId === 'youtube' ? (
+                            <YoutubePreview config={metadata.config || {}} />
                         ) : (
                             <div className="w-full h-full flex items-center justify-center text-white bg-slate-900 flex-col gap-4">
                                 <span className="text-2xl font-bold">App: {appId}</span>

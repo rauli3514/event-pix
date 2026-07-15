@@ -17,6 +17,7 @@ import { ClockForm, ClockPreview } from './clock/ClockApp';
 import { QRForm, QRPreview } from './qr/QRApp';
 import { ReviewsForm, ReviewsPreview } from './reviews/ReviewsApp';
 import { DynamicMenuForm, DynamicMenuPreview } from './dynamic-menu/DynamicMenuApp';
+import { YoutubeForm, YoutubePreview } from './youtube/YoutubeApp';
 
 interface AppEditorModalProps {
     isOpen: boolean;
@@ -53,6 +54,7 @@ export const AppEditorModal = ({ isOpen, onClose, onBack, appId, commerceId, cur
             case 'qr': return <QRForm config={appConfig} onChange={setAppConfig} />;
             case 'reviews': return <ReviewsForm config={appConfig} onChange={setAppConfig} />;
             case 'dynamic-menu': return <DynamicMenuForm config={appConfig} onChange={setAppConfig} commerceId={commerceId} />;
+            case 'youtube': return <YoutubeForm config={appConfig} onChange={setAppConfig} />;
             default: return <div className="text-slate-500 p-4">App form not implemented yet.</div>;
         }
     };
@@ -67,6 +69,7 @@ export const AppEditorModal = ({ isOpen, onClose, onBack, appId, commerceId, cur
             case 'qr': return <QRPreview config={appConfig} />;
             case 'reviews': return <ReviewsPreview config={appConfig} />;
             case 'dynamic-menu': return <DynamicMenuPreview config={appConfig} onChange={setAppConfig} isEditing={true} commerceId={commerceId} />;
+            case 'youtube': return <YoutubePreview config={appConfig} />;
             default: return <div className="text-slate-500 flex items-center justify-center h-full">App preview not implemented yet.</div>;
         }
     };
