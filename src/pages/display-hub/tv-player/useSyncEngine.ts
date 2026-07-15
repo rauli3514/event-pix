@@ -233,7 +233,7 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
             supabase.removeChannel(commandChannel);
             clearInterval(fallbackInterval);
         };
-    }, [deviceCode, status]);
+    }, [deviceCode]); // Removed 'status' dependency to prevent constant resubscription loops
 
     return {
         items,

@@ -188,6 +188,7 @@ export const PlayerRenderer = ({ item, isActive, commerceId }: PlayerRendererPro
                             preload="auto"
                             disablePictureInPicture
                             controls={false}
+                            poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                             className="[&::-webkit-media-controls-play-button]:hidden [&::-webkit-media-controls-start-playback-button]:hidden [&::-webkit-media-controls]:hidden"
                             onEnded={(e) => {
                                 if (item.loop !== false) {
