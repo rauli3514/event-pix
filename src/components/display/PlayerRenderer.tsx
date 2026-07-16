@@ -21,6 +21,7 @@ export const PlayerRenderer = ({ item, isActive, commerceId }: PlayerRendererPro
     const { data: mediaList = [] } = useDisplayMedia(commerceId || '');
 
     const iframeRef = useRef<HTMLIFrameElement>(null);
+    const videoRef = useRef<HTMLVideoElement>(null);
 
     // Si es un iframe, forzar una recarga suave cuando se vuelve activo (opcional, depende de si queremos resetear el estado de la web externa)
     useEffect(() => {
@@ -29,6 +30,18 @@ export const PlayerRenderer = ({ item, isActive, commerceId }: PlayerRendererPro
             // iframeRef.current.src = item.url || '';
         }
     }, [isActive, item]);
+
+    // Handle video play/pause based on active state without unmounting
+    useEffect(() => {
+        if ((item.type === 'video' || item.type === 'video_ad') && videoRef.current) {
+            if (isActive) {
+                videoRef.current.currentTime = 0;
+                videoRef.current.play().catch(() => {});
+            } else {
+                videoRef.current.pause();
+            }
+        }
+    }, [isActive, item.type]);
 
     // Implementamos transiciones CSS (Fade, Slide, etc.)
     const getTransitionStyle = (): React.CSSProperties => {
@@ -88,32 +101,30 @@ export const PlayerRenderer = ({ item, isActive, commerceId }: PlayerRendererPro
             
             return (
                 <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: '#000', ...displayStyle }}>
-                    {isActive ? (
-                        appId === 'weather' ? (
-                            <WeatherPreview config={metadata.config || {}} />
-                        ) : appId === 'split-screen' ? (
-                            <SplitScreenPreview config={metadata.config || {}} commerceId={commerceId} />
-                        ) : appId === 'dolar' ? (
-                            <DolarPreview config={metadata.config || {}} />
-                        ) : appId === 'ticker' ? (
-                            <TickerPreview config={metadata.config || {}} />
-                        ) : appId === 'clock' ? (
-                            <ClockPreview config={metadata.config || {}} />
-                        ) : appId === 'qr' ? (
-                            <QRPreview config={metadata.config || {}} />
-                        ) : appId === 'reviews' ? (
-                            <ReviewsPreview config={metadata.config || {}} />
-                        ) : appId === 'dynamic-menu' ? (
-                            <DynamicMenuPreview config={metadata.config || {}} commerceId={commerceId} />
-                        ) : appId === 'youtube' ? (
-                            <YoutubePreview config={metadata.config || {}} />
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center text-white bg-slate-900 flex-col gap-4">
-                                <span className="text-2xl font-bold">App: {appId}</span>
-                                <span className="text-slate-400">Esta app aún no está soportada en el reproductor.</span>
-                            </div>
-                        )
-                    ) : null}
+                    {appId === 'weather' ? (
+                        <WeatherPreview config={metadata.config || {}} />
+                    ) : appId === 'split-screen' ? (
+                        <SplitScreenPreview config={metadata.config || {}} commerceId={commerceId} />
+                    ) : appId === 'dolar' ? (
+                        <DolarPreview config={metadata.config || {}} />
+                    ) : appId === 'ticker' ? (
+                        <TickerPreview config={metadata.config || {}} />
+                    ) : appId === 'clock' ? (
+                        <ClockPreview config={metadata.config || {}} />
+                    ) : appId === 'qr' ? (
+                        <QRPreview config={metadata.config || {}} />
+                    ) : appId === 'reviews' ? (
+                        <ReviewsPreview config={metadata.config || {}} />
+                    ) : appId === 'dynamic-menu' ? (
+                        <DynamicMenuPreview config={metadata.config || {}} commerceId={commerceId} />
+                    ) : appId === 'youtube' ? (
+                        <YoutubePreview config={metadata.config || {}} />
+                    ) : (
+                        <div className="w-full h-full flex items-center justify-center text-white bg-slate-900 flex-col gap-4">
+                            <span className="text-2xl font-bold">App: {appId}</span>
+                            <span className="text-slate-400">Esta app aún no está soportada en el reproductor.</span>
+                        </div>
+                    )}
                 </div>
             );
 
@@ -141,7 +152,7 @@ export const PlayerRenderer = ({ item, isActive, commerceId }: PlayerRendererPro
 
             return (
                 <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: '#000', ...displayStyle }}>
-                    {isActive && normalizedUrl ? (
+                    {normalizedUrl ? (
                         <iframe 
                             ref={iframeRef}
                             src={normalizedUrl} 
@@ -149,11 +160,11 @@ export const PlayerRenderer = ({ item, isActive, commerceId }: PlayerRendererPro
                             allow="autoplay; fullscreen"
                             title={item.title || item.content}
                         />
-                    ) : isActive && !normalizedUrl ? (
+                    ) : (
                         <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '1.5rem' }}>
                             URL Externa no configurada
                         </div>
-                    ) : null}
+                    )}
                 </div>
             );
         
@@ -180,11 +191,11 @@ export const PlayerRenderer = ({ item, isActive, commerceId }: PlayerRendererPro
         case 'video_ad':
             return (
                 <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: '#000', alignItems: 'center', justifyContent: 'center', ...displayStyle }}>
-                    {item.url && isActive ? (
+                    {item.url ? (
                         <video 
+                            ref={videoRef}
                             src={item.url} 
                             style={{ width: '100%', height: '100%', objectFit: objectFitValue, pointerEvents: 'none' }}
-                            autoPlay={true}
                             muted={item.mute !== false}
                             loop={item.loop !== false}
                             playsInline

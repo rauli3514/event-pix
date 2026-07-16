@@ -138,9 +138,9 @@ export const YoutubePreview = ({ config }: YoutubePreviewProps) => {
     let embedUrl = '';
     
     if (videoId) {
-        embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=${isMuted ? 1 : 0}&controls=${showControls}${loopParam}`;
+        embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=${isMuted ? 1 : 0}&controls=${showControls}&cc_load_policy=3&iv_load_policy=3${loopParam}`;
     } else if (playlistId) {
-        embedUrl = `https://www.youtube.com/embed/videoseries?list=${playlistId}&autoplay=1&mute=${isMuted ? 1 : 0}&controls=${showControls}&loop=1`;
+        embedUrl = `https://www.youtube.com/embed/videoseries?list=${playlistId}&autoplay=1&mute=${isMuted ? 1 : 0}&controls=${showControls}&loop=1&cc_load_policy=3&iv_load_policy=3`;
     }
 
     return (

@@ -1,4 +1,4 @@
-import { Component, ErrorInfo, ReactNode } from 'react';
+import { Component, ErrorInfo, ReactNode, useEffect, useState } from 'react';
 import { PlayerRenderer } from '@/components/display/PlayerRenderer';
 import { CampaignItem } from '@/types/display';
 
@@ -37,22 +37,40 @@ export class MediaErrorBoundary extends Component<{children: ReactNode, onError:
 }
 
 export function MediaRenderer({ items, currentIndex, deviceCommerceId }: Props) {
-    const activeItem = items[currentIndex];
+    const [renderedIndices, setRenderedIndices] = useState<number[]>([currentIndex]);
 
-    if (!activeItem) return null;
+    useEffect(() => {
+        setRenderedIndices(prev => {
+            if (prev.includes(currentIndex)) return prev;
+            // Keep the previous index and the new current index in the DOM for transitions
+            return [prev[prev.length - 1], currentIndex].filter(i => i !== undefined);
+        });
+    }, [currentIndex]);
+
+    if (items.length === 0) return null;
 
     return (
-        <MediaErrorBoundary 
-            key={`${activeItem.id}-${currentIndex}`}
-            onError={() => {
-                console.log(`Error in item ${activeItem.id}. Watchdog will skip.`);
-            }}
-        >
-            <PlayerRenderer 
-                item={activeItem} 
-                isActive={true} 
-                commerceId={deviceCommerceId}
-            />
-        </MediaErrorBoundary>
+        <>
+            {renderedIndices.map(index => {
+                const item = items[index];
+                if (!item) return null;
+                const isActive = index === currentIndex;
+
+                return (
+                    <MediaErrorBoundary 
+                        key={`${item.id}-${index}`}
+                        onError={() => {
+                            console.log(`Error in item ${item.id}. Watchdog will skip.`);
+                        }}
+                    >
+                        <PlayerRenderer 
+                            item={item} 
+                            isActive={isActive} 
+                            commerceId={deviceCommerceId}
+                        />
+                    </MediaErrorBoundary>
+                );
+            })}
+        </>
     );
 }

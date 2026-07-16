@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Monitor, Save, HardDrive, Clock, Smartphone, Activity, Cpu, PlaySquare, Trash2, AlertTriangle, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Monitor, Save, HardDrive, Clock, Smartphone, Activity, Cpu, PlaySquare, Trash2, AlertTriangle, RotateCcw, Wifi } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -10,6 +12,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useDisplayDevice, useAssignContentToDevice, useUpdateDisplayDevice, useDisplayCampaigns, useDeleteAssignment } from "@/hooks/use-display-hub";
 import { useDisplayMedia } from "@/hooks/use-display-media";
 import { supabase } from "@/lib/supabase";
+
+const WifiSignal = ({ dbm }: { dbm: number }) => {
+    let bars = 0;
+    if (dbm >= -50) bars = 4;
+    else if (dbm >= -65) bars = 3;
+    else if (dbm >= -80) bars = 2;
+    else if (dbm > -100) bars = 1;
+
+    return (
+        <div className="flex items-end gap-[2px] h-[14px]" title={`${dbm} dBm`}>
+            {[1, 2, 3, 4].map(i => (
+                <div 
+                    key={i} 
+                    className={`w-1 rounded-sm ${i <= bars ? (bars > 2 ? 'bg-emerald-400' : bars === 2 ? 'bg-yellow-400' : 'bg-rose-400') : 'bg-slate-700'}`} 
+                    style={{ height: `${(i / 4) * 100}%` }} 
+                />
+            ))}
+        </div>
+    );
+};
 
 const DisplayDeviceDetail = () => {
     const { id } = useParams<{ id: string }>();
@@ -547,10 +569,22 @@ const DisplayDeviceDetail = () => {
                                         <Activity className="w-5 h-5 text-slate-500 mt-0.5" />
                                         <div>
                                             <p className="text-sm font-medium text-slate-300">Red Activa</p>
-                                            <p className="text-sm text-slate-500">
-                                                {deviceData.telemetry.network.type === 'wifi' ? `Wi-Fi (${deviceData.telemetry.network.wifi_rssi_dbm} dBm)` : deviceData.telemetry.network.type}
-                                                {deviceData.telemetry.network.ip ? ` - IP: ${deviceData.telemetry.network.ip}` : ''}
-                                            </p>
+                                            <div className="flex items-center gap-2 mt-0.5">
+                                                {deviceData.telemetry.network.type === 'wifi' ? (
+                                                    <>
+                                                        <WifiSignal dbm={deviceData.telemetry.network.wifi_rssi_dbm || -100} />
+                                                        <span className="text-sm text-slate-500">Wi-Fi</span>
+                                                    </>
+                                                ) : (
+                                                    <span className="text-sm text-slate-500 capitalize">{deviceData.telemetry.network.type}</span>
+                                                )}
+                                                {deviceData.telemetry.network.ip && (
+                                                    <>
+                                                        <span className="text-slate-600">•</span>
+                                                        <span className="text-sm text-slate-500">IP: {deviceData.telemetry.network.ip}</span>
+                                                    </>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 )}
