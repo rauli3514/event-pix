@@ -322,101 +322,103 @@ const DisplayHubList = () => {
 
                 {/* Modal de Vinculación */}
                 <Dialog open={isLinkModalOpen} onOpenChange={setIsLinkModalOpen}>
-                    <DialogContent className="sm:max-w-[700px] bg-card border-border text-foreground p-0 overflow-hidden">
-                        <div className="p-6 border-b border-border bg-muted/30">
+                    <DialogContent className="sm:max-w-[700px] bg-card border-border text-foreground p-0 overflow-hidden flex flex-col max-h-[100dvh] sm:max-h-[90vh]">
+                        <div className="p-4 sm:p-6 border-b border-border bg-muted/30 shrink-0">
                             <DialogTitle className="text-xl">Vincular Nueva Pantalla</DialogTitle>
                             <DialogDescription className="text-muted-foreground mt-1">
                                 Abre la aplicación de EventPix en la TV para obtener el código.
                             </DialogDescription>
                         </div>
-                        <form onSubmit={handleLinkSubmit} className="flex flex-col md:flex-row h-full">
-                            {/* Left Side: Basic Info */}
-                            <div className="flex-1 p-6 space-y-5 border-b md:border-b-0 md:border-r border-border">
-                                <div className="space-y-2">
-                                    <Label htmlFor="code" className="text-foreground font-bold">1. Código de Vinculación *</Label>
-                                    <div className="relative">
-                                        <Hash className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
+                        <div className="overflow-y-auto flex-1">
+                            <form id="link-device-form" onSubmit={handleLinkSubmit} className="flex flex-col md:flex-row h-full">
+                                {/* Left Side: Basic Info */}
+                                <div className="flex-1 p-4 sm:p-6 space-y-5 border-b md:border-b-0 md:border-r border-border">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="code" className="text-foreground font-bold">1. Código de Vinculación *</Label>
+                                        <div className="relative">
+                                            <Hash className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
+                                            <Input
+                                                id="code"
+                                                value={linkData.device_code}
+                                                onChange={(e) => setLinkData({ ...linkData, device_code: e.target.value.toUpperCase() })}
+                                                placeholder="Ej: MX9-K7P2A"
+                                                className="pl-9 bg-background border-primary/50 text-foreground font-mono uppercase tracking-widest text-lg h-11 focus-visible:ring-primary"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="name" className="text-foreground font-bold">2. Nombre *</Label>
                                         <Input
-                                            id="code"
-                                            value={linkData.device_code}
-                                            onChange={(e) => setLinkData({ ...linkData, device_code: e.target.value.toUpperCase() })}
-                                            placeholder="Ej: MX9-K7P2A"
-                                            className="pl-9 bg-background border-primary/50 text-foreground font-mono uppercase tracking-widest text-lg h-11 focus-visible:ring-primary"
+                                            id="name"
+                                            value={linkData.name}
+                                            onChange={(e) => setLinkData({ ...linkData, name: e.target.value })}
+                                            placeholder="Ej: TV Salón Principal"
+                                            className="bg-background border-border text-foreground h-11 focus-visible:ring-primary"
                                             required
                                         />
                                     </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="group" className="text-foreground font-bold">3. Ubicación / Grupo</Label>
+                                        <Select value={linkData.group_id} onValueChange={(val) => setLinkData({ ...linkData, group_id: val })}>
+                                            <SelectTrigger className="w-full bg-background border-border text-foreground h-11 focus:ring-primary">
+                                                <SelectValue placeholder="Ninguna zona..." />
+                                            </SelectTrigger>
+                                            <SelectContent className="bg-card border-border text-foreground">
+                                                <SelectItem value="none">Sin Grupo</SelectItem>
+                                                {linkGroups?.map(g => (
+                                                    <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
                                 </div>
 
-                                <div className="space-y-2">
-                                    <Label htmlFor="name" className="text-foreground font-bold">2. Nombre *</Label>
-                                    <Input
-                                        id="name"
-                                        value={linkData.name}
-                                        onChange={(e) => setLinkData({ ...linkData, name: e.target.value })}
-                                        placeholder="Ej: TV Salón Principal"
-                                        className="bg-background border-border text-foreground h-11 focus-visible:ring-primary"
-                                        required
-                                    />
-                                </div>
+                                {/* Right Side: Orientation */}
+                                <div className="flex-1 p-4 sm:p-6 bg-background">
+                                    <Label className="text-foreground font-bold mb-4 block">4. Orientación Inicial</Label>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {/* Horizontal */}
+                                        <button 
+                                            type="button"
+                                            onClick={() => setLinkData({ ...linkData, orientation: 'landscape' })}
+                                            className={`flex flex-col items-center justify-center p-6 rounded-xl border-2 transition-all ${
+                                                linkData.orientation === 'landscape' ? 'border-primary bg-primary/10 text-primary shadow-sm' : 'border-border bg-card text-muted-foreground hover:border-primary/50 hover:bg-muted'
+                                            }`}
+                                        >
+                                            <div className="w-16 h-10 border-2 border-current rounded flex items-center justify-center mb-3">
+                                                <Play className="w-4 h-4 ml-1" />
+                                            </div>
+                                            <span className="font-semibold text-sm">Horizontal</span>
+                                            <span className="text-xs opacity-70 mt-1 hidden sm:block">FHD 1080p</span>
+                                        </button>
 
-                                <div className="space-y-2">
-                                    <Label htmlFor="group" className="text-foreground font-bold">3. Ubicación / Grupo</Label>
-                                    <Select value={linkData.group_id} onValueChange={(val) => setLinkData({ ...linkData, group_id: val })}>
-                                        <SelectTrigger className="w-full bg-background border-border text-foreground h-11 focus:ring-primary">
-                                            <SelectValue placeholder="Ninguna zona..." />
-                                        </SelectTrigger>
-                                        <SelectContent className="bg-card border-border text-foreground">
-                                            <SelectItem value="none">Sin Grupo</SelectItem>
-                                            {linkGroups?.map(g => (
-                                                <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                        {/* Vertical */}
+                                        <button 
+                                            type="button"
+                                            onClick={() => setLinkData({ ...linkData, orientation: 'portrait' })}
+                                            className={`flex flex-col items-center justify-center p-6 rounded-xl border-2 transition-all ${
+                                                linkData.orientation === 'portrait' ? 'border-primary bg-primary/10 text-primary shadow-sm' : 'border-border bg-card text-muted-foreground hover:border-primary/50 hover:bg-muted'
+                                            }`}
+                                        >
+                                            <div className="w-10 h-16 border-2 border-current rounded flex items-center justify-center mb-3">
+                                                <Play className="w-4 h-4 ml-1" />
+                                            </div>
+                                            <span className="font-semibold text-sm">Vertical</span>
+                                            <span className="text-xs opacity-70 mt-1 hidden sm:block">FHD 1080p</span>
+                                        </button>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-4 text-center">
+                                        Podrás cambiarla luego desde los ajustes de la pantalla.
+                                    </p>
                                 </div>
-                            </div>
-
-                            {/* Right Side: Orientation */}
-                            <div className="flex-1 p-6 bg-background">
-                                <Label className="text-foreground font-bold mb-4 block">4. Orientación Inicial</Label>
-                                <div className="grid grid-cols-2 gap-4">
-                                    {/* Horizontal */}
-                                    <button 
-                                        type="button"
-                                        onClick={() => setLinkData({ ...linkData, orientation: 'landscape' })}
-                                        className={`flex flex-col items-center justify-center p-6 rounded-xl border-2 transition-all ${
-                                            linkData.orientation === 'landscape' ? 'border-primary bg-primary/10 text-primary shadow-sm' : 'border-border bg-card text-muted-foreground hover:border-primary/50 hover:bg-muted'
-                                        }`}
-                                    >
-                                        <div className="w-16 h-10 border-2 border-current rounded flex items-center justify-center mb-3">
-                                            <Play className="w-4 h-4 ml-1" />
-                                        </div>
-                                        <span className="font-semibold text-sm">Horizontal</span>
-                                        <span className="text-xs opacity-70 mt-1 hidden sm:block">FHD 1080p</span>
-                                    </button>
-
-                                    {/* Vertical */}
-                                    <button 
-                                        type="button"
-                                        onClick={() => setLinkData({ ...linkData, orientation: 'portrait' })}
-                                        className={`flex flex-col items-center justify-center p-6 rounded-xl border-2 transition-all ${
-                                            linkData.orientation === 'portrait' ? 'border-primary bg-primary/10 text-primary shadow-sm' : 'border-border bg-card text-muted-foreground hover:border-primary/50 hover:bg-muted'
-                                        }`}
-                                    >
-                                        <div className="w-10 h-16 border-2 border-current rounded flex items-center justify-center mb-3">
-                                            <Play className="w-4 h-4 ml-1" />
-                                        </div>
-                                        <span className="font-semibold text-sm">Vertical</span>
-                                        <span className="text-xs opacity-70 mt-1 hidden sm:block">FHD 1080p</span>
-                                    </button>
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-4 text-center">
-                                    Podrás cambiarla luego desde los ajustes de la pantalla.
-                                </p>
-                            </div>
-                        </form>
-                        <div className="p-4 border-t border-border flex justify-end gap-3 bg-muted/20">
+                            </form>
+                        </div>
+                        <div className="p-4 border-t border-border flex justify-end gap-3 bg-muted/20 shrink-0">
                             <Button type="button" variant="ghost" onClick={() => setIsLinkModalOpen(false)}>Cancelar</Button>
-                            <Button onClick={handleLinkSubmit} className="bg-primary hover:bg-primary/90 min-w-[140px] h-10" disabled={linkDevice.isPending}>
+                            <Button type="submit" form="link-device-form" className="bg-primary hover:bg-primary/90 min-w-[140px] h-10" disabled={linkDevice.isPending}>
                                 {linkDevice.isPending ? 'Vinculando...' : 'Vincular Pantalla'}
                             </Button>
                         </div>
