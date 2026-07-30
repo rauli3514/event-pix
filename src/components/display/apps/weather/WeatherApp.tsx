@@ -15,7 +15,8 @@ export interface WeatherConfig {
         lat: number;
         lon: number;
     }[];
-    theme: 'light' | 'dark' | 'dynamic' | 'vibrant' | 'glass';
+    theme: 'light' | 'dark' | 'dynamic' | 'vibrant' | 'glass' | 'custom';
+    customBgImage?: string;
     unit: 'celsius' | 'fahrenheit';
 }
 
@@ -164,7 +165,8 @@ export const WeatherForm = ({ config, onChange }: WeatherFormProps) => {
                         <SelectValue placeholder="Selecciona un tema" />
                     </SelectTrigger>
                     <SelectContent className="bg-slate-900 border-slate-800 text-slate-200">
-                        <SelectItem value="dynamic">Dinámico (Sutil según clima)</SelectItem>
+                        <SelectItem value="dynamic">Dinámico (Fondo según clima)</SelectItem>
+                        <SelectItem value="custom">Imagen Personalizada</SelectItem>
                         <SelectItem value="vibrant">Vibrante Sólido (Estilo ScreenCloud)</SelectItem>
                         <SelectItem value="glass">Premium Glassmorphism</SelectItem>
                         <SelectItem value="dark">Modo Oscuro Plano</SelectItem>
@@ -172,6 +174,19 @@ export const WeatherForm = ({ config, onChange }: WeatherFormProps) => {
                     </SelectContent>
                 </Select>
             </div>
+
+            {config.theme === 'custom' && (
+                <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+                    <Label className="text-slate-300">URL de Imagen Personalizada</Label>
+                    <Input 
+                        placeholder="https://ejemplo.com/tu-imagen.jpg" 
+                        value={config.customBgImage || ''}
+                        onChange={(e) => onChange({ ...config, customBgImage: e.target.value })}
+                        className="bg-slate-950 border-slate-800 text-slate-200"
+                    />
+                    <p className="text-xs text-slate-500">Pega el enlace directo a cualquier imagen (.jpg, .png).</p>
+                </div>
+            )}
         </div>
     );
 };
@@ -373,6 +388,10 @@ const WeatherCard = ({ data, unitStr, mode, theme, containerWidth = 1920 }: { da
     } else if (theme === 'dynamic') {
         bgStyle = 'text-white bg-slate-900';
         bgImage = getBackgroundImage(code, isDay);
+        cardStyle = 'bg-black/60 backdrop-blur-md border border-white/10 shadow-xl';
+    } else if (theme === 'custom') {
+        bgStyle = 'text-white bg-slate-900';
+        bgImage = config.customBgImage || getBackgroundImage(code, isDay);
         cardStyle = 'bg-black/60 backdrop-blur-md border border-white/10 shadow-xl';
     }
 
