@@ -334,15 +334,15 @@ const parseWeatherData = (data: any) => {
 
 const getBackgroundImage = (code: number, isDay: boolean) => {
     if (!isDay) {
-        if (code <= 3) return 'https://images.unsplash.com/photo-1505322022520-5e1ceaf74c93?auto=format&fit=crop&w=1920&q=80'; // clear night
-        return 'https://images.unsplash.com/photo-1483702581635-c33118cf6f5e?auto=format&fit=crop&w=1920&q=80'; // cloudy night
+        if (code <= 3) return 'https://images.unsplash.com/photo-1503330936140-b3a87ed1b1eb?auto=format&fit=crop&w=1920&q=80'; // clear night
+        return 'https://images.unsplash.com/photo-1485249245068-d8dc50b77cc7?auto=format&fit=crop&w=1920&q=80'; // cloudy night
     }
-    if (code === 0) return 'https://images.unsplash.com/photo-1601297183305-6df14faa7181?auto=format&fit=crop&w=1920&q=80'; // clear day
-    if (code >= 1 && code <= 3) return 'https://images.unsplash.com/photo-1534274988757-a28bf1a5753a?auto=format&fit=crop&w=1920&q=80'; // cloudy day
+    if (code === 0) return 'https://images.unsplash.com/photo-1514454529242-9e4677563e7b?auto=format&fit=crop&w=1920&q=80'; // clear day
+    if (code >= 1 && code <= 3) return 'https://images.unsplash.com/photo-1469365556835-3da3db4c253b?auto=format&fit=crop&w=1920&q=80'; // cloudy day
     if (code >= 51 && code <= 67) return 'https://images.unsplash.com/photo-1515694346937-94d85e41e6f0?auto=format&fit=crop&w=1920&q=80'; // rain
     if (code >= 71 && code <= 82) return 'https://images.unsplash.com/photo-1478265409131-1f65c88f965c?auto=format&fit=crop&w=1920&q=80'; // snow
-    if (code >= 95) return 'https://images.unsplash.com/photo-1605722243979-fc647f98f267?auto=format&fit=crop&w=1920&q=80'; // storm
-    return 'https://images.unsplash.com/photo-1601297183305-6df14faa7181?auto=format&fit=crop&w=1920&q=80';
+    if (code >= 95) return 'https://images.unsplash.com/photo-1429552077091-836152271555?auto=format&fit=crop&w=1920&q=80'; // storm
+    return 'https://images.unsplash.com/photo-1514454529242-9e4677563e7b?auto=format&fit=crop&w=1920&q=80';
 };
 
 const WeatherCard = ({ data, unitStr, mode, theme, containerWidth = 1920 }: { data: any, unitStr: string, mode: 'micro' | 'square' | 'column' | 'main', theme: string, containerWidth?: number }) => {
