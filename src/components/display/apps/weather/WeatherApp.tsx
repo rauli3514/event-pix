@@ -281,14 +281,14 @@ export const WeatherPreview = ({ config }: { config: Partial<WeatherConfig> }) =
                 )}
 
                 {(isMicro || isSquare) && (
-                    <WeatherCard data={weatherDataList[0]} unitStr={unitStr} mode={isMicro ? 'micro' : 'square'} theme={theme} containerWidth={width} />
+                    <WeatherCard data={weatherDataList[0]} unitStr={unitStr} mode={isMicro ? 'micro' : 'square'} theme={theme} containerWidth={width} customBgImage={config.customBgImage} />
                 )}
 
                 {isColumn && (
                     <div className="w-full h-full flex flex-col">
                         {weatherDataList.map((data, idx) => (
                             <div key={idx} className="flex-1 min-h-0 border-b border-white/10 last:border-0 relative">
-                                <WeatherCard data={data} unitStr={unitStr} mode="main" theme={theme} containerWidth={width} />
+                                <WeatherCard data={data} unitStr={unitStr} mode="main" theme={theme} containerWidth={width} customBgImage={config.customBgImage} />
                             </div>
                         ))}
                     </div>
@@ -298,7 +298,7 @@ export const WeatherPreview = ({ config }: { config: Partial<WeatherConfig> }) =
                     <div className="w-full h-full flex">
                         {weatherDataList.map((data, idx) => (
                             <div key={idx} className="flex-1 min-w-0 border-r border-white/20 last:border-0 relative">
-                                <WeatherCard data={data} unitStr={unitStr} mode="main" theme={theme} containerWidth={width / weatherDataList.length} />
+                                <WeatherCard data={data} unitStr={unitStr} mode="main" theme={theme} containerWidth={width / weatherDataList.length} customBgImage={config.customBgImage} />
                             </div>
                         ))}
                     </div>
@@ -360,7 +360,7 @@ const getBackgroundImage = (code: number, isDay: boolean) => {
     return 'https://images.unsplash.com/photo-1514454529242-9e4677563e7b?auto=format&fit=crop&w=1920&q=80';
 };
 
-const WeatherCard = ({ data, unitStr, mode, theme, containerWidth = 1920 }: { data: any, unitStr: string, mode: 'micro' | 'square' | 'column' | 'main', theme: string, containerWidth?: number }) => {
+const WeatherCard = ({ data, unitStr, mode, theme, containerWidth = 1920, customBgImage }: { data: any, unitStr: string, mode: 'micro' | 'square' | 'column' | 'main', theme: string, containerWidth?: number, customBgImage?: string }) => {
     const { code, temp, isDay, windSpeed, humidity, feelsLike, cloudCover, rain } = parseWeatherData(data);
     const Icon = getWeatherIcon(code, isDay);
     const desc = getWeatherDesc(code);
@@ -391,7 +391,7 @@ const WeatherCard = ({ data, unitStr, mode, theme, containerWidth = 1920 }: { da
         cardStyle = 'bg-black/60 backdrop-blur-md border border-white/10 shadow-xl';
     } else if (theme === 'custom') {
         bgStyle = 'text-white bg-slate-900';
-        bgImage = config.customBgImage || getBackgroundImage(code, isDay);
+        bgImage = customBgImage || getBackgroundImage(code, isDay);
         cardStyle = 'bg-black/60 backdrop-blur-md border border-white/10 shadow-xl';
     }
 
