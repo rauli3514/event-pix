@@ -26,6 +26,23 @@ export function useTelemetry(deviceCode: string | undefined) {
                         if (bridgeTelemetry.android_version) androidVersion = bridgeTelemetry.android_version;
                         telemetry = { ...bridgeTelemetry };
                     } catch (e) {}
+                } else {
+                    try {
+                        const { Device } = await import('@capacitor/device');
+                        const { App } = await import('@capacitor/app');
+                        
+                        const deviceInfo = await Device.getInfo();
+                        const appInfo = await App.getInfo();
+                        
+                        appVersion = appInfo.version;
+                        androidVersion = deviceInfo.osVersion;
+                        
+                        telemetry.model = deviceInfo.model;
+                        telemetry.manufacturer = deviceInfo.manufacturer;
+                        telemetry.platform = deviceInfo.platform;
+                    } catch (e) {
+                        console.error("Error obteniendo telemetría nativa", e);
+                    }
                 }
 
                 if ((window.performance as any).memory) {

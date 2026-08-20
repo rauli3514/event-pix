@@ -2,6 +2,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
 import Index from "./pages/Index";
 import Admin from "./pages/Admin";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -95,7 +96,17 @@ const App = () => (
               <Route path="/:slug/display" element={<Display />} />
             </Route>
 
-            <Route path="/" element={<Navigate to="/login" replace />} />
+            {/* 
+              VITE_APP_FLAVOR=mobile → celular (va a /usuarios)
+              VITE_APP_FLAVOR=tv (default) → Tanix (va al /tv-boot)
+            */}
+            <Route path="/" element={<Navigate to={
+              Capacitor.isNativePlatform() && import.meta.env.VITE_APP_FLAVOR === 'mobile'
+                ? "/usuarios"
+                : Capacitor.isNativePlatform()
+                  ? "/tv-boot"
+                  : "/usuarios"
+            } replace />} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>

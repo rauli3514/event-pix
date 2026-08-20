@@ -195,6 +195,8 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
                 } else if (payload.payload?.action === 'clear_cache') {
                     localStorage.removeItem(`tv_cache_${deviceCode}`);
                     window.location.reload();
+                } else if (payload.payload?.action === 'rotate_screen') {
+                    fetchCampaign();
                 } else if (payload.payload?.action === 'reset_telemetry') {
                     if ((window as any).TvBridge && typeof (window as any).TvBridge.resetTelemetry === 'function') {
                         (window as any).TvBridge.resetTelemetry();
@@ -202,8 +204,16 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
                     }
                 } else if (payload.payload?.action === 'set_volume') {
                     const vol = payload.payload?.volume;
-                    if (vol !== undefined && (window as any).TvBridge && typeof (window as any).TvBridge.setVolume === 'function') {
-                        (window as any).TvBridge.setVolume(vol);
+                    if (typeof vol === 'number' && vol >= 0 && vol <= 100) {
+                        if ((window as any).TvBridge && typeof (window as any).TvBridge.setVolume === 'function') {
+                            (window as any).TvBridge.setVolume(vol);
+                        } else if ((window as any).AndroidKiosk) {
+                            (window as any).AndroidKiosk.setVolume(vol);
+                        } else {
+                            import('@capawesome/capacitor-volume').then(({ Volume }) => {
+                                Volume.setVolume({ volume: vol / 100 });
+                            }).catch(console.error);
+                        }
                         forceHeartbeat();
                     }
                 } else if (payload.payload?.action === 'connect_wifi') {
@@ -219,6 +229,9 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
                 }
             })
             // Suscribirse no solo a assignments sino también a campañas!
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'display_devices' }, () => {
+                fetchCampaign();
+            })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'display_assignments' }, () => {
                 fetchCampaign();
             })

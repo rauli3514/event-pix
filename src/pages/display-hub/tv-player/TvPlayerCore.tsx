@@ -56,8 +56,44 @@ const TvPlayerCore = () => {
         fetchCampaign
     } = useSyncEngine(deviceCode, sendHeartbeat);
 
-    // 3. System Events (Rotation & Online status)
+    // 3. System Events (Rotation, Online status & Secret Exit)
     useEffect(() => {
+        let backPressCount = 0;
+        let lastPressTime = 0;
+
+        const registerBackAction = () => {
+            const now = Date.now();
+            if (now - lastPressTime > 1500) {
+                backPressCount = 1;
+            } else {
+                backPressCount++;
+            }
+            lastPressTime = now;
+
+            if (backPressCount >= 5) {
+                backPressCount = 0;
+                if ((window as any).AndroidKiosk?.openSettings) {
+                    (window as any).AndroidKiosk.openSettings();
+                }
+            }
+        };
+
+        const handleGlobalKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' || e.key === 'Backspace' || e.key === 'GoBack' || e.key === 'BrowserBack' || e.keyCode === 4) {
+                e.preventDefault();
+                registerBackAction();
+            }
+        };
+
+        window.addEventListener('keydown', handleGlobalKeyDown);
+
+        // Listener nativo de Capacitor para capturar el botón BACK de Android sin cerrar la App
+        let appListenerPromise = import('@capacitor/app').then(({ App }) => {
+            return App.addListener('backButton', () => {
+                registerBackAction();
+            });
+        }).catch(console.error);
+
         const storedRotation = localStorage.getItem('local_rotation');
         if (storedRotation !== null) {
             setLocalRotation(parseInt(storedRotation, 10));
@@ -69,7 +105,9 @@ const TvPlayerCore = () => {
         window.addEventListener('local_rotation_changed', handleRotationChange);
 
         return () => {
+            window.removeEventListener('keydown', handleGlobalKeyDown);
             window.removeEventListener('local_rotation_changed', handleRotationChange);
+            appListenerPromise?.then(listener => listener?.remove?.());
         };
     }, []);
 
@@ -100,21 +138,47 @@ const TvPlayerCore = () => {
     // --- UI Renders ---
     
     const getRotationStyle = (orientation: string | undefined): React.CSSProperties => {
-        let degreeStr = orientation === 'portrait' ? '90' : (orientation === 'landscape' ? '0' : (orientation || '0'));
-        if (localRotation !== null) degreeStr = String(localRotation);
-        const isVertical = degreeStr === '90' || degreeStr === '270';
+        let degreeStr = localRotation !== null ? String(localRotation) : (orientation || '0');
+        if (degreeStr === 'portrait') degreeStr = '90';
+        if (degreeStr === 'landscape') degreeStr = '0';
         
-        if (isVertical) {
+        const degree = parseInt(degreeStr, 10) || 0;
+
+        if (degree === 90 || degree === 270) {
             return {
-                position: 'fixed', transform: `rotate(${degreeStr}deg)`, transformOrigin: 'center center',
-                width: '100vh', height: '100vw', top: 'calc(50vh - 50vw)', left: 'calc(50vw - 50vh)',
-                backgroundColor: '#111', overflow: 'hidden'
+                position: 'fixed',
+                transform: `rotate(${degree}deg)`,
+                transformOrigin: 'center center',
+                width: '100vh',
+                height: '100vw',
+                top: 'calc(50vh - 50vw)',
+                left: 'calc(50vw - 50vh)',
+                backgroundColor: '#111',
+                overflow: 'hidden'
+            };
+        } else if (degree === 180) {
+            return {
+                position: 'fixed',
+                transform: 'rotate(180deg)',
+                transformOrigin: 'center center',
+                width: '100vw',
+                height: '100vh',
+                top: 0,
+                left: 0,
+                backgroundColor: '#111',
+                overflow: 'hidden'
             };
         }
+
         return {
-            position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', 
-            transform: `rotate(${degreeStr}deg)`, transformOrigin: 'center center',
-            backgroundColor: '#111', overflow: 'hidden'
+            position: 'fixed',
+            transform: 'none',
+            width: '100vw',
+            height: '100vh',
+            top: 0,
+            left: 0,
+            backgroundColor: '#111',
+            overflow: 'hidden'
         };
     };
 

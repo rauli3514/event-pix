@@ -143,16 +143,46 @@ export const TvSettingsMenu = ({ deviceCode, onRefresh }: TvSettingsMenuProps) =
             }
         },
         {
+            id: 'wifi_settings',
+            label: 'Configurar Wi-Fi (Android)',
+            icon: <Zap className="w-5 h-5 text-cyan-400" />,
+            action: () => {
+                if ((window as any).AndroidKiosk?.openWifiSettings) {
+                    (window as any).AndroidKiosk.openWifiSettings();
+                } else if ((window as any).AndroidKiosk?.openSettings) {
+                    (window as any).AndroidKiosk.openSettings();
+                } else {
+                    alert('Solo disponible en Android.');
+                }
+            }
+        },
+        {
+            id: 'home_settings',
+            label: 'Cambiar Launcher / Salir a Android',
+            icon: <Power className="w-5 h-5 text-amber-400" />,
+            action: () => {
+                if ((window as any).AndroidKiosk?.openHomeSettings) {
+                    (window as any).AndroidKiosk.openHomeSettings();
+                } else if ((window as any).AndroidKiosk?.openSettings) {
+                    (window as any).AndroidKiosk.openSettings();
+                } else {
+                    alert('Solo disponible en Android.');
+                }
+            }
+        },
+        {
             id: 'exit',
             label: 'Salir de la App',
             icon: <Power className="w-5 h-5 text-red-500" />,
             action: () => {
-                if (window.confirm('¿Seguro que deseas salir de la aplicación?')) {
-                    if (window.TvBridge) {
-                        window.TvBridge.exitApp();
-                    } else {
-                        alert('Esta función solo está disponible en la TV.');
-                    }
+                if ((window as any).AndroidKiosk?.exitApp) {
+                    (window as any).AndroidKiosk.exitApp();
+                } else {
+                    import('@capacitor/app').then(({ App }) => {
+                        App.exitApp();
+                    }).catch(() => {
+                        window.close();
+                    });
                 }
             }
         },

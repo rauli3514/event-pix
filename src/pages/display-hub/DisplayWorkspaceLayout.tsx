@@ -11,7 +11,8 @@ import {
   Menu,
   LogOut,
   PenTool,
-  Database
+  Database,
+  Bluetooth
 } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { cn } from '@/lib/utils';
@@ -19,8 +20,10 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import { useCommerces } from '@/hooks/use-display-hub';
 import { supabase } from '@/lib/supabase';
-import { Bot } from 'lucide-react';
+import { Bot, Sparkles } from 'lucide-react';
 import { AIAssistantPanel } from '@/components/display/ai/AIAssistantPanel';
+import { Capacitor } from '@capacitor/core';
+import { BluetoothProvisioningModal } from '@/components/display/BluetoothProvisioningModal';
 
 const MENU_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: 'dashboard' },
@@ -53,6 +56,8 @@ export default function DisplayWorkspaceLayout() {
   // Mobile menu state
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
+  const [isBluetoothOpen, setIsBluetoothOpen] = useState(false);
+  const isNativeAndroid = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
 
   // Close mobile menu when route changes
   useEffect(() => {
@@ -104,7 +109,31 @@ export default function DisplayWorkspaceLayout() {
             </Link>
           );
         })}
-        <div className="pt-4 mt-4 border-t border-border">
+        <div className="pt-4 mt-4 border-t border-border space-y-1">
+          <button
+            onClick={() => {
+              if (commerceId) localStorage.removeItem(`onboarding_dismissed_${commerceId}`);
+              navigate(`/admin/display/commerce/${commerceId}/workspace/dashboard`);
+              setIsMobileMenuOpen(false);
+            }}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-amber-500 hover:bg-amber-500/10"
+          >
+            <Sparkles className="w-5 h-5 shrink-0 text-amber-400" />
+            <span className="truncate">Guía de Inicio (Comience)</span>
+          </button>
+          {/* Bluetooth — solo en app Android nativa (celular) */}
+          {isNativeAndroid && (
+            <button
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                setTimeout(() => setIsBluetoothOpen(true), 150);
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <Bluetooth className="w-5 h-5 shrink-0 text-indigo-400" />
+              <span className="truncate">Configurar TV (Bluetooth)</span>
+            </button>
+          )}
           <button
             onClick={() => { setIsAIPanelOpen(true); setIsMobileMenuOpen(false); }}
             className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-gradient-to-r from-indigo-600/10 to-purple-600/10 text-indigo-500 hover:from-indigo-600/20 hover:to-purple-600/20 border border-indigo-500/20"
@@ -187,6 +216,13 @@ export default function DisplayWorkspaceLayout() {
 
       {/* AI Assistant Panel */}
       <AIAssistantPanel isOpen={isAIPanelOpen} onClose={() => setIsAIPanelOpen(false)} />
+
+      {/* Bluetooth Setup Modal */}
+      <BluetoothProvisioningModal 
+        isOpen={isBluetoothOpen} 
+        onClose={() => setIsBluetoothOpen(false)} 
+        commerceId={commerceId}
+      />
 
     </div>
   );

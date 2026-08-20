@@ -6,6 +6,8 @@ import { Monitor, ListVideo, Rocket, ChevronRight, CheckCircle2, CloudOff, Calen
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 
+import { OnboardingWizardWidget } from '@/components/display/OnboardingWizardWidget';
+
 export default function WorkspaceDashboard() {
     const { commerceId } = useParams();
     const navigate = useNavigate();
@@ -167,8 +169,11 @@ export default function WorkspaceDashboard() {
                     </div>
                 </div>
 
-                {/* Right Column: Playlists & Schedules */}
+                {/* Right Column: Onboarding, Playlists & Schedules */}
                 <div className="space-y-8">
+                    {/* Guía Inicial / Onboarding Wizard */}
+                    <OnboardingWizardWidget className="w-full max-w-none shadow-md" />
+
                     {/* Recent Playlists */}
                     <div className="space-y-4">
                         <div className="flex items-center justify-between">

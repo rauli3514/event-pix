@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Monitor, Plus, Hash, Eye, ChevronDown, MoreVertical, Edit2, Info, Move, Trash2, Play } from 'lucide-react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { Monitor, Plus, Hash, Eye, ChevronDown, MoreVertical, Edit2, Info, Move, Trash2, Play, Bluetooth } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,7 +11,9 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/s
 import { EditScreenModal } from "@/components/display/EditScreenModal";
 import { ZoneManagerSidebar } from "@/components/display/ZoneManagerSidebar";
 import { MoveDeviceModal } from "@/components/display/MoveDeviceModal";
+import { BluetoothProvisioningModal } from "@/components/display/BluetoothProvisioningModal";
 import { Layers } from 'lucide-react';
+import { useEffect } from 'react';
 
 import { toast } from 'sonner';
 
@@ -23,9 +25,21 @@ import { DisplayDevice } from '@/types/display';
 const DisplayHubList = () => {
     const { commerceId } = useParams<{ commerceId: string }>();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    
+    const urlCode = searchParams.get('code') || searchParams.get('bt')?.replace('EventPix-TV-', '');
     
     // States for linking
     const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+    const [isBluetoothModalOpen, setIsBluetoothModalOpen] = useState(!!urlCode);
+    const [initialDeviceCode, setInitialDeviceCode] = useState<string | undefined>(urlCode || undefined);
+    
+    useEffect(() => {
+        if (urlCode) {
+            setInitialDeviceCode(urlCode);
+            setIsBluetoothModalOpen(true);
+        }
+    }, [urlCode]);
     const [linkData, setLinkData] = useState({ device_code: '', name: '', description: '', group_id: 'none', orientation: 'landscape' as 'landscape' | 'portrait' });
     
     // States for filtering & sidebar
@@ -135,23 +149,23 @@ const DisplayHubList = () => {
     );
 
     return (
-        <div className="flex h-[calc(100vh-64px)] w-full overflow-hidden bg-background text-foreground flex-col transition-colors duration-300">
+        <div className="flex h-full w-full min-h-0 overflow-hidden bg-background text-foreground flex-col transition-colors duration-300">
             {/* Descriptive Top Banner */}
-            <div className="p-6 md:px-8 pt-6 pb-2 shrink-0">
-                <div className="relative overflow-hidden rounded-3xl bg-card border border-border shadow-xl flex items-center min-h-[140px] px-8 py-6 transition-colors duration-300">
+            <div className="p-4 sm:p-6 md:px-8 pt-4 sm:pt-6 pb-2 shrink-0">
+                <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-card border border-border shadow-xl flex items-center px-4 py-4 sm:px-8 sm:py-6 transition-colors duration-300">
                     {/* Decorative Background for Banner */}
                     <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-background/20 to-secondary/10 pointer-events-none">
                         <div className="absolute right-10 top-1/2 -translate-y-1/2 w-48 h-48 bg-emerald-500/10 rounded-full blur-[60px]"></div>
                         <div className="absolute right-32 bottom-0 w-32 h-32 bg-sky-500/10 rounded-full blur-[40px]"></div>
                     </div>
                     
-                    <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between w-full gap-6">
+                    <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between w-full gap-4 sm:gap-6">
                         <div className="flex flex-col gap-1 w-full max-w-2xl">
-                            <h1 className="text-3xl font-extrabold text-foreground flex items-center gap-3">
+                            <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground flex items-center gap-3">
                                 <Sheet>
                                     <SheetTrigger asChild>
-                                        <Button variant="outline" size="icon" className="md:hidden border-border bg-muted/50 text-muted-foreground w-10 h-10 shrink-0 hover:text-foreground">
-                                            <Layers className="w-5 h-5" />
+                                        <Button variant="outline" size="icon" className="lg:hidden border-border bg-muted/50 text-muted-foreground w-9 h-9 shrink-0 hover:text-foreground">
+                                            <Layers className="w-4 h-4" />
                                         </Button>
                                     </SheetTrigger>
                                     <SheetContent side="left" className="p-0 bg-card border-r-border w-72 flex flex-col transition-colors duration-300">
@@ -173,9 +187,12 @@ const DisplayHubList = () => {
                             </p>
                         </div>
                         
-                        <div className="shrink-0">
-                            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-6 py-5 text-sm font-bold shadow-lg shadow-primary/10 transition-all hover:scale-105" onClick={() => setIsLinkModalOpen(true)}>
-                                <Plus className="w-4 h-4 mr-2" /> Agregar Pantalla
+                        <div className="shrink-0 flex flex-wrap items-center gap-2 sm:gap-3">
+                            <Button variant="outline" className="border-border text-foreground hover:bg-muted rounded-full px-4 py-2 sm:px-5 sm:py-5 text-xs sm:text-sm font-bold shadow-sm transition-all" onClick={() => setIsBluetoothModalOpen(true)}>
+                                <Bluetooth className="w-4 h-4 mr-1.5 sm:mr-2 text-blue-500" /> Configurar por Bluetooth
+                            </Button>
+                            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-4 py-2 sm:px-6 sm:py-5 text-xs sm:text-sm font-bold shadow-lg shadow-primary/10 transition-all hover:scale-105" onClick={() => setIsLinkModalOpen(true)}>
+                                <Plus className="w-4 h-4 mr-1.5 sm:mr-2" /> Agregar Pantalla
                             </Button>
                         </div>
                     </div>
@@ -184,8 +201,8 @@ const DisplayHubList = () => {
 
             {/* Main Content Area: Sidebar + Grid */}
             <div className="flex-1 flex overflow-hidden">
-                {/* Sidebar de Zonas (Desktop) */}
-                <div className="hidden md:block shrink-0 h-full">
+                {/* Sidebar de Zonas (Desktop > 1024px) */}
+                <div className="hidden lg:block shrink-0 h-full">
                     <ZoneManagerSidebar 
                         commerceId={effectiveCommerceId}
                         groups={linkGroups || []}
@@ -197,7 +214,7 @@ const DisplayHubList = () => {
                 </div>
 
                 {/* Contenido Principal */}
-                <div className="flex-1 overflow-y-auto p-6 md:px-8 bg-background">
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:px-8 bg-background min-w-0">
                     {/* Filters & Search */}
                     <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
                     <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
@@ -238,31 +255,31 @@ const DisplayHubList = () => {
                                 {groupDevices.map(device => {
                                     const isOnline = device.derived_status === 'online';
                                     return (
-                                        <div key={device.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 hover:bg-muted/50 transition-colors group gap-4 sm:gap-0">
+                                        <div key={device.id} className="flex flex-col md:flex-row items-start md:items-center justify-between p-3 sm:p-4 hover:bg-muted/50 transition-colors group gap-3 md:gap-4 min-w-0 w-full">
                                             {/* Izquierda: Checkbox, Estado y Nombre */}
-                                            <div className="flex items-center gap-4">
-                                                <input type="checkbox" className="w-4.5 h-4.5 rounded border-border bg-background text-emerald-500 focus:ring-emerald-500/20" />
+                                            <div className="flex flex-wrap items-center gap-2 sm:gap-4 min-w-0 flex-1">
+                                                <input type="checkbox" className="w-4.5 h-4.5 rounded border-border bg-background text-emerald-500 focus:ring-emerald-500/20 shrink-0" />
                                                 
-                                                <div className={`px-2 py-0.5 rounded-full text-[11px] font-bold flex items-center gap-1.5 w-[110px] justify-center ${isOnline ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' : 'bg-muted text-muted-foreground border border-border'}`}>
+                                                <div className={`px-2 py-0.5 rounded-full text-[11px] font-bold flex items-center gap-1.5 shrink-0 ${isOnline ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' : 'bg-muted text-muted-foreground border border-border'}`}>
                                                     {isOnline && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
                                                     {isOnline ? 'En línea' : 'Desconectado'}
                                                 </div>
                                                 
-                                                <div>
-                                                    <h4 className="font-semibold text-foreground cursor-pointer hover:text-primary transition-colors" onClick={() => { setSelectedDevice(device); setEditModalOpen(true); }}>
+                                                <div className="min-w-0 flex-1">
+                                                    <h4 className="font-semibold text-foreground cursor-pointer hover:text-primary transition-colors truncate" onClick={() => { setSelectedDevice(device); setEditModalOpen(true); }}>
                                                         {device.name}
                                                     </h4>
-                                                    <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
-                                                        Recurso: <span className="text-muted-foreground font-medium">
+                                                    <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1 truncate">
+                                                        Recurso: <span className="text-muted-foreground font-medium truncate">
                                                             {device.assignment?.schedule?.name || device.assignment?.media?.name || device.assignment?.campaign?.name || 'Sin asignar'}
                                                         </span>
-                                                        <ChevronDown className="w-3 h-3" />
+                                                        <ChevronDown className="w-3 h-3 shrink-0" />
                                                     </p>
                                                 </div>
                                             </div>
 
                                             {/* Derecha: Botones de Acción */}
-                                            <div className="flex items-center gap-2 opacity-50 group-hover:opacity-100 transition-opacity w-full sm:w-auto justify-end">
+                                            <div className="flex items-center gap-2 opacity-100 sm:opacity-70 group-hover:opacity-100 transition-opacity w-full md:w-auto justify-start md:justify-end flex-wrap pt-2 md:pt-0 border-t md:border-t-0 border-border/50">
                                                 <Button 
                                                     variant="outline" 
                                                     size="sm" 
@@ -500,6 +517,17 @@ const DisplayHubList = () => {
                     device={moveDeviceTarget}
                     groups={linkGroups || []}
                     commerceId={effectiveCommerceId}
+                />
+
+                {/* Modal de Aprovisionamiento Bluetooth */}
+                <BluetoothProvisioningModal 
+                    isOpen={isBluetoothModalOpen}
+                    onClose={() => {
+                        setIsBluetoothModalOpen(false);
+                        setInitialDeviceCode(undefined);
+                    }}
+                    commerceId={effectiveCommerceId}
+                    initialDeviceCode={initialDeviceCode}
                 />
             </div>
         </div>
