@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
     Plus, Calendar, ExternalLink, Settings, LogOut, Trash2, Lock, Unlock, 
-    Users, Shield, Sparkles, Monitor, Activity, Tv, ServerCrash, Building2, ChevronRight, PenTool 
+    Users, Sparkles, Monitor, Activity, Tv, ServerCrash, Building2, ChevronRight, PenTool 
 } from 'lucide-react';
 import TemplateManager from './admin/TemplateManager';
 
@@ -38,19 +38,6 @@ const AdminDashboard = () => {
 
     const [isCreateCommerceOpen, setIsCreateCommerceOpen] = useState(false);
     const [newCommerce, setNewCommerce] = useState({ name: '', email: '' });
-
-    // Dev Helper: Claim Admin
-    const claimAdmin = useMutation({
-        mutationFn: async () => {
-            const { error } = await supabase.rpc('claim_super_admin');
-            if (error) throw error;
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries(); // Refresh everything
-            toast.success("¡Ahora eres Super Admin!");
-        },
-        onError: (e) => toast.error(e.message)
-    });
 
     const { data: events, isLoading: isEventsLoading } = useQuery({
         queryKey: ['events'],
@@ -244,11 +231,6 @@ const AdminDashboard = () => {
                 </div>
 
                 <div className="flex flex-wrap gap-3 justify-center">
-                    {!isSuperAdmin && (
-                        <Button variant="ghost" onClick={() => claimAdmin.mutate()} className="text-amber-500 hover:bg-amber-500/10 hover:text-amber-400">
-                            <Shield className="w-4 h-4 mr-2" /> Activar Admin
-                        </Button>
-                    )}
                     {isSuperAdmin && (
                         <>
                             <Button asChild variant="outline" className="bg-transparent border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">
