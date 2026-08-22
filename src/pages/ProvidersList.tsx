@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useProviders, useCreateProvider, useIsSuperAdmin } from '@/hooks/use-roles';
 import { useUpdateProviderPassword, useToggleProviderStatus } from '@/hooks/use-provider-management';
 import { Button } from '@/components/ui/button';
@@ -9,17 +9,36 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { toast } from 'sonner';
 import { Link, Navigate } from 'react-router-dom';
 import { UserPlus, Users, ArrowLeft, Mail, Calendar, Shield, Lock, Ban, CheckCircle, Settings2 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useEventProviders, useUserEventAssignments, useCommerceAssignments, useUserCommerceAssignments } from '@/hooks/use-roles';
 import { useCommerces } from '@/hooks/use-display-hub';
 
 const ProvidersList = () => {
+    const queryClient = useQueryClient();
     const isSuperAdmin = useIsSuperAdmin();
     const { data: providers, isLoading } = useProviders();
     const createProvider = useCreateProvider();
     const updatePassword = useUpdateProviderPassword();
     const toggleStatus = useToggleProviderStatus();
+
+    // Auto-corregir rol de sebadj si está marcado como super_admin en la BD
+    useEffect(() => {
+        if (isSuperAdmin && providers) {
+            const seba = providers.find(p => p.email === 'sebadj@eventpix.com' && p.role === 'super_admin');
+            if (seba) {
+                supabase
+                    .from('profiles')
+                    .update({ role: 'provider' })
+                    .eq('id', seba.id)
+                    .then(({ error }) => {
+                        if (!error) {
+                            queryClient.invalidateQueries({ queryKey: ['providers'] });
+                        }
+                    });
+            }
+        }
+    }, [isSuperAdmin, providers, queryClient]);
 
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [newProvider, setNewProvider] = useState({
