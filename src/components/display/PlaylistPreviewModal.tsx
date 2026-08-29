@@ -64,13 +64,20 @@ export const PlaylistPreviewModal: React.FC<PlaylistPreviewModalProps> = ({ isOp
                             <p className="text-sm">Añade elementos para previsualizarlos aquí</p>
                         </div>
                     ) : (
-                        items.map((item, index) => (
-                            <PlayerRenderer 
-                                key={`${item.id}-${index}`} 
-                                item={item} 
-                                isActive={index === currentIndex} 
-                            />
-                        ))
+                        items.map((item, index) => {
+                            const isActive = index === currentIndex;
+                            const prevIndex = items.length > 1 ? (currentIndex - 1 + items.length) % items.length : -1;
+                            const isPrev = index === prevIndex;
+
+                            return (
+                                <PlayerRenderer 
+                                    key={`${item.id}-${index}`} 
+                                    item={item} 
+                                    isActive={isActive} 
+                                    isPrev={isPrev}
+                                />
+                            );
+                        })
                     )}
                 </div>
 

@@ -13,10 +13,12 @@ import { YoutubePreview } from './apps/youtube/YoutubeApp';
 interface PlayerRendererProps {
     item: any; // Using any to support both CampaignItem (V1) and UniversalElement (V2)
     isActive: boolean;
+    isPrev?: boolean;
     commerceId?: string;
+    defaultTransition?: string;
 }
 
-export const PlayerRenderer = ({ item, isActive, commerceId }: PlayerRendererProps) => {
+export const PlayerRenderer = ({ item, isActive, isPrev, commerceId, defaultTransition }: PlayerRendererProps) => {
     // Attempt to fetch live media to keep apps synchronized with recent edits without reloading the playlist
     const { data: mediaList = [] } = useDisplayMedia(commerceId || '');
 
@@ -43,33 +45,90 @@ export const PlayerRenderer = ({ item, isActive, commerceId }: PlayerRendererPro
         }
     }, [isActive, item.type]);
 
-    // Implementamos transiciones CSS (Fade, Slide, etc.)
+    // Implementamos transiciones CSS fluidas (Fade, Slide, Zoom, etc.)
     const getTransitionStyle = (): React.CSSProperties => {
+        const transitionType = item.transition || defaultTransition || 'fade';
+        const duration = '0.9s';
+        const easing = 'cubic-bezier(0.25, 1, 0.5, 1)';
+
         const base: React.CSSProperties = {
-            position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-            opacity: isActive ? 1 : 0,
+            position: 'absolute', 
+            top: 0, 
+            left: 0, 
+            width: '100%', 
+            height: '100%',
             pointerEvents: isActive ? 'auto' : 'none',
-            zIndex: isActive ? 10 : 1,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            willChange: 'opacity, transform'
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            willChange: 'opacity, transform',
+            overflow: 'hidden'
         };
 
-        if (item.transition === 'none') {
-            return { ...base, transition: 'none', display: isActive ? 'flex' : 'none' };
-        }
-        
-        if (item.transition === 'slide') {
+        if (transitionType === 'none') {
             return {
                 ...base,
-                transition: 'transform 0.8s ease-in-out, opacity 0.8s ease-in-out',
-                transform: isActive ? 'translateX(0)' : 'translateX(100%)'
+                opacity: isActive ? 1 : 0,
+                zIndex: isActive ? 10 : 1,
+                display: isActive ? 'flex' : 'none',
+                transition: 'none'
             };
         }
 
-        // Default: Fade
+        if (transitionType === 'slide') {
+            let transform = 'translateX(100%)';
+            let opacity = 0;
+            let zIndex = 1;
+
+            if (isActive) {
+                transform = 'translateX(0%)';
+                opacity = 1;
+                zIndex = 10;
+            } else if (isPrev) {
+                transform = 'translateX(-100%)';
+                opacity = 0;
+                zIndex = 5;
+            }
+
+            return {
+                ...base,
+                zIndex,
+                opacity,
+                transform,
+                transition: `transform ${duration} ${easing}, opacity ${duration} ${easing}`
+            };
+        }
+
+        if (transitionType === 'zoom') {
+            let transform = 'scale(0.85)';
+            let opacity = 0;
+            let zIndex = 1;
+
+            if (isActive) {
+                transform = 'scale(1)';
+                opacity = 1;
+                zIndex = 10;
+            } else if (isPrev) {
+                transform = 'scale(1.15)';
+                opacity = 0;
+                zIndex = 5;
+            }
+
+            return {
+                ...base,
+                zIndex,
+                opacity,
+                transform,
+                transition: `transform ${duration} ${easing}, opacity ${duration} ${easing}`
+            };
+        }
+
+        // Default: Fade transition
         return {
             ...base,
-            transition: 'opacity 1s ease-in-out'
+            zIndex: isActive ? 10 : (isPrev ? 5 : 1),
+            opacity: isActive ? 1 : 0,
+            transition: `opacity ${duration} ${easing}`
         };
     };
 

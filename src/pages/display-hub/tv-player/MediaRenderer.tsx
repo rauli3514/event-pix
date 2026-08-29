@@ -1,4 +1,4 @@
-import { Component, ErrorInfo, ReactNode, useEffect, useState } from 'react';
+import { Component, ErrorInfo, ReactNode } from 'react';
 import { PlayerRenderer } from '@/components/display/PlayerRenderer';
 import { CampaignItem } from '@/types/display';
 
@@ -37,24 +37,22 @@ export class MediaErrorBoundary extends Component<{children: ReactNode, onError:
 }
 
 export function MediaRenderer({ items, currentIndex, deviceCommerceId }: Props) {
-    const [renderedIndices, setRenderedIndices] = useState<number[]>([currentIndex]);
+    if (!items || items.length === 0) return null;
 
-    useEffect(() => {
-        setRenderedIndices(prev => {
-            if (prev.includes(currentIndex)) return prev;
-            // Keep the previous index and the new current index in the DOM for transitions
-            return [prev[prev.length - 1], currentIndex].filter(i => i !== undefined);
-        });
-    }, [currentIndex]);
-
-    if (items.length === 0) return null;
+    const prevIndex = items.length > 1 ? (currentIndex - 1 + items.length) % items.length : -1;
+    const nextIndex = items.length > 1 ? (currentIndex + 1) % items.length : -1;
 
     return (
-        <>
-            {renderedIndices.map(index => {
-                const item = items[index];
-                if (!item) return null;
+        <div className="relative w-full h-full overflow-hidden bg-black">
+            {items.map((item, index) => {
                 const isActive = index === currentIndex;
+                const isPrev = index === prevIndex;
+                const isNext = index === nextIndex;
+
+                // Solo renderizar en el DOM si es el activo, el anterior (en transición de salida) o el siguiente (precargando)
+                if (!isActive && !isPrev && !isNext && items.length > 3) {
+                    return null;
+                }
 
                 return (
                     <MediaErrorBoundary 
@@ -66,11 +64,12 @@ export function MediaRenderer({ items, currentIndex, deviceCommerceId }: Props) 
                         <PlayerRenderer 
                             item={item} 
                             isActive={isActive} 
+                            isPrev={isPrev}
                             commerceId={deviceCommerceId}
                         />
                     </MediaErrorBoundary>
                 );
             })}
-        </>
+        </div>
     );
 }
