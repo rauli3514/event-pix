@@ -284,10 +284,14 @@ const PlaylistBuilder = () => {
                                         onValueChange={v => setCampaignV2({ ...campaignV2, settings: { ...campaignV2.settings, transition: v as DisplayTransition }})}
                                     >
                                         <SelectTrigger className="bg-background border-border text-foreground"><SelectValue /></SelectTrigger>
-                                        <SelectContent className="bg-card border-border text-foreground">
-                                            <SelectItem value="none">Ninguna (Corte seco)</SelectItem>
-                                            <SelectItem value="fade">Desvanecer (Fade)</SelectItem>
-                                            <SelectItem value="slide">Deslizar (Slide)</SelectItem>
+                                        <SelectContent className="bg-card border-border text-foreground z-50">
+                                            <SelectItem value="fade">✨ Desvanecer (Fade)</SelectItem>
+                                            <SelectItem value="slide">↔️ Deslizar (Slide)</SelectItem>
+                                            <SelectItem value="zoom">🔍 Zoom In (Escala)</SelectItem>
+                                            <SelectItem value="flip">🔄 Giro 3D (Flip)</SelectItem>
+                                            <SelectItem value="blur">💧 Desenfoque (Blur)</SelectItem>
+                                            <SelectItem value="bounce">🏀 Rebote (Bounce)</SelectItem>
+                                            <SelectItem value="none">⚡ Ninguna (Corte seco)</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -401,14 +405,19 @@ const PlaylistBuilder = () => {
                                                             </SelectContent>
                                                         </Select>
                                                         
-                                                        <Select value={item.transition || 'fade'} onValueChange={v => handleUpdateItem(item.id, { transition: v as DisplayTransition })}>
-                                                            <SelectTrigger className="h-7 text-xs px-2 w-[90px] md:w-[110px] bg-background border-border text-muted-foreground">
-                                                                <SelectValue />
+                                                        <Select value={item.transition || 'default'} onValueChange={v => handleUpdateItem(item.id, { transition: v as DisplayTransition })}>
+                                                            <SelectTrigger className="h-7 text-xs px-2 w-[100px] md:w-[125px] bg-background border-border text-muted-foreground">
+                                                                <SelectValue placeholder="Transición" />
                                                             </SelectTrigger>
-                                                            <SelectContent className="bg-card border-border text-foreground">
-                                                                <SelectItem value="fade">Fade</SelectItem>
-                                                                <SelectItem value="slide">Slide</SelectItem>
-                                                                <SelectItem value="none">Corte</SelectItem>
+                                                            <SelectContent className="bg-card border-border text-foreground z-50">
+                                                                <SelectItem value="default">⚙️ Por Defecto</SelectItem>
+                                                                <SelectItem value="fade">✨ Desvanecer</SelectItem>
+                                                                <SelectItem value="slide">↔️ Deslizar</SelectItem>
+                                                                <SelectItem value="zoom">🔍 Zoom In</SelectItem>
+                                                                <SelectItem value="flip">🔄 Giro 3D</SelectItem>
+                                                                <SelectItem value="blur">💧 Desenfoque</SelectItem>
+                                                                <SelectItem value="bounce">🏀 Rebote</SelectItem>
+                                                                <SelectItem value="none">⚡ Corte</SelectItem>
                                                             </SelectContent>
                                                         </Select>
                                                     </div>

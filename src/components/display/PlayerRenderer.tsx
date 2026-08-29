@@ -100,7 +100,7 @@ export const PlayerRenderer = ({ item, isActive, isPrev, commerceId, defaultTran
         }
 
         if (transitionType === 'zoom') {
-            let transform = 'scale(0.85)';
+            let transform = 'scale(0.8)';
             let opacity = 0;
             let zIndex = 1;
 
@@ -109,7 +109,7 @@ export const PlayerRenderer = ({ item, isActive, isPrev, commerceId, defaultTran
                 opacity = 1;
                 zIndex = 10;
             } else if (isPrev) {
-                transform = 'scale(1.15)';
+                transform = 'scale(1.2)';
                 opacity = 0;
                 zIndex = 5;
             }
@@ -120,6 +120,83 @@ export const PlayerRenderer = ({ item, isActive, isPrev, commerceId, defaultTran
                 opacity,
                 transform,
                 transition: `transform ${duration} ${easing}, opacity ${duration} ${easing}`
+            };
+        }
+
+        if (transitionType === 'flip') {
+            let transform = 'perspective(1200px) rotateY(90deg) scale(0.9)';
+            let opacity = 0;
+            let zIndex = 1;
+
+            if (isActive) {
+                transform = 'perspective(1200px) rotateY(0deg) scale(1)';
+                opacity = 1;
+                zIndex = 10;
+            } else if (isPrev) {
+                transform = 'perspective(1200px) rotateY(-90deg) scale(0.9)';
+                opacity = 0;
+                zIndex = 5;
+            }
+
+            return {
+                ...base,
+                zIndex,
+                opacity,
+                transform,
+                transition: `transform ${duration} ${easing}, opacity ${duration} ${easing}`
+            };
+        }
+
+        if (transitionType === 'blur') {
+            let filter = 'blur(16px)';
+            let opacity = 0;
+            let transform = 'scale(1.08)';
+            let zIndex = 1;
+
+            if (isActive) {
+                filter = 'blur(0px)';
+                opacity = 1;
+                transform = 'scale(1)';
+                zIndex = 10;
+            } else if (isPrev) {
+                filter = 'blur(16px)';
+                opacity = 0;
+                transform = 'scale(0.92)';
+                zIndex = 5;
+            }
+
+            return {
+                ...base,
+                zIndex,
+                opacity,
+                transform,
+                filter,
+                transition: `filter ${duration} ${easing}, opacity ${duration} ${easing}, transform ${duration} ${easing}`
+            };
+        }
+
+        if (transitionType === 'bounce') {
+            const bounceEasing = 'cubic-bezier(0.34, 1.56, 0.64, 1)';
+            let transform = 'translateY(100%) scale(0.85)';
+            let opacity = 0;
+            let zIndex = 1;
+
+            if (isActive) {
+                transform = 'translateY(0%) scale(1)';
+                opacity = 1;
+                zIndex = 10;
+            } else if (isPrev) {
+                transform = 'translateY(-100%) scale(0.85)';
+                opacity = 0;
+                zIndex = 5;
+            }
+
+            return {
+                ...base,
+                zIndex,
+                opacity,
+                transform,
+                transition: `transform ${duration} ${bounceEasing}, opacity ${duration} ease-in-out`
             };
         }
 

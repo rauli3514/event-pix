@@ -117,11 +117,19 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
 
                 if (activeContent.campaign && activeContent.campaign.items_json) {
                     const rawItems = activeContent.campaign.items_json;
+                    const campaignDefaultTransition = activeContent.campaign.settings?.transition || 'fade';
+                    
                     if (rawItems.version === '2.0' && Array.isArray(rawItems.zones) && rawItems.zones.length > 0) {
                         compiledItems = rawItems.zones[0].playlist || [];
                     } else if (Array.isArray(rawItems)) {
                         compiledItems = rawItems;
                     }
+
+                    // Asegurar que cada elemento herede la transición por defecto de la playlist si no la especifica
+                    compiledItems = compiledItems.map((item: any) => ({
+                        ...item,
+                        transition: (item.transition && item.transition !== 'default') ? item.transition : campaignDefaultTransition
+                    }));
                 } else if (activeContent.media) {
                     if (!device.commerce_id && activeContent.media.commerce_id) {
                         setDeviceCommerceId(activeContent.media.commerce_id);
@@ -132,7 +140,8 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
                         url: activeContent.media.url,
                         metadata: activeContent.media.metadata,
                         duration: 0,
-                        title: activeContent.media.name
+                        title: activeContent.media.name,
+                        transition: 'fade'
                     }];
                 }
 

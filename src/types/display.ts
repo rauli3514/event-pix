@@ -64,7 +64,7 @@ export interface CampaignItem {
 export type DisplayOrientation = 'landscape' | 'portrait' | 'auto';
 export type DisplayBackgroundType = 'color' | 'image' | 'video';
 export type DisplayFitMode = 'contain' | 'cover' | 'fill' | 'none';
-export type DisplayTransition = 'none' | 'fade' | 'slide' | 'zoom';
+export type DisplayTransition = 'none' | 'fade' | 'slide' | 'zoom' | 'flip' | 'blur' | 'bounce';
 export type ElementAlignmentH = 'left' | 'center' | 'right';
 export type ElementAlignmentV = 'top' | 'center' | 'bottom';
 
