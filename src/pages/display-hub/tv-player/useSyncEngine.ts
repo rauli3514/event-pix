@@ -147,18 +147,17 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
 
                 if (compiledItems.length > 0) {
                     const newItemsString = JSON.stringify(compiledItems);
-                    const oldItemsString = localStorage.getItem(`tv_cache_${deviceCode}`);
+                    const cacheKey = `tv_cache_${deviceCode}_v3`;
+                    const oldItemsString = localStorage.getItem(cacheKey);
                     
                     if (oldItemsString !== newItemsString) {
-                        setStatus('loading');
                         await preloadAssets(compiledItems);
-                        localStorage.setItem(`tv_cache_${deviceCode}`, newItemsString);
-                        setItems(compiledItems);
-                        setStatus('playing');
-                    } else if (status !== 'playing') {
-                        setItems(compiledItems);
-                        setStatus('playing');
+                        localStorage.setItem(cacheKey, newItemsString);
                     }
+
+                    // Siempre actualizar el estado de items en React para aplicar cambios de transición y duración
+                    setItems(compiledItems);
+                    setStatus('playing');
                     return;
                 }
             }

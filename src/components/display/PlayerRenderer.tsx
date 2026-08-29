@@ -45,7 +45,7 @@ export const PlayerRenderer = ({ item, isActive, isPrev, commerceId, defaultTran
         }
     }, [isActive, item.type]);
 
-    // Implementamos transiciones CSS fluidas (Fade, Slide, Zoom, etc.)
+    // Implementamos transiciones CSS fluidas (Fade, Slide, Zoom, etc.) aceleradas por hardware GPU (Chromium TV / Android WebView)
     const getTransitionStyle = (): React.CSSProperties => {
         const transitionType = item.transition || defaultTransition || 'fade';
         const duration = '0.9s';
@@ -61,7 +61,8 @@ export const PlayerRenderer = ({ item, isActive, isPrev, commerceId, defaultTran
             display: 'flex', 
             alignItems: 'center', 
             justifyContent: 'center',
-            willChange: 'opacity, transform',
+            WebkitBackfaceVisibility: 'hidden',
+            backfaceVisibility: 'hidden',
             overflow: 'hidden'
         };
 
@@ -71,21 +72,22 @@ export const PlayerRenderer = ({ item, isActive, isPrev, commerceId, defaultTran
                 opacity: isActive ? 1 : 0,
                 zIndex: isActive ? 10 : 1,
                 display: isActive ? 'flex' : 'none',
-                transition: 'none'
+                transition: 'none',
+                WebkitTransition: 'none'
             };
         }
 
         if (transitionType === 'slide') {
-            let transform = 'translateX(100%)';
+            let transform = 'translate3d(100%, 0, 0)';
             let opacity = 0;
             let zIndex = 1;
 
             if (isActive) {
-                transform = 'translateX(0%)';
+                transform = 'translate3d(0%, 0, 0)';
                 opacity = 1;
                 zIndex = 10;
             } else if (isPrev) {
-                transform = 'translateX(-100%)';
+                transform = 'translate3d(-100%, 0, 0)';
                 opacity = 0;
                 zIndex = 5;
             }
@@ -95,21 +97,23 @@ export const PlayerRenderer = ({ item, isActive, isPrev, commerceId, defaultTran
                 zIndex,
                 opacity,
                 transform,
-                transition: `transform ${duration} ${easing}, opacity ${duration} ${easing}`
+                WebkitTransform: transform,
+                transition: `transform ${duration} ${easing}, opacity ${duration} ${easing}`,
+                WebkitTransition: `-webkit-transform ${duration} ${easing}, opacity ${duration} ${easing}`
             };
         }
 
         if (transitionType === 'zoom') {
-            let transform = 'scale(0.8)';
+            let transform = 'scale3d(0.8, 0.8, 1)';
             let opacity = 0;
             let zIndex = 1;
 
             if (isActive) {
-                transform = 'scale(1)';
+                transform = 'scale3d(1, 1, 1)';
                 opacity = 1;
                 zIndex = 10;
             } else if (isPrev) {
-                transform = 'scale(1.2)';
+                transform = 'scale3d(1.2, 1.2, 1)';
                 opacity = 0;
                 zIndex = 5;
             }
@@ -119,21 +123,23 @@ export const PlayerRenderer = ({ item, isActive, isPrev, commerceId, defaultTran
                 zIndex,
                 opacity,
                 transform,
-                transition: `transform ${duration} ${easing}, opacity ${duration} ${easing}`
+                WebkitTransform: transform,
+                transition: `transform ${duration} ${easing}, opacity ${duration} ${easing}`,
+                WebkitTransition: `-webkit-transform ${duration} ${easing}, opacity ${duration} ${easing}`
             };
         }
 
         if (transitionType === 'flip') {
-            let transform = 'perspective(1200px) rotateY(90deg) scale(0.9)';
+            let transform = 'perspective(1200px) rotateY(90deg) scale3d(0.9, 0.9, 1)';
             let opacity = 0;
             let zIndex = 1;
 
             if (isActive) {
-                transform = 'perspective(1200px) rotateY(0deg) scale(1)';
+                transform = 'perspective(1200px) rotateY(0deg) scale3d(1, 1, 1)';
                 opacity = 1;
                 zIndex = 10;
             } else if (isPrev) {
-                transform = 'perspective(1200px) rotateY(-90deg) scale(0.9)';
+                transform = 'perspective(1200px) rotateY(-90deg) scale3d(0.9, 0.9, 1)';
                 opacity = 0;
                 zIndex = 5;
             }
@@ -143,25 +149,27 @@ export const PlayerRenderer = ({ item, isActive, isPrev, commerceId, defaultTran
                 zIndex,
                 opacity,
                 transform,
-                transition: `transform ${duration} ${easing}, opacity ${duration} ${easing}`
+                WebkitTransform: transform,
+                transition: `transform ${duration} ${easing}, opacity ${duration} ${easing}`,
+                WebkitTransition: `-webkit-transform ${duration} ${easing}, opacity ${duration} ${easing}`
             };
         }
 
         if (transitionType === 'blur') {
-            let filter = 'blur(16px)';
+            let filter = 'blur(12px)';
             let opacity = 0;
-            let transform = 'scale(1.08)';
+            let transform = 'scale3d(1.08, 1.08, 1)';
             let zIndex = 1;
 
             if (isActive) {
                 filter = 'blur(0px)';
                 opacity = 1;
-                transform = 'scale(1)';
+                transform = 'scale3d(1, 1, 1)';
                 zIndex = 10;
             } else if (isPrev) {
-                filter = 'blur(16px)';
+                filter = 'blur(12px)';
                 opacity = 0;
-                transform = 'scale(0.92)';
+                transform = 'scale3d(0.92, 0.92, 1)';
                 zIndex = 5;
             }
 
@@ -170,23 +178,26 @@ export const PlayerRenderer = ({ item, isActive, isPrev, commerceId, defaultTran
                 zIndex,
                 opacity,
                 transform,
+                WebkitTransform: transform,
                 filter,
-                transition: `filter ${duration} ${easing}, opacity ${duration} ${easing}, transform ${duration} ${easing}`
+                WebkitFilter: filter,
+                transition: `filter ${duration} ${easing}, opacity ${duration} ${easing}, transform ${duration} ${easing}`,
+                WebkitTransition: `-webkit-filter ${duration} ${easing}, opacity ${duration} ${easing}, -webkit-transform ${duration} ${easing}`
             };
         }
 
         if (transitionType === 'bounce') {
             const bounceEasing = 'cubic-bezier(0.34, 1.56, 0.64, 1)';
-            let transform = 'translateY(100%) scale(0.85)';
+            let transform = 'translate3d(0, 100%, 0) scale3d(0.85, 0.85, 1)';
             let opacity = 0;
             let zIndex = 1;
 
             if (isActive) {
-                transform = 'translateY(0%) scale(1)';
+                transform = 'translate3d(0, 0%, 0) scale3d(1, 1, 1)';
                 opacity = 1;
                 zIndex = 10;
             } else if (isPrev) {
-                transform = 'translateY(-100%) scale(0.85)';
+                transform = 'translate3d(0, -100%, 0) scale3d(0.85, 0.85, 1)';
                 opacity = 0;
                 zIndex = 5;
             }
@@ -196,7 +207,9 @@ export const PlayerRenderer = ({ item, isActive, isPrev, commerceId, defaultTran
                 zIndex,
                 opacity,
                 transform,
-                transition: `transform ${duration} ${bounceEasing}, opacity ${duration} ease-in-out`
+                WebkitTransform: transform,
+                transition: `transform ${duration} ${bounceEasing}, opacity ${duration} ease-in-out`,
+                WebkitTransition: `-webkit-transform ${duration} ${bounceEasing}, opacity ${duration} ease-in-out`
             };
         }
 
@@ -205,7 +218,8 @@ export const PlayerRenderer = ({ item, isActive, isPrev, commerceId, defaultTran
             ...base,
             zIndex: isActive ? 10 : (isPrev ? 5 : 1),
             opacity: isActive ? 1 : 0,
-            transition: `opacity ${duration} ${easing}`
+            transition: `opacity ${duration} ${easing}`,
+            WebkitTransition: `opacity ${duration} ${easing}`
         };
     };
 
