@@ -19,10 +19,13 @@ class WebViewManager(private val webView: WebView) {
             domStorageEnabled = true
             mediaPlaybackRequiresUserGesture = false
             cacheMode = WebSettings.LOAD_CACHE_ELSE_NETWORK
-            // Optimizations for TV
+            // Optimizations for TV & 60fps GPU CSS Transitions
             useWideViewPort = true
             loadWithOverviewMode = true
         }
+
+        // Enable hardware GPU acceleration layer for smooth 3D CSS transitions
+        webView.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
 
         webView.webViewClient = object : WebViewClient() {
             override fun shouldInterceptRequest(
