@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">EventPix</string>
+    <string name="title_activity_main">EventPix</string>
+    <string name="package_name">com.eventpix.app</string>
+    <string name="custom_url_scheme">com.eventpix.app</string>
+</resources>

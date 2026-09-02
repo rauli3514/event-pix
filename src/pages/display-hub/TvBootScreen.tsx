@@ -93,13 +93,15 @@ export default function TvBootScreen() {
           clearInterval(pollInterval);
         };
       } catch (error) {
-        console.log("Offline or network error, checking for cached data...");
-        // Si no hay internet, pero ya tenemos contenido offline, vamos directo al reproductor
-        const cachedData = localStorage.getItem(`tv_cache_${deviceId}`);
+        console.log("Offline or network error, checking for cached data...", error);
+        setPin(deviceId); // Mostrar siempre el PIN en pantalla en caso de estar offline
+        
+        // Si no hay internet, pero ya tenemos contenido offline en cualquier versión de caché, vamos al reproductor
+        const cachedData = localStorage.getItem(`tv_cache_${deviceId}_v3`) || 
+                           localStorage.getItem(`tv_cache_${deviceId}_v2`) || 
+                           localStorage.getItem(`tv_cache_${deviceId}`);
         if (cachedData) {
           navigate(`/tv/${deviceId}`);
-        } else {
-          setPin(deviceId); // Show PIN just in case it's a first run with flaky network
         }
       }
     }

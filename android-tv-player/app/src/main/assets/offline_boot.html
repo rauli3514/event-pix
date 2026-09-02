@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EventPix TV - Sin Conexión</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+        body {
+            background: linear-gradient(135deg, #09090b 0%, #121318 50%, #09090b 100%);
+            color: #ffffff;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .header {
+            position: absolute;
+            top: 40px;
+            left: 48px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background-color: #e11d48;
+            box-shadow: 0 0 12px rgba(225, 29, 72, 0.8);
+            animation: pulse 2s infinite;
+        }
+        .brand {
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            color: #d4d4d8;
+        }
+        .brand span {
+            color: #06b6d4;
+        }
+        .card {
+            background: rgba(24, 24, 27, 0.85);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(63, 63, 70, 0.5);
+            border-radius: 28px;
+            padding: 40px;
+            width: 90%;
+            max-width: 560px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 24px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+        }
+        .tag {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            color: #fbbf24;
+        }
+        .title {
+            font-size: 28px;
+            font-weight: 800;
+            color: #ffffff;
+            margin-top: 4px;
+        }
+        .subtitle {
+            font-size: 14px;
+            color: #a1a1aa;
+            line-height: 1.5;
+        }
+        .pin-box {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px dashed rgba(6, 182, 212, 0.5);
+            border-radius: 20px;
+            padding: 20px;
+            width: 100%;
+            margin: 8px 0;
+        }
+        .pin-code {
+            font-family: monospace;
+            font-size: 48px;
+            font-weight: 800;
+            letter-spacing: 8px;
+            color: #06b6d4;
+            text-shadow: 0 0 20px rgba(6, 182, 212, 0.4);
+        }
+        .actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            width: 100%;
+        }
+        .btn {
+            background: #27272a;
+            color: #e4e4e7;
+            border: 1px solid #3f3f46;
+            padding: 14px 20px;
+            border-radius: 16px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.2s ease;
+        }
+        .btn:hover, .btn:focus {
+            background: #3f3f46;
+            color: #ffffff;
+            border-color: #06b6d4;
+            outline: none;
+            transform: scale(1.02);
+        }
+        .btn-cyan {
+            background: rgba(6, 182, 212, 0.15);
+            color: #22d3ee;
+            border-color: rgba(6, 182, 212, 0.4);
+        }
+        .btn-cyan:hover, .btn-cyan:focus {
+            background: rgba(6, 182, 212, 0.3);
+            color: #ffffff;
+        }
+        .footer-note {
+            position: absolute;
+            bottom: 24px;
+            font-size: 12px;
+            color: #71717a;
+            font-family: monospace;
+        }
+        @keyframes pulse {
+            0% { opacity: 0.4; }
+            50% { opacity: 1; }
+            100% { opacity: 0.4; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="dot"></div>
+        <div class="brand">EVENTPIX <span>TV</span></div>
+    </div>
+
+    <div class="card">
+        <div>
+            <div class="tag">Sin Conexión a Internet</div>
+            <div class="title">Configuración de Red</div>
+            <div class="subtitle">Conecta el dispositivo a una red Wi-Fi o Ethernet para vincular y descargar contenido.</div>
+        </div>
+
+        <div class="pin-box">
+            <div class="pin-code" id="pinDisplay">------</div>
+        </div>
+
+        <div class="actions">
+            <button className="btn btn-cyan" onclick="openWifi()" tabindex="1">
+                📶 Ajustes Wi-Fi
+            </button>
+            <button className="btn" onclick="retryConnection()" tabindex="2">
+                🔄 Reintentar
+            </button>
+        </div>
+    </div>
+
+    <div class="footer-note">
+        Presiona 5 veces la tecla ATRÁS en el control remoto para acceder a Ajustes
+    </div>
+
+    <script>
+        function getDeviceCode() {
+            var code = localStorage.getItem('device_id');
+            if (!code) {
+                if (window.TvBridge && typeof window.TvBridge.getDeviceCode === 'function') {
+                    code = window.TvBridge.getDeviceCode();
+                } else {
+                    var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                    code = '';
+                    for (var i = 0; i < 6; i++) {
+                        code += chars.charAt(Math.floor(Math.random() * chars.length));
+                    }
+                }
+                localStorage.setItem('device_id', code);
+            }
+            document.getElementById('pinDisplay').innerText = code;
+        }
+
+        function openWifi() {
+            if (window.TvBridge && typeof window.TvBridge.openWifiSettings === 'function') {
+                window.TvBridge.openWifiSettings();
+            } else if (window.TvBridge && typeof window.TvBridge.openSettings === 'function') {
+                window.TvBridge.openSettings();
+            } else if (window.AndroidKiosk && typeof window.AndroidKiosk.openWifiSettings === 'function') {
+                window.AndroidKiosk.openWifiSettings();
+            } else {
+                alert('Abre los ajustes de red en tu dispositivo Android.');
+            }
+        }
+
+        function retryConnection() {
+            window.location.href = 'https://app.event-pix.com.ar/tv-boot';
+        }
+
+        // Auto-reintento automático cada 5 segundos si vuelve la red
+        setInterval(function() {
+            if (navigator.onLine) {
+                window.location.href = 'https://app.event-pix.com.ar/tv-boot';
+            }
+        }, 5000);
+
+        getDeviceCode();
+    </script>
+</body>
+</html>

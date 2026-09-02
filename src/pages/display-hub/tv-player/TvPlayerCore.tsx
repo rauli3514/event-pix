@@ -111,6 +111,30 @@ const TvPlayerCore = () => {
         };
     }, []);
 
+    // Lock native orientation & apply rotation when orientation setting changes from Web Admin
+    useEffect(() => {
+        if (deviceSettings.orientation !== undefined && deviceSettings.orientation !== null) {
+            let degreeStr = String(deviceSettings.orientation);
+            if (degreeStr === 'portrait') degreeStr = '90';
+            if (degreeStr === 'landscape') degreeStr = '0';
+            const degree = parseInt(degreeStr, 10) || 0;
+
+            if ((window as any).TvBridge?.setOrientation) {
+                (window as any).TvBridge.setOrientation(degree === 90 || degree === 270 ? false : true);
+            } else if ((window as any).AndroidKiosk?.setOrientation) {
+                (window as any).AndroidKiosk.setOrientation(degree);
+            }
+
+            if ((window as any).Capacitor?.Plugins?.ScreenOrientation) {
+                const ScreenOrientation = (window as any).Capacitor.Plugins.ScreenOrientation;
+                if (degree === 90) ScreenOrientation.lock({ orientation: 'portrait-primary' });
+                else if (degree === 270) ScreenOrientation.lock({ orientation: 'portrait-secondary' });
+                else if (degree === 180) ScreenOrientation.lock({ orientation: 'landscape-secondary' });
+                else ScreenOrientation.lock({ orientation: 'landscape-primary' });
+            }
+        }
+    }, [deviceSettings.orientation]);
+
     // 4. Media Rotation Logic
     useEffect(() => {
         if (items.length === 0 || (status !== 'playing' && status !== 'offline_playing')) return;
@@ -138,7 +162,11 @@ const TvPlayerCore = () => {
     // --- UI Renders ---
     
     const getRotationStyle = (orientation: string | undefined): React.CSSProperties => {
-        let degreeStr = localRotation !== null ? String(localRotation) : (orientation || '0');
+        // Web Admin orientation takes priority
+        let degreeStr = (orientation !== undefined && orientation !== null && orientation !== '') 
+            ? String(orientation) 
+            : (localRotation !== null ? String(localRotation) : '0');
+
         if (degreeStr === 'portrait') degreeStr = '90';
         if (degreeStr === 'landscape') degreeStr = '0';
         

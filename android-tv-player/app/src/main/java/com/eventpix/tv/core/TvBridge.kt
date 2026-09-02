@@ -35,6 +35,39 @@ class TvBridge(private val activity: MainActivity) {
     }
 
     @JavascriptInterface
+    fun openWifiSettings() {
+        try {
+            val intent = Intent(android.provider.Settings.ACTION_WIFI_SETTINGS)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            activity.startActivity(intent)
+        } catch (e: Exception) {
+            openSettings()
+        }
+    }
+
+    @JavascriptInterface
+    fun openSettings() {
+        try {
+            val intent = Intent(android.provider.Settings.ACTION_SETTINGS)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            activity.startActivity(intent)
+        } catch (e: Exception) {
+            Log.e("TvBridge", "Failed to open settings", e)
+        }
+    }
+
+    @JavascriptInterface
+    fun getDeviceCode(): String {
+        var deviceId = prefs.getString("device_id", null)
+        if (deviceId.isNullOrEmpty()) {
+            val chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+            deviceId = (1..6).map { chars.random() }.joinToString("")
+            prefs.edit().putString("device_id", deviceId).apply()
+        }
+        return deviceId
+    }
+
+    @JavascriptInterface
     fun setAutoBoot(enabled: Boolean) {
         Log.d("TvBridge", "setAutoBoot: \$enabled")
         prefs.edit().putBoolean("autoBoot", enabled).apply()

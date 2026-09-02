@@ -18,7 +18,7 @@ class WebViewManager(private val webView: WebView) {
             javaScriptEnabled = true
             domStorageEnabled = true
             mediaPlaybackRequiresUserGesture = false
-            cacheMode = WebSettings.LOAD_DEFAULT
+            cacheMode = WebSettings.LOAD_CACHE_ELSE_NETWORK
             // Optimizations for TV
             useWideViewPort = true
             loadWithOverviewMode = true
@@ -62,6 +62,12 @@ class WebViewManager(private val webView: WebView) {
             ) {
                 super.onReceivedError(view, request, error)
                 Log.e("WebViewManager", "Error loading web content: ${error?.description}")
+                
+                // Si falla la carga del frame principal por estar sin red, cargar fallback local
+                if (request?.isForMainFrame == true && view?.url?.startsWith("file:///android_asset/") != true) {
+                    Log.d("WebViewManager", "Main frame load failed offline. Loading local asset offline_boot.html...")
+                    view?.loadUrl("file:///android_asset/offline_boot.html")
+                }
             }
 
             override fun onRenderProcessGone(view: WebView?, detail: android.webkit.RenderProcessGoneDetail?): Boolean {
