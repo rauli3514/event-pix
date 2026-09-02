@@ -28,6 +28,19 @@ const Index = () => {
     const { data: settings } = useEventSettings(event?.id);
     const params = useParams<{ slug?: string }>();
 
+    // Si el slug termina en .apk, redirigir directamente al archivo para descarga directa
+    if (params.slug && params.slug.toLowerCase().endsWith('.apk')) {
+        window.location.href = '/' + params.slug;
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-black text-white font-sans">
+                <div className="text-center space-y-4">
+                    <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                    <p className="text-cyan-400 font-bold">Descargando aplicación EventPix TV...</p>
+                </div>
+            </div>
+        );
+    }
+
     if (isLoading) {
         if (settings?.show_splash_logo) {
             return <SplashScreen />;
