@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { IntelligencePost, NodeType } from '../../types/intelligence';
 import { Plus, Sparkles, Layers, Zap, Eye, Bookmark, Trash2, CheckCircle2, RefreshCw, Link, Bot, FileImage, MessageSquare, ArrowRight, Send, Tv, QrCode } from 'lucide-react';
 import { ReelSynthesisResult } from '../../services/intelligence/reelAnalyzerService';
+import { DisplayTvPreviewModal } from './DisplayTvPreviewModal';
 import { toast } from 'sonner';
 
 export interface CanvasNode {
@@ -48,6 +49,7 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [nodePositions, setNodePositions] = useState<{ [key: string]: { x: number; y: number } }>({});
   const [executingNodeId, setExecutingNodeId] = useState<string | null>(null);
+  const [isTvModalOpen, setIsTvModalOpen] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const getNodePos = (node: CanvasNode) => {
@@ -102,14 +104,17 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
   };
 
   const handleExecuteConnectorAction = (nodeId: string, actionName: string) => {
+    if (actionName.includes('Display Digital') || actionName.includes('Pantallas TV') || actionName.includes('Emitir en TV')) {
+      setIsTvModalOpen(true);
+      return;
+    }
+
     setExecutingNodeId(nodeId);
     toast.info(`Ejecutando: ${actionName}...`);
 
     setTimeout(() => {
       setExecutingNodeId(null);
-      if (actionName.includes('Display Digital') || actionName.includes('Pantallas TV')) {
-        toast.success('📺 Campaña enviada a las Pantallas Digitales de tus locales! Playlist programada de Viernes a Domingo.');
-      } else if (actionName.includes('Auto-DM')) {
+      if (actionName.includes('Auto-DM')) {
         toast.success('⚡ Auto-Responder configurado en Meta Suite! Se enviará la plantilla al comentar "APP".');
       } else if (actionName.includes('Canva')) {
         toast.success('🎨 Diseño exportado a Canva con el kit de marca EventPix!');
@@ -135,6 +140,7 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
         }}
       />
 
+      {/* SVG Canvas Edges */}
       <svg className="absolute inset-0 w-full h-full pointer-events-none z-10 min-w-[2000px] min-h-[1500px]">
         <defs>
           <linearGradient id="edgeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -255,6 +261,7 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
         </div>
       </div>
 
+      {/* Renderizado de Nodos */}
       <div className="relative w-full h-full z-20 pt-6 p-6 min-h-[800px]">
         {nodes.map(node => {
           const pos = getNodePos(node);
@@ -497,10 +504,9 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
                     <p className="text-emerald-200 font-semibold text-[11px]">"{synth.cta}"</p>
                   </div>
 
-                  {/* BOTONES DE ACCIÓN DIRECTA DE LA SÍNTESIS INCLUYENDO DISPLAY TV */}
                   <div className="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-800">
                     <button
-                      onClick={() => handleExecuteConnectorAction(node.id, 'Enviar a Pantallas TV')}
+                      onClick={() => handleExecuteConnectorAction(node.id, 'Emitir en TV')}
                       className="bg-amber-600 hover:bg-amber-500 text-white font-bold py-2 px-2 rounded-xl flex items-center justify-center gap-1 text-[10px] transition-all shadow-lg shadow-amber-600/20"
                     >
                       <Tv className="w-3.5 h-3.5" />
@@ -529,6 +535,14 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
           return null;
         })}
       </div>
+
+      {/* Modal Previsualizador de Emisión TV */}
+      <DisplayTvPreviewModal
+        isOpen={isTvModalOpen}
+        onClose={() => setIsTvModalOpen(false)}
+        scriptHook="Escuchá esto antes de grabar tu próximo Reel... Descubrí la automatización que duplica las ventas en tu comercio."
+        scriptCta='Comenta "APP" en Instagram o escaneá el QR para recibir la promoción VIP en WhatsApp'
+      />
     </div>
   );
 };
