@@ -20,12 +20,39 @@ export const IntelligenceCanvasPage: React.FC = () => {
   const [posts, setPosts] = useState<IntelligencePost[]>(INITIAL_POSTS);
   const [auditReport, setAuditReport] = useState<BusinessAuditReport>(INITIAL_AUDIT_REPORT);
 
+  // Espaciado perfecto y coordinado de Nodos
   const [nodes, setNodes] = useState<CanvasNode[]>([
-    { id: 'node_1', x: 60, y: 120, type: 'reel', post: INITIAL_POSTS[0] },
-    { id: 'node_meta', x: 60, y: 440, type: 'meta_business', integrationName: 'Meta Business Suite (Auto-DM)' }
+    { id: 'node_1', x: 40, y: 80, type: 'reel', post: INITIAL_POSTS[0] },
+    {
+      id: 'node_synth',
+      x: 360,
+      y: 80,
+      type: 'synthesis',
+      synthesisResult: {
+        title: 'Super Guion Fusionado',
+        hook: 'Escuchá esto antes de grabar tu próximo Reel... La razón por la que los comercios más exitosos están usando automatización con IA.',
+        structure_breakdown: [
+          '0-3s: Hook de Alta Curiosidad + Texto Flotante OCR',
+          '3-12s: Exposición del Freno de Conversión del Mercado',
+          '12-32s: Demostración Visual de los 3 Patrones Ganadores',
+          '32-45s: CTA de Comentario por Palabra Clave ("APP")'
+        ],
+        cta: 'Comenta "APP" y te la envío ya!!! ⬇️',
+        full_script: `[HOOK (0-3s)]\n(Corte rápido + Texto gigante en amarillo en pantalla)\n"Escuchá esto antes de grabar tu próximo Reel... La razón por la que los comercios más exitosos están usando automatización con IA."\n\n[PROBLEMA / CONFLICTO (3-12s)]\nSi estás publicando videos estáticos o esperando que el algoritmo te regale alcance sin una estructura probada, estás perdiendo el 80% de tus prospectos.\n\n[VALOR & DEMOSTRACIÓN (12-32s)]\nAcá está la clave: Enganchá con una pregunta chocante en los primeros 1.5s, demostrá el resultado visualmente y usá subtítulos dinámicos.\n\n[CTA (32-45s)]\nComenta "APP" y te la envío ya!!! ⬇️`,
+        why_it_works: 'Combina retención del 32% con auto-DM directo.',
+        expected_impact: '2.4x más guardados y 3.1x más comentarios por palabra clave.'
+      }
+    },
+    { id: 'node_meta', x: 780, y: 60, type: 'meta_business', integrationName: 'Meta Business Suite (Auto-DM)' },
+    { id: 'node_canva', x: 780, y: 220, type: 'canva', integrationName: 'Canva Design Kit' },
+    { id: 'node_chatgpt', x: 780, y: 380, type: 'chatgpt', integrationName: 'ChatGPT User Memory' }
   ]);
+
   const [edges, setEdges] = useState<CanvasEdge[]>([
-    { id: 'edge_meta_1', source: 'node_1', target: 'node_meta' }
+    { id: 'edge_1_synth', source: 'node_1', target: 'node_synth' },
+    { id: 'edge_synth_meta', source: 'node_synth', target: 'node_meta' },
+    { id: 'edge_synth_canva', source: 'node_synth', target: 'node_canva' },
+    { id: 'edge_synth_gpt', source: 'node_synth', target: 'node_chatgpt' }
   ]);
 
   const [isBrandDnaOpen, setIsBrandDnaOpen] = useState(true);
@@ -114,8 +141,8 @@ export const IntelligenceCanvasPage: React.FC = () => {
 
     const newCanvasNode: CanvasNode = {
       id: newId,
-      x: 60,
-      y: 120 + nodes.length * 120,
+      x: 40,
+      y: 80 + nodes.filter(n => n.type === 'reel').length * 280,
       type: 'reel',
       post: newPost
     };
@@ -133,8 +160,8 @@ export const IntelligenceCanvasPage: React.FC = () => {
     const newId = `node_${type}_${Date.now()}`;
     const newNode: CanvasNode = {
       id: newId,
-      x: 60,
-      y: 200 + nodes.length * 100,
+      x: 780,
+      y: 60 + nodes.filter(n => n.type !== 'reel' && n.type !== 'synthesis').length * 160,
       type,
       integrationName: name
     };
@@ -158,8 +185,8 @@ export const IntelligenceCanvasPage: React.FC = () => {
       const synthNodeId = `synth_${Date.now()}`;
       const synthNode: CanvasNode = {
         id: synthNodeId,
-        x: 420,
-        y: 200,
+        x: 360,
+        y: 80,
         type: 'synthesis',
         synthesisResult: result
       };
@@ -200,7 +227,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
                 EVENTPIX INTELLIGENCE
               </h1>
               <span className="text-[10px] bg-violet-500/20 text-violet-300 border border-violet-500/30 px-2 py-0.5 rounded-full font-mono font-semibold">
-                Canvas & Connectors
+                Canvas Studio v2.0
               </span>
             </div>
             <p className="text-xs text-slate-400">
