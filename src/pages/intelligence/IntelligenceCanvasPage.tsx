@@ -11,7 +11,7 @@ import { BusinessAuditPanel } from '../../components/intelligence/BusinessAuditP
 import { StrategyCanvas, CanvasNode, CanvasEdge } from '../../components/intelligence/StrategyCanvas';
 import { ReelBreakdownModal } from '../../components/intelligence/ReelBreakdownModal';
 import { ReelAnalyzerService } from '../../services/intelligence/reelAnalyzerService';
-import { Brain, Activity, Share2 } from 'lucide-react';
+import { Brain, Activity, Share2, Tv } from 'lucide-react';
 import { toast } from 'sonner';
 
 export const IntelligenceCanvasPage: React.FC = () => {
@@ -20,7 +20,6 @@ export const IntelligenceCanvasPage: React.FC = () => {
   const [posts, setPosts] = useState<IntelligencePost[]>(INITIAL_POSTS);
   const [auditReport, setAuditReport] = useState<BusinessAuditReport>(INITIAL_AUDIT_REPORT);
 
-  // Espaciado perfecto y coordinado de Nodos
   const [nodes, setNodes] = useState<CanvasNode[]>([
     { id: 'node_1', x: 40, y: 80, type: 'reel', post: INITIAL_POSTS[0] },
     {
@@ -39,20 +38,20 @@ export const IntelligenceCanvasPage: React.FC = () => {
         ],
         cta: 'Comenta "APP" y te la envío ya!!! ⬇️',
         full_script: `[HOOK (0-3s)]\n(Corte rápido + Texto gigante en amarillo en pantalla)\n"Escuchá esto antes de grabar tu próximo Reel... La razón por la que los comercios más exitosos están usando automatización con IA."\n\n[PROBLEMA / CONFLICTO (3-12s)]\nSi estás publicando videos estáticos o esperando que el algoritmo te regale alcance sin una estructura probada, estás perdiendo el 80% de tus prospectos.\n\n[VALOR & DEMOSTRACIÓN (12-32s)]\nAcá está la clave: Enganchá con una pregunta chocante en los primeros 1.5s, demostrá el resultado visualmente y usá subtítulos dinámicos.\n\n[CTA (32-45s)]\nComenta "APP" y te la envío ya!!! ⬇️`,
-        why_it_works: 'Combina retención del 32% con auto-DM directo.',
-        expected_impact: '2.4x más guardados y 3.1x más comentarios por palabra clave.'
+        why_it_works: 'Combina retención del 32% con emisión en Pantallas TV del local.',
+        expected_impact: '2.4x más guardados y transmisión directa en las pantallas del local.'
       }
     },
-    { id: 'node_meta', x: 780, y: 60, type: 'meta_business', integrationName: 'Meta Business Suite (Auto-DM)' },
-    { id: 'node_canva', x: 780, y: 220, type: 'canva', integrationName: 'Canva Design Kit' },
-    { id: 'node_chatgpt', x: 780, y: 380, type: 'chatgpt', integrationName: 'ChatGPT User Memory' }
+    { id: 'node_display', x: 780, y: 40, type: 'display_digital', integrationName: 'EventPix Display Hub (Pantallas TV)' },
+    { id: 'node_meta', x: 780, y: 220, type: 'meta_business', integrationName: 'Meta Business Suite (Auto-DM)' },
+    { id: 'node_canva', x: 780, y: 400, type: 'canva', integrationName: 'Canva Design Kit' }
   ]);
 
   const [edges, setEdges] = useState<CanvasEdge[]>([
     { id: 'edge_1_synth', source: 'node_1', target: 'node_synth' },
+    { id: 'edge_synth_display', source: 'node_synth', target: 'node_display' },
     { id: 'edge_synth_meta', source: 'node_synth', target: 'node_meta' },
-    { id: 'edge_synth_canva', source: 'node_synth', target: 'node_canva' },
-    { id: 'edge_synth_gpt', source: 'node_synth', target: 'node_chatgpt' }
+    { id: 'edge_synth_canva', source: 'node_synth', target: 'node_canva' }
   ]);
 
   const [isBrandDnaOpen, setIsBrandDnaOpen] = useState(true);
@@ -161,7 +160,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
     const newNode: CanvasNode = {
       id: newId,
       x: 780,
-      y: 60 + nodes.filter(n => n.type !== 'reel' && n.type !== 'synthesis').length * 160,
+      y: 40 + nodes.filter(n => n.type !== 'reel' && n.type !== 'synthesis').length * 160,
       type,
       integrationName: name
     };
@@ -227,7 +226,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
                 EVENTPIX INTELLIGENCE
               </h1>
               <span className="text-[10px] bg-violet-500/20 text-violet-300 border border-violet-500/30 px-2 py-0.5 rounded-full font-mono font-semibold">
-                Canvas Studio v2.0
+                Social $\rightarrow$ Display TV Omnichannel
               </span>
             </div>
             <p className="text-xs text-slate-400">
@@ -237,6 +236,12 @@ export const IntelligenceCanvasPage: React.FC = () => {
         </div>
 
         <div className="hidden md:flex items-center gap-4 text-xs">
+          <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl">
+            <Tv className="w-4 h-4 text-amber-400" />
+            <span className="text-slate-300">Display TV Hub:</span>
+            <span className="text-amber-400 font-bold font-mono">3 Pantallas Activas</span>
+          </div>
+
           <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl">
             <Share2 className="w-4 h-4 text-cyan-400" />
             <span className="text-slate-300">Meta Suite & Canva:</span>

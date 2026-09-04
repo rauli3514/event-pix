@@ -14,6 +14,13 @@ export const INITIAL_BUSINESS: IntelligenceBusiness = {
 
 export const INITIAL_CONNECTORS: IntegrationConnector[] = [
   {
+    id: 'conn_display',
+    provider: 'display_digital',
+    name: 'EventPix Display Hub (Pantallas TV del Local)',
+    status: 'connected',
+    account_name: '3 Pantallas Activas (Tanix W2 + Smart TV)'
+  },
+  {
     id: 'conn_meta',
     provider: 'meta_business',
     name: 'Meta Business Suite (Instagram & Facebook)',
@@ -199,7 +206,7 @@ export const INITIAL_POSTS: IntelligencePost[] = [
         what_to_repeat: [
           'Mantener la estrategia de sticker rosa "Comenta APP y te la envío ya!!!".'
         ],
-        next_test: 'Probar respuesta automática por DM integrada con Meta Business Suite.'
+        next_test: 'Emitir la campaña promocional en las Pantallas Digitales TV del local.'
       }
     }
   }
@@ -225,7 +232,7 @@ export const INITIAL_AUDIT_REPORT: BusinessAuditReport = {
       'Actualizar el link en bio para que dirija a una landing que siempre tenga la versión grabada disponible.'
     ]
   },
-  executive_summary: 'El perfil de @beaacamposr es fuerte en autoridad y conversión, con una propuesta de valor nítida y un alto nivel de interacción. Sin embargo, la bio requiere optimización para evitar la fuga de conversión por fechas obsoletas.',
+  executive_summary: 'El perfil de @beaacamposr es fuerte en autoridad y conversión, con una propuesta de valor nítida y un alto nivel de interacción. Se recomienda emitir la campaña ganadora en las pantallas TV del comercio para cerrar ventas en el punto de atención físico.',
   strengths: [
     'Autoridad masiva y prueba social explícita (+9k clientes).',
     'Maestría en CTAs de activación por comentario ("Comenta APP").',
@@ -233,9 +240,15 @@ export const INITIAL_AUDIT_REPORT: BusinessAuditReport = {
   ],
   conversion_bottlenecks: [
     'Mención a fecha específica ("2 de junio") que desactualiza el perfil.',
-    'Oportunidad de automatizar la entrega por DM usando Meta Business Suite.'
+    'Oportunidad de emitir la oferta estrella en las Pantallas TV de los locales comerciales.'
   ],
   immediate_actions: [
+    {
+      title: 'Emitir Campaña en Pantallas TV del Comercio',
+      description: 'Programar el video y la oferta de "Comenta APP" en la playlist de Display Digital de tus locales.',
+      priority: 'Alta',
+      effort: 'Bajo'
+    },
     {
       title: 'Actualizar Bio a formato Evergreen (Atemporal)',
       description: 'Reemplazar "Clase en vivo: 2 de junio" por "Acceso al Entrenamiento VIP".',
@@ -247,12 +260,6 @@ export const INITIAL_AUDIT_REPORT: BusinessAuditReport = {
       description: 'Conectar el activador de "Comenta APP" para enviar el enlace automáticamente por mensaje directo.',
       priority: 'Alta',
       effort: 'Medio'
-    },
-    {
-      title: 'Exportar Guion Fusionado a Canva',
-      description: 'Generar la carátula y el sticker rosa de llamado a la acción directamente en Canva.',
-      priority: 'Media',
-      effort: 'Bajo'
     }
   ],
   updated_at: new Date().toISOString()

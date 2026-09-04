@@ -12,7 +12,7 @@ export interface IntelligenceBusiness {
 
 export interface IntegrationConnector {
   id: string;
-  provider: 'meta_business' | 'chatgpt' | 'claude' | 'canva' | 'webhook_automation';
+  provider: 'meta_business' | 'chatgpt' | 'claude' | 'canva' | 'webhook_automation' | 'display_digital';
   name: string;
   status: 'connected' | 'disconnected' | 'pending';
   account_name?: string;
@@ -21,10 +21,10 @@ export interface IntegrationConnector {
 
 export interface BioAudit {
   current_bio: string;
-  bio_score: number; // 0 - 100
+  bio_score: number;
   strengths: string[];
-  weaknesses: string[]; // ej: Fuga de conversión por fecha específica ("2 de junio")
-  recommendations: string[]; // ej: Usar CTA evergreen
+  weaknesses: string[];
+  recommendations: string[];
 }
 
 export interface BrandDNA {
@@ -160,7 +160,7 @@ export interface BusinessAuditReport {
   updated_at: string;
 }
 
-export type NodeType = 'reel' | 'synthesis' | 'meta_business' | 'chatgpt' | 'claude' | 'canva' | 'automation_action';
+export type NodeType = 'reel' | 'synthesis' | 'meta_business' | 'chatgpt' | 'claude' | 'canva' | 'automation_action' | 'display_digital';
 
 export interface CanvasNodeData {
   label?: string;
@@ -168,8 +168,8 @@ export interface CanvasNodeData {
   type?: NodeType;
   integration?: IntegrationConnector;
   automation?: {
-    trigger_keyword?: string; // ej: "APP" o "REEL"
-    response_message?: string; // ej: "¡Te envío el acceso por privado!"
+    trigger_keyword?: string;
+    response_message?: string;
   };
   synthesisResult?: {
     hook: string;
@@ -177,5 +177,6 @@ export interface CanvasNodeData {
     cta: string;
     full_script: string;
     canva_template_url?: string;
+    display_campaign_name?: string;
   };
 }

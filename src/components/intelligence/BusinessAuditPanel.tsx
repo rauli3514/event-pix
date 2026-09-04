@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { BusinessAuditReport, IntelligenceBusiness, IntegrationConnector } from '../../types/intelligence';
 import { INITIAL_CONNECTORS } from '../../services/intelligence/mockData';
-import { Activity, AlertTriangle, CheckCircle, Lightbulb, ChevronRight, ChevronLeft, ArrowUpRight, Share2, Sparkles, MessageSquare, Bot, FileImage, ShieldCheck } from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle, Lightbulb, ChevronRight, ChevronLeft, ArrowUpRight, Share2, Sparkles, MessageSquare, Bot, FileImage, ShieldCheck, Tv } from 'lucide-react';
 
 interface BusinessAuditPanelProps {
   business: IntelligenceBusiness;
@@ -37,7 +37,6 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
 
   return (
     <aside className="w-80 lg:w-96 bg-slate-950/95 border-l border-slate-800/80 h-[calc(100vh-4rem)] flex flex-col z-30 shadow-2xl backdrop-blur-xl transition-all duration-300">
-      {/* Header */}
       <div className="p-4 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/50">
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-emerald-600/20 border border-emerald-500/30 text-emerald-400">
@@ -59,7 +58,6 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
         </button>
       </div>
 
-      {/* Tabs */}
       <div className="grid grid-cols-2 p-1.5 bg-slate-900/80 border-b border-slate-800/60 text-xs font-medium">
         <button
           onClick={() => setActiveTab('audit')}
@@ -77,22 +75,19 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
           }`}
         >
           <Share2 className="w-3.5 h-3.5" />
-          Conectores (IA & Meta)
+          Conectores (IA, TV & Meta)
         </button>
       </div>
 
-      {/* Content Body */}
       <div className="flex-1 overflow-y-auto p-4 space-y-5 custom-scrollbar text-xs">
         {activeTab === 'audit' && (
           <>
-            {/* Velocímetro de Salud (Scorecard) */}
             <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-2xl flex flex-col items-center relative overflow-hidden">
               <div className="w-full flex items-center justify-between text-[11px] text-slate-400 mb-1">
                 <span>Calificación general del perfil</span>
                 <span className="text-emerald-400 font-mono font-bold">{auditReport.health_score}/100</span>
               </div>
 
-              {/* Gauge */}
               <div className="relative w-44 h-24 my-2 flex items-end justify-center">
                 <svg className="w-44 h-24 overflow-visible" viewBox="0 0 100 50">
                   <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="#1E293B" strokeWidth="10" strokeLinecap="round" />
@@ -112,7 +107,6 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
               </div>
             </div>
 
-            {/* Resumen Ejecutivo */}
             <div className="bg-slate-900/60 border border-slate-800/80 p-3.5 rounded-xl space-y-1.5">
               <h4 className="font-bold text-slate-200 flex items-center gap-1.5 text-xs">
                 <Lightbulb className="w-4 h-4 text-amber-400" />
@@ -123,7 +117,6 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
               </p>
             </div>
 
-            {/* Auditoría de Bio (Scripty Style) */}
             <div className="bg-slate-900/90 border border-slate-800 p-3.5 rounded-2xl space-y-3">
               <h4 className="font-bold text-violet-400 flex items-center gap-1.5 text-xs uppercase tracking-wider">
                 <Sparkles className="w-4 h-4 text-violet-400" />
@@ -153,7 +146,6 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
               </div>
             </div>
 
-            {/* Fortalezas */}
             <div className="space-y-2">
               <h4 className="font-bold text-emerald-400 flex items-center gap-1.5 text-xs uppercase tracking-wider">
                 <CheckCircle className="w-4 h-4 text-emerald-400" />
@@ -169,7 +161,6 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
               </div>
             </div>
 
-            {/* Acciones Prioritarias */}
             <div className="space-y-2.5 pt-2 border-t border-slate-800/80">
               <h4 className="font-bold text-slate-200 flex items-center justify-between text-xs">
                 <span className="flex items-center gap-1.5">
@@ -202,7 +193,7 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
                 Matriz de Conectores e Integraciones
               </h4>
               <p className="text-slate-400 text-[11px]">
-                Conectá las herramientas de tu negocio para sincronizar datos en vivo en el Canvas.
+                Conectá las pantallas TV del local, Meta Suite y Canva para sincronizar campañas en vivo.
               </p>
             </div>
 
@@ -211,6 +202,7 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
                 <div key={conn.id} className="bg-slate-900 border border-slate-800 p-3 rounded-2xl space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
+                      {conn.provider === 'display_digital' && <Tv className="w-4 h-4 text-amber-400" />}
                       {conn.provider === 'meta_business' && <MessageSquare className="w-4 h-4 text-cyan-400" />}
                       {conn.provider === 'chatgpt' && <Bot className="w-4 h-4 text-emerald-400" />}
                       {conn.provider === 'claude' && <Sparkles className="w-4 h-4 text-amber-400" />}

@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { IntelligencePost, NodeType } from '../../types/intelligence';
-import { Plus, Sparkles, Layers, Zap, Eye, Bookmark, Trash2, CheckCircle2, RefreshCw, Link, Bot, FileImage, MessageSquare, ArrowRight, Send } from 'lucide-react';
+import { Plus, Sparkles, Layers, Zap, Eye, Bookmark, Trash2, CheckCircle2, RefreshCw, Link, Bot, FileImage, MessageSquare, ArrowRight, Send, Tv, QrCode } from 'lucide-react';
 import { ReelSynthesisResult } from '../../services/intelligence/reelAnalyzerService';
 import { toast } from 'sonner';
 
@@ -57,7 +57,7 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
   const getNodeDimensions = (node: CanvasNode) => {
     if (node.type === 'synthesis') return { width: 380, height: 420 };
     if (node.type === 'reel') return { width: 280, height: 260 };
-    return { width: 260, height: 160 }; // Integration connectors
+    return { width: 270, height: 170 };
   };
 
   const handleMouseDownNode = (id: string, e: React.MouseEvent) => {
@@ -101,19 +101,18 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
     setInputUrl('');
   };
 
-  // Ejecución de Acción en Conectores
   const handleExecuteConnectorAction = (nodeId: string, actionName: string) => {
     setExecutingNodeId(nodeId);
-    toast.info(`Ejecutando acción: ${actionName}...`);
+    toast.info(`Ejecutando: ${actionName}...`);
 
     setTimeout(() => {
       setExecutingNodeId(null);
-      if (actionName.includes('Auto-DM')) {
-        toast.success('⚡ Auto-Responder configurado en Meta Suite! Se enviará la plantilla al comentar "APP" o "REEL".');
+      if (actionName.includes('Display Digital') || actionName.includes('Pantallas TV')) {
+        toast.success('📺 Campaña enviada a las Pantallas Digitales de tus locales! Playlist programada de Viernes a Domingo.');
+      } else if (actionName.includes('Auto-DM')) {
+        toast.success('⚡ Auto-Responder configurado en Meta Suite! Se enviará la plantilla al comentar "APP".');
       } else if (actionName.includes('Canva')) {
-        toast.success('🎨 Diseño de plantilla e historia exportado a Canva con el kit de marca EventPix!');
-      } else if (actionName.includes('ChatGPT') || actionName.includes('Claude')) {
-        toast.success('🧠 ADN de Marca y Preferencias sincronizadas con el motor de IA!');
+        toast.success('🎨 Diseño exportado a Canva con el kit de marca EventPix!');
       } else {
         toast.success(`Acción "${actionName}" completada con éxito!`);
       }
@@ -128,7 +127,6 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
       className="relative flex-1 bg-[#080C14] overflow-auto select-none cursor-grab active:cursor-grabbing flex flex-col custom-scrollbar"
       style={{ minHeight: '600px', minWidth: '900px' }}
     >
-      {/* Grid Pattern */}
       <div
         className="absolute inset-0 opacity-20 pointer-events-none min-w-[2000px] min-h-[1500px]"
         style={{
@@ -137,7 +135,6 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
         }}
       />
 
-      {/* SVG Connections (Lineas Conectoras Precisas) */}
       <svg className="absolute inset-0 w-full h-full pointer-events-none z-10 min-w-[2000px] min-h-[1500px]">
         <defs>
           <linearGradient id="edgeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -164,7 +161,6 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
           const sDim = getNodeDimensions(sourceNode);
           const tDim = getNodeDimensions(targetNode);
 
-          // Puntos exactos de puerto (Borde derecho del origen -> Borde izquierdo del destino)
           const x1 = sPos.x + sDim.width;
           const y1 = sPos.y + Math.min(sDim.height / 2, 80);
 
@@ -215,16 +211,16 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
         <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 text-[11px]">
           <span className="text-slate-500 px-2 font-bold uppercase text-[9px]">Añadir Conector:</span>
           <button
+            onClick={() => onAddIntegrationNode('display_digital', 'Display Hub (Pantallas TV)')}
+            className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2.5 py-1 rounded-lg flex items-center gap-1 font-medium transition-all"
+          >
+            <Tv className="w-3 h-3" /> Display TV
+          </button>
+          <button
             onClick={() => onAddIntegrationNode('meta_business', 'Meta Suite (Auto-DM)')}
             className="bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-2.5 py-1 rounded-lg flex items-center gap-1 font-medium transition-all"
           >
             <MessageSquare className="w-3 h-3" /> Meta Suite
-          </button>
-          <button
-            onClick={() => onAddIntegrationNode('chatgpt', 'ChatGPT Memory')}
-            className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded-lg flex items-center gap-1 font-medium transition-all"
-          >
-            <Bot className="w-3 h-3" /> ChatGPT
           </button>
           <button
             onClick={() => onAddIntegrationNode('canva', 'Canva Design Kit')}
@@ -234,7 +230,6 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
           </button>
         </div>
 
-        {/* Fusión */}
         <div className="flex items-center gap-3">
           <button
             disabled={selectedNodeIds.length < 1 || isSynthesizing}
@@ -260,13 +255,11 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
         </div>
       </div>
 
-      {/* Renderizado de Nodos */}
       <div className="relative w-full h-full z-20 pt-6 p-6 min-h-[800px]">
         {nodes.map(node => {
           const pos = getNodePos(node);
           const isSelected = selectedNodeIds.includes(node.id);
 
-          // 1. NODO REEL
           if (node.type === 'reel' && node.post) {
             const post = node.post;
             return (
@@ -280,8 +273,7 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
                     : 'border-slate-800 hover:border-slate-700'
                 }`}
               >
-                {/* Puerto de Salida (Dot derecho) */}
-                <div className="absolute -right-2.5 top-14 w-5 h-5 rounded-full bg-violet-600 border-2 border-slate-950 shadow-md flex items-center justify-center text-white z-30" title="Puerto Conector de Salida">
+                <div className="absolute -right-2.5 top-14 w-5 h-5 rounded-full bg-violet-600 border-2 border-slate-950 shadow-md flex items-center justify-center text-white z-30">
                   <div className="w-2 h-2 rounded-full bg-white animate-ping" />
                 </div>
 
@@ -353,8 +345,7 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
             );
           }
 
-          // 2. NODO CONECTOR DE INTEGRACIÓN (CON BOTONES DE ACCIÓN REAL)
-          if (['meta_business', 'chatgpt', 'claude', 'canva', 'automation_action'].includes(node.type)) {
+          if (['meta_business', 'chatgpt', 'claude', 'canva', 'automation_action', 'display_digital'].includes(node.type)) {
             const isExecuting = executingNodeId === node.id;
             return (
               <div
@@ -362,12 +353,11 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
                 onMouseDown={(e) => handleMouseDownNode(node.id, e)}
                 style={{ left: `${pos.x}px`, top: `${pos.y}px` }}
                 className={`absolute w-64 bg-slate-900 border rounded-2xl shadow-xl backdrop-blur-xl transition-all ${
-                  isSelected ? 'border-cyan-500 ring-2 ring-cyan-500/40' : 'border-slate-800'
+                  isSelected ? 'border-amber-500 ring-2 ring-amber-500/40' : 'border-slate-800'
                 }`}
               >
-                {/* Puerto conector */}
-                <div className="absolute -left-2.5 top-12 w-5 h-5 rounded-full bg-cyan-500 border-2 border-slate-950 shadow-md flex items-center justify-center text-white z-30">
-                  <div className="w-2 h-2 rounded-full bg-white" />
+                <div className="absolute -left-2.5 top-12 w-5 h-5 rounded-full bg-amber-400 border-2 border-slate-950 shadow-md flex items-center justify-center text-white z-30">
+                  <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
                 </div>
 
                 <div className="p-3 border-b border-slate-800 flex items-center justify-between bg-slate-950 rounded-t-2xl">
@@ -375,11 +365,12 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
                     <button
                       onClick={(e) => handleToggleSelectNode(node.id, e)}
                       className={`w-4 h-4 rounded border flex items-center justify-center ${
-                        isSelected ? 'bg-cyan-600 border-cyan-500 text-white' : 'border-slate-700 bg-slate-950 text-transparent'
+                        isSelected ? 'bg-amber-600 border-amber-500 text-white' : 'border-slate-700 bg-slate-950 text-transparent'
                       }`}
                     >
                       <CheckCircle2 className="w-3 h-3" />
                     </button>
+                    {node.type === 'display_digital' && <Tv className="w-4 h-4 text-amber-400" />}
                     {node.type === 'meta_business' && <MessageSquare className="w-4 h-4 text-cyan-400" />}
                     {node.type === 'chatgpt' && <Bot className="w-4 h-4 text-emerald-400" />}
                     {node.type === 'canva' && <FileImage className="w-4 h-4 text-violet-400" />}
@@ -390,7 +381,6 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
                   </button>
                 </div>
 
-                {/* Acciones del Conector */}
                 <div className="p-3 space-y-2 text-[11px]">
                   <div className="flex items-center justify-between">
                     <span className="text-slate-400 font-medium">Estado:</span>
@@ -399,7 +389,33 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
                     </span>
                   </div>
 
-                  {/* Acciones específicas según el tipo de conector */}
+                  {node.type === 'display_digital' && (
+                    <div className="space-y-1.5 pt-1">
+                      <button
+                        onClick={() => handleExecuteConnectorAction(node.id, 'Enviar a Pantallas TV')}
+                        disabled={isExecuting}
+                        className="w-full bg-amber-950/60 hover:bg-amber-900/60 text-amber-200 border border-amber-500/30 font-semibold py-1.5 px-2 rounded-xl flex items-center justify-between text-[10px] transition-colors"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Tv className="w-3.5 h-3.5 text-amber-400" />
+                          Enviar a Pantallas TV
+                        </span>
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={() => handleExecuteConnectorAction(node.id, 'Generar QR WhatsApp')}
+                        disabled={isExecuting}
+                        className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold py-1 px-2 rounded-xl flex items-center justify-between text-[9px] transition-colors"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <QrCode className="w-3 h-3 text-emerald-400" />
+                          Generar QR WhatsApp
+                        </span>
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+
                   {node.type === 'meta_business' && (
                     <div className="space-y-1.5 pt-1">
                       <button
@@ -431,28 +447,11 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
                       </button>
                     </div>
                   )}
-
-                  {node.type === 'chatgpt' && (
-                    <div className="space-y-1.5 pt-1">
-                      <button
-                        onClick={() => handleExecuteConnectorAction(node.id, 'Sincronizar Memoria ChatGPT')}
-                        disabled={isExecuting}
-                        className="w-full bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-200 border border-emerald-500/30 font-semibold py-1.5 px-2 rounded-xl flex items-center justify-between text-[10px] transition-colors"
-                      >
-                        <span className="flex items-center gap-1.5">
-                          <Bot className="w-3 h-3 text-emerald-400" />
-                          Sincronizar Memoria ADN
-                        </span>
-                        <ArrowRight className="w-3 h-3" />
-                      </button>
-                    </div>
-                  )}
                 </div>
               </div>
             );
           }
 
-          // 3. NODO SÍNTESIS DE IA (RESULTADO CON ACCIONES DE EJECUCIÓN DIRECTA)
           if (node.type === 'synthesis' && node.synthesisResult) {
             const synth = node.synthesisResult;
             return (
@@ -462,7 +461,6 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
                 style={{ left: `${pos.x}px`, top: `${pos.y}px` }}
                 className="absolute w-96 bg-gradient-to-b from-slate-900 to-slate-950 border-2 border-cyan-500/50 rounded-3xl shadow-2xl backdrop-blur-xl z-30"
               >
-                {/* Puerto conector */}
                 <div className="absolute -left-2.5 top-12 w-5 h-5 rounded-full bg-cyan-400 border-2 border-slate-950 shadow-md flex items-center justify-center text-white z-30">
                   <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
                 </div>
@@ -499,28 +497,28 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
                     <p className="text-emerald-200 font-semibold text-[11px]">"{synth.cta}"</p>
                   </div>
 
-                  <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 space-y-1">
-                    <span className="text-[10px] font-bold uppercase text-amber-400 tracking-wider">Guion Completo a Grabar:</span>
-                    <pre className="text-slate-300 text-[10px] font-mono leading-relaxed whitespace-pre-wrap max-h-40 overflow-y-auto custom-scrollbar p-2 bg-slate-900 rounded-xl">
-                      {synth.full_script}
-                    </pre>
-                  </div>
-
-                  {/* BOTONES DE ACCIÓN DIRECTA DE LA SÍNTESIS */}
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800">
+                  {/* BOTONES DE ACCIÓN DIRECTA DE LA SÍNTESIS INCLUYENDO DISPLAY TV */}
+                  <div className="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-800">
+                    <button
+                      onClick={() => handleExecuteConnectorAction(node.id, 'Enviar a Pantallas TV')}
+                      className="bg-amber-600 hover:bg-amber-500 text-white font-bold py-2 px-2 rounded-xl flex items-center justify-center gap-1 text-[10px] transition-all shadow-lg shadow-amber-600/20"
+                    >
+                      <Tv className="w-3.5 h-3.5" />
+                      Emitir en TV
+                    </button>
                     <button
                       onClick={() => handleExecuteConnectorAction(node.id, 'Auto-DM en Meta Business Suite')}
-                      className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 text-[11px] transition-all shadow-lg shadow-cyan-600/20"
+                      className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 px-2 rounded-xl flex items-center justify-center gap-1 text-[10px] transition-all shadow-lg shadow-cyan-600/20"
                     >
                       <Send className="w-3.5 h-3.5" />
-                      Activar Auto-DM
+                      Auto-DM
                     </button>
                     <button
                       onClick={() => handleExecuteConnectorAction(node.id, 'Diseño en Canva')}
-                      className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 text-[11px] transition-all shadow-lg shadow-violet-600/20"
+                      className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2 px-3 rounded-xl flex items-center justify-center gap-1 text-[10px] transition-all shadow-lg shadow-violet-600/20"
                     >
                       <FileImage className="w-3.5 h-3.5" />
-                      Exportar a Canva
+                      Canva
                     </button>
                   </div>
                 </div>
