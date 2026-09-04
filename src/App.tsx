@@ -37,6 +37,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { EventProvider } from "./context/EventContext";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
+import { IntelligenceCanvasPage } from "./pages/intelligence/IntelligenceCanvasPage";
 import { ThemeProvider } from "./components/theme-provider";
 
 const queryClient = new QueryClient();
@@ -59,6 +60,7 @@ const App = () => (
               <Route element={<ProtectedRoute />}>
                 <Route path="/admin" element={<AdminDashboard />} />
                 <Route path="/admin/providers" element={<ProvidersList />} />
+                <Route path="/admin/intelligence" element={<IntelligenceCanvasPage />} />
                 <Route path="/admin/kiosco-manager" element={<KioskManager />} />
                 <Route path="/admin/display" element={<DisplayHubMain />} />
                 
