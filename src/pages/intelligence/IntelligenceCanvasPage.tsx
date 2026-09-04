@@ -5,13 +5,13 @@ import {
   INITIAL_POSTS,
   INITIAL_AUDIT_REPORT
 } from '../../services/intelligence/mockData';
-import { BrandDNA, IntelligencePost, BusinessAuditReport } from '../../types/intelligence';
+import { BrandDNA, IntelligencePost, BusinessAuditReport, NodeType } from '../../types/intelligence';
 import { BrandDnaPanel } from '../../components/intelligence/BrandDnaPanel';
 import { BusinessAuditPanel } from '../../components/intelligence/BusinessAuditPanel';
 import { StrategyCanvas, CanvasNode, CanvasEdge } from '../../components/intelligence/StrategyCanvas';
 import { ReelBreakdownModal } from '../../components/intelligence/ReelBreakdownModal';
 import { ReelAnalyzerService } from '../../services/intelligence/reelAnalyzerService';
-import { Brain, Activity, ShieldCheck } from 'lucide-react';
+import { Brain, Activity, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export const IntelligenceCanvasPage: React.FC = () => {
@@ -20,20 +20,19 @@ export const IntelligenceCanvasPage: React.FC = () => {
   const [posts, setPosts] = useState<IntelligencePost[]>(INITIAL_POSTS);
   const [auditReport, setAuditReport] = useState<BusinessAuditReport>(INITIAL_AUDIT_REPORT);
 
-  // Estados del Canvas
   const [nodes, setNodes] = useState<CanvasNode[]>([
     { id: 'node_1', x: 60, y: 120, type: 'reel', post: INITIAL_POSTS[0] },
-    { id: 'node_2', x: 60, y: 440, type: 'reel', post: INITIAL_POSTS[1] }
+    { id: 'node_meta', x: 60, y: 440, type: 'meta_business', integrationName: 'Meta Business Suite (Auto-DM)' }
   ]);
-  const [edges, setEdges] = useState<CanvasEdge[]>([]);
+  const [edges, setEdges] = useState<CanvasEdge[]>([
+    { id: 'edge_meta_1', source: 'node_1', target: 'node_meta' }
+  ]);
 
-  // Estados de Paneles y Modales
   const [isBrandDnaOpen, setIsBrandDnaOpen] = useState(true);
   const [isAuditOpen, setIsAuditOpen] = useState(true);
   const [inspectedPost, setInspectedPost] = useState<IntelligencePost | null>(null);
   const [isSynthesizing, setIsSynthesizing] = useState(false);
 
-  // Agregar Reel por URL
   const handleAddNodeFromUrl = (url: string) => {
     const newId = `node_${Date.now()}`;
     const newPost: IntelligencePost = {
@@ -92,7 +91,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
         },
         cta_data: {
           detected: true,
-          text: 'Comentá "REEL"',
+          text: 'Comenta "APP" y te la envío ya!!! ⬇️',
           type: 'comment_keyword',
           strength: 'fuerte'
         },
@@ -100,7 +99,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
           { range: '0-3s', content: 'La estrategia no secreta...', narrative_role: 'hook', visual_cue: 'Corte rápido' },
           { range: '3-15s', content: 'Exposición del problema...', narrative_role: 'problem', visual_cue: 'B-roll de estudio' },
           { range: '15-40s', content: 'Desarrollo de la solución...', narrative_role: 'value', visual_cue: 'Gráfico animado' },
-          { range: '40-50s', content: 'CTA en comentarios...', narrative_role: 'cta', visual_cue: 'Flecha hacia abajo' }
+          { range: '40-50s', content: 'Comenta "APP" y te la envío ya!!!', narrative_role: 'cta', visual_cue: 'Sticker rosa' }
         ],
         diagnosis: {
           what_worked: ['Gancho de alto impacto.'],
@@ -116,7 +115,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
     const newCanvasNode: CanvasNode = {
       id: newId,
       x: 60,
-      y: 120 + nodes.length * 150,
+      y: 120 + nodes.length * 120,
       type: 'reel',
       post: newPost
     };
@@ -124,14 +123,25 @@ export const IntelligenceCanvasPage: React.FC = () => {
     setNodes(prev => [...prev, newCanvasNode]);
     setPosts(prev => [...prev, newPost]);
 
-    // Recalcular auditoría
     const updatedAudit = ReelAnalyzerService.calculateAuditReport([...posts, newPost], brandDna);
     setAuditReport(updatedAudit);
 
-    toast.success('Reel importado y analizado por la IA con éxito!');
+    toast.success('Reel importado y analizado con éxito!');
   };
 
-  // Sintetizar Reels seleccionados
+  const handleAddIntegrationNode = (type: NodeType, name: string) => {
+    const newId = `node_${type}_${Date.now()}`;
+    const newNode: CanvasNode = {
+      id: newId,
+      x: 60,
+      y: 200 + nodes.length * 100,
+      type,
+      integrationName: name
+    };
+    setNodes(prev => [...prev, newNode]);
+    toast.success(`Nodo conector "${name}" añadido al canvas!`);
+  };
+
   const handleSynthesize = async (sourceNodeIds: string[]) => {
     setIsSynthesizing(true);
     const selectedPosts = nodes
@@ -141,7 +151,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
     try {
       const result = await ReelAnalyzerService.synthesizeReels({
         business_id: business.id,
-        source_posts: selectedPosts,
+        source_posts: selectedPosts.length > 0 ? selectedPosts : [INITIAL_POSTS[0]],
         brand_dna: brandDna
       });
 
@@ -154,7 +164,6 @@ export const IntelligenceCanvasPage: React.FC = () => {
         synthesisResult: result
       };
 
-      // Crear bordes conectoras
       const newEdges: CanvasEdge[] = sourceNodeIds.map(srcId => ({
         id: `edge_${srcId}_${synthNodeId}`,
         source: srcId,
@@ -164,7 +173,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
       setNodes(prev => [...prev.filter(n => n.type !== 'synthesis'), synthNode]);
       setEdges(prev => [...prev.filter(e => e.target !== synthNodeId), ...newEdges]);
 
-      toast.success('Super Guion generado combinando lo mejor de tus Reels!');
+      toast.success('Super Guion generado combinando conectores e IA!');
     } catch (err) {
       toast.error('Error al generar la síntesis del guion.');
     } finally {
@@ -175,12 +184,11 @@ export const IntelligenceCanvasPage: React.FC = () => {
   const handleDeleteNode = (nodeId: string) => {
     setNodes(prev => prev.filter(n => n.id !== nodeId));
     setEdges(prev => prev.filter(e => e.source !== nodeId && e.target !== nodeId));
-    toast.info('Nodo eliminado del canvas.');
+    toast.info('Nodo eliminado.');
   };
 
   return (
     <div className="h-screen w-screen flex flex-col bg-[#080C14] text-slate-100 overflow-hidden font-sans">
-      {/* Top Header Bar */}
       <header className="h-16 bg-slate-950/90 border-b border-slate-800/80 px-6 flex items-center justify-between z-40 backdrop-blur-xl shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-violet-600/30">
@@ -192,21 +200,20 @@ export const IntelligenceCanvasPage: React.FC = () => {
                 EVENTPIX INTELLIGENCE
               </h1>
               <span className="text-[10px] bg-violet-500/20 text-violet-300 border border-violet-500/30 px-2 py-0.5 rounded-full font-mono font-semibold">
-                SaaS v2.0
+                Canvas & Connectors
               </span>
             </div>
             <p className="text-xs text-slate-400">
-              Analista + Estratega de Contenido para <strong className="text-slate-200">{business.name}</strong>
+              Analista + Estratega para <strong className="text-slate-200">{auditReport.instagram_handle || business.name}</strong>
             </p>
           </div>
         </div>
 
-        {/* Status Conexiones */}
         <div className="hidden md:flex items-center gap-4 text-xs">
           <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span className="text-slate-300">Meta Graph MCP:</span>
-            <span className="text-emerald-400 font-bold font-mono">Conectado</span>
+            <Share2 className="w-4 h-4 text-cyan-400" />
+            <span className="text-slate-300">Meta Suite & Canva:</span>
+            <span className="text-emerald-400 font-bold font-mono">Conectados</span>
           </div>
 
           <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl">
@@ -217,9 +224,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Container with Canvas and Side Panels */}
       <div className="flex-1 flex relative overflow-hidden">
-        {/* Left Side Panel (Brand DNA & Voice Trainer) */}
         <BrandDnaPanel
           business={business}
           brandDna={brandDna}
@@ -228,18 +233,17 @@ export const IntelligenceCanvasPage: React.FC = () => {
           onToggle={() => setIsBrandDnaOpen(!isBrandDnaOpen)}
         />
 
-        {/* Central Workspace Canvas */}
         <StrategyCanvas
           nodes={nodes}
           edges={edges}
           onAddNodeFromUrl={handleAddNodeFromUrl}
+          onAddIntegrationNode={handleAddIntegrationNode}
           onSynthesize={handleSynthesize}
           onInspectNode={setInspectedPost}
           onDeleteNode={handleDeleteNode}
           isSynthesizing={isSynthesizing}
         />
 
-        {/* Right Side Panel (Account Audit & Actions) */}
         <BusinessAuditPanel
           business={business}
           auditReport={auditReport}
@@ -248,7 +252,6 @@ export const IntelligenceCanvasPage: React.FC = () => {
         />
       </div>
 
-      {/* Modal Despiece de 5 Capas */}
       <ReelBreakdownModal
         post={inspectedPost}
         onClose={() => setInspectedPost(null)}

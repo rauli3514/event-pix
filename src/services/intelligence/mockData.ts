@@ -1,4 +1,4 @@
-import { IntelligenceBusiness, BrandDNA, IntelligencePost, BusinessAuditReport } from '../../types/intelligence';
+import { IntelligenceBusiness, BrandDNA, IntelligencePost, BusinessAuditReport, IntegrationConnector } from '../../types/intelligence';
 
 export const INITIAL_BUSINESS: IntelligenceBusiness = {
   id: 'biz_001',
@@ -7,9 +7,48 @@ export const INITIAL_BUSINESS: IntelligenceBusiness = {
   niche: 'Agencia de Marketing & Soluciones Audiovisuales para Eventos',
   target_audience: 'Dueños de locales, organizadores de eventos y creadores B2B en LATAM',
   brand_tone: 'directo',
+  instagram_handle: '@beaacamposr',
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString()
 };
+
+export const INITIAL_CONNECTORS: IntegrationConnector[] = [
+  {
+    id: 'conn_meta',
+    provider: 'meta_business',
+    name: 'Meta Business Suite (Instagram & Facebook)',
+    status: 'connected',
+    account_name: '@beaacamposr (8830 seg.)'
+  },
+  {
+    id: 'conn_chatgpt',
+    provider: 'chatgpt',
+    name: 'ChatGPT User Memory & Preference',
+    status: 'connected',
+    account_name: 'Custom GPT Active'
+  },
+  {
+    id: 'conn_claude',
+    provider: 'claude',
+    name: 'Claude 3.5 Sonnet Strategy Engine',
+    status: 'connected',
+    account_name: 'Anthropic Agent Ready'
+  },
+  {
+    id: 'conn_canva',
+    provider: 'canva',
+    name: 'Canva Design Connector',
+    status: 'connected',
+    account_name: 'EventPix Brand Kit'
+  },
+  {
+    id: 'conn_auto',
+    provider: 'webhook_automation',
+    name: 'Auto-Responder DM ("Comenta APP")',
+    status: 'connected',
+    account_name: 'Trigger Active'
+  }
+];
 
 export const INITIAL_BRAND_DNA: BrandDNA = {
   business_id: 'biz_001',
@@ -40,9 +79,9 @@ export const INITIAL_BRAND_DNA: BrandDNA = {
       'Auditoría Estratégica de Reels'
     ],
     call_to_actions: [
+      'Comenta "APP" y te la envío ya!!! ⬇️',
       'Comentá "REEL" y te envío el despiece completo.',
-      'Hacé clic en el link de la bio para probar EventPix Intelligence.',
-      'Guardá este Reel para aplicarlo en tu próximo guion.'
+      'Hacé clic en el link de la bio para acceder al entrenamiento.'
     ],
     whatsapp_link: 'https://wa.me/5491100000000',
     landing_url: 'https://app.event-pix.com.ar'
@@ -113,7 +152,7 @@ export const INITIAL_POSTS: IntelligencePost[] = [
       },
       cta_data: {
         detected: true,
-        text: 'Comentá "REEL" para enviarte la plantilla',
+        text: 'Comenta "APP" y te la envío ya!!! ⬇️',
         type: 'comment_keyword',
         strength: 'fuerte'
       },
@@ -138,137 +177,29 @@ export const INITIAL_POSTS: IntelligencePost[] = [
         },
         {
           range: '35-45s',
-          content: 'Si querés la guía completa de despiece, comentá la palabra REEL acá abajo.',
+          content: 'Comenta "APP" y te la envío ya!!! ⬇️',
           narrative_role: 'cta',
-          visual_cue: 'Flecha hacia la zona de comentarios'
+          visual_cue: 'Banner rosa con texto gigante'
         }
       ],
       diagnosis: {
         what_worked: [
-          'El gancho de comparación ("venden más que vos") generó una altísima tasa de retención inicial (85% a los 3s).',
-          'El CTA de palabra clave en comentarios disparó la tasa de guardados y comentarios.'
+          'Autoridad masiva: Verificación y prueba social explícita.',
+          'Maestría en CTAs de activación: El uso de "Comenta APP" genera volúmenes masivos de comentarios, disparando el alcance.'
         ],
         what_failed: [
-          'Ligera caída de audiencia entre los segundos 20 y 25 por una explicación demasiado extensa.'
+          'Fuga de conversión por fecha: La mención a una fecha específica en la bio hace que la oferta parezca obsoleta para visitantes posteriores.'
         ],
         hypotheses: [
-          'Ganchos basados en comparación o pérdida ("lo que estás haciendo mal") tienen 2.4x más guardados en tu audiencia.'
+          'Reemplazar el CTA de fecha específica por uno "evergreen" (atemporal) como "Accede al Entrenamiento VIP".'
         ],
         what_to_change: [
-          'Acortar el segmento de valor de 20s a 12s para mantener el ritmo alto.'
+          'Actualizar el link en la bio para que dirija a una landing que siempre tenga la próxima clase disponible.'
         ],
         what_to_repeat: [
-          'Mantener el texto flotante OCR en los primeros 1.5s.',
-          'Usar el CTA de comentario por palabra clave ("REEL").'
+          'Mantener la estrategia de sticker rosa "Comenta APP y te la envío ya!!!".'
         ],
-        next_test: 'Probar un gancho de error común: "El error de $0 que te está costando el 50% de tus ventas en Instagram"'
-      }
-    }
-  },
-  {
-    id: 'post_002',
-    business_id: 'biz_001',
-    title: 'Cómo automatizar tu análisis de contenido con IA',
-    video_url: 'https://www.youtube.com/watch?v=b9QO1v72cxQ',
-    thumbnail_url: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=400&auto=format&fit=crop',
-    duration_seconds: 60,
-    objective: 'sales',
-    published_at: new Date(Date.now() - 7 * 86400000).toISOString(),
-    created_at: new Date().toISOString(),
-    metrics: {
-      post_id: 'post_002',
-      views: 9800,
-      reach: 8400,
-      likes: 620,
-      comments: 98,
-      shares: 215,
-      saves: 430,
-      followers_gained: 32,
-      average_watch_time_seconds: 18.2,
-      total_watch_time_seconds: 178360,
-      profile_visits: 180,
-      like_rate: 6.32,
-      comment_rate: 1.00,
-      share_rate: 2.19,
-      save_rate: 4.38,
-      retention_percentage: 30.3
-    },
-    analysis: {
-      post_id: 'post_002',
-      hook_data: {
-        text: 'Dejá de adivinar qué publicar en Instagram: te enseño a usar IA',
-        type: 'secreto_revelado',
-        curiosity_score: 88,
-        clarity_score: 94,
-        auditory_strength: 'alta',
-        has_text_on_screen: true
-      },
-      promise: 'Demostrar un flujo automático para analizar y replicar patrones virales.',
-      topic: 'Automatización & IA',
-      audience: 'Marketers y creadores de contenido',
-      structure: ['hook', 'value', 'proof', 'cta'],
-      language_data: {
-        tone: 'Práctico y estructurado',
-        proximity: 'cercano',
-        technicality: 'baja',
-        second_person_usage: true
-      },
-      emotions: ['alivio', 'eficiencia'],
-      visual_analysis: {
-        scene_change_frequency_sec: 3.0,
-        has_captions: true,
-        main_visual_element: 'Captura de pantalla de flujo n8n + canvas interactivo'
-      },
-      cta_data: {
-        detected: true,
-        text: 'Hacé clic en el enlace de la bio para ver el tutorial gratis',
-        type: 'link_in_bio',
-        strength: 'moderado'
-      },
-      time_segments: [
-        {
-          range: '0-3s',
-          content: 'Dejá de adivinar qué publicar en Instagram...',
-          narrative_role: 'hook',
-          visual_cue: 'Demostración visual directa en pantalla'
-        },
-        {
-          range: '3-20s',
-          content: 'Conectamos el scraper de Reels con nuestro modelo de IA...',
-          narrative_role: 'value',
-          visual_cue: 'Recorrido por las piezas del flujo'
-        },
-        {
-          range: '20-45s',
-          content: 'Acá podés ver cómo desglosa el gancho, la retención y la propuesta...',
-          narrative_role: 'proof',
-          visual_cue: 'Muestra del reporte final'
-        },
-        {
-          range: '45-60s',
-          content: 'Probá el sistema en EventPix Intelligence.',
-          narrative_role: 'cta',
-          visual_cue: 'Botón animado de ingreso'
-        }
-      ],
-      diagnosis: {
-        what_worked: [
-          'La demostración práctica en los primeros 5 segundos validó la promesa inmediatamente.',
-          'Alta tasa de guardados (4.38%) por tratarse de un recurso tutorial práctico.'
-        ],
-        what_failed: [
-          'El CTA final fue un poco tibio comparado con el CTA de palabra clave en comentarios.'
-        ],
-        hypotheses: [
-          'Los tutoriales visuales estilo "Screen share + Explicación" convierten 1.8x más a guardados.'
-        ],
-        what_to_change: [
-          'Cambiar el CTA final a palabra clave en comentarios en lugar de enviar a la bio.'
-        ],
-        what_to_repeat: [
-          'Formato tutorial visual con captura del software en vivo.'
-        ],
-        next_test: 'Probar la combinación del Hook del Post 1 con la Demostración del Post 2.'
+        next_test: 'Probar respuesta automática por DM integrada con Meta Business Suite.'
       }
     }
   }
@@ -277,32 +208,49 @@ export const INITIAL_POSTS: IntelligencePost[] = [
 export const INITIAL_AUDIT_REPORT: BusinessAuditReport = {
   business_id: 'biz_001',
   health_score: 88,
-  executive_summary: 'El perfil de EventPix & Marketing Pro muestra una autoridad y tasa de interacción sobresalientes (88/100). El gancho inicial en Reels B2B es sumamente efectivo en retener a la audiencia en los primeros 3 segundos. Sin embargo, existe margen para optimizar los llamados a la acción y la conversión directa.',
+  instagram_handle: '@beaacamposr',
+  bio_audit: {
+    current_bio: `Convierto expertas en dueñas que facturan con IG\nMi app: @scripty.app\n💛 +9K clientas en LATAM y USA 🙏\n🎓 Clase en vivo: 2 de junio\n⬇️ Empecemos aquí`,
+    bio_score: 85,
+    strengths: [
+      'Autoridad masiva: Verificación y base de clientes en LATAM y USA.',
+      'Maestría en CTAs de activación: El uso de "Comenta APP" genera interacción continua.',
+      'Sinergia de marca: Conexión directa con la app propia creando un bucle de atracción.'
+    ],
+    weaknesses: [
+      'Fuga de conversión por fecha: La mención a la fecha "2 de junio" hace que la oferta principal parezca obsoleta para cualquier visitante posterior a esa fecha.'
+    ],
+    recommendations: [
+      'Reemplazar el CTA de fecha específica por uno "evergreen" (atemporal) como "Clase Gratuita Semanal" o "Accede al Entrenamiento VIP".',
+      'Actualizar el link en bio para que dirija a una landing que siempre tenga la versión grabada disponible.'
+    ]
+  },
+  executive_summary: 'El perfil de @beaacamposr es fuerte en autoridad y conversión, con una propuesta de valor nítida y un alto nivel de interacción. Sin embargo, la bio requiere optimización para evitar la fuga de conversión por fechas obsoletas.',
   strengths: [
-    'Propuesta de valor ultra-clara en el gancho de los Reels (Retención a los 3s superior al 82%).',
-    'Excelente tasa de guardados (promedio de 3.98%), lo que indica contenido percibido como altamente valioso.',
-    'Uso consistente de subtítulos dinámicos OCR y ritmo visual optimizado.'
+    'Autoridad masiva y prueba social explícita (+9k clientes).',
+    'Maestría en CTAs de activación por comentario ("Comenta APP").',
+    'Demanda explícita visible en comentarios validando la oferta.'
   ],
   conversion_bottlenecks: [
-    'Ligera caída de espectadores entre los segundos 15 y 25 por explicaciones conceptuales sin apoyo de B-roll.',
-    'El CTA del 40% de los videos envía al enlace de la bio en lugar de pedir una palabra clave en comentarios, reduciendo el engagement del algoritmo.'
+    'Mención a fecha específica ("2 de junio") que desactualiza el perfil.',
+    'Oportunidad de automatizar la entrega por DM usando Meta Business Suite.'
   ],
   immediate_actions: [
     {
-      title: 'Implementar CTAs de palabra clave en el 100% de los Reels',
-      description: 'Reemplazar "ir al link de la bio" por "Comentá REEL y te lo envío por MD". Esto multiplica x3 los comentarios y dispara el alcance.',
+      title: 'Actualizar Bio a formato Evergreen (Atemporal)',
+      description: 'Reemplazar "Clase en vivo: 2 de junio" por "Acceso al Entrenamiento VIP".',
       priority: 'Alta',
       effort: 'Bajo'
     },
     {
-      title: 'Fusionar el Hook del Reel #1 con la Demostración Visual del Reel #2',
-      description: 'Utilizar el gancho de comparación "3 cosas que hacen los comercios que venden más" seguido de una demostración visual rápida del software.',
+      title: 'Activar Conector de Meta Business Suite (Auto-DM)',
+      description: 'Conectar el activador de "Comenta APP" para enviar el enlace automáticamente por mensaje directo.',
       priority: 'Alta',
       effort: 'Medio'
     },
     {
-      title: 'Ajustar muletillas en el Entrenador de Voz (Panel Izquierdo)',
-      description: 'Añadir la muletilla "Escuchá esto antes de grabar..." para consolidar la marca personal en la apertura.',
+      title: 'Exportar Guion Fusionado a Canva',
+      description: 'Generar la carátula y el sticker rosa de llamado a la acción directamente en Canva.',
       priority: 'Media',
       effort: 'Bajo'
     }

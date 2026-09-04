@@ -5,8 +5,26 @@ export interface IntelligenceBusiness {
   niche: string;
   target_audience?: string;
   brand_tone: string;
+  instagram_handle?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface IntegrationConnector {
+  id: string;
+  provider: 'meta_business' | 'chatgpt' | 'claude' | 'canva' | 'webhook_automation';
+  name: string;
+  status: 'connected' | 'disconnected' | 'pending';
+  account_name?: string;
+  settings?: Record<string, any>;
+}
+
+export interface BioAudit {
+  current_bio: string;
+  bio_score: number; // 0 - 100
+  strengths: string[];
+  weaknesses: string[]; // ej: Fuga de conversión por fecha específica ("2 de junio")
+  recommendations: string[]; // ej: Usar CTA evergreen
 }
 
 export interface BrandDNA {
@@ -20,8 +38,8 @@ export interface BrandDNA {
   voice_and_tone: {
     primary_tone: 'directo' | 'educativo' | 'humoristico' | 'inspiracional' | 'provocador';
     secondary_tone?: string;
-    favorite_catchphrases: string[]; // Muletillas o frases habituales
-    forbidden_words: string[];      // Lo que NUNCA diría la marca
+    favorite_catchphrases: string[];
+    forbidden_words: string[];
     pacing: 'rapido' | 'moderado' | 'pausado';
   };
   offers: {
@@ -74,14 +92,14 @@ export interface IntelligenceMetrics {
 export interface HookData {
   text: string;
   type: 'preguntas_negativas' | 'afirmacion_chocante' | 'error_comun' | 'secreto_revelado' | 'curiosidad';
-  curiosity_score: number; // 0 - 100
-  clarity_score: number;   // 0 - 100
+  curiosity_score: number;
+  clarity_score: number;
   auditory_strength: 'alta' | 'media' | 'baja';
   has_text_on_screen: boolean;
 }
 
 export interface TimeSegment {
-  range: string; // "0-3s", "3-15s", "15-45s", "45-60s"
+  range: string;
   content: string;
   narrative_role: 'hook' | 'problem' | 'value' | 'cta' | 'proof';
   visual_cue?: string;
@@ -94,14 +112,14 @@ export interface IntelligenceAnalysis {
   promise: string;
   topic: string;
   audience: string;
-  structure: string[]; // ["hook", "problem", "solution", "cta"]
+  structure: string[];
   language_data: {
     tone: string;
     proximity: 'cercano' | 'formal' | 'desenfadado';
     technicality: 'baja' | 'media' | 'alta';
     second_person_usage: boolean;
   };
-  emotions: string[]; // ["curiosidad", "urgencia", "deseo"]
+  emotions: string[];
   visual_analysis: {
     scene_change_frequency_sec?: number;
     has_captions: boolean;
@@ -124,22 +142,12 @@ export interface IntelligenceAnalysis {
   };
 }
 
-export interface IntelligencePattern {
-  id?: string;
-  business_id: string;
-  title: string;
-  pattern_type: 'hook' | 'structure' | 'duration' | 'language' | 'cta';
-  description: string;
-  impact_multiplier: number; // ej: 2.4 (2.4x más guardados)
-  confidence_level: 'Alta' | 'Media' | 'Baja';
-  sample_size: number;
-  evidence_posts: string[];
-}
-
 export interface BusinessAuditReport {
   id?: string;
   business_id: string;
-  health_score: number; // 0 - 100
+  health_score: number;
+  instagram_handle: string;
+  bio_audit: BioAudit;
   executive_summary: string;
   strengths: string[];
   conversion_bottlenecks: string[];
@@ -150,4 +158,24 @@ export interface BusinessAuditReport {
     effort: 'Bajo' | 'Medio' | 'Alto';
   }>;
   updated_at: string;
+}
+
+export type NodeType = 'reel' | 'synthesis' | 'meta_business' | 'chatgpt' | 'claude' | 'canva' | 'automation_action';
+
+export interface CanvasNodeData {
+  label?: string;
+  post?: IntelligencePost;
+  type?: NodeType;
+  integration?: IntegrationConnector;
+  automation?: {
+    trigger_keyword?: string; // ej: "APP" o "REEL"
+    response_message?: string; // ej: "¡Te envío el acceso por privado!"
+  };
+  synthesisResult?: {
+    hook: string;
+    structure: string;
+    cta: string;
+    full_script: string;
+    canva_template_url?: string;
+  };
 }

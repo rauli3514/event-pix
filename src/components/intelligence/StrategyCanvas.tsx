@@ -1,15 +1,16 @@
 import React, { useState, useRef } from 'react';
-import { IntelligencePost } from '../../types/intelligence';
-import { Plus, Sparkles, Layers, Zap, Eye, Bookmark, Trash2, CheckCircle2, RefreshCw, Link } from 'lucide-react';
+import { IntelligencePost, NodeType } from '../../types/intelligence';
+import { Plus, Sparkles, Layers, Zap, Eye, Bookmark, Trash2, CheckCircle2, RefreshCw, Link, Bot, FileImage, MessageSquare } from 'lucide-react';
 import { ReelSynthesisResult } from '../../services/intelligence/reelAnalyzerService';
 
 export interface CanvasNode {
   id: string;
   x: number;
   y: number;
-  type: 'reel' | 'synthesis';
+  type: NodeType;
   post?: IntelligencePost;
   synthesisResult?: ReelSynthesisResult;
+  integrationName?: string;
 }
 
 export interface CanvasEdge {
@@ -22,6 +23,7 @@ interface StrategyCanvasProps {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
   onAddNodeFromUrl: (url: string) => void;
+  onAddIntegrationNode: (type: NodeType, name: string) => void;
   onSynthesize: (sourceNodeIds: string[]) => void;
   onInspectNode: (post: IntelligencePost) => void;
   onDeleteNode: (nodeId: string) => void;
@@ -32,6 +34,7 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
   nodes,
   edges,
   onAddNodeFromUrl,
+  onAddIntegrationNode,
   onSynthesize,
   onInspectNode,
   onDeleteNode,
@@ -44,7 +47,6 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
   const [nodePositions, setNodePositions] = useState<{ [key: string]: { x: number; y: number } }>({});
   const canvasRef = useRef<HTMLDivElement>(null);
 
-  // Obtener posición real de un nodo
   const getNodePos = (node: CanvasNode) => {
     return nodePositions[node.id] || { x: node.x, y: node.y };
   };
@@ -97,7 +99,6 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
       onMouseUp={handleMouseUpCanvas}
       className="relative flex-1 bg-[#080C14] overflow-hidden select-none cursor-grab active:cursor-grabbing flex flex-col"
     >
-      {/* Fondo de cuadrícula de nodos (Grid dot pattern) */}
       <div
         className="absolute inset-0 opacity-20 pointer-events-none"
         style={{
@@ -106,7 +107,7 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
         }}
       />
 
-      {/* SVG Canvas Edges / Flechas de Conexión */}
+      {/* SVG Canvas Edges */}
       <svg className="absolute inset-0 w-full h-full pointer-events-none z-10">
         <defs>
           <linearGradient id="edgeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -130,12 +131,11 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
           const sPos = getNodePos(sourceNode);
           const tPos = getNodePos(targetNode);
 
-          const x1 = sPos.x + 280; // Ancho del nodo tarjeta
+          const x1 = sPos.x + 280;
           const y1 = sPos.y + 120;
           const x2 = tPos.x;
           const y2 = tPos.y + 140;
 
-          // Curva Bézier suave entre nodos
           const dx = (x2 - x1) / 2;
           const pathD = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
 
@@ -156,35 +156,51 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
         })}
       </svg>
 
-      {/* Barra de Herramientas Flotante Superior (Toolbar) */}
+      {/* Toolbar Flotante Superior */}
       <div className="absolute top-4 left-6 right-6 z-20 flex flex-wrap items-center justify-between gap-3 bg-slate-900/90 border border-slate-800 p-3 rounded-2xl shadow-2xl backdrop-blur-xl">
-        {/* Entrada de URL de Reel */}
-        <div className="flex items-center gap-2 flex-1 max-w-xl">
-          <div className="relative flex-1">
-            <input
-              type="text"
-              placeholder="Pegá el link de un Reel (ej: https://www.instagram.com/reel/...)"
-              value={inputUrl}
-              onChange={(e) => setInputUrl(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleAddUrl()}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-violet-500 transition-colors"
-            />
-          </div>
+        <div className="flex items-center gap-2 flex-1 max-w-lg">
+          <input
+            type="text"
+            placeholder="Pegá el link de un Reel (ej: instagram.com/reel/...)"
+            value={inputUrl}
+            onChange={(e) => setInputUrl(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleAddUrl()}
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-violet-500 transition-colors"
+          />
           <button
             onClick={handleAddUrl}
-            className="bg-violet-600 hover:bg-violet-500 text-white px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-lg shadow-violet-600/20 transition-all shrink-0"
+            className="bg-violet-600 hover:bg-violet-500 text-white px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-lg shrink-0 transition-all"
           >
             <Plus className="w-4 h-4" />
             Pegar Reel
           </button>
         </div>
 
-        {/* Acciones de Selección y Fusión */}
-        <div className="flex items-center gap-3">
-          <div className="text-xs text-slate-400 font-mono">
-            {selectedNodeIds.length} Reels Seleccionados
-          </div>
+        {/* Nodos de Conectores Rápidos */}
+        <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 text-[11px]">
+          <span className="text-slate-500 px-2 font-bold uppercase text-[9px]">Añadir Conector:</span>
+          <button
+            onClick={() => onAddIntegrationNode('meta_business', 'Meta Business Suite (Auto-DM)')}
+            className="bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-2.5 py-1 rounded-lg flex items-center gap-1 font-medium transition-all"
+          >
+            <MessageSquare className="w-3 h-3" /> Meta Suite
+          </button>
+          <button
+            onClick={() => onAddIntegrationNode('chatgpt', 'ChatGPT User Preferences')}
+            className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded-lg flex items-center gap-1 font-medium transition-all"
+          >
+            <Bot className="w-3 h-3" /> ChatGPT
+          </button>
+          <button
+            onClick={() => onAddIntegrationNode('canva', 'Canva Design Kit')}
+            className="bg-violet-500/10 hover:bg-violet-500/20 text-violet-300 border border-violet-500/30 px-2.5 py-1 rounded-lg flex items-center gap-1 font-medium transition-all"
+          >
+            <FileImage className="w-3 h-3" /> Canva
+          </button>
+        </div>
 
+        {/* Fusión */}
+        <div className="flex items-center gap-3">
           <button
             disabled={selectedNodeIds.length < 1 || isSynthesizing}
             onClick={() => onSynthesize(selectedNodeIds)}
@@ -202,14 +218,14 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
             ) : (
               <>
                 <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
-                FUSIONAR Y SINTETIZAR CON IA
+                FUSIONAR CON CONECTORES
               </>
             )}
           </button>
         </div>
       </div>
 
-      {/* Renderizado de Nodos en el Canvas */}
+      {/* Renderizado de Nodos */}
       <div className="relative w-full h-full z-10 pt-20 p-6">
         {nodes.map(node => {
           const pos = getNodePos(node);
@@ -228,7 +244,6 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
                     : 'border-slate-800 hover:border-slate-700'
                 }`}
               >
-                {/* Header Nodo Reel */}
                 <div className="p-3 border-b border-slate-800/80 flex items-center justify-between bg-slate-950/50 rounded-t-2xl">
                   <div className="flex items-center gap-2">
                     <button
@@ -244,15 +259,11 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
                     </span>
                   </div>
 
-                  <button
-                    onClick={() => onDeleteNode(node.id)}
-                    className="text-slate-600 hover:text-rose-400 p-1 transition-colors"
-                  >
+                  <button onClick={() => onDeleteNode(node.id)} className="text-slate-600 hover:text-rose-400 p-1">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
 
-                {/* Body Nodo Reel */}
                 <div className="p-3 space-y-2.5">
                   <div className="flex gap-3">
                     <img
@@ -272,7 +283,6 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
                     </div>
                   </div>
 
-                  {/* Badges de Métricas */}
                   {post.metrics && (
                     <div className="grid grid-cols-3 gap-1.5 text-[10px] pt-1 border-t border-slate-800/60 font-mono">
                       <div className="bg-slate-950 px-2 py-1 rounded-lg text-slate-300 text-center">
@@ -290,7 +300,6 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
                     </div>
                   )}
 
-                  {/* Acciones */}
                   <button
                     onClick={() => onInspectNode(post)}
                     className="w-full bg-slate-800/80 hover:bg-slate-800 text-slate-200 text-[11px] font-semibold py-1.5 rounded-xl border border-slate-700/80 flex items-center justify-center gap-1.5 transition-all"
@@ -303,6 +312,45 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
             );
           }
 
+          if (['meta_business', 'chatgpt', 'claude', 'canva', 'automation_action'].includes(node.type)) {
+            return (
+              <div
+                key={node.id}
+                onMouseDown={(e) => handleMouseDownNode(node.id, e)}
+                style={{ left: `${pos.x}px`, top: `${pos.y}px` }}
+                className={`absolute w-64 bg-slate-900 border rounded-2xl shadow-xl backdrop-blur-xl transition-shadow ${
+                  isSelected ? 'border-cyan-500 ring-2 ring-cyan-500/40' : 'border-slate-800'
+                }`}
+              >
+                <div className="p-3 border-b border-slate-800 flex items-center justify-between bg-slate-950 rounded-t-2xl">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-200">
+                    <button
+                      onClick={(e) => handleToggleSelectNode(node.id, e)}
+                      className={`w-4 h-4 rounded border flex items-center justify-center ${
+                        isSelected ? 'bg-cyan-600 border-cyan-500 text-white' : 'border-slate-700 bg-slate-950 text-transparent'
+                      }`}
+                    >
+                      <CheckCircle2 className="w-3 h-3" />
+                    </button>
+                    {node.type === 'meta_business' && <MessageSquare className="w-4 h-4 text-cyan-400" />}
+                    {node.type === 'chatgpt' && <Bot className="w-4 h-4 text-emerald-400" />}
+                    {node.type === 'canva' && <FileImage className="w-4 h-4 text-violet-400" />}
+                    <span className="truncate">{node.integrationName || node.type}</span>
+                  </div>
+                  <button onClick={() => onDeleteNode(node.id)} className="text-slate-600 hover:text-rose-400 p-1">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <div className="p-3 text-[11px] text-slate-400 space-y-1">
+                  <p className="text-slate-300 font-medium">Sincronizador Activo</p>
+                  <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full inline-block font-mono">
+                    Conectado con Canvas
+                  </span>
+                </div>
+              </div>
+            );
+          }
+
           if (node.type === 'synthesis' && node.synthesisResult) {
             const synth = node.synthesisResult;
             return (
@@ -310,7 +358,7 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
                 key={node.id}
                 onMouseDown={(e) => handleMouseDownNode(node.id, e)}
                 style={{ left: `${pos.x}px`, top: `${pos.y}px` }}
-                className="absolute w-96 bg-gradient-to-b from-slate-900 to-slate-950 border-2 border-cyan-500/50 rounded-3xl shadow-2xl shadow-cyan-950/50 backdrop-blur-xl z-20"
+                className="absolute w-96 bg-gradient-to-b from-slate-900 to-slate-950 border-2 border-cyan-500/50 rounded-3xl shadow-2xl backdrop-blur-xl z-20"
               >
                 <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/80 rounded-t-3xl">
                   <span className="text-xs font-bold text-cyan-300 flex items-center gap-2">
