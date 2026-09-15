@@ -10,6 +10,8 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+dist-print-server
+dev-dist
 *.local
 
 # Editor directories and files
@@ -27,5 +29,41 @@ kiosco de fotos/
 build_errors.txt
 scripts/
 
+# ---------------------------------------------------------------
+# Artefactos de build móvil (Capacitor / Android)
+# ---------------------------------------------------------------
+# Binarios compilados: se generan con build-mobile-apk.sh, no se versionan.
+*.apk
+*.aab
+*.apks
+*.idsig
+*.keystore
+*.jks
 
-# Ignorar temas locales muy pesados
+android/app/build/
+android/build/
+android/.gradle/
+android/captures/
+android/local.properties
+android/app/release/
+android/app/debug/
+android-tv-player/build/
+android-tv-player/.gradle/
+android-tv-player/local.properties
+.gradle/
+
+# ---------------------------------------------------------------
+# Caches de herramientas
+# ---------------------------------------------------------------
+.vite/
+*.tsbuildinfo
+coverage/
+.eslintcache
+
+# ---------------------------------------------------------------
+# Archivos temporales y de depuración generados en la raíz
+# ---------------------------------------------------------------
+.temp_github_runs.json
+build_log.txt
+job_log.txt
+logs.zip
