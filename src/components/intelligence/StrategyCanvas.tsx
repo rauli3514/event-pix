@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { IntelligencePost, NodeType } from '../../types/intelligence';
 import {
   Plus, Sparkles, Layers, Zap, Eye, Trash2, CheckCircle2, RefreshCw,
@@ -551,7 +552,7 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
             <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800">
               <span className="text-slate-500 block text-[10px]">Mediana de Referencia:</span>
               <p className="font-medium text-slate-200 mt-0.5">
-                {activeBenchmark ? `${activeBenchmark.median_views.toLocaleString()} vistas | ${activeBenchmark.median_saves} guardados` : 'Pendiente de sincronización'}
+                {activeBenchmark ? `${formatMetric(activeBenchmark.median_views)} vistas | ${formatMetric(activeBenchmark.median_saves)} guardados` : 'Pendiente de sincronización'}
               </p>
             </div>
           </div>
@@ -856,7 +857,7 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
                       className="bg-slate-800/80 hover:bg-slate-800 text-slate-200 text-[10px] font-semibold py-1.5 rounded-xl border border-slate-700/80 flex items-center justify-center gap-1 transition-all"
                     >
                       <Layers className="w-3 h-3 text-violet-400" />
-                      5 Capas
+                      Ver Detalle
                     </button>
                     <button
                       onClick={(e) => {
@@ -1345,47 +1346,56 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
         </div>
       </div>
 
-      {/* Floating HUD de Navegación, Zoom y Pan (posicionado en el lienzo inferior izquierdo) */}
-      <div className="canvas-hud absolute bottom-4 left-6 z-20 flex items-center gap-1.5 bg-slate-950/90 border border-slate-800/90 px-3 py-1.5 rounded-2xl shadow-2xl backdrop-blur-xl text-xs">
-        <div className="flex items-center gap-1.5 pr-2 border-r border-slate-800 text-slate-400 text-[11px]">
-          <Move className="w-3.5 h-3.5 text-slate-500" />
-          <span className="hidden sm:inline">Arrastrá lienzo</span>
-        </div>
+      {/* Floating HUD de Navegación, Zoom y Pan.
+          Portal directo a document.body: este HUD vive dentro del
+          contenedor con scroll/pan del lienzo (canvasRef) y dentro del
+          div con transform: scale() del zoom, así que position:absolute
+          o position:fixed acá adentro quedan atados a ese contenido — se
+          mueven y se pierden al arrastrar el lienzo. El portal lo saca
+          de ese árbol para que quede anclado a la ventana de verdad. */}
+      {createPortal(
+        <div className="canvas-hud fixed bottom-4 left-6 z-20 flex items-center gap-1.5 bg-slate-950/90 border border-slate-800/90 px-3 py-1.5 rounded-2xl shadow-2xl backdrop-blur-xl text-xs">
+          <div className="flex items-center gap-1.5 pr-2 border-r border-slate-800 text-slate-400 text-[11px]">
+            <Move className="w-3.5 h-3.5 text-slate-500" />
+            <span className="hidden sm:inline">Arrastrá lienzo</span>
+          </div>
 
-        <button
-          onClick={handleZoomOut}
-          disabled={zoomLevel <= 0.6}
-          className="p-1 text-slate-400 hover:text-slate-100 hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-30"
-          title="Alejar (Zoom Out)"
-        >
-          <ZoomOut className="w-3.5 h-3.5" />
-        </button>
+          <button
+            onClick={handleZoomOut}
+            disabled={zoomLevel <= 0.6}
+            className="p-1 text-slate-400 hover:text-slate-100 hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-30"
+            title="Alejar (Zoom Out)"
+          >
+            <ZoomOut className="w-3.5 h-3.5" />
+          </button>
 
-        <button
-          onClick={handleResetView}
-          className="px-2 py-0.5 bg-slate-900 hover:bg-slate-800 text-slate-200 font-mono font-bold rounded-lg border border-slate-800 text-[11px] transition-colors"
-          title="Restablecer zoom al 100% y centrar"
-        >
-          {Math.round(zoomLevel * 100)}%
-        </button>
+          <button
+            onClick={handleResetView}
+            className="px-2 py-0.5 bg-slate-900 hover:bg-slate-800 text-slate-200 font-mono font-bold rounded-lg border border-slate-800 text-[11px] transition-colors"
+            title="Restablecer zoom al 100% y centrar"
+          >
+            {Math.round(zoomLevel * 100)}%
+          </button>
 
-        <button
-          onClick={handleZoomIn}
-          disabled={zoomLevel >= 1.4}
-          className="p-1 text-slate-400 hover:text-slate-100 hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-30"
-          title="Acercar (Zoom In)"
-        >
-          <ZoomIn className="w-3.5 h-3.5" />
-        </button>
+          <button
+            onClick={handleZoomIn}
+            disabled={zoomLevel >= 1.4}
+            className="p-1 text-slate-400 hover:text-slate-100 hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-30"
+            title="Acercar (Zoom In)"
+          >
+            <ZoomIn className="w-3.5 h-3.5" />
+          </button>
 
-        <button
-          onClick={handleResetView}
-          className="p-1 text-slate-400 hover:text-violet-300 hover:bg-slate-800 rounded-lg transition-colors"
-          title="Centrar vista (100%)"
-        >
-          <Focus className="w-3.5 h-3.5" />
-        </button>
-      </div>
+          <button
+            onClick={handleResetView}
+            className="p-1 text-slate-400 hover:text-violet-300 hover:bg-slate-800 rounded-lg transition-colors"
+            title="Centrar vista (100%)"
+          >
+            <Focus className="w-3.5 h-3.5" />
+          </button>
+        </div>,
+        document.body
+      )}
       </div>
 
       <DisplayTvPreviewModal

@@ -540,11 +540,11 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
                   <div className="grid grid-cols-2 gap-2 text-left bg-slate-950 p-2.5 rounded-lg border border-slate-800 text-[10px]">
                     <div>
                       <span className="text-slate-500 block">Mediana Reproducciones:</span>
-                      <span className="font-mono font-bold text-slate-200">{benchmark.median_views.toLocaleString()}</span>
+                      <span className="font-mono font-bold text-slate-200">{formatMetric(benchmark.median_views)}</span>
                     </div>
                     <div>
                       <span className="text-slate-500 block">Mediana Guardados:</span>
-                      <span className="font-mono font-bold text-emerald-400">{benchmark.median_saves}</span>
+                      <span className="font-mono font-bold text-emerald-400">{formatMetric(benchmark.median_saves)}</span>
                     </div>
                   </div>
                 )}
