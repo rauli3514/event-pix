@@ -611,7 +611,7 @@ export const ExecutiveDecisionDashboard: React.FC<ExecutiveDecisionDashboardProp
                       </li>
                       <li className="flex items-center gap-1.5">
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                        <span><strong>Retención:</strong> {topReel.metrics?.retention_percentage ? `${topReel.metrics.retention_percentage}%` : 'Calculada por duración de video.'}</span>
+                        <span><strong>Retención:</strong> {hasValue(topReel.metrics?.retention_percentage) ? `${formatMetric(topReel.metrics?.retention_percentage)}%` : 'Calculada por duración de video.'}</span>
                       </li>
                       <li className="flex items-center gap-1.5">
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
