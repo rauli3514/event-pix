@@ -21,9 +21,9 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/s
 import { useCommerces } from '@/hooks/use-display-hub';
 import { supabase } from '@/lib/supabase';
 import { Bot, Sparkles } from 'lucide-react';
-import { AIAssistantPanel } from '@/components/display/ai/AIAssistantPanel';
 import { Capacitor } from '@capacitor/core';
 import { BluetoothProvisioningModal } from '@/components/display/BluetoothProvisioningModal';
+import { IntelligenceStorageService } from '@/services/intelligence/IntelligenceStorageService';
 
 const MENU_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: 'dashboard' },
@@ -110,6 +110,19 @@ export default function DisplayWorkspaceLayout() {
           );
         })}
         <div className="pt-4 mt-4 border-t border-border space-y-1">
+          <button
+            onClick={() => {
+              if (commerceId) {
+                IntelligenceStorageService.setActiveBusinessId(commerceId);
+              }
+              navigate('/admin/intelligence');
+              setIsMobileMenuOpen(false);
+            }}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-gradient-to-r from-violet-600/15 to-indigo-600/15 text-violet-400 hover:from-violet-600/25 hover:to-indigo-600/25 border border-violet-500/30 shadow-sm"
+          >
+            <Sparkles className="w-5 h-5 shrink-0 text-violet-400" />
+            <span className="truncate font-semibold">EventPix Intelligence (IA & Reels)</span>
+          </button>
           <button
             onClick={() => {
               if (commerceId) localStorage.removeItem(`onboarding_dismissed_${commerceId}`);

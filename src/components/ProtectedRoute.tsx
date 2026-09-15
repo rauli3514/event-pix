@@ -16,10 +16,16 @@ export const ProtectedRoute = () => {
             return;
         }
 
+        const timer = setTimeout(() => {
+            setSession((prev) => (prev === null ? false : prev));
+        }, 2500);
+
         supabase.auth.getSession().then(({ data: { session } }) => {
+            clearTimeout(timer);
             setSession(!!session);
         }).catch((error) => {
             console.error("Auth check failed:", error);
+            clearTimeout(timer);
             setSession(false);
         });
 
@@ -29,11 +35,19 @@ export const ProtectedRoute = () => {
             setSession(!!session);
         });
 
-        return () => subscription.unsubscribe();
+        return () => {
+            clearTimeout(timer);
+            subscription.unsubscribe();
+        };
     }, []);
 
     if (session === null) {
-        return null; // Loading state
+        return (
+            <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-300">
+                <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mb-3" />
+                <p className="text-xs text-slate-400">Verificando acceso...</p>
+            </div>
+        );
     }
 
     const isDisplayUser = localStorage.getItem('display_user_mode') === 'true';

@@ -88,12 +88,20 @@ const Login = () => {
                         </Button>
                     </form>
 
-                    <div className="text-center pt-8">
-                        <p className="text-sm text-slate-500">
-                            ¿No tienes cuenta?{' '}
-                            <Link to="/register" className="font-semibold text-blue-400 hover:text-blue-300 transition-colors">
-                                Solicitar acceso
+                    <div className="text-center pt-6 space-y-3">
+                        <div className="p-3 bg-violet-950/30 border border-violet-500/25 rounded-xl">
+                            <p className="text-xs text-slate-300 font-medium">
+                                ¿Querés sumar tu local a EventPix?
+                            </p>
+                            <Link 
+                                to="/register" 
+                                className="inline-block mt-1.5 text-xs font-bold text-violet-400 hover:text-violet-300 transition-colors"
+                            >
+                                ✨ Registrá tu comercio y conectá tu Instagram →
                             </Link>
+                        </div>
+                        <p className="text-xs text-slate-500">
+                            Acceso general para clientes de cartelería e inteligencia
                         </p>
                     </div>
                 </CardContent>
