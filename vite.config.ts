@@ -753,7 +753,12 @@ export default defineConfig({
         clientsClaim: true,
         skipWaiting: true,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        maximumFileSizeToCacheInBytes: 4000000,
+        // El bundle legacy (target navegadores viejos) ronda los 4 MB;
+        // el límite anterior (4.000.000 bytes) estaba pegado a ese
+        // tamaño real, así que una variación mínima entre entornos
+        // (Node 20 vs Node 24, por ejemplo) hacía que el build pasara
+        // localmente y fallara en CI. Con margen real de sobra.
+        maximumFileSizeToCacheInBytes: 8000000,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
