@@ -18,6 +18,7 @@ import { CanvasNode, CanvasEdge } from '../../components/intelligence/StrategyCa
 import { ExecutiveIntelligenceReport } from './ContentIntelligenceEngine';
 
 import { UserProfileContext } from '../../types/strategicProfile';
+import { INITIAL_BRAND_DNA } from './mockData';
 
 const LOCAL_STORAGE_KEYS = {
   BUSINESS: 'eventpix_saas_business',
@@ -224,7 +225,7 @@ export class IntelligenceStorageService {
       offers: {
         main_products: [`Servicio / Producto Estrella de ${newBiz.name}`],
         call_to_actions: ['Escribinos por WhatsApp', 'Consultá por mensaje directo'],
-        whatsapp_link: phone ? `https://wa.me/${phone.replace(/[^0-9]/g, '')}` : undefined
+        whatsapp_link: params.phone ? `https://wa.me/${params.phone.replace(/[^0-9]/g, '')}` : undefined
       },
       samples: []
     };

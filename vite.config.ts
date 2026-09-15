@@ -101,11 +101,11 @@ export default defineConfig({
                 try { fs.unlinkSync(tempFilePath); } catch {}
 
                 if (!whisperRes.ok) {
-                  const errJson = await whisperRes.json().catch(() => ({}));
+                  const errJson: any = await whisperRes.json().catch(() => ({}));
                   throw new Error(errJson?.error?.message || 'Error en la llamada a Whisper API');
                 }
 
-                const whisperData = await whisperRes.json();
+                const whisperData: any = await whisperRes.json();
                 const text = (whisperData.text || '').trim();
                 const segments = (whisperData.segments || []).map((s: any) => ({
                   range: `${Math.round(s.start)}-${Math.round(s.end)}s`,
@@ -172,7 +172,7 @@ export default defineConfig({
                     }
                   });
                   if (modelsRes.ok) {
-                    const modelsData = await modelsRes.json();
+                    const modelsData: any = await modelsRes.json();
                     if (Array.isArray(modelsData.data)) {
                       availableModels = modelsData.data.map((m: any) => m.id);
                       console.log('[Vite Claude Test] Modelos habilitados en la cuenta:', availableModels);
@@ -239,7 +239,7 @@ export default defineConfig({
                         'anthropic-version': '2023-06-01'
                       }
                     });
-                    const wsData = await wsRes.json();
+                    const wsData: any = await wsRes.json();
                     console.log(`[Vite Claude Test] Workspaces API status: ${wsRes.status}`, JSON.stringify(wsData));
                     if (wsData.data && wsData.data.length > 0) {
                       effectiveWorkspaceId = wsData.data[0].id;

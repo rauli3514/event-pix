@@ -7,20 +7,13 @@
 
 import React, { useState } from 'react';
 import {
-  Zap,
   Copy,
   Check,
   Send,
-  Sparkles,
   X,
-  Flame,
-  ArrowRight,
-  Filter,
-  Eye,
-  TrendingUp,
-  MessageSquare
+  Flame
 } from 'lucide-react';
-import { ScriptyFrameworkService, ScriptyHookFormula } from '../../../services/intelligence/ScriptyFrameworkService';
+import { ScriptyFrameworkService } from '../../../services/intelligence/ScriptyFrameworkService';
 import { toast } from 'sonner';
 
 interface HooksResourceDrawerProps {
@@ -35,7 +28,6 @@ export const HooksResourceDrawer: React.FC<HooksResourceDrawerProps> = ({
   isOpen,
   onClose,
   onApplyHookToChat,
-  businessNiche = 'Comercios y Negocios',
   businessName = 'Display Digital'
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');

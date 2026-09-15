@@ -74,10 +74,6 @@ export class ConnectionStorageService {
    * nunca se pierdan al alternar de negocio o recargar el navegador.
    */
   static loadConnections(businessId = 'biz_001'): UnifiedConnectionsState {
-    const hasAnthropicEnv = !!(import.meta as any).env?.VITE_ANTHROPIC_API_KEY;
-    const hasOpenAiEnv = !!(import.meta as any).env?.VITE_OPENAI_API_KEY;
-    const hasGeminiEnv = !!(import.meta as any).env?.VITE_GEMINI_API_KEY;
-
     // Buscar claves guardadas en almacenamiento permanente
     const discoveredOpenAiKey = this.findKeyAcrossAllStorage('openai') || (import.meta as any).env?.VITE_OPENAI_API_KEY || '';
     const discoveredClaudeKey = this.findKeyAcrossAllStorage('claude') || (import.meta as any).env?.VITE_ANTHROPIC_API_KEY || '';

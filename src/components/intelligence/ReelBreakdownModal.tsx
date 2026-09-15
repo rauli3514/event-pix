@@ -9,7 +9,7 @@ import { IntelligencePost, BrandDNA } from '../../types/intelligence';
 import {
   X, Eye, Heart, MessageSquare, Bookmark,
   Flame, Target, Layers, Zap, Sparkles, Edit3, Check,
-  Loader2, BarChart2, TrendingUp, HelpCircle, CheckCircle, ArrowRight, RefreshCw,
+  Loader2, BarChart2, TrendingUp, ArrowRight, RefreshCw,
   Copy, Video, Lightbulb
 } from 'lucide-react';
 import { ConnectionStorageService } from '../../services/intelligence/ConnectionStorageService';
@@ -697,7 +697,6 @@ export const ReelBreakdownModal: React.FC<ReelBreakdownModalProps> = ({
               {/* 4. SECCIÓN: GUIÓN COMPLETO TELEPROMPTER */}
               {(() => {
                 const cleanScript = (
-                  analysis.scripty_data?.full_spoken_script ||
                   `${analysis.hook_data?.text || 'Escuchá esto antes de invertir en cartelería para tu comercio.'}\n\nSi todavía usás carteles de lona impresos que nadie lee, estás perdiendo hasta el 80% de los clientes que pasan por tu vereda.\n\nCon una pantalla vertical dinámica cambiás los combos, las ofertas y los precios desde tu celular en 30 segundos. Mirá el impacto que genera en la vidriera.\n\n${analysis.cta_data?.text || 'Comentá "APP" acá abajo y te mandamos el catálogo con financiación para tu rubro.'}`
                 ).replace(/\[.*?\]|\(.*?\)/g, '').trim();
 
@@ -748,7 +747,7 @@ export const ReelBreakdownModal: React.FC<ReelBreakdownModalProps> = ({
                         Texto 100% Hablado (Listo para Leer a Cámara):
                       </span>
                       <div className="space-y-2 text-slate-200 text-xs leading-relaxed max-h-48 overflow-y-auto pr-1">
-                        {cleanScript.split('\n\n').filter(Boolean).map((para, pIdx) => (
+                        {cleanScript.split('\n\n').filter(Boolean).map((para: string, pIdx: number) => (
                           <p key={pIdx} className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/60">
                             {para}
                           </p>
@@ -1216,8 +1215,7 @@ export const ReelBreakdownModal: React.FC<ReelBreakdownModalProps> = ({
         onClose={() => setIsTeleprompterOpen(false)}
         title={post.title || 'Guión para Teleprompter'}
         scriptText={
-          (analysis.scripty_data?.full_spoken_script ||
-          `${analysis.hook_data?.text || 'Escuchá esto antes de invertir en cartelería para tu comercio.'}\n\nSi todavía usás carteles de lona impresos que nadie lee, estás perdiendo hasta el 80% de los clientes que pasan por tu vereda.\n\nCon una pantalla vertical dinámica cambiás los combos, las ofertas y los precios desde tu celular en 30 segundos. Mirá el impacto que genera en la vidriera.\n\n${analysis.cta_data?.text || 'Comentá "APP" acá abajo y te mandamos el catálogo con financiación para tu rubro.'}`
+          (`${analysis.hook_data?.text || 'Escuchá esto antes de invertir en cartelería para tu comercio.'}\n\nSi todavía usás carteles de lona impresos que nadie lee, estás perdiendo hasta el 80% de los clientes que pasan por tu vereda.\n\nCon una pantalla vertical dinámica cambiás los combos, las ofertas y los precios desde tu celular en 30 segundos. Mirá el impacto que genera en la vidriera.\n\n${analysis.cta_data?.text || 'Comentá "APP" acá abajo y te mandamos el catálogo con financiación para tu rubro.'}`
           ).replace(/\[.*?\]|\(.*?\)/g, '').trim()
         }
         hook={analysis.hook_data?.text}

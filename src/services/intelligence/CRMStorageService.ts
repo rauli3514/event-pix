@@ -5,8 +5,8 @@
 // ================================================================
 
 import { supabase } from '../../lib/supabase';
-import { CRMConversation, CRMAutomationRule, CRMTask, LeadStage, CRMMessage } from '../../types/crm';
-import { INITIAL_CRM_RULES } from './mockCRMData';
+import { CRMConversation, CRMAutomationRule, CRMTask, LeadStage, CRMMessage, CRMLead } from '../../types/crm';
+import { INITIAL_CRM_RULES, INITIAL_CRM_CONVERSATIONS } from './mockCRMData';
 
 const LOCAL_STORAGE_KEYS = {
   CONVERSATIONS: 'eventpix_crm_conversations',

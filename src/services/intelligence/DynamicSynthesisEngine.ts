@@ -37,14 +37,12 @@ export class DynamicSynthesisEngine {
     const topComments = toOptional(topPerformer.metrics?.comments);
 
     const secTitle = secondaryPost ? (secondaryPost.title || 'Reel Secundario') : '';
-    const secHook = secondaryPost?.analysis?.hook_data?.text || secTitle.slice(0, 50);
 
     // 3. Detección de patrones y temáticas
     const allText = posts.map(p => `${p.title} ${p.analysis?.hook_data?.text || ''} ${p.analysis?.cta_data?.text || ''}`).join(' ').toLowerCase();
 
     const isSorteoOrContest = allText.includes('sorteo') || allText.includes('premio') || allText.includes('particip') || allText.includes('ganad');
     const isCarteleriaOrDisplay = allText.includes('cartel') || allText.includes('pantalla') || allText.includes('digital') || allText.includes('local') || allText.includes('comercio') || allText.includes('vidriera');
-    const isQuestionOrCuriosity = allText.includes('sabes') || allText.includes('sabías') || allText.includes('por qué') || allText.includes('cómo');
 
     const brandCatchphrase = brandDna.voice_and_tone?.favorite_catchphrases?.[0] || 'Escuchá esto:';
     const mainProduct = catalogProducts[0]?.name || brandDna.offers?.main_products?.[0] || 'pantallas digitales de alto brillo';

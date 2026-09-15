@@ -11,6 +11,7 @@ import {
   ReelPerformanceClassification
 } from '../../types/intelligence';
 import { MetaMediaItem, MetaMediaInsights } from '../meta/MetaGraphService';
+import { toOptional } from './metricUtils';
 
 export class ContentDnaEngine {
   /**
@@ -128,21 +129,40 @@ export class ContentDnaEngine {
     const classMap = new Map(classifications.map(c => [c.reel_id, c]));
 
     // Agrupación por tipo de gancho
-    const hookGroups: Record<string, { total: number; winners: number; commercialWinners: number; totalSavesRatio: number; totalViewsRatio: number }> = {};
+    const hookGroups: Record<string, {
+      total: number; winners: number; commercialWinners: number;
+      totalSavesRatio: number; savesRatioSamples: number;
+      totalViewsRatio: number; viewsRatioSamples: number;
+    }> = {};
 
     dnaItems.forEach(item => {
       const cls = classMap.get(item.reel_id);
       if (!cls) return;
 
       if (!hookGroups[item.hook_type]) {
-        hookGroups[item.hook_type] = { total: 0, winners: 0, commercialWinners: 0, totalSavesRatio: 0, totalViewsRatio: 0 };
+        hookGroups[item.hook_type] = {
+          total: 0, winners: 0, commercialWinners: 0,
+          totalSavesRatio: 0, savesRatioSamples: 0,
+          totalViewsRatio: 0, viewsRatioSamples: 0
+        };
       }
       const g = hookGroups[item.hook_type];
       g.total += 1;
       if (cls.is_viral_reach_winner || cls.is_commercial_winner) g.winners += 1;
       if (cls.is_commercial_winner) g.commercialWinners += 1;
-      g.totalSavesRatio += cls.performance_index.saves_ratio;
-      g.totalViewsRatio += cls.performance_index.views_ratio;
+      // saves_ratio/views_ratio son MetricValue: `+=` sobre 'no_disponible'
+      // concatenaba en vez de sumar. Se excluyen del promedio (no se
+      // cuentan como 0) en vez de fabricar un ratio para el reel.
+      const savesRatio = toOptional(cls.performance_index.saves_ratio);
+      if (savesRatio !== undefined) {
+        g.totalSavesRatio += savesRatio;
+        g.savesRatioSamples += 1;
+      }
+      const viewsRatio = toOptional(cls.performance_index.views_ratio);
+      if (viewsRatio !== undefined) {
+        g.totalViewsRatio += viewsRatio;
+        g.viewsRatioSamples += 1;
+      }
     });
 
     const patterns: EmpiricalPattern[] = [];
@@ -163,8 +183,12 @@ export class ContentDnaEngine {
     Object.entries(hookGroups).forEach(([hookType, stats]) => {
       if (stats.total === 0) return;
       const winRate = stats.winners / stats.total;
-      const avgSavesRatio = Math.round((stats.totalSavesRatio / stats.total) * 100) / 100;
-      const avgViewsRatio = Math.round((stats.totalViewsRatio / stats.total) * 100) / 100;
+      const avgSavesRatio = stats.savesRatioSamples > 0
+        ? Math.round((stats.totalSavesRatio / stats.savesRatioSamples) * 100) / 100
+        : 1;
+      const avgViewsRatio = stats.viewsRatioSamples > 0
+        ? Math.round((stats.totalViewsRatio / stats.viewsRatioSamples) * 100) / 100
+        : 1;
 
       // Nivel de confianza empírico según tamaño de muestra
       let confidence: 'alta' | 'media' | 'baja' = 'baja';
@@ -231,7 +255,9 @@ export class ContentDnaEngine {
 
     // Si la muestra es pequeña (< 2 por grupo), asegurar al menos una hipótesis de arranque basada en la mejor publicación
     if (hypotheses.length === 0 && classifications.length > 0) {
-      const topReelCls = [...classifications].sort((a, b) => b.performance_index.saves_ratio - a.performance_index.saves_ratio)[0];
+      const topReelCls = [...classifications].sort((a, b) =>
+        (toOptional(b.performance_index.saves_ratio) ?? 0) - (toOptional(a.performance_index.saves_ratio) ?? 0)
+      )[0];
       const topDna = dnaItems.find(d => d.reel_id === topReelCls.reel_id);
 
       hypotheses.push({

@@ -10,12 +10,13 @@ import {
   Clock, ShieldAlert, Check,
   Search, ArrowRight, AlertTriangle,
   X, Instagram, PhoneCall, Zap, Plus, Edit2,
-  Trash2, Play, CheckCircle2, DollarSign, Flame, Activity, ShieldCheck, RotateCcw
+  Trash2, Play, DollarSign, Flame, Activity, ShieldCheck, RotateCcw
 } from 'lucide-react';
 import {
   CRMConversation,
   CRMAutomationRule,
   CRMTask,
+  CRMMessage,
   LeadStage,
   CRMChannel,
   CommercialOpportunity,
@@ -162,7 +163,7 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
     return {
       reply: generated.suggestedReply,
       reasoning: generated.reasoning,
-      intent: generated.intent,
+      intent: generated.detectedIntent,
       providerUsed: 'Motor Determinístico'
     };
   }, [activeConversation, lastLeadMessage, connections.shopDePlumas, brandDna, liveAIResult]);
@@ -344,7 +345,7 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
             ).catch(console.error);
           }
         } else if (execRes.suggestedText) {
-          setActiveAIReplyText(execRes.suggestedText);
+          setMessageInput(execRes.suggestedText);
           toast.info(`⚡ Regla "${match.rule.name}": Sugerencia comercial preparada.`);
         }
 
@@ -421,23 +422,6 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
     }
   };
 
-  // Aplicar sugerencia de la IA (Control Humano) con precios reales de Shop de Plumas
-  const handleApproveAISuggestion = () => {
-    if (!activeConversation || !lastLeadMessage) return;
-    const catalogProducts = connections.shopDePlumas.status === 'connected'
-      ? connections.shopDePlumas.syncedProducts
-      : [];
-    const fallbackText = lastLeadMessage.ai_metadata?.suggested_reply ||
-      CRMIntelligenceEngine.generateAISuggestion(
-        lastLeadMessage.content,
-        activeConversation.lead,
-        brandDna,
-        catalogProducts
-      ).suggestedReply;
-    const text = isEditingSuggestion ? customSuggestionText : fallbackText;
-    handleSendMessage(text);
-  };
-
   // Toggle de tarea de seguimiento
   const handleToggleTask = async (taskId: string) => {
     const updated = await CRMStorageService.toggleTaskCompleted(taskId);
@@ -498,7 +482,7 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
       if (result.autoMessageSent) {
         toast.success(`⚡ ¡Regla probada! Auto-mensaje enviado a "${activeConversation.lead.name}".`);
       } else if (result.suggestedText) {
-        setActiveAIReplyText(result.suggestedText);
+        setMessageInput(result.suggestedText);
         toast.info(`💡 Sugerencia generada por "${rule.name}" y lista en el chat.`);
       }
 
