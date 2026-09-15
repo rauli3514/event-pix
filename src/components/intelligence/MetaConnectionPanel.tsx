@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Instagram, Link2, CheckCircle2, AlertCircle, Loader2, RefreshCw,
-  Eye, Heart, MessageCircle, Bookmark, Share2, Play, TrendingUp,
-  Plus, ChevronDown, ChevronUp, ExternalLink, Settings, Trash2, Zap, Users,
-  GripVertical, AlertTriangle, ArrowRight, Link
+  Instagram, CheckCircle2, AlertCircle, Loader2,
+  Eye, Heart, MessageCircle, Play, TrendingUp,
+  Plus, ExternalLink, Settings, Trash2, Zap, Users,
+  GripVertical, AlertTriangle, ArrowRight
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -50,7 +50,6 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ onAddR
   const [profile, setProfile] = useState<MetaProfileInsights | null>(null);
   const [reels, setReels] = useState<Array<MetaMediaItem & { insights?: MetaMediaInsights }>>([]);
   const [connectedTab, setConnectedTab] = useState<ConnectedTab>('reels');
-  const [showManualForm, setShowManualForm] = useState(true);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [directReelUrl, setDirectReelUrl] = useState('');
   const [isImportingDirect, setIsImportingDirect] = useState(false);
@@ -532,6 +531,12 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ onAddR
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
+      {warningMsg && (
+        <div className="mx-4 mt-3 flex items-start gap-2 text-[11px] text-amber-300 bg-amber-950/30 border border-amber-500/30 rounded-xl px-3 py-2">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+          <span>{warningMsg}</span>
+        </div>
+      )}
       {/* Profile Header */}
       <div className="px-4 pt-3 pb-2 space-y-2 shrink-0 bg-slate-900/40 border-b border-slate-800/60">
         <div className="flex items-center gap-3">
@@ -576,6 +581,18 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ onAddR
               {reels.length}
             </p>
             <p className="text-slate-500 text-[9px]">Reels Sincronizados</p>
+          </div>
+          <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-2 text-center">
+            <p className="font-black text-slate-100 font-mono">
+              {reelsWithReach.length > 0 ? `${avgEngagement.toFixed(1)}%` : 'Sin dato'}
+            </p>
+            <p className="text-slate-500 text-[9px]">Engagement Promedio</p>
+          </div>
+          <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-2 text-center">
+            <p className="font-black text-slate-100 font-mono">
+              {totalPlays > 0 ? formatNumber(totalPlays) : 'Sin dato'}
+            </p>
+            <p className="text-slate-500 text-[9px]">Reproducciones Totales</p>
           </div>
         </div>
 
