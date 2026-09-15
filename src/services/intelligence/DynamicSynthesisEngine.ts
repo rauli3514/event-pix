@@ -8,6 +8,7 @@
 
 import { IntelligencePost, BrandDNA } from '../../types/intelligence';
 import { ReelSynthesisResult, ReelSynthesisIdea } from './reelAnalyzerService';
+import { toOptional, hasValue } from './metricUtils';
 
 export class DynamicSynthesisEngine {
   static synthesize(
@@ -21,8 +22,8 @@ export class DynamicSynthesisEngine {
 
     // 1. Identificar el Reel de Mayor Engagement / Viralidad y el de Oferta Comercial
     const sortedByEngagement = [...posts].sort((a, b) => {
-      const engA = (a.metrics?.likes || 0) * 2 + (a.metrics?.comments || 0) * 4;
-      const engB = (b.metrics?.likes || 0) * 2 + (b.metrics?.comments || 0) * 4;
+      const engA = (toOptional(a.metrics?.likes) ?? 0) * 2 + (toOptional(a.metrics?.comments) ?? 0) * 4;
+      const engB = (toOptional(b.metrics?.likes) ?? 0) * 2 + (toOptional(b.metrics?.comments) ?? 0) * 4;
       return engB - engA;
     });
 
@@ -32,8 +33,8 @@ export class DynamicSynthesisEngine {
     // 2. Extraer ganchos, títulos y temas de cada post
     const topTitle = topPerformer.title || 'Reel Destacado';
     const topHook = topPerformer.analysis?.hook_data?.text || topTitle.slice(0, 50);
-    const topLikes = topPerformer.metrics?.likes || 0;
-    const topComments = topPerformer.metrics?.comments || 0;
+    const topLikes = toOptional(topPerformer.metrics?.likes);
+    const topComments = toOptional(topPerformer.metrics?.comments);
 
     const secTitle = secondaryPost ? (secondaryPost.title || 'Reel Secundario') : '';
     const secHook = secondaryPost?.analysis?.hook_data?.text || secTitle.slice(0, 50);
@@ -61,15 +62,25 @@ export class DynamicSynthesisEngine {
       // CASO COMBINADO: Sorteo de Alta Participación (ej. Shop de Plumas) + Cartelería Digital
       synthesizedTitle = `Estrategia Híbrida: Dinámica de Sorteo Viral aplicada a Pantallas Comerciales`;
       hook = `¿Sabés qué pasa cuando combinás un sorteo que explota en comentarios con una pantalla en la vidriera de tu local?`;
-      
-      teleprompterScript = `¿Sabés qué pasa cuando combinás un sorteo que explota en comentarios con una pantalla en la vidriera de tu local?\n\nMirá este caso: un solo posteo con dinámica de sorteo y menciones logró más de novecientos likes y mil seiscientos comentarios de clientes reales.\n\nAhora imaginate tener esa misma interacción pero en vivo en tu comercio. En vez de un cartel de papel que nadie mira, ponés una pantalla vertical que muestra el sorteo en tiempo real con un código QR gigante.\n\nLa gente que pasa por la vereda frena con el celular, escanea, te sigue en Instagram y te deja su WhatsApp en el acto.\n\nComentá la palabra "SORTEO" acá abajo y te mostramos cómo armar esta campaña llave en mano con nuestras pantallas digitales para tu negocio.`;
 
-      fullScript = `[HOOK (0-3s)]\n(Corte rápido a pantalla vertical con interacción)\n"${hook}"\n\n[ANÁLISIS DEL CASO VIRAL (3-15s)]\nUn solo Reel con concurso logró ${topLikes > 0 ? topLikes : '900+'} likes y ${topComments > 0 ? topComments : '1.600+'} comentarios. La clave es el incentivo inmediato.\n\n[FUSIÓN CON PANTALLAS DIGITALES (15-30s)]\nLlevá esa misma interacción a la vereda de tu local con ${mainProduct}. El QR gigante en pantalla captura el contacto del cliente antes de que siga caminando.\n\n[LLAMADO A LA ACCIÓN (30-42s)]\nComentá "SORTEO" y te enviamos la propuesta y equipamiento para tu rubro.`;
+      // El caso viral solo se cuantifica con las métricas reales del Reel
+      // fuente; sin datos, la frase queda cualitativa en vez de inventar
+      // una cifra de likes/comentarios que suene creíble.
+      const caseStatsPhrase = hasValue(topLikes) && hasValue(topComments)
+        ? `logró ${topLikes} likes y ${topComments} comentarios de clientes reales`
+        : `generó una ola real de likes y comentarios de clientes`;
+      const caseStatsPhraseShort = hasValue(topLikes) && hasValue(topComments)
+        ? `${topLikes} likes y ${topComments} comentarios`
+        : 'una ola de comentarios';
+
+      teleprompterScript = `¿Sabés qué pasa cuando combinás un sorteo que explota en comentarios con una pantalla en la vidriera de tu local?\n\nMirá este caso: un solo posteo con dinámica de sorteo y menciones ${caseStatsPhrase}.\n\nAhora imaginate tener esa misma interacción pero en vivo en tu comercio. En vez de un cartel de papel que nadie mira, ponés una pantalla vertical que muestra el sorteo en tiempo real con un código QR gigante.\n\nLa gente que pasa por la vereda frena con el celular, escanea, te sigue en Instagram y te deja su WhatsApp en el acto.\n\nComentá la palabra "SORTEO" acá abajo y te mostramos cómo armar esta campaña llave en mano con nuestras pantallas digitales para tu negocio.`;
+
+      fullScript = `[HOOK (0-3s)]\n(Corte rápido a pantalla vertical con interacción)\n"${hook}"\n\n[ANÁLISIS DEL CASO VIRAL (3-15s)]\nUn solo Reel con concurso ${caseStatsPhrase}. La clave es el incentivo inmediato.\n\n[FUSIÓN CON PANTALLAS DIGITALES (15-30s)]\nLlevá esa misma interacción a la vereda de tu local con ${mainProduct}. El QR gigante en pantalla captura el contacto del cliente antes de que siga caminando.\n\n[LLAMADO A LA ACCIÓN (30-42s)]\nComentá "SORTEO" y te enviamos la propuesta y equipamiento para tu rubro.`;
 
       alternativeHooks = [
         {
           type: 'Curiosidad / Caso Real',
-          text: `El truco de 1.600 comentarios que usan los comercios que más venden y cómo ponerlo en tu vidriera.`
+          text: `El truco de ${caseStatsPhraseShort} que usan los comercios que más venden y cómo ponerlo en tu vidriera.`
         },
         {
           type: 'Dolor / Costo de Oportunidad',

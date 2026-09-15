@@ -7,6 +7,7 @@ import { MetaAdsAuditPanel } from './MetaAdsAuditPanel';
 import { MetaAdsIntelligenceEngine } from '../../services/intelligence/MetaAdsIntelligenceEngine';
 import { MetaAdCampaign } from '../../types/ads';
 import { MetaMediaItem, MetaMediaInsights } from '../../services/meta/MetaGraphService';
+import { toOptional, hasValue, averageAvailable } from '../../services/intelligence/metricUtils';
 
 import { UnifiedConnectionsState } from '../../types/connections';
 
@@ -45,12 +46,18 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
     if (!posts || posts.length === 0) {
       return { myAvgViews: 0, myAvgLikes: 0, myAvgComments: 0, myEngagementRate: 0 };
     }
-    const validViews = posts.map(p => p.metrics?.views || 0).filter(v => v > 0);
-    const avgViews = validViews.length > 0 ? Math.round(validViews.reduce((a, b) => a + b, 0) / validViews.length) : 0;
-    const avgLikes = Math.round(posts.reduce((s, p) => s + (p.metrics?.likes || 0), 0) / posts.length);
-    const avgComments = Math.round(posts.reduce((s, p) => s + (p.metrics?.comments || 0), 0) / posts.length);
-    const totalInteractions = posts.reduce((s, p) => s + (p.metrics?.likes || 0) + (p.metrics?.comments || 0), 0);
-    const totalReach = posts.reduce((s, p) => s + (p.metrics?.reach || p.metrics?.views || 0), 0);
+    // MetricValue puede ser 'no_disponible': sumar/promediar con `|| 0`
+    // sobre un string concatenaba en vez de sumar. toOptional + promedios
+    // sobre valores disponibles evita ese bug y no diluye el promedio
+    // con posts que simplemente no reportaron la métrica.
+    const viewsAvg = averageAvailable(posts.map(p => toOptional(p.metrics?.views)));
+    const likesAvg = averageAvailable(posts.map(p => toOptional(p.metrics?.likes)));
+    const commentsAvg = averageAvailable(posts.map(p => toOptional(p.metrics?.comments)));
+    const avgViews = hasValue(viewsAvg) ? Math.round(viewsAvg) : 0;
+    const avgLikes = hasValue(likesAvg) ? Math.round(likesAvg) : 0;
+    const avgComments = hasValue(commentsAvg) ? Math.round(commentsAvg) : 0;
+    const totalInteractions = posts.reduce((s, p) => s + (toOptional(p.metrics?.likes) ?? 0) + (toOptional(p.metrics?.comments) ?? 0), 0);
+    const totalReach = posts.reduce((s, p) => s + (toOptional(p.metrics?.reach) ?? toOptional(p.metrics?.views) ?? 0), 0);
     const engRate = totalReach > 0 ? Math.round((totalInteractions / totalReach) * 1000) / 10 : 0;
     return { myAvgViews: avgViews, myAvgLikes: avgLikes, myAvgComments: avgComments, myEngagementRate: engRate };
   }, [posts]);

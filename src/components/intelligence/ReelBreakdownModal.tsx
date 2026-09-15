@@ -16,6 +16,8 @@ import { ConnectionStorageService } from '../../services/intelligence/Connection
 import { AIProviderService } from '../../services/intelligence/AIProviderService';
 import { ScriptyFrameworkService } from '../../services/intelligence/ScriptyFrameworkService';
 import { TeleprompterModal } from './TeleprompterModal';
+import { NO_DATA } from '../../types/intelligence';
+import { rate, hasValue, formatMetric } from '../../services/intelligence/metricUtils';
 import { toast } from 'sonner';
 
 interface ReelBreakdownModalProps {
@@ -63,12 +65,15 @@ export const ReelBreakdownModal: React.FC<ReelBreakdownModalProps> = ({
       }
 
       if (post.metrics) {
-        setCustomViews(post.metrics.views || 150);
-        setCustomLikes(post.metrics.likes || 4);
-        setCustomComments(post.metrics.comments || 2);
-        setCustomSaves(post.metrics.saves || 2);
-        setCustomShares(post.metrics.shares || 1);
-        setCustomRetention(post.metrics.retention_percentage || 34);
+        // Solo precarga el formulario manual con datos reales; sin dato,
+        // deja el placeholder del input en vez de fabricar un valor de
+        // relleno (150 vistas, 4 likes, etc.) que parecería real.
+        if (hasValue(post.metrics.views)) setCustomViews(post.metrics.views);
+        if (hasValue(post.metrics.likes)) setCustomLikes(post.metrics.likes);
+        if (hasValue(post.metrics.comments)) setCustomComments(post.metrics.comments);
+        if (hasValue(post.metrics.saves)) setCustomSaves(post.metrics.saves);
+        if (hasValue(post.metrics.shares)) setCustomShares(post.metrics.shares);
+        if (hasValue(post.metrics.retention_percentage)) setCustomRetention(post.metrics.retention_percentage);
       }
     }
   }, [post]);
@@ -193,6 +198,9 @@ export const ReelBreakdownModal: React.FC<ReelBreakdownModalProps> = ({
   // Aplicar gancho Scripty directamente al post
   const handleApplyScriptyHook = (hookText: string) => {
     if (!post || !post.analysis) return;
+    // El score depende de la fórmula que efectivamente calza con el texto
+    // del gancho aplicado, no un valor fijo idéntico para cualquier hook.
+    const { score: curiosityScore } = ScriptyFrameworkService.classifyHook(hookText);
     const updatedPost: IntelligencePost = {
       ...post,
       analysis: {
@@ -200,7 +208,7 @@ export const ReelBreakdownModal: React.FC<ReelBreakdownModalProps> = ({
         hook_data: {
           ...post.analysis.hook_data,
           text: hookText,
-          curiosity_score: 95
+          curiosity_score: curiosityScore
         },
         time_segments: post.analysis.time_segments.map(seg =>
           seg.range.includes('0-3') || seg.narrative_role === 'hook'
@@ -252,16 +260,17 @@ export const ReelBreakdownModal: React.FC<ReelBreakdownModalProps> = ({
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'No se pudieron extraer métricas');
 
-      const likes = typeof data.likes === 'number' ? data.likes : 4;
-      const comments = typeof data.commentsCount === 'number' ? data.commentsCount : 2;
-      const views = Math.max(likes * 35, 140);
-      const reach = Math.round(views * 0.85);
-      const saves = Math.max(1, Math.round(likes * 0.4));
-      const shares = Math.max(1, Math.round(comments * 0.5));
-      const like_rate = Number(((likes / views) * 100).toFixed(1));
-      const comment_rate = Number(((comments / views) * 100).toFixed(1));
-      const save_rate = Number(((saves / views) * 100).toFixed(1));
-      const share_rate = Number(((shares / views) * 100).toFixed(1));
+      // El scraper público solo expone likes y comentarios visibles en la
+      // página del Reel. Views, reach, saves, shares y retención son
+      // insights privados de Instagram que no están en ese HTML: no se
+      // derivan de likes, quedan NO_DATA hasta conectar Meta Graph API o
+      // cargarlos a mano.
+      const likes = typeof data.likes === 'number' ? data.likes : NO_DATA;
+      const comments = typeof data.commentsCount === 'number' ? data.commentsCount : NO_DATA;
+      const views = NO_DATA;
+      const reach = NO_DATA;
+      const saves = NO_DATA;
+      const shares = NO_DATA;
 
       const updatedPost: IntelligencePost = {
         ...post,
@@ -274,22 +283,23 @@ export const ReelBreakdownModal: React.FC<ReelBreakdownModalProps> = ({
           comments,
           saves,
           shares,
-          like_rate,
-          comment_rate,
-          save_rate,
-          share_rate,
-          retention_percentage: post.metrics?.retention_percentage || 34
+          like_rate: rate(likes, views),
+          comment_rate: rate(comments, views),
+          save_rate: rate(saves, views),
+          share_rate: rate(shares, views),
+          retention_percentage: post.metrics?.retention_percentage ?? NO_DATA,
+          source: 'instagram_scrape',
+          synced_at: new Date().toISOString()
         }
       };
 
-      setCustomViews(views);
-      setCustomLikes(likes);
-      setCustomComments(comments);
-      setCustomSaves(saves);
-      setCustomShares(shares);
+      if (typeof likes === 'number') setCustomLikes(likes);
+      if (typeof comments === 'number') setCustomComments(comments);
 
       onUpdatePost?.(updatedPost);
-      toast.success(`¡Métricas Reales Sincronizadas! (${likes} Likes, ${comments} Comentarios)`, { id: toastId });
+      const likesLabel = typeof likes === 'number' ? `${likes} Likes` : 'Likes sin dato';
+      const commentsLabel = typeof comments === 'number' ? `${comments} Comentarios` : 'Comentarios sin dato';
+      toast.success(`Likes/comentarios sincronizados (${likesLabel}, ${commentsLabel}). Views, reach, saves y shares no están disponibles por scraping público.`, { id: toastId });
     } catch (err: any) {
       console.error(err);
       toast.error('Error al sincronizar: ' + (err.message || 'desconocido'), { id: toastId });
@@ -318,7 +328,10 @@ export const ReelBreakdownModal: React.FC<ReelBreakdownModalProps> = ({
       metrics: {
         ...post.metrics,
         views,
-        reach: Math.round(views * 0.88),
+        // El formulario no tiene un campo para reach: no hay dato manual
+        // que cargar, así que se conserva lo que ya hubiera (por ejemplo
+        // de Meta Graph API) en vez de estimarlo a partir de views.
+        reach: post.metrics.reach,
         likes,
         comments,
         saves,
@@ -327,7 +340,9 @@ export const ReelBreakdownModal: React.FC<ReelBreakdownModalProps> = ({
         comment_rate,
         save_rate,
         share_rate,
-        retention_percentage: retention
+        retention_percentage: retention,
+        source: 'manual',
+        synced_at: new Date().toISOString()
       }
     };
 
@@ -1013,48 +1028,54 @@ export const ReelBreakdownModal: React.FC<ReelBreakdownModalProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                   {(() => {
-                    const retention = metrics?.retention_percentage ?? 30;
-                    const saveRate = metrics?.save_rate ?? 2.0;
-                    const commentRate = metrics?.comment_rate ?? 0.5;
+                    const retention = metrics?.retention_percentage;
+                    const saveRate = metrics?.save_rate;
+                    const commentRate = metrics?.comment_rate;
 
                     return (
                       <>
                         <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
                           <span className="text-slate-400 text-[11px] block">Retención Promedio:</span>
                           <div className="flex items-baseline gap-2">
-                            <span className="text-base font-bold text-cyan-400 font-mono">{retention}%</span>
-                            <span className="text-[10px] text-slate-500">vs 25% media</span>
+                            <span className="text-base font-bold text-cyan-400 font-mono">{formatMetric(retention, { suffix: '%' })}</span>
+                            {hasValue(retention) && <span className="text-[10px] text-slate-500">vs 25% media</span>}
                           </div>
                           <p className="text-[10px] text-slate-400 pt-1">
-                            {retention >= 30
-                              ? '🟢 Gancho sobresaliente: Retiene más allá de los primeros 14 segundos.'
-                              : '🟡 Fuga temprana: El gancho inicial necesita mayor curiosidad en los primeros 1.5s.'}
+                            {!hasValue(retention)
+                              ? '⚪ Sin dato: Instagram no reportó retención para este Reel (requiere Meta Graph API).'
+                              : retention >= 30
+                                ? '🟢 Gancho sobresaliente: Retiene más allá de los primeros 14 segundos.'
+                                : '🟡 Fuga temprana: El gancho inicial necesita mayor curiosidad en los primeros 1.5s.'}
                           </p>
                         </div>
 
                         <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
                           <span className="text-slate-400 text-[11px] block">Tasa de Guardados (Virilidad):</span>
                           <div className="flex items-baseline gap-2">
-                            <span className="text-base font-bold text-violet-400 font-mono">{saveRate}%</span>
-                            <span className="text-[10px] text-slate-500">vs 1.8% media</span>
+                            <span className="text-base font-bold text-violet-400 font-mono">{formatMetric(saveRate, { suffix: '%' })}</span>
+                            {hasValue(saveRate) && <span className="text-[10px] text-slate-500">vs 1.8% media</span>}
                           </div>
                           <p className="text-[10px] text-slate-400 pt-1">
-                            {saveRate >= 2.5
-                              ? '🟢 Contenido de alto valor: La audiencia lo guarda para consultarlo después.'
-                              : '🟡 Contenido pasivo: El espectador no sintió urgencia de guardarlo como referencia.'}
+                            {!hasValue(saveRate)
+                              ? '⚪ Sin dato: faltan guardados o vistas reales para calcular esta tasa.'
+                              : saveRate >= 2.5
+                                ? '🟢 Contenido de alto valor: La audiencia lo guarda para consultarlo después.'
+                                : '🟡 Contenido pasivo: El espectador no sintió urgencia de guardarlo como referencia.'}
                           </p>
                         </div>
 
                         <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
                           <span className="text-slate-400 text-[11px] block">Conversión a Prospectos:</span>
                           <div className="flex items-baseline gap-2">
-                            <span className="text-base font-bold text-emerald-400 font-mono">{commentRate}%</span>
-                            <span className="text-[10px] text-slate-500">comentarios / vista</span>
+                            <span className="text-base font-bold text-emerald-400 font-mono">{formatMetric(commentRate, { suffix: '%' })}</span>
+                            {hasValue(commentRate) && <span className="text-[10px] text-slate-500">comentarios / vista</span>}
                           </div>
                           <p className="text-[10px] text-slate-400 pt-1">
-                            {commentRate >= 0.8
-                              ? '🟢 Excelente interacción comercial: Muchos comentarios pidiendo info.'
-                              : '🔴 Fuga de conversión: Falta pedir una palabra clave en comentarios (ej: "APP").'}
+                            {!hasValue(commentRate)
+                              ? '⚪ Sin dato: faltan comentarios o vistas reales para calcular esta tasa.'
+                              : commentRate >= 0.8
+                                ? '🟢 Excelente interacción comercial: Muchos comentarios pidiendo info.'
+                                : '🔴 Fuga de conversión: Falta pedir una palabra clave en comentarios (ej: "APP").'}
                           </p>
                         </div>
                       </>

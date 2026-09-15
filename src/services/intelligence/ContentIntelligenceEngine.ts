@@ -5,6 +5,7 @@
 // ================================================================
 
 import { IntelligencePost, BrandDNA } from '../../types/intelligence';
+import { toOptional, averageAvailable, hasValue } from './metricUtils';
 
 export interface ContentScoreBreakdown {
   total_score: number; // 0 - 100
@@ -113,30 +114,30 @@ export class ContentIntelligenceEngine {
       avgRetention: number;
     }
   ): ContentScoreBreakdown {
-    const m = post.metrics || {
-      views: 100,
-      reach: 100,
-      likes: 0,
-      comments: 0,
-      shares: 0,
-      saves: 0,
-      followers_gained: 0,
-      average_watch_time_seconds: 10,
-      total_watch_time_seconds: 1000,
-      profile_visits: 0,
-      like_rate: 0,
-      comment_rate: 0,
-      share_rate: 0,
-      save_rate: 0,
-      retention_percentage: 20,
-    };
+    // Métricas ausentes (MetricValue = 'no_disponible') se tratan como
+    // "sin contribución conocida" para la fórmula, nunca como un número
+    // inventado que aparente ser el dato real: por eso se normalizan acá
+    // con toOptional + ?? 0 en vez de fabricar vistas, guardados, etc.
+    const hasMetrics = !!post.metrics;
+    const views = toOptional(post.metrics?.views) ?? 0;
+    const saves = toOptional(post.metrics?.saves) ?? 0;
+    const shares = toOptional(post.metrics?.shares) ?? 0;
+    const profileVisits = toOptional(post.metrics?.profile_visits) ?? 0;
+    const comments = toOptional(post.metrics?.comments) ?? 0;
+    const likes = toOptional(post.metrics?.likes) ?? 0;
+    // Sin retención reportada, se asume el baseline conservador de la
+    // cuenta para no romper la fórmula con NaN; no se muestra como dato real.
+    const retentionVal = toOptional(post.metrics?.retention_percentage) ?? accountAverages.avgRetention;
 
     const penalties: string[] = [];
     const bonuses: string[] = [];
+    if (!hasMetrics) {
+      penalties.push('Sin métricas sincronizadas: el score usa valores neutros hasta conectar datos reales.');
+    }
 
     // 1. Ratio de Alcance (Base 20 pts)
     const reachFactor = accountAverages.avgViews > 0
-      ? Math.min(m.views / accountAverages.avgViews, 3.0)
+      ? Math.min(views / accountAverages.avgViews, 3.0)
       : 1;
     let reachScore = Math.min(Math.round(reachFactor * 50), 100);
 
@@ -144,12 +145,12 @@ export class ContentIntelligenceEngine {
     // Guardados = valor real (alguien quiere volver a verlo)
     // Compartidos = validación social (recomienda el contenido)
     const savesFactor = accountAverages.avgSaves > 0
-      ? Math.min(m.saves / accountAverages.avgSaves, 3.0)
-      : (m.saves > 10 ? 1.5 : 0.8);
+      ? Math.min(saves / accountAverages.avgSaves, 3.0)
+      : (saves > 10 ? 1.5 : 0.8);
     const sharesFactor = accountAverages.avgShares > 0
-      ? Math.min(m.shares / accountAverages.avgShares, 3.0)
-      : (m.shares > 5 ? 1.4 : 0.8);
-    
+      ? Math.min(shares / accountAverages.avgShares, 3.0)
+      : (shares > 5 ? 1.4 : 0.8);
+
     let interestScore = Math.min(
       Math.round((savesFactor * 0.65 + sharesFactor * 0.35) * 50),
       100
@@ -158,12 +159,12 @@ export class ContentIntelligenceEngine {
     // 3. Intención Comercial (Base 30 pts)
     // Visitas al perfil tras ver el Reel + Comentarios (posible consulta)
     const visitsFactor = accountAverages.avgProfileVisits > 0
-      ? Math.min(m.profile_visits / accountAverages.avgProfileVisits, 3.0)
-      : (m.profile_visits > 5 ? 1.5 : 0.8);
-    
+      ? Math.min(profileVisits / accountAverages.avgProfileVisits, 3.0)
+      : (profileVisits > 5 ? 1.5 : 0.8);
+
     const commentsFactor = accountAverages.avgComments > 0
-      ? Math.min(m.comments / accountAverages.avgComments, 3.0)
-      : (m.comments > 3 ? 1.3 : 0.7);
+      ? Math.min(comments / accountAverages.avgComments, 3.0)
+      : (comments > 3 ? 1.3 : 0.7);
 
     let commercialIntentScore = Math.min(
       Math.round((visitsFactor * 0.6 + commentsFactor * 0.4) * 50),
@@ -171,17 +172,16 @@ export class ContentIntelligenceEngine {
     );
 
     // 4. Retención de Gancho (Base 10 pts)
-    const retentionVal = m.retention_percentage || 25;
     const hookScore = Math.min(Math.round((retentionVal / 40) * 100), 100);
 
     // Bonificaciones / Penalizaciones matemáticas
-    if (m.views > accountAverages.avgViews * 2 && interestScore < 35) {
+    if (views > accountAverages.avgViews * 2 && interestScore < 35) {
       penalties.push('Viralidad hueca: alto alcance pero muy baja interacción profunda.');
     }
-    if (interestScore > 75 && m.views < accountAverages.avgViews * 0.8) {
+    if (interestScore > 75 && views < accountAverages.avgViews * 0.8) {
       bonuses.push('Joya de conversión oculta: baja difusión algorítmica pero alta apreciación de valor.');
     }
-    if (m.saves > (m.likes * 0.5) && m.likes > 5) {
+    if (saves > (likes * 0.5) && likes > 5) {
       bonuses.push('Ratio de guardados extraordinario (>50% de los likes).');
     }
     if (retentionVal < 18) {
@@ -245,24 +245,36 @@ export class ContentIntelligenceEngine {
     }
 
     // 1. Cálculos de promedios de la cuenta
-    const n = posts.length;
-    const sumViews = posts.reduce((s, p) => s + (p.metrics?.views || 0), 0);
-    const sumLikes = posts.reduce((s, p) => s + (p.metrics?.likes || 0), 0);
-    const sumComments = posts.reduce((s, p) => s + (p.metrics?.comments || 0), 0);
-    const sumSaves = posts.reduce((s, p) => s + (p.metrics?.saves || 0), 0);
-    const sumShares = posts.reduce((s, p) => s + (p.metrics?.shares || 0), 0);
-    const sumVisits = posts.reduce((s, p) => s + (p.metrics?.profile_visits || 0), 0);
-    const sumRetention = posts.reduce((s, p) => s + (p.metrics?.retention_percentage || 25), 0);
+    // averageAvailable divide solo entre los posts que efectivamente
+    // reportaron cada métrica (no entre el total), y nunca trata
+    // 'no_disponible' como 0: promediar con ceros fabricados hundía el
+    // promedio de toda la cuenta cada vez que faltaba un insight.
+    const toNum = (v: number | 'no_disponible' | undefined) => toOptional(v);
+    const avgViewsAvail = averageAvailable(posts.map(p => toNum(p.metrics?.views)));
+    const avgLikesAvail = averageAvailable(posts.map(p => toNum(p.metrics?.likes)));
+    const avgCommentsAvail = averageAvailable(posts.map(p => toNum(p.metrics?.comments)));
+    const avgSavesAvail = averageAvailable(posts.map(p => toNum(p.metrics?.saves)));
+    const avgSharesAvail = averageAvailable(posts.map(p => toNum(p.metrics?.shares)));
+    const avgVisitsAvail = averageAvailable(posts.map(p => toNum(p.metrics?.profile_visits)));
+    const avgRetentionAvail = averageAvailable(posts.map(p => toNum(p.metrics?.retention_percentage)));
 
     const accountAverages = {
-      avgViews: Math.round(sumViews / n) || 1,
-      avgLikes: Math.round(sumLikes / n) || 1,
-      avgComments: Math.round(sumComments / n) || 1,
-      avgSaves: Math.round(sumSaves / n) || 1,
-      avgShares: Math.round(sumShares / n) || 1,
-      avgProfileVisits: Math.round(sumVisits / n) || 1,
-      avgRetention: Number((sumRetention / n).toFixed(1)) || 25,
+      avgViews: (hasValue(avgViewsAvail) ? Math.round(avgViewsAvail) : 0) || 1,
+      avgLikes: (hasValue(avgLikesAvail) ? Math.round(avgLikesAvail) : 0) || 1,
+      avgComments: (hasValue(avgCommentsAvail) ? Math.round(avgCommentsAvail) : 0) || 1,
+      avgSaves: (hasValue(avgSavesAvail) ? Math.round(avgSavesAvail) : 0) || 1,
+      avgShares: (hasValue(avgSharesAvail) ? Math.round(avgSharesAvail) : 0) || 1,
+      avgProfileVisits: (hasValue(avgVisitsAvail) ? Math.round(avgVisitsAvail) : 0) || 1,
+      avgRetention: hasValue(avgRetentionAvail) ? Number(avgRetentionAvail.toFixed(1)) : 25,
     };
+
+    // Sumas reales (para las tasas de capa más abajo), tratando lo
+    // ausente como 0 solo a efectos de sumar, nunca de promediar.
+    const sumViews = posts.reduce((s, p) => s + (toNum(p.metrics?.views) ?? 0), 0);
+    const sumSaves = posts.reduce((s, p) => s + (toNum(p.metrics?.saves) ?? 0), 0);
+    const sumShares = posts.reduce((s, p) => s + (toNum(p.metrics?.shares) ?? 0), 0);
+    const sumVisits = posts.reduce((s, p) => s + (toNum(p.metrics?.profile_visits) ?? 0), 0);
+    const sumComments = posts.reduce((s, p) => s + (toNum(p.metrics?.comments) ?? 0), 0);
 
     // 2. Evaluar cada post
     const analyzedPosts: PostPerformanceAnalysis[] = posts.map(post => {
@@ -281,19 +293,21 @@ export class ContentIntelligenceEngine {
       }
 
       const evidence: string[] = [];
-      const m = post.metrics;
-      if (m) {
-        if (m.views > accountAverages.avgViews * 1.3) {
-          evidence.push(`Alcance ${Math.round((m.views / accountAverages.avgViews - 1) * 100)}% superior al promedio`);
-        } else if (m.views < accountAverages.avgViews * 0.7) {
-          evidence.push(`Alcance ${Math.round((1 - m.views / accountAverages.avgViews) * 100)}% por debajo de la media`);
+      const evViews = toOptional(post.metrics?.views);
+      const evSaves = toOptional(post.metrics?.saves);
+      const evComments = toOptional(post.metrics?.comments);
+      if (hasValue(evViews)) {
+        if (evViews > accountAverages.avgViews * 1.3) {
+          evidence.push(`Alcance ${Math.round((evViews / accountAverages.avgViews - 1) * 100)}% superior al promedio`);
+        } else if (evViews < accountAverages.avgViews * 0.7) {
+          evidence.push(`Alcance ${Math.round((1 - evViews / accountAverages.avgViews) * 100)}% por debajo de la media`);
         }
-        if (m.saves > accountAverages.avgSaves * 1.4) {
-          evidence.push(`Tasa de guardado ${((m.saves / (accountAverages.avgSaves || 1))).toFixed(1)}x sobre la media`);
-        }
-        if (m.comments > accountAverages.avgComments * 1.5) {
-          evidence.push(`Alta generación de conversación (${m.comments} comentarios)`);
-        }
+      }
+      if (hasValue(evSaves) && evSaves > accountAverages.avgSaves * 1.4) {
+        evidence.push(`Tasa de guardado ${(evSaves / (accountAverages.avgSaves || 1)).toFixed(1)}x sobre la media`);
+      }
+      if (hasValue(evComments) && evComments > accountAverages.avgComments * 1.5) {
+        evidence.push(`Alta generación de conversación (${evComments} comentarios)`);
       }
 
       return {
@@ -351,7 +365,10 @@ export class ContentIntelligenceEngine {
       });
     }
 
-    const lowSavesPosts = posts.filter(p => (p.metrics?.saves || 0) <= 2);
+    const lowSavesPosts = posts.filter(p => {
+      const s = toOptional(p.metrics?.saves);
+      return hasValue(s) && s <= 2;
+    });
     if (lowSavesPosts.length > 1) {
       what_to_stop.push({
         action: 'Evitar publicaciones puramente expositivas sin elementos de valor accionable o lista de pasos.',
@@ -363,9 +380,13 @@ export class ContentIntelligenceEngine {
     // Qué repetir
     if (top_performers.length > 0) {
       const best = top_performers[0];
+      const bestSaves = toOptional(best.post.metrics?.saves);
+      const bestShares = toOptional(best.post.metrics?.shares);
+      const savesLabel = hasValue(bestSaves) ? `${bestSaves} guardados` : 'guardados sin dato';
+      const sharesLabel = hasValue(bestShares) ? `${bestShares} compartidos` : 'compartidos sin dato';
       what_to_repeat.push({
         action: `Replicar la estructura de gancho visual directo de "${best.post.title.slice(0, 45)}..."`,
-        evidence: `Logró un score de ${best.score.total_score}/100 y concentró el mayor interés de la cuenta con ${best.post.metrics?.saves || 0} guardados y ${best.post.metrics?.shares || 0} compartidos.`,
+        evidence: `Logró un score de ${best.score.total_score}/100 y concentró el mayor interés de la cuenta con ${savesLabel} y ${sharesLabel}.`,
         expected_gain: 'Consistencia en el percentil superior del algoritmo y mayor flujo de prospectos.',
       });
     }
@@ -438,7 +459,8 @@ export class ContentIntelligenceEngine {
     const shortPosts = posts.filter(p => p.duration_seconds <= 30);
 
     if (shortPosts.length > 0) {
-      const avgViewsShort = shortPosts.reduce((s, p) => s + (p.metrics?.views || 0), 0) / shortPosts.length;
+      const shortViewsAvail = averageAvailable(shortPosts.map(p => toOptional(p.metrics?.views)));
+      const avgViewsShort = hasValue(shortViewsAvail) ? shortViewsAvail : 0;
       const pct = Math.round(((avgViewsShort - accountAverages.avgViews) / Math.max(accountAverages.avgViews, 1)) * 100);
       patterns.push({
         name: 'Formato Corto (< 30s) de Alta Dinámica',

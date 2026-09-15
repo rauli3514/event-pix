@@ -15,6 +15,7 @@ import { IntelligencePost, BrandDNA } from '../../types/intelligence';
 import { CRMConversation, CRMTask } from '../../types/crm';
 import { CRMStorageService } from '../../services/intelligence/CRMStorageService';
 import { CRMIntelligenceEngine } from '../../services/intelligence/CRMIntelligenceEngine';
+import { toOptional, formatMetric, hasValue } from '../../services/intelligence/metricUtils';
 
 interface ExecutiveDecisionDashboardProps {
   posts: IntelligencePost[];
@@ -77,10 +78,12 @@ export const ExecutiveDecisionDashboard: React.FC<ExecutiveDecisionDashboardProp
   // Cálculos dinámicos de Publicaciones
   const safePosts = Array.isArray(posts) ? posts : [];
   const postsCount = safePosts.length;
-  const totalViews = useMemo(() => safePosts.reduce((acc, p) => acc + (p?.metrics?.views || 0), 0), [safePosts]);
-  const totalLikes = useMemo(() => safePosts.reduce((acc, p) => acc + (p?.metrics?.likes || 0), 0), [safePosts]);
-  const totalComments = useMemo(() => safePosts.reduce((acc, p) => acc + (p?.metrics?.comments || 0), 0), [safePosts]);
-  const totalSaves = useMemo(() => safePosts.reduce((acc, p) => acc + (p?.metrics?.saves || 0), 0), [safePosts]);
+  // `|| 0` sobre un MetricValue 'no_disponible' (string, truthy) concatenaba
+  // en vez de sumar; toOptional lo normaliza a undefined antes del `?? 0`.
+  const totalViews = useMemo(() => safePosts.reduce((acc, p) => acc + (toOptional(p?.metrics?.views) ?? 0), 0), [safePosts]);
+  const totalLikes = useMemo(() => safePosts.reduce((acc, p) => acc + (toOptional(p?.metrics?.likes) ?? 0), 0), [safePosts]);
+  const totalComments = useMemo(() => safePosts.reduce((acc, p) => acc + (toOptional(p?.metrics?.comments) ?? 0), 0), [safePosts]);
+  const totalSaves = useMemo(() => safePosts.reduce((acc, p) => acc + (toOptional(p?.metrics?.saves) ?? 0), 0), [safePosts]);
   const totalInteractions = totalLikes + totalComments + totalSaves;
   const avgEngagement = totalViews > 0 ? ((totalInteractions / totalViews) * 100).toFixed(1) : '0.0';
 
@@ -580,19 +583,19 @@ export const ExecutiveDecisionDashboard: React.FC<ExecutiveDecisionDashboardProp
                     <div className="bg-slate-900 p-2 rounded-lg border border-slate-800">
                       <span className="text-[10px] text-slate-500 block">Vistas / Alcance</span>
                       <span className="text-xs font-bold text-slate-200">
-                        {topReel.metrics?.views || topReel.metrics?.reach || 0}
+                        {hasValue(topReel.metrics?.views) ? formatMetric(topReel.metrics?.views) : formatMetric(topReel.metrics?.reach)}
                       </span>
                     </div>
                     <div className="bg-slate-900 p-2 rounded-lg border border-slate-800">
                       <span className="text-[10px] text-slate-500 block">Guardados</span>
                       <span className="text-xs font-bold text-cyan-400">
-                        {topReel.metrics?.saves || 0}
+                        {formatMetric(topReel.metrics?.saves)}
                       </span>
                     </div>
                     <div className="bg-slate-900 p-2 rounded-lg border border-slate-800">
                       <span className="text-[10px] text-slate-500 block">Likes / Comentarios</span>
                       <span className="text-xs font-bold text-emerald-400">
-                        {topReel.metrics?.likes || 0} / {topReel.metrics?.comments || 0}
+                        {formatMetric(topReel.metrics?.likes)} / {formatMetric(topReel.metrics?.comments)}
                       </span>
                     </div>
                   </div>

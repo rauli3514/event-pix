@@ -6,6 +6,7 @@
 
 import { MetaAdCampaign, AdsIntelligenceReport, CrossChannelOpportunity } from '../../types/ads';
 import { IntelligencePost } from '../../types/intelligence';
+import { toOptional } from './metricUtils';
 
 // Campañas modelo del comercio Display Digital para benchmarking y auditoría
 export const INITIAL_DISPLAY_DIGITAL_CAMPAIGNS: MetaAdCampaign[] = [
@@ -228,9 +229,9 @@ export class MetaAdsIntelligenceEngine {
 
     // Si hay posts orgánicos, evaluamos los de mayor intención o retención
     for (const post of organicPosts) {
-      const likes = post.metrics?.likes || 0;
-      const saves = post.metrics?.saves || 0;
-      const comments = post.metrics?.comments || 0;
+      const likes = toOptional(post.metrics?.likes) ?? 0;
+      const saves = toOptional(post.metrics?.saves) ?? 0;
+      const comments = toOptional(post.metrics?.comments) ?? 0;
 
       // Reel con tracción comercial probada
       if (saves >= 2 || comments >= 1 || likes >= 3) {

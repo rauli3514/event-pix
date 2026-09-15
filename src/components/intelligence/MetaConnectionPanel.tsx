@@ -17,6 +17,7 @@ import {
 import { AccountBenchmarkService } from '../../services/intelligence/AccountBenchmarkService';
 import { IntelligenceStorageService } from '../../services/intelligence/IntelligenceStorageService';
 import { ContentDnaEngine } from '../../services/intelligence/ContentDnaEngine';
+import { hasValue } from '../../services/intelligence/metricUtils';
 
 interface MetaConnectionPanelProps {
   onAddReelToCanvas?: (reel: MetaMediaItem & { insights?: MetaMediaInsights }) => void;
@@ -241,12 +242,13 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ onAddR
         comments_count: data.commentsCount || 0,
         insights: {
           media_id: `reel_${data.shortcode || Date.now()}`,
-          impressions: data.likes ? data.likes * 10 : 0,
-          reach: data.likes ? data.likes * 8 : 0,
-          saved: 0,
-          shares: 0,
-          plays: data.likes ? data.likes * 12 : 0,
+          // El scraper público solo expone likes/comentarios visibles en la página.
+          // Reach, impressions y plays son insights privados que Instagram no
+          // publica en el HTML: no se estiman a partir de likes, quedan
+          // ausentes hasta que se conecten por Meta Graph API.
           total_interactions: (data.likes || 0) + (data.commentsCount || 0),
+          unavailable: true,
+          unavailable_reason: 'Reel importado por scraping público: Instagram no expone reach/impressions/plays fuera de Meta Graph API.',
         },
       };
 
@@ -512,13 +514,18 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ onAddR
   }
 
   // ---- Render: State Connected ----
+  // Solo promedia engagement sobre reels con reach/impressions reales:
+  // sin esa base no hay forma de calcular una tasa, y estimar el
+  // denominador a partir de likes fabricaba el dato en vez de reportar
+  // que faltaba.
+  const reelsWithReach = reels.filter((r) => hasValue(r.insights?.reach) || hasValue(r.insights?.impressions));
   const avgEngagement =
-    reels.length > 0
-      ? reels.reduce((s, r) => {
-          const total = r.insights?.total_interactions || (r.like_count || 0) + (r.comments_count || 0);
-          const reach = r.insights?.reach || r.insights?.impressions || (r.like_count ? r.like_count * 10 : 1);
+    reelsWithReach.length > 0
+      ? reelsWithReach.reduce((s, r) => {
+          const total = r.insights?.total_interactions ?? (r.like_count || 0) + (r.comments_count || 0);
+          const reach = (r.insights?.reach ?? r.insights?.impressions) as number;
           return s + (total / reach) * 100;
-        }, 0) / reels.length
+        }, 0) / reelsWithReach.length
       : 0;
 
   const totalPlays = reels.reduce((s, r) => s + (r.insights?.plays || 0), 0);
