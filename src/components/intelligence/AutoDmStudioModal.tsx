@@ -6,14 +6,12 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  X, Zap, MessageSquare, Send, Sparkles, CheckCircle2,
-  Instagram, Smartphone, ArrowRight, Bot, RefreshCw,
-  Copy, ExternalLink, ShieldCheck, Play, Flame, ShoppingBag
+  X, Zap, MessageSquare, Send,
+  Smartphone, RefreshCw, Play, Flame
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { CRMStorageService } from '../../services/intelligence/CRMStorageService';
 import { CRMAutomationRule, CRMConversation } from '../../types/crm';
-import { ConnectionStorageService } from '../../services/intelligence/ConnectionStorageService';
 
 interface AutoDmStudioModalProps {
   isOpen: boolean;
@@ -58,7 +56,6 @@ export const AutoDmStudioModal: React.FC<AutoDmStudioModalProps> = ({
   );
 
   const [directToWhatsApp, setDirectToWhatsApp] = useState(true);
-  const [whatsappPhone, setWhatsappPhone] = useState('+54 9 11 2345-6789');
 
   // Estados del Simulador de iPhone
   const [simulationState, setSimulationState] = useState<'idle' | 'commented' | 'replied' | 'dm_received' | 'chat_open'>('idle');
@@ -108,7 +105,7 @@ export const AutoDmStudioModal: React.FC<AutoDmStudioModalProps> = ({
       description: `Dispara respuesta pública y DM privado cuando comentan "${keyword}" en Instagram Reels`,
       trigger_event: 'keyword_match',
       trigger_keyword: keyword.toUpperCase(),
-      action_type: 'send_auto_message',
+      action_type: 'send_auto_reply',
       action_payload: {
         message_template: privateDmMessage,
         target_stage: 'contactado',
@@ -118,54 +115,79 @@ export const AutoDmStudioModal: React.FC<AutoDmStudioModalProps> = ({
       is_active: true
     };
 
-    // Crear un Lead real en el CRM para demostrar el funcionamiento
+    // Crear un Lead de demostración en el CRM para mostrar cómo queda el flujo activado
+    const now = Date.now();
+    const conversationId = `conv_lead_${now}`;
     const newLeadConv: CRMConversation = {
-      id: `conv_lead_${Date.now()}`,
+      id: conversationId,
       business_id: businessId,
-      channel: 'instagram',
+      lead_id: `lead_${now}`,
+      channel: 'instagram_dm',
+      unread_count: 0,
+      ai_mode: 'suggestion',
+      ai_summary: 'Solicitud de catálogo y precios por Reel',
+      ai_detected_intent: 'Solicitud de catálogo y precios por Reel',
+      ai_purchase_intent_score: 92,
+      messaging_window: {
+        is_open: true,
+        expires_at: new Date(now + 24 * 60 * 60 * 1000).toISOString(),
+        hours_remaining: 24
+      },
       lead: {
-        id: `lead_${Date.now()}`,
+        id: `lead_${now}`,
+        business_id: businessId,
         name: 'Martín Comercio (Vidrieras & Retail)',
         instagram_username: 'martin_retail_ba',
+        channel: 'instagram_dm',
         stage: 'contactado',
-        qualification_score: 92,
+        intent_score: 92,
+        intent_label: 'Alta Intención',
         primary_interest: `Pantalla Vertical Display Hub (${keyword})`,
-        created_at: new Date().toISOString()
+        source: {
+          type: 'instagram_organic',
+          keyword_triggered: keyword,
+          attribution_confidence: 'alta'
+        },
+        tags: ['Reel Viral', `Keyword: ${keyword}`, 'Auto-DM Meta', 'Display Hub'],
+        last_interaction_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       },
       messages: [
         {
-          id: `msg_1_${Date.now()}`,
-          sender: 'lead',
+          id: `msg_1_${now}`,
+          conversation_id: conversationId,
+          sender_type: 'lead',
           content: `Comentario en Reel: "${keyword}"`,
-          timestamp: new Date(Date.now() - 60000).toISOString(),
-          channel: 'instagram'
+          status: 'received',
+          message_type: 'incoming',
+          created_at: new Date(now - 60000).toISOString()
         },
         {
-          id: `msg_2_${Date.now()}`,
-          sender: 'agent',
+          id: `msg_2_${now}`,
+          conversation_id: conversationId,
+          sender_type: 'ai_auto',
           content: publicReplies[0],
-          timestamp: new Date(Date.now() - 50000).toISOString(),
-          channel: 'instagram'
+          status: 'sent',
+          message_type: 'auto_reply',
+          created_at: new Date(now - 50000).toISOString()
         },
         {
-          id: `msg_3_${Date.now()}`,
-          sender: 'agent',
+          id: `msg_3_${now}`,
+          conversation_id: conversationId,
+          sender_type: 'ai_auto',
           content: privateDmMessage,
-          timestamp: new Date().toISOString(),
-          channel: 'instagram'
+          status: 'sent',
+          message_type: 'auto_reply',
+          created_at: new Date().toISOString()
         }
       ],
-      ai_copilot: {
-        next_suggested_response: '¡Hola Martín! Para locales con vidriera a la calle recomendamos el modelo de 43" de alto brillo con soporte de pie.',
-        detected_intent: 'Solicitud de catálogo y precios por Reel',
-        sentiment: 'positive',
-        suggested_stage: 'contactado'
-      },
-      tags: ['Reel Viral', `Keyword: ${keyword}`, 'Auto-DM Meta', 'Display Hub']
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     };
 
-    const existingConvs = await CRMStorageService.loadConversations();
-    await CRMStorageService.saveConversations([newLeadConv, ...existingConvs]);
+    const existingConvs = await CRMStorageService.loadConversations(businessId);
+    await CRMStorageService.saveConversations(businessId, [newLeadConv, ...existingConvs]);
 
     const existingRules = await CRMStorageService.loadRules(businessId);
     await CRMStorageService.saveRules(businessId, [newRule, ...existingRules]);
