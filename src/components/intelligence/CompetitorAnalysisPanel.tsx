@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Users, Plus, TrendingUp, Eye, Bookmark, Zap, Heart, MessageCircle,
-  Share2, ChevronDown, ChevronUp, Instagram, X, RefreshCw, BarChart2,
-  ArrowUpRight, ArrowDownRight, Minus, Trophy, Target, Sparkles, ExternalLink,
-  Trash2, Play, AlertCircle, ShieldCheck, Link2
+  Users, Plus, Zap, Heart, MessageCircle,
+  X, RefreshCw, BarChart2,
+  Trophy, ExternalLink,
+  Trash2, Play, ShieldCheck, Link2
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -359,12 +359,24 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
             Benchmark Frente a tu Cuenta
           </h5>
           <div className="grid grid-cols-2 gap-2 text-center text-xs">
+            {myAvgViews > 0 && (
+              <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2">
+                <span className="text-[10px] text-slate-400 block">Tus Vistas Promedio</span>
+                <span className="font-mono font-black text-slate-100 text-sm">{myAvgViews}</span>
+              </div>
+            )}
             <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2">
               <span className="text-[10px] text-slate-400 block">Tus Likes Promedio</span>
               <span className="font-mono font-black text-slate-100 text-sm">{myAvgLikes}</span>
             </div>
+            {myAvgComments > 0 && (
+              <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2">
+                <span className="text-[10px] text-slate-400 block">Tus Comentarios Promedio</span>
+                <span className="font-mono font-black text-slate-100 text-sm">{myAvgComments}</span>
+              </div>
+            )}
             <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2">
-              <span className="text-[10px] text-slate-400 block">Competidores Promedio</span>
+              <span className="text-[10px] text-slate-400 block">Competidores Promedio (Likes)</span>
               <span className="font-mono font-black text-amber-400 text-sm">
                 {Math.round(
                   competitors.filter((c) => c.reels.length > 0).reduce((s, c) => s + c.avg_likes, 0) /
