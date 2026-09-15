@@ -149,6 +149,10 @@ export const ReelBreakdownModal: React.FC<ReelBreakdownModalProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           url: post.video_url,
+          // En producción (Vercel) la transcripción usa el archivo directo
+          // de Meta Graph API en vez de descargarlo con yt-dlp; solo
+          // funciona para Reels importados desde una cuenta conectada.
+          mediaUrl: post.meta_media_url,
           apiKey: connections.openai.apiKey
         })
       });

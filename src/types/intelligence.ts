@@ -60,6 +60,14 @@ export interface IntelligencePost {
   business_id: string;
   title: string;
   video_url?: string;
+  /**
+   * Link directo y descargable al archivo de video (CDN de Meta), disponible
+   * solo cuando el Reel se importó por Meta Graph API con una cuenta
+   * conectada. `video_url` es el permalink público (para abrir en
+   * Instagram); este campo es el que puede usarse para bajar los bytes
+   * reales del video, por ejemplo para transcribir con Whisper.
+   */
+  meta_media_url?: string;
   thumbnail_url?: string;
   duration_seconds: number;
   objective: 'engagement' | 'sales' | 'brand_awareness' | 'community';

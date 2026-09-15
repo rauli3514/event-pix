@@ -357,7 +357,10 @@ export const IntelligenceCanvasPage: React.FC = () => {
       business_id: business.id,
       title: cleanTitle,
       video_url: reel.permalink,
-      thumbnail_url: reel.thumbnail_url || reel.media_url,
+      // Solo presente cuando media_type es un video real (REELS/VIDEO);
+      // para imágenes reel.media_url no es un archivo de video descargable.
+      meta_media_url: reel.media_type !== 'IMAGE' ? reel.media_url : undefined,
+      thumbnail_url: reel.thumbnail_url || (reel.media_type === 'IMAGE' ? reel.media_url : undefined),
       // Meta no devuelve la duración en los campos consultados; 0 = desconocida.
       duration_seconds: 0,
       objective: 'sales',
