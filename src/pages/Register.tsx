@@ -5,15 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { toast } from "sonner";
-import { 
-  Building2, 
-  ArrowRight, 
-  Store, 
-  Instagram, 
-  PhoneCall, 
-  Sparkles, 
-  ShieldCheck, 
-  Tv,
+import {
+  ArrowRight,
+  Store,
+  Instagram,
+  PhoneCall,
+  ShieldCheck,
   CheckCircle2
 } from "lucide-react";
 import { IntelligenceStorageService } from "@/services/intelligence/IntelligenceStorageService";

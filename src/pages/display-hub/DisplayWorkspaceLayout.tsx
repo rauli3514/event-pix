@@ -23,6 +23,7 @@ import { supabase } from '@/lib/supabase';
 import { Bot, Sparkles } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { BluetoothProvisioningModal } from '@/components/display/BluetoothProvisioningModal';
+import { AIAssistantPanel } from '@/components/display/ai/AIAssistantPanel';
 import { IntelligenceStorageService } from '@/services/intelligence/IntelligenceStorageService';
 
 const MENU_ITEMS = [

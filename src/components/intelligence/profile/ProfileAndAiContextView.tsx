@@ -6,17 +6,14 @@
 // ================================================================
 
 import React, { useState, useEffect } from 'react';
-import { 
-  User, 
-  Sparkles, 
-  MessageSquare, 
-  Instagram, 
-  Check, 
-  Plus, 
-  Trash2, 
-  Save, 
-  HelpCircle,
-  ExternalLink,
+import {
+  Sparkles,
+  MessageSquare,
+  Instagram,
+  Check,
+  Plus,
+  Trash2,
+  Save,
   ShieldCheck,
   Zap,
   Tag,

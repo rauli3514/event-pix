@@ -8,16 +8,12 @@ import React, { useState } from 'react';
 import {
   X,
   Store,
-  Instagram,
   PhoneCall,
   Sparkles,
   ArrowRight,
   CheckCircle2,
   ShieldCheck,
-  Building2,
-  Lock,
-  Key,
-  HelpCircle
+  Key
 } from 'lucide-react';
 import { IntelligenceBusiness } from '../../types/intelligence';
 import { IntelligenceStorageService } from '../../services/intelligence/IntelligenceStorageService';

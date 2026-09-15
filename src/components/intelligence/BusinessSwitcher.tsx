@@ -5,15 +5,13 @@
 // ================================================================
 
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Building2, 
-  ChevronDown, 
-  Plus, 
-  Check, 
-  Instagram, 
-  Store,
-  Sparkles,
-  ExternalLink
+import {
+  Building2,
+  ChevronDown,
+  Plus,
+  Check,
+  Instagram,
+  Store
 } from 'lucide-react';
 import { IntelligenceBusiness } from '../../types/intelligence';
 import { IntelligenceStorageService } from '../../services/intelligence/IntelligenceStorageService';

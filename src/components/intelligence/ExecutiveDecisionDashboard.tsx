@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  TrendingUp, TrendingDown, AlertTriangle, CheckCircle2,
+  TrendingUp, AlertTriangle, CheckCircle2,
   Sparkles, ArrowRight, Brain, Zap, MessageSquare,
   Play, Tv, BarChart3,
   Flame, LayoutDashboard, Radio, Plus
@@ -33,7 +33,6 @@ interface ExecutiveDecisionDashboardProps {
 
 export const ExecutiveDecisionDashboard: React.FC<ExecutiveDecisionDashboardProps> = ({
   posts,
-  brandDna,
   accountHandle,
   onSwitchToCanvas,
   onOpenCrm,
@@ -210,7 +209,7 @@ export const ExecutiveDecisionDashboard: React.FC<ExecutiveDecisionDashboardProp
               <p className="text-[11px] text-slate-400 mt-1">
                 {conversations.length === 0
                   ? 'Sin mensajes aún. Conectá WhatsApp Cloud API en Conectar APIs.'
-                  : `${funnelMetrics.qualifiedLeads} prospectos calificados en seguimiento.`}
+                  : `${funnelMetrics.qualified_leads} prospectos calificados en seguimiento.`}
               </p>
             </div>
           </div>
@@ -608,7 +607,7 @@ export const ExecutiveDecisionDashboard: React.FC<ExecutiveDecisionDashboardProp
                     <ul className="space-y-1 text-slate-300">
                       <li className="flex items-center gap-1.5">
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                        <span><strong>Gancho:</strong> {topReel.analysis?.hook_analysis?.identified_hook ? `"${topReel.analysis.hook_analysis.identified_hook.slice(0, 50)}..."` : 'Gancho visual dinámico.'}</span>
+                        <span><strong>Gancho:</strong> {topReel.analysis?.hook_data?.text ? `"${topReel.analysis.hook_data.text.slice(0, 50)}..."` : 'Gancho visual dinámico.'}</span>
                       </li>
                       <li className="flex items-center gap-1.5">
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />

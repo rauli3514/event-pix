@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { IntelligencePost, NodeType } from '../../types/intelligence';
 import {
-  Plus, Sparkles, Layers, Zap, Eye, Bookmark, Trash2, CheckCircle2, RefreshCw,
+  Plus, Sparkles, Layers, Zap, Eye, Trash2, CheckCircle2, RefreshCw,
   Link, Bot, FileImage, MessageSquare, ArrowRight, Send, Tv, QrCode, Instagram,
   Link2, ZoomIn, ZoomOut, Maximize2, Minimize2,
   Move, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Focus,
@@ -15,6 +15,7 @@ import { AutoDmStudioModal } from './AutoDmStudioModal';
 import { AiChatCardNode, ChatMessage, ContentFormatMode } from './canvas/AiChatCardNode';
 import { HooksResourceDrawer } from './canvas/HooksResourceDrawer';
 import { IntelligenceStorageService } from '../../services/intelligence/IntelligenceStorageService';
+import { formatMetric } from '../../services/intelligence/metricUtils';
 import { toast } from 'sonner';
 
 export interface CanvasNode {
@@ -836,15 +837,15 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
                     <div className="grid grid-cols-3 gap-1.5 text-[10px] pt-1 border-t border-slate-800/60 font-mono">
                       <div className="bg-slate-950 px-2 py-1 rounded-lg text-slate-300 text-center" title="Vistas estimadas">
                         <Eye className="w-3 h-3 text-cyan-400 inline mr-1" />
-                        {post.metrics.views >= 1000 ? `${(post.metrics.views / 1000).toFixed(1)}k` : post.metrics.views}
+                        {formatMetric(post.metrics.views, { compact: true })}
                       </div>
                       <div className="bg-slate-950 px-2 py-1 rounded-lg text-slate-300 text-center" title="Likes reales de Instagram">
                         <Heart className="w-3 h-3 text-rose-400 inline mr-1" />
-                        {post.metrics.likes}
+                        {formatMetric(post.metrics.likes)}
                       </div>
                       <div className="bg-slate-950 px-2 py-1 rounded-lg text-slate-300 text-center" title="Comentarios reales de Instagram">
                         <MessageSquare className="w-3 h-3 text-emerald-400 inline mr-1" />
-                        {post.metrics.comments}
+                        {formatMetric(post.metrics.comments)}
                       </div>
                     </div>
                   )}

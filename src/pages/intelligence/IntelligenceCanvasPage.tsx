@@ -3,7 +3,7 @@ import {
   INITIAL_BUSINESS,
   INITIAL_BRAND_DNA
 } from '../../services/intelligence/mockData';
-import { BrandDNA, IntelligencePost, BusinessAuditReport, NodeType, NO_DATA } from '../../types/intelligence';
+import { BrandDNA, IntelligencePost, BusinessAuditReport, NodeType, NO_DATA, IntelligenceBusiness } from '../../types/intelligence';
 import { fromApi, rate } from '../../services/intelligence/metricUtils';
 import { BrandDnaPanel } from '../../components/intelligence/BrandDnaPanel';
 import { BusinessAuditPanel } from '../../components/intelligence/BusinessAuditPanel';
@@ -26,7 +26,7 @@ import { BusinessSwitcher } from '../../components/intelligence/BusinessSwitcher
 import { NewClientRegistrationModal } from '../../components/intelligence/NewClientRegistrationModal';
 import { ProfileAndAiContextView } from '../../components/intelligence/profile/ProfileAndAiContextView';
 import { ChatMessage, ContentFormatMode } from '../../components/intelligence/canvas/AiChatCardNode';
-import { Brain, Activity, Tv, Sparkles, Cloud, Loader2, MessageSquare, LayoutDashboard, Network, Radio, Trash2, Bot, Plus, User, Zap } from 'lucide-react';
+import { Brain, Activity, Tv, Sparkles, Cloud, Loader2, MessageSquare, LayoutDashboard, Network, Radio, Trash2, Bot, User, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 
 export const IntelligenceCanvasPage: React.FC = () => {
@@ -94,7 +94,9 @@ export const IntelligenceCanvasPage: React.FC = () => {
 
         if (!isMounted || !activeBiz) return;
         setBusiness(activeBiz);
-        setAccountHandle(activeBiz.instagram_handle);
+        if (activeBiz.instagram_handle) {
+          setAccountHandle(activeBiz.instagram_handle);
+        }
 
         // Cargar Brand DNA guardado
         const savedDna = await IntelligenceStorageService.loadBrandDna(activeBiz.id);
@@ -145,7 +147,9 @@ export const IntelligenceCanvasPage: React.FC = () => {
   // Cambio dinámico de Negocio / Cliente activo (Multi-Tenant)
   const handleSelectBusiness = async (newBiz: IntelligenceBusiness) => {
     setBusiness(newBiz);
-    setAccountHandle(newBiz.instagram_handle);
+    if (newBiz.instagram_handle) {
+      setAccountHandle(newBiz.instagram_handle);
+    }
     IntelligenceStorageService.setActiveBusinessId(newBiz.id);
 
     // 1. Cargar Brand DNA del nuevo negocio
@@ -427,6 +431,8 @@ export const IntelligenceCanvasPage: React.FC = () => {
         ],
         cta: nextPost.cta,
         full_script: `[HOOK (0-3s)]\n"${nextPost.hook}"\n\n[ESTRUCTURA]\n${nextPost.structure}\n\n[LLAMADO A LA ACCIÓN]\n"${nextPost.cta}"`,
+        teleprompter_clean_script: `${nextPost.hook}\n\n${nextPost.structure}\n\n${nextPost.cta}`,
+        alternative_hooks: [],
         why_it_works: nextPost.justification,
         expected_impact: 'Diseñado a partir de los patrones con mayor tasa de interés e intención comercial de tu cuenta.'
       }
