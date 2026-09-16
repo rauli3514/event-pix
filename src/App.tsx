@@ -52,8 +52,6 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/usuarios" element={<DisplayUserLogin />} />
             <Route path="/register" element={<Register />} />
-            <Route path="/intelligence" element={<ErrorBoundary><IntelligenceCanvasPage /></ErrorBoundary>} />
-            <Route path="/admin/intelligence" element={<ErrorBoundary><IntelligenceCanvasPage /></ErrorBoundary>} />
 
             <Route path="/kiosco" element={<KioskAI />} />
             <Route path="/sticker-test" element={<div className="min-h-screen bg-zinc-950 pt-10"><StickerEditor userPhotoUrl="/placeholder-user.jpg" onSave={(url) => console.log(url)} onCancel={() => console.log("cancel")} /></div>} />
@@ -64,7 +62,9 @@ const App = () => (
                 <Route path="/admin/providers" element={<ProvidersList />} />
                 <Route path="/admin/kiosco-manager" element={<KioskManager />} />
                 <Route path="/admin/display" element={<DisplayHubMain />} />
-                
+                <Route path="/intelligence" element={<ErrorBoundary><IntelligenceCanvasPage /></ErrorBoundary>} />
+                <Route path="/admin/intelligence" element={<ErrorBoundary><IntelligenceCanvasPage /></ErrorBoundary>} />
+
                 {/* Rutas del Display Workspace */}
                 <Route path="/admin/display/commerce/:commerceId/workspace" element={<DisplayWorkspaceLayout />}>
                   <Route index element={<Navigate to="screens" replace />} />

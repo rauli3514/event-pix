@@ -17,6 +17,7 @@ import { ContentIntelligenceEngine } from '../../services/intelligence/ContentIn
 import { IntelligenceStorageService } from '../../services/intelligence/IntelligenceStorageService';
 import { CRMStorageService } from '../../services/intelligence/CRMStorageService';
 import { MetaGraphService, MetaMediaItem, MetaMediaInsights } from '../../services/meta/MetaGraphService';
+import { supabase } from '../../lib/supabase';
 import { UnifiedConnectionsModal } from '../../components/intelligence/UnifiedConnectionsModal';
 import { ConnectionStorageService } from '../../services/intelligence/ConnectionStorageService';
 import { AIProviderService } from '../../services/intelligence/AIProviderService';
@@ -37,6 +38,24 @@ export const IntelligenceCanvasPage: React.FC = () => {
   const [isCrmOpen, setIsCrmOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'canvas' | 'profile' | 'dashboard'>('profile');
   const [isNewClientModalOpen, setIsNewClientModalOpen] = useState(false);
+
+  // Rol del usuario logueado: un cliente normal solo ve/gestiona su propio negocio
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !isMounted) return;
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (isMounted) setIsSuperAdmin(profile?.role === 'super_admin');
+    })();
+    return () => { isMounted = false; };
+  }, []);
 
   // Estado de Conexiones Unificadas (Shop de Plumas, Meta/WhatsApp, OpenAI, Claude)
   const [connections, setConnections] = useState<UnifiedConnectionsState>(() => {
@@ -789,6 +808,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
               currentBusiness={business}
               onSelectBusiness={handleSelectBusiness}
               onOpenNewClientModal={() => setIsNewClientModalOpen(true)}
+              readOnly={!isSuperAdmin}
             />
           </div>
         </div>

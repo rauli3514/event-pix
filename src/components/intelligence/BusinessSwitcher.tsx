@@ -20,12 +20,15 @@ interface BusinessSwitcherProps {
   currentBusiness: IntelligenceBusiness;
   onSelectBusiness: (business: IntelligenceBusiness) => void;
   onOpenNewClientModal?: () => void;
+  // Un cliente normal (no super_admin) no puede ver ni cambiar a otros negocios
+  readOnly?: boolean;
 }
 
 export const BusinessSwitcher: React.FC<BusinessSwitcherProps> = ({
   currentBusiness,
   onSelectBusiness,
-  onOpenNewClientModal
+  onOpenNewClientModal,
+  readOnly = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [businesses, setBusinesses] = useState<IntelligenceBusiness[]>([]);
@@ -57,10 +60,14 @@ export const BusinessSwitcher: React.FC<BusinessSwitcherProps> = ({
       <button
         type="button"
         onClick={() => {
+          if (readOnly) return;
           loadList();
           setIsOpen(!isOpen);
         }}
-        className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 transition-all text-left shadow-sm group"
+        title={readOnly ? 'Negocio asignado a tu cuenta' : undefined}
+        className={`flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 transition-all text-left shadow-sm group ${
+          readOnly ? 'cursor-default' : 'hover:bg-slate-850 hover:border-slate-700'
+        }`}
       >
         <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center text-white shrink-0 shadow-sm shadow-violet-600/30">
           <Store className="w-3.5 h-3.5" />
@@ -80,11 +87,13 @@ export const BusinessSwitcher: React.FC<BusinessSwitcherProps> = ({
           </span>
         </div>
 
-        <ChevronDown className={`w-3.5 h-3.5 text-slate-400 group-hover:text-slate-200 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+        {!readOnly && (
+          <ChevronDown className={`w-3.5 h-3.5 text-slate-400 group-hover:text-slate-200 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+        )}
       </button>
 
       {/* Dropdown Menu */}
-      {isOpen && (
+      {!readOnly && isOpen && (
         <div className="absolute left-0 mt-2 w-80 rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
           
           <div className="p-3 border-b border-slate-800 bg-slate-950/40 flex items-center justify-between">

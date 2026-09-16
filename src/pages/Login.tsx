@@ -25,7 +25,7 @@ const Login = () => {
             return;
         }
 
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
             email,
             password,
         });
@@ -34,9 +34,34 @@ const Login = () => {
             toast.error(error.message);
         } else {
             toast.success("Bienvenido de nuevo");
-            navigate("/admin/display");
+            navigate(await resolvePostLoginRoute(data.user?.id));
         }
         setLoading(false);
+    };
+
+    // Un super_admin va al hub de Cartelería (comportamiento actual).
+    // Un cliente de Intelligence sin ese rol va directo a su negocio.
+    const resolvePostLoginRoute = async (userId?: string): Promise<string> => {
+        if (!userId) return "/admin/display";
+
+        const { data: profile } = await supabase
+            .from("profiles")
+            .select("role")
+            .eq("id", userId)
+            .maybeSingle();
+
+        if (profile?.role === "super_admin") {
+            return "/admin/display";
+        }
+
+        const { data: membership } = await supabase
+            .from("intelligence_business_users")
+            .select("business_id")
+            .eq("user_id", userId)
+            .limit(1)
+            .maybeSingle();
+
+        return membership ? "/intelligence" : "/admin/display";
     };
 
     return (
