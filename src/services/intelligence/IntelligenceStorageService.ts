@@ -132,7 +132,8 @@ export class IntelligenceStorageService {
       brand_tone: 'directo',
       instagram_handle: '@display_digital',
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
+      catalog_provider: 'shop_de_plumas'
     };
 
     // Unir sin duplicados por ID

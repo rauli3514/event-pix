@@ -783,7 +783,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
   return (
     <div className="h-screen w-screen bg-[#080C14] text-slate-100 flex flex-col overflow-hidden font-sans select-none">
       {/* Header Superior Reorganizado y Orientado a Decisiones */}
-      <header className="h-14 border-b border-slate-800/80 bg-slate-950/80 px-4 flex items-center justify-between z-30 shrink-0 backdrop-blur-md">
+      <header className="min-h-14 border-b border-slate-800/80 bg-slate-950/80 px-4 py-2 flex flex-wrap items-center justify-between gap-y-2 z-30 shrink-0 backdrop-blur-md">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-violet-600/30">
             <Brain className="w-5 h-5" />
@@ -1086,6 +1086,8 @@ export const IntelligenceCanvasPage: React.FC = () => {
         onClose={() => setIsConnectionsOpen(false)}
         businessId={business.id}
         onConnectionsUpdated={(newConns) => setConnections(newConns)}
+        isSuperAdmin={isSuperAdmin}
+        catalogProvider={business.catalog_provider}
       />
 
       <CRMConversationalHub

@@ -22,27 +22,44 @@ interface UnifiedConnectionsModalProps {
   onClose: () => void;
   businessId?: string;
   onConnectionsUpdated?: (state: UnifiedConnectionsState) => void;
+  // La IA de OpenAI/Claude/Gemini la provee la plataforma: un cliente normal
+  // no debe ver ni tocar esas claves, solo el super_admin.
+  isSuperAdmin?: boolean;
+  // El catálogo de Shop de Plumas solo aplica al negocio que lo usa.
+  catalogProvider?: 'shop_de_plumas' | 'none';
 }
 
 export const UnifiedConnectionsModal: React.FC<UnifiedConnectionsModalProps> = ({
   isOpen,
   onClose,
   businessId = 'biz_default',
-  onConnectionsUpdated
+  onConnectionsUpdated,
+  isSuperAdmin = false,
+  catalogProvider = 'none'
 }) => {
   const [connections, setConnections] = useState<UnifiedConnectionsState>(() => {
     return ConnectionStorageService.loadConnections(businessId);
   });
 
-  // Recargar conexiones frescas cada vez que se abre el modal o cambia el comercio
+  const [activeTab, setActiveTab] = useState<'openai' | 'claude' | 'gemini' | 'whatsapp' | 'shop_plumas'>(
+    isSuperAdmin ? 'openai' : 'whatsapp'
+  );
+
+  // Recargar conexiones frescas cada vez que se abre el modal o cambia el comercio,
+  // y asegurar que un cliente normal no quede parado en una pestaña que no puede ver.
   useEffect(() => {
     if (isOpen) {
       const latest = ConnectionStorageService.loadConnections(businessId);
       setConnections(latest);
-    }
-  }, [isOpen, businessId]);
 
-  const [activeTab, setActiveTab] = useState<'openai' | 'claude' | 'gemini' | 'whatsapp' | 'shop_plumas'>('openai');
+      const aiOnlyTab = activeTab === 'openai' || activeTab === 'claude' || activeTab === 'gemini';
+      const catalogNotAllowed = activeTab === 'shop_plumas' && catalogProvider !== 'shop_de_plumas';
+      if ((!isSuperAdmin && aiOnlyTab) || catalogNotAllowed) {
+        setActiveTab('whatsapp');
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, businessId, isSuperAdmin, catalogProvider]);
   const [showKeyOpenAI, setShowKeyOpenAI] = useState(false);
   const [showKeyClaude, setShowKeyClaude] = useState(false);
   const [showKeyGemini, setShowKeyGemini] = useState(false);
@@ -348,50 +365,54 @@ export const UnifiedConnectionsModal: React.FC<UnifiedConnectionsModalProps> = (
 
         {/* Tab Selector */}
         <div className="flex border-b border-slate-800 bg-slate-950/60 p-1.5 gap-1 text-xs overflow-x-auto shrink-0">
-          <button
-            onClick={() => setActiveTab('openai')}
-            className={`px-3.5 py-2 rounded-xl flex items-center gap-2 font-semibold transition-all whitespace-nowrap ${
-              activeTab === 'openai'
-                ? 'bg-violet-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-            }`}
-          >
-            <Bot className="w-3.5 h-3.5 text-emerald-400" />
-            <span>ChatGPT (OpenAI)</span>
-            {(connections.openai.status === 'connected' || Boolean(connections.openai.apiKey && connections.openai.apiKey.length > 5)) && (
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            )}
-          </button>
+          {isSuperAdmin && (
+            <>
+              <button
+                onClick={() => setActiveTab('openai')}
+                className={`px-3.5 py-2 rounded-xl flex items-center gap-2 font-semibold transition-all whitespace-nowrap ${
+                  activeTab === 'openai'
+                    ? 'bg-violet-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
+              >
+                <Bot className="w-3.5 h-3.5 text-emerald-400" />
+                <span>ChatGPT (OpenAI)</span>
+                {(connections.openai.status === 'connected' || Boolean(connections.openai.apiKey && connections.openai.apiKey.length > 5)) && (
+                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                )}
+              </button>
 
-          <button
-            onClick={() => setActiveTab('claude')}
-            className={`px-3.5 py-2 rounded-xl flex items-center gap-2 font-semibold transition-all whitespace-nowrap ${
-              activeTab === 'claude'
-                ? 'bg-violet-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>Claude (Anthropic)</span>
-            {(connections.claude.status === 'connected' || Boolean(connections.claude.apiKey && connections.claude.apiKey.length > 5)) && (
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            )}
-          </button>
+              <button
+                onClick={() => setActiveTab('claude')}
+                className={`px-3.5 py-2 rounded-xl flex items-center gap-2 font-semibold transition-all whitespace-nowrap ${
+                  activeTab === 'claude'
+                    ? 'bg-violet-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>Claude (Anthropic)</span>
+                {(connections.claude.status === 'connected' || Boolean(connections.claude.apiKey && connections.claude.apiKey.length > 5)) && (
+                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                )}
+              </button>
 
-          <button
-            onClick={() => setActiveTab('gemini')}
-            className={`px-3.5 py-2 rounded-xl flex items-center gap-2 font-semibold transition-all whitespace-nowrap ${
-              activeTab === 'gemini'
-                ? 'bg-violet-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-            }`}
-          >
-            <Zap className="w-3.5 h-3.5 text-sky-400" />
-            <span>Google Gemini</span>
-            {(connections.gemini?.status === 'connected' || Boolean(connections.gemini?.apiKey && connections.gemini.apiKey.length > 5)) && (
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            )}
-          </button>
+              <button
+                onClick={() => setActiveTab('gemini')}
+                className={`px-3.5 py-2 rounded-xl flex items-center gap-2 font-semibold transition-all whitespace-nowrap ${
+                  activeTab === 'gemini'
+                    ? 'bg-violet-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
+              >
+                <Zap className="w-3.5 h-3.5 text-sky-400" />
+                <span>Google Gemini</span>
+                {(connections.gemini?.status === 'connected' || Boolean(connections.gemini?.apiKey && connections.gemini.apiKey.length > 5)) && (
+                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                )}
+              </button>
+            </>
+          )}
 
           <button
             onClick={() => setActiveTab('whatsapp')}
@@ -408,27 +429,29 @@ export const UnifiedConnectionsModal: React.FC<UnifiedConnectionsModalProps> = (
             )}
           </button>
 
-          <button
-            onClick={() => setActiveTab('shop_plumas')}
-            className={`px-3.5 py-2 rounded-xl flex items-center gap-2 font-semibold transition-all whitespace-nowrap ${
-              activeTab === 'shop_plumas'
-                ? 'bg-violet-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-            }`}
-          >
-            <ShoppingBag className="w-3.5 h-3.5 text-pink-400" />
-            <span>Shop de Plumas (Catálogo)</span>
-            {connections.shopDePlumas.status === 'connected' && (
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            )}
-          </button>
+          {catalogProvider === 'shop_de_plumas' && (
+            <button
+              onClick={() => setActiveTab('shop_plumas')}
+              className={`px-3.5 py-2 rounded-xl flex items-center gap-2 font-semibold transition-all whitespace-nowrap ${
+                activeTab === 'shop_plumas'
+                  ? 'bg-violet-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+              }`}
+            >
+              <ShoppingBag className="w-3.5 h-3.5 text-pink-400" />
+              <span>Shop de Plumas (Catálogo)</span>
+              {connections.shopDePlumas.status === 'connected' && (
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              )}
+            </button>
+          )}
         </div>
 
         {/* Tab Content */}
         <div className="p-6 overflow-y-auto flex-1 space-y-5 custom-scrollbar text-xs">
           
           {/* TAB 1: OPENAI */}
-          {activeTab === 'openai' && (
+          {isSuperAdmin && activeTab === 'openai' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between p-3.5 bg-slate-950/60 border border-slate-800 rounded-2xl">
                 <div>
@@ -534,7 +557,7 @@ export const UnifiedConnectionsModal: React.FC<UnifiedConnectionsModalProps> = (
           )}
 
           {/* TAB 2: CLAUDE */}
-          {activeTab === 'claude' && (
+          {isSuperAdmin && activeTab === 'claude' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between p-3.5 bg-slate-950/60 border border-slate-800 rounded-2xl">
                 <div>
@@ -648,7 +671,7 @@ export const UnifiedConnectionsModal: React.FC<UnifiedConnectionsModalProps> = (
           )}
 
           {/* TAB: GEMINI */}
-          {activeTab === 'gemini' && (
+          {isSuperAdmin && activeTab === 'gemini' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between p-3.5 bg-slate-950/60 border border-slate-800 rounded-2xl">
                 <div>
@@ -843,7 +866,7 @@ export const UnifiedConnectionsModal: React.FC<UnifiedConnectionsModalProps> = (
           )}
 
           {/* TAB 4: SHOP DE PLUMAS */}
-          {activeTab === 'shop_plumas' && (
+          {catalogProvider === 'shop_de_plumas' && activeTab === 'shop_plumas' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between p-3.5 bg-slate-950/60 border border-slate-800 rounded-2xl">
                 <div>

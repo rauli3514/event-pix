@@ -8,6 +8,9 @@ export interface IntelligenceBusiness {
   instagram_handle?: string;
   created_at: string;
   updated_at: string;
+  // Integración de catálogo de e-commerce propia de este negocio (opcional).
+  // 'none' o ausente = el comercio no tiene catálogo conectado.
+  catalog_provider?: 'shop_de_plumas' | 'none';
 }
 
 export interface IntegrationConnector {
