@@ -35,8 +35,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
   const [brandDna, setBrandDna] = useState<BrandDNA>(INITIAL_BRAND_DNA);
   const [posts, setPosts] = useState<IntelligencePost[]>([]);
   const [syncStatus, setSyncStatus] = useState<'synced' | 'saving'>('synced');
-  const [isCrmOpen, setIsCrmOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'canvas' | 'profile' | 'dashboard'>('profile');
+  const [viewMode, setViewMode] = useState<'canvas' | 'messages' | 'profile' | 'dashboard'>('profile');
   const [isNewClientModalOpen, setIsNewClientModalOpen] = useState(false);
 
   // Rol del usuario logueado: un cliente normal solo ve/gestiona su propio negocio
@@ -830,6 +829,19 @@ export const IntelligenceCanvasPage: React.FC = () => {
 
           <button
             type="button"
+            onClick={() => setViewMode('messages')}
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
+              viewMode === 'messages'
+                ? 'bg-gradient-to-r from-emerald-600 to-teal-500 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span>Mensajes</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setViewMode('profile')}
             className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
               viewMode === 'profile'
@@ -945,16 +957,6 @@ export const IntelligenceCanvasPage: React.FC = () => {
             </button>
           )}
 
-          {/* Botón CRM & WhatsApp */}
-          <button
-            onClick={() => setIsCrmOpen(true)}
-            className="flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white px-3 py-1.5 rounded-xl font-bold text-xs shadow-lg shadow-emerald-600/30 transition-all hover:scale-105"
-            title="Abrir CRM Conversacional y Mensajería Meta/WhatsApp"
-          >
-            <MessageSquare className="w-3.5 h-3.5 text-emerald-200" />
-            <span className="hidden sm:inline">CRM & WhatsApp</span>
-          </button>
-
           {/* Botón Destacado: INFORME DE INTELIGENCIA */}
           <button
             onClick={() => setIsExecutiveReportOpen(true)}
@@ -987,13 +989,21 @@ export const IntelligenceCanvasPage: React.FC = () => {
             }
           }}
         />
+      ) : viewMode === 'messages' ? (
+        <CRMConversationalHub
+          isOpen={true}
+          onClose={() => setViewMode('canvas')}
+          brandDna={brandDna}
+          businessId={business.id}
+          variant="inline"
+        />
       ) : viewMode === 'dashboard' ? (
         <ExecutiveDecisionDashboard
           posts={posts}
           brandDna={brandDna}
           accountHandle={accountHandle}
           onSwitchToCanvas={() => setViewMode('canvas')}
-          onOpenCrm={() => setIsCrmOpen(true)}
+          onOpenCrm={() => setViewMode('messages')}
           onOpenExecutiveReport={() => setIsExecutiveReportOpen(true)}
           onInspectPost={setInspectedPost}
           onApplyRecommendationToCanvas={handleApplyRecommendationToCanvas}
@@ -1029,7 +1039,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
             isAuditOpen={isAuditOpen}
             onToggleAudit={() => setIsAuditOpen(!isAuditOpen)}
             onToggleFullScreenCanvas={handleToggleFullScreenCanvas}
-            onOpenCrm={() => setIsCrmOpen(true)}
+            onOpenCrm={() => setViewMode('messages')}
             onToggleConnectEdge={handleToggleConnectEdge}
             onDisconnectAllFromTarget={handleDisconnectAllFromTarget}
             onSendChatMessage={handleSendChatMessage}
@@ -1088,13 +1098,6 @@ export const IntelligenceCanvasPage: React.FC = () => {
         onConnectionsUpdated={(newConns) => setConnections(newConns)}
         isSuperAdmin={isSuperAdmin}
         catalogProvider={business.catalog_provider}
-      />
-
-      <CRMConversationalHub
-        isOpen={isCrmOpen}
-        onClose={() => setIsCrmOpen(false)}
-        brandDna={brandDna}
-        businessId={business.id}
       />
 
       <NewClientRegistrationModal

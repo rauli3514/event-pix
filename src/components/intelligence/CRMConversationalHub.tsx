@@ -40,6 +40,9 @@ interface CRMConversationalHubProps {
   brandDna?: BrandDNA;
   onNavigateToPost?: (postId: string) => void;
   businessId?: string;
+  // 'modal' (default): overlay flotante, como siempre.
+  // 'inline': pantalla completa igual de jerarquía que Lienzo/Perfil/Métricas.
+  variant?: 'modal' | 'inline';
 }
 
 export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
@@ -47,7 +50,8 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
   onClose,
   brandDna,
   onNavigateToPost,
-  businessId = 'biz_default'
+  businessId = 'biz_default',
+  variant = 'modal'
 }) => {
   const [conversations, setConversations] = useState<CRMConversation[]>([]);
   const [rules, setRules] = useState<CRMAutomationRule[]>([]);
@@ -572,9 +576,17 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-7xl h-[92vh] bg-slate-950 border border-slate-800 rounded-3xl shadow-2xl flex flex-col overflow-hidden text-slate-100">
-        
+    <div className={
+      variant === 'inline'
+        ? 'flex-1 flex overflow-hidden'
+        : 'fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200'
+    }>
+      <div className={
+        variant === 'inline'
+          ? 'w-full h-full bg-slate-950 flex flex-col overflow-hidden text-slate-100'
+          : 'w-full max-w-7xl h-[92vh] bg-slate-950 border border-slate-800 rounded-3xl shadow-2xl flex flex-col overflow-hidden text-slate-100'
+      }>
+
         {/* HEADER DEL CRM HUB */}
         <div className="h-16 px-6 border-b border-slate-800 bg-slate-900/60 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
@@ -653,12 +665,14 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
             </button>
           </div>
 
-          <button
-            onClick={onClose}
-            className="w-9 h-9 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-100 flex items-center justify-center border border-slate-800 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          {variant === 'modal' && (
+            <button
+              onClick={onClose}
+              className="w-9 h-9 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-100 flex items-center justify-center border border-slate-800 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
         </div>
 
         {/* CUERPO PRINCIPAL SEGÚN PESTAÑA */}
