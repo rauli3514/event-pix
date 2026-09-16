@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 
 export const ProtectedRoute = () => {
     const [session, setSession] = useState<boolean | null>(null);
+    const location = useLocation();
 
     useEffect(() => {
         // Check if we are in mock mode (placeholder URL)
@@ -48,6 +49,11 @@ export const ProtectedRoute = () => {
                 <p className="text-xs text-slate-400">Verificando acceso...</p>
             </div>
         );
+    }
+
+    const isIntelligenceRoute = location.pathname.startsWith('/intelligence') || location.pathname.startsWith('/admin/intelligence');
+    if (isIntelligenceRoute) {
+        return session ? <Outlet /> : <Navigate to="/intelligence/login" state={{ from: location.pathname }} replace />;
     }
 
     const isDisplayUser = localStorage.getItem('display_user_mode') === 'true';
