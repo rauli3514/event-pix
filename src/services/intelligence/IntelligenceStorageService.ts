@@ -398,9 +398,6 @@ export class IntelligenceStorageService {
   static async saveProfileContext(businessId: string, context: UserProfileContext): Promise<boolean> {
     try {
       localStorage.setItem(`${LOCAL_STORAGE_KEYS.PROFILE_CONTEXT}_${businessId}`, JSON.stringify(context));
-      if (businessId === 'biz_001') {
-        localStorage.setItem(LOCAL_STORAGE_KEYS.PROFILE_CONTEXT, JSON.stringify(context));
-      }
     } catch (e) {
       console.error('Error guardando perfil y contexto IA:', e);
     }
@@ -408,9 +405,10 @@ export class IntelligenceStorageService {
   }
 
   static async loadProfileContext(businessId: string): Promise<UserProfileContext> {
-    // 1. Intentar cargar desde localStorage aislado
-    const cached = localStorage.getItem(`${LOCAL_STORAGE_KEYS.PROFILE_CONTEXT}_${businessId}`) ||
-                   localStorage.getItem(LOCAL_STORAGE_KEYS.PROFILE_CONTEXT);
+    // 1. Intentar cargar desde localStorage aislado a ESTE negocio únicamente.
+    // (Antes había un fallback a una clave global compartida: un negocio nuevo
+    // terminaba heredando el perfil guardado de otro comercio distinto.)
+    const cached = localStorage.getItem(`${LOCAL_STORAGE_KEYS.PROFILE_CONTEXT}_${businessId}`);
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
@@ -430,12 +428,11 @@ export class IntelligenceStorageService {
     const defaultContext: UserProfileContext = {
       business_id: businessId,
       profile: {
-        avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
-        instagram_handle: currentBiz?.instagram_handle?.replace('@', '') || 'beaacamposr',
-        niche: currentBiz?.niche || 'Coaching & Marca Personal',
+        avatar_url: '',
+        instagram_handle: currentBiz?.instagram_handle?.replace('@', '') || '',
+        niche: currentBiz?.niche || '',
         language: 'Español (Latinoamérica)',
-        about_content: brandDna?.identity?.mission ||
-          'Ayudo a profesionales y negocios a transformar su contenido para atraer clientes de alto valor y generar ventas sin depender de la suerte. Trabajo la marca personal sólida y sistemas de conversión directa.'
+        about_content: brandDna?.identity?.mission || ''
       },
       ai_context: {
         tone: (brandDna?.voice_and_tone?.primary_tone as any) || 'directo',
@@ -449,24 +446,13 @@ export class IntelligenceStorageService {
           'No inventar datos falsos ni prometer fórmulas mágicas de la noche a la mañana.',
           'Evitar saludos lentos tipo "¿Cómo están chicos?" al inicio de los videos.'
         ],
-        favorite_catchphrases: brandDna?.voice_and_tone?.favorite_catchphrases || [
-          'El dinero que no se mueve, no crece.',
-          'Riqueza en movimiento: estrategia primero, ejecución consciente.',
-          'Escribinos por WhatsApp y te asesoramos.'
-        ]
+        favorite_catchphrases: brandDna?.voice_and_tone?.favorite_catchphrases || []
       },
       cta_list: [
         {
           id: 'cta_1',
           keyword: 'APP',
           full_phrase: 'Comenta "APP" y te la envío ya mismo!! 🤩👇',
-          action_type: 'comment_keyword',
-          is_favorite: true
-        },
-        {
-          id: 'cta_2',
-          keyword: 'PANTALLA',
-          full_phrase: 'Comenta "PANTALLA" para enviarte el catálogo con cuotas sin interés.',
           action_type: 'comment_keyword',
           is_favorite: true
         },

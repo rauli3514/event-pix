@@ -766,18 +766,19 @@ export const IntelligenceCanvasPage: React.FC = () => {
 
   const handleResetToZero = useCallback(async () => {
     if (window.confirm('¿Seguro que querés reiniciar todo a 0? Se limpiarán los datos demo del CRM, lienzo y publicaciones para comenzar únicamente con tus datos reales.')) {
+      const ownHandle = business.instagram_handle || accountHandle;
       IntelligenceStorageService.clearAllData();
       CRMStorageService.clearAllData();
       MetaGraphService.clearCredentials();
-      setAccountHandle('@display_digital');
+      setAccountHandle(ownHandle);
       setPosts([]);
       setNodes([]);
       setEdges([]);
-      const emptyAudit = ReelAnalyzerService.calculateAuditReport([], brandDna, '@display_digital');
+      const emptyAudit = ReelAnalyzerService.calculateAuditReport([], brandDna, ownHandle);
       setAuditReport(emptyAudit);
-      toast.success('✨ Sistema reiniciado a 0 con @display_digital. Listo para cargar tus datos reales.');
+      toast.success(`✨ Sistema reiniciado a 0 con ${ownHandle}. Listo para cargar tus datos reales.`);
     }
-  }, [brandDna]);
+  }, [brandDna, business.instagram_handle, accountHandle]);
 
   return (
     <div className="h-screen w-screen bg-[#080C14] text-slate-100 flex flex-col overflow-hidden font-sans select-none">
