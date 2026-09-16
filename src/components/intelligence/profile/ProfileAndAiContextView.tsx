@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { UserProfileContext, CtaItem } from '../../../types/strategicProfile';
 import { IntelligenceStorageService } from '../../../services/intelligence/IntelligenceStorageService';
+import { ProductCatalogManager } from './ProductCatalogManager';
 import { toast } from 'sonner';
 
 interface ProfileAndAiContextViewProps {
@@ -59,7 +60,7 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
   businessId,
   onProfileUpdated
 }) => {
-  const [activeTab, setActiveTab] = useState<'profile' | 'ai_context' | 'ctas' | 'instagram'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'ai_context' | 'ctas' | 'catalog' | 'instagram'>('profile');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [context, setContext] = useState<UserProfileContext | null>(null);
@@ -154,6 +155,18 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
               }`}
             >
               Lista de CTAs ({context.cta_list.length})
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('catalog')}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                activeTab === 'catalog'
+                  ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-md shadow-pink-600/20'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+              }`}
+            >
+              Catálogo
             </button>
 
             <button
@@ -730,6 +743,10 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
         {/* ========================================================================= */}
         {/* SUB-PESTAÑA 4: VINCULAR INSTAGRAM */}
         {/* ========================================================================= */}
+        {activeTab === 'catalog' && (
+          <ProductCatalogManager businessId={businessId} />
+        )}
+
         {activeTab === 'instagram' && (
           <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 sm:p-8 space-y-6 animate-in fade-in duration-200">
             <div>
