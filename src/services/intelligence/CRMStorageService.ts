@@ -215,8 +215,40 @@ export class CRMStorageService {
   // =========================================================================
   // 2. AUTOMATIZACIONES (RULES)
   // =========================================================================
+  // Estas reglas las tiene que poder leer también el webhook del bot
+  // (corre en el servidor, sin sesión de navegador), así que viven en
+  // Supabase scopeadas por negocio — no alcanza con localStorage.
 
-  static async loadRules(_businessId?: string): Promise<CRMAutomationRule[]> {
+  static async loadRules(businessId?: string): Promise<CRMAutomationRule[]> {
+    const isSupa = await this.testSupabase();
+
+    if (isSupa && businessId) {
+      try {
+        const { data, error } = await supabase
+          .from('intelligence_crm_automations')
+          .select('*')
+          .eq('business_id', businessId)
+          .order('created_at', { ascending: true });
+
+        if (!error && data) {
+          return data.map((row: any): CRMAutomationRule => ({
+            id: row.id,
+            business_id: row.business_id,
+            name: row.name,
+            description: row.description || '',
+            trigger_event: row.trigger_event,
+            trigger_keyword: row.trigger_keyword || undefined,
+            action_type: row.action_type,
+            action_payload: row.action_payload || {},
+            requires_human_approval: row.requires_human_approval,
+            is_active: row.is_active
+          }));
+        }
+      } catch (err) {
+        console.warn('Fallback to local storage for CRM rules:', err);
+      }
+    }
+
     try {
       const stored = localStorage.getItem(LOCAL_STORAGE_KEYS.RULES);
       if (stored) {
@@ -238,8 +270,46 @@ export class CRMStorageService {
     return INITIAL_CRM_RULES;
   }
 
-  static async saveRules(_businessId: string, rules: CRMAutomationRule[]): Promise<void> {
+  static async saveRules(businessId: string, rules: CRMAutomationRule[]): Promise<void> {
     this.saveRulesLocally(rules);
+
+    const isSupa = await this.testSupabase();
+    if (!isSupa || !businessId) return;
+
+    try {
+      const { data: existing } = await supabase
+        .from('intelligence_crm_automations')
+        .select('id')
+        .eq('business_id', businessId);
+
+      const currentIds = new Set(rules.map(r => r.id));
+      const idsToDelete = (existing || [])
+        .map((r: any) => r.id)
+        .filter((id: string) => !currentIds.has(id));
+      if (idsToDelete.length > 0) {
+        await supabase.from('intelligence_crm_automations').delete().in('id', idsToDelete);
+      }
+
+      for (const rule of rules) {
+        // IDs generados en el navegador (ej. "rule_1234") no son UUID válidos:
+        // dejamos que Supabase genere el suyo en el primer guardado.
+        const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rule.id);
+        await supabase.from('intelligence_crm_automations').upsert({
+          ...(isValidUuid ? { id: rule.id } : {}),
+          business_id: businessId,
+          name: rule.name,
+          description: rule.description,
+          trigger_event: rule.trigger_event,
+          trigger_keyword: rule.trigger_keyword,
+          action_type: rule.action_type,
+          action_payload: rule.action_payload,
+          requires_human_approval: rule.requires_human_approval,
+          is_active: rule.is_active
+        });
+      }
+    } catch (err) {
+      console.error('Error syncing CRM rules to Supabase:', err);
+    }
   }
 
   private static saveRulesLocally(rules: CRMAutomationRule[]): void {
@@ -247,6 +317,41 @@ export class CRMStorageService {
       localStorage.setItem(LOCAL_STORAGE_KEYS.RULES, JSON.stringify(rules));
     } catch (e) {
       console.error('Error saving rules to localStorage', e);
+    }
+  }
+
+  // =========================================================================
+  // 2b. MENSAJES REALES DE UNA CONVERSACIÓN (incluye los que llegan por el
+  //     webhook del bot, no solo los enviados desde esta pantalla)
+  // =========================================================================
+
+  static async loadMessages(conversationId: string): Promise<CRMMessage[]> {
+    const isSupa = await this.testSupabase();
+    if (!isSupa || !conversationId) return [];
+
+    try {
+      const { data, error } = await supabase
+        .from('intelligence_crm_messages')
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: true });
+
+      if (error || !data) return [];
+
+      return data.map((row: any): CRMMessage => ({
+        id: row.id,
+        conversation_id: row.conversation_id,
+        sender_type: row.sender_type,
+        sender_name: row.sender_name || undefined,
+        content: row.content,
+        status: row.status,
+        message_type: row.message_type,
+        ai_metadata: row.ai_metadata,
+        created_at: row.created_at
+      }));
+    } catch (err) {
+      console.warn('No se pudieron cargar mensajes reales de Supabase:', err);
+      return [];
     }
   }
 

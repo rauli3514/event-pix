@@ -15,13 +15,15 @@ interface AutomationRuleBuilderModalProps {
   onClose: () => void;
   initialRule?: Partial<CRMAutomationRule> | null;
   onSaveRule: (rule: CRMAutomationRule) => void;
+  businessId: string;
 }
 
 export const AutomationRuleBuilderModal: React.FC<AutomationRuleBuilderModalProps> = ({
   isOpen,
   onClose,
   initialRule,
-  onSaveRule
+  onSaveRule,
+  businessId
 }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -63,7 +65,7 @@ export const AutomationRuleBuilderModal: React.FC<AutomationRuleBuilderModalProp
     e.preventDefault();
     const newRule: CRMAutomationRule = {
       id: initialRule?.id || `rule_${Date.now()}`,
-      business_id: 'biz_default',
+      business_id: businessId,
       name: name.trim() || 'Automatización sin título',
       description: description.trim() || 'Automatización de mensajes',
       trigger_event: triggerEvent,

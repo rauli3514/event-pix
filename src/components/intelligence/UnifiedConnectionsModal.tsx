@@ -15,6 +15,7 @@ import { ConnectionStorageService } from '../../services/intelligence/Connection
 import { AIProviderService } from '../../services/intelligence/AIProviderService';
 import { WhatsAppCloudService } from '../../services/meta/WhatsAppCloudService';
 import { ShopDePlumasSyncService } from '../../services/intelligence/ShopDePlumasSyncService';
+import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
 
 interface UnifiedConnectionsModalProps {
@@ -223,6 +224,20 @@ export const UnifiedConnectionsModal: React.FC<UnifiedConnectionsModalProps> = (
       ConnectionStorageService.saveConnections(businessId, updated);
       onConnectionsUpdated?.(updated);
       toast.success(`¡WhatsApp Verificado! Tel: ${result.displayPhoneNumber || 'OK'}`);
+
+      // El bot corre en el servidor: necesita poder leer este número/token
+      // desde la base de datos, no alcanza con guardarlo en este navegador.
+      try {
+        await supabase
+          .from('intelligence_businesses')
+          .update({
+            whatsapp_phone_number_id: connections.whatsapp.phoneNumberId.trim(),
+            whatsapp_access_token: connections.whatsapp.accessToken.trim()
+          })
+          .eq('id', businessId);
+      } catch (err) {
+        console.warn('No se pudo sincronizar WhatsApp con Supabase:', err);
+      }
     } else {
       const updated: UnifiedConnectionsState = {
         ...connections,

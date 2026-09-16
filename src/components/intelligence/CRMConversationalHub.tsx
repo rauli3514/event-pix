@@ -100,8 +100,8 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
   React.useEffect(() => {
     let isMounted = true;
     async function loadData() {
-      const convs = await CRMStorageService.loadConversations();
-      const r = await CRMStorageService.loadRules();
+      const convs = await CRMStorageService.loadConversations(businessId);
+      const r = await CRMStorageService.loadRules(businessId);
       const t = await CRMStorageService.loadTasks();
       const logs = AutomationEngineService.loadLogs();
       const conns = ConnectionStorageService.loadConnections(businessId);
@@ -122,6 +122,25 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
   const activeConversation = useMemo(() => {
     return conversations.find(c => c.id === selectedConvId) || conversations[0] || null;
   }, [conversations, selectedConvId]);
+
+  // Traer los mensajes reales de la conversación abierta (incluye los que
+  // llegan por WhatsApp desde el webhook del bot, no solo los que se
+  // mandaron desde esta pantalla) y refrescar cada tanto mientras está abierto.
+  React.useEffect(() => {
+    if (!isOpen || !activeConversation) return;
+    const convId = activeConversation.id;
+
+    let isMounted = true;
+    const fetchMessages = async () => {
+      const realMessages = await CRMStorageService.loadMessages(convId);
+      if (!isMounted || realMessages.length === 0) return;
+      setConversations(prev => prev.map(c => (c.id === convId ? { ...c, messages: realMessages } : c)));
+    };
+
+    fetchMessages();
+    const interval = setInterval(fetchMessages, 15000);
+    return () => { isMounted = false; clearInterval(interval); };
+  }, [isOpen, activeConversation?.id]);
 
   const lastLeadMessage = useMemo(() => {
     if (!activeConversation) return null;
@@ -355,7 +374,7 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
       }
 
       // Refrescar conversaciones, tareas y logs actualizados
-      const freshConvs = await CRMStorageService.loadConversations();
+      const freshConvs = await CRMStorageService.loadConversations(businessId);
       const freshTasks = await CRMStorageService.loadTasks();
       setConversations(freshConvs);
       setTasks(freshTasks);
@@ -465,7 +484,7 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
       );
 
       // Refrescar estado global
-      const freshConvs = await CRMStorageService.loadConversations();
+      const freshConvs = await CRMStorageService.loadConversations(businessId);
       const freshTasks = await CRMStorageService.loadTasks();
       setConversations(freshConvs);
       setTasks(freshTasks);
@@ -2057,6 +2076,7 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
         onClose={() => setIsRuleBuilderOpen(false)}
         initialRule={editingRule}
         onSaveRule={handleSaveRule}
+        businessId={businessId}
       />
     </div>
   );
