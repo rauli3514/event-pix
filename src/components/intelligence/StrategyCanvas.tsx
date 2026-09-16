@@ -1403,6 +1403,7 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
         onClose={() => setIsTvModalOpen(false)}
         scriptHook="Escuchá esto antes de grabar tu próximo Reel... Descubrí la automatización que duplica las ventas en tu comercio."
         scriptCta='Comenta "APP" en Instagram o escaneá el QR para recibir la promoción VIP en WhatsApp'
+        businessId={businessId}
       />
 
       <TeleprompterModal

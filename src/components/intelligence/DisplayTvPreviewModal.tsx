@@ -1,16 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   X, Tv, Image as ImageIcon, QrCode, CheckCircle2, Play, RefreshCw, Send,
   Monitor, Smartphone, RotateCw, List, Clock, Plus, GripVertical, Trash2,
   ChevronUp, ChevronDown, Zap, Globe, PauseCircle, PlayCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useDisplayMedia } from '../../hooks/use-display-media';
+import { useDisplayCampaigns, useCreateCampaign, useUpdateCampaign, useDisplayDevices } from '../../hooks/use-display-hub';
+import { DisplayCampaignV2, UniversalElement } from '../../types/display';
 
 interface DisplayTvPreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
   scriptHook: string;
   scriptCta: string;
+  businessId: string;
 }
 
 interface PlaylistItem {
@@ -23,69 +27,118 @@ interface PlaylistItem {
   active: boolean;
 }
 
+const AI_CAMPAIGN_NAME = 'Generado con IA (EventPix Intelligence)';
+
 export const DisplayTvPreviewModal: React.FC<DisplayTvPreviewModalProps> = ({
   isOpen,
   onClose,
   scriptHook,
-  scriptCta
+  scriptCta,
+  businessId
 }) => {
-  const [catalogPhotos] = useState([
-    { id: 'p1', name: 'Plato / Producto Estrella #1', url: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?q=80&w=600&auto=format&fit=crop' },
-    { id: 'p2', name: 'Combo Especial Fin de Semana', url: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=600&auto=format&fit=crop' },
-    { id: 'p3', name: 'Servicio / Experiencia VIP', url: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=600&auto=format&fit=crop' },
-    { id: 'p4', name: 'Ambiente / Decoración del Local', url: 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?q=80&w=600&auto=format&fit=crop' },
-    { id: 'p5', name: 'Oferta Especial del Día', url: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?q=80&w=600&auto=format&fit=crop' },
-    { id: 'p6', name: 'Equipo / Personal del Local', url: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?q=80&w=600&auto=format&fit=crop' }
-  ]);
+  const { data: mediaFiles = [] } = useDisplayMedia(businessId);
+  const { data: campaigns = [] } = useDisplayCampaigns(businessId);
+  const { data: devices = [] } = useDisplayDevices(businessId);
+  const createCampaign = useCreateCampaign();
+  const updateCampaign = useUpdateCampaign();
 
-  const [selectedPhoto, setSelectedPhoto] = useState(catalogPhotos[0].url);
+  const catalogPhotos = useMemo(
+    () => mediaFiles.filter(m => m.type === 'image').map(m => ({ id: m.id, name: m.name, url: m.url })),
+    [mediaFiles]
+  );
+  const onlineDevicesCount = devices.filter((d: any) => d.derived_status === 'online').length;
+
+  const [selectedPhoto, setSelectedPhoto] = useState('');
   const [selectedScreen, setSelectedScreen] = useState<'all' | 'screen1' | 'screen2'>('all');
   const [orientation, setOrientation] = useState<'16:9' | '9:16'>('16:9');
   const [isSending, setIsSending] = useState(false);
   const [activeTab, setActiveTab] = useState<'preview' | 'playlist'>('preview');
 
-  const [playlist, setPlaylist] = useState<PlaylistItem[]>([
-    {
-      id: 'pl_1',
-      name: 'Campaña Principal IA',
-      photoUrl: catalogPhotos[0].url,
-      hook: scriptHook,
-      cta: scriptCta,
-      duration: 15,
-      active: true
-    },
-    {
-      id: 'pl_2',
-      name: 'Combo Especial del Fin de Semana',
-      photoUrl: catalogPhotos[1].url,
-      hook: '¡El combo que todo el barrio pide! Solo los fines de semana...',
-      cta: 'Escaneá el QR y hacé tu pedido ya → WhatsApp',
-      duration: 10,
-      active: true
-    },
-    {
-      id: 'pl_3',
-      name: 'Experiencia VIP Premium',
-      photoUrl: catalogPhotos[2].url,
-      hook: 'Viví la experiencia que solo nosotros podemos ofrecerte.',
-      cta: 'Reservas: Escaneá el QR o consultá en mostrador',
-      duration: 12,
-      active: false
+  const [playlist, setPlaylist] = useState<PlaylistItem[]>([]);
+
+  // Una vez que llega la biblioteca real, arrancamos con la primera foto seleccionada.
+  React.useEffect(() => {
+    if (!selectedPhoto && catalogPhotos.length > 0) {
+      setSelectedPhoto(catalogPhotos[0].url);
     }
-  ]);
+  }, [catalogPhotos, selectedPhoto]);
 
   const totalDuration = playlist.filter(p => p.active).reduce((s, p) => s + p.duration, 0);
 
   if (!isOpen) return null;
 
-  const handlePublishToTV = () => {
+  const handlePublishToTV = async () => {
+    const activeItems = playlist.filter(p => p.active);
+    if (activeItems.length === 0) {
+      toast.error('Agregá al menos un slide activo antes de emitir.');
+      return;
+    }
+
     setIsSending(true);
-    setTimeout(() => {
-      setIsSending(false);
+    try {
+      const elements: UniversalElement[] = activeItems.flatMap((item) => {
+        const els: UniversalElement[] = [
+          {
+            id: `${item.id}_img`,
+            type: 'image',
+            url: item.photoUrl,
+            duration: item.duration,
+            transition: 'fade',
+            fitMode: 'contain'
+          }
+        ];
+        if (item.hook || item.cta) {
+          els.push({
+            id: `${item.id}_txt`,
+            type: 'text',
+            content: [item.hook, item.cta].filter(Boolean).join('\n'),
+            duration: 5,
+            transition: 'fade'
+          });
+        }
+        return els;
+      });
+
+      const campaignData: DisplayCampaignV2 = {
+        version: '2.0',
+        settings: {
+          orientation: orientation === '9:16' ? 'portrait' : 'landscape',
+          background: { type: 'color', value: '#050505' },
+          shuffle: false,
+          transition: 'fade',
+          defaultDuration: 10
+        },
+        zones: [{
+          id: 'main',
+          name: 'Principal',
+          width: '100%', height: '100%', top: 0, left: 0, zIndex: 1,
+          playlist: elements
+        }]
+      };
+
+      const existing = campaigns.find((c: any) => c.name === AI_CAMPAIGN_NAME);
+      if (existing) {
+        await updateCampaign.mutateAsync({ id: existing.id, updates: { items_json: campaignData } });
+      } else {
+        await createCampaign.mutateAsync({
+          commerceId: businessId,
+          name: AI_CAMPAIGN_NAME,
+          description: 'Campaña generada automáticamente desde el lienzo de Intelligence.',
+          items_json: campaignData
+        });
+      }
+
       onClose();
-      const activeCount = playlist.filter(p => p.active).length;
-      toast.success(`📺 ¡${activeCount} slide${activeCount > 1 ? 's' : ''} emitido${activeCount > 1 ? 's' : ''} en formato ${orientation === '9:16' ? 'Vertical 9:16' : 'Horizontal 16:9'} — Playlist activa en las Pantallas TV del comercio!`);
-    }, 1500);
+      if (onlineDevicesCount > 0) {
+        toast.success(`Guardado en la campaña "${AI_CAMPAIGN_NAME}". Si ya la tenés asignada a una pantalla, se actualiza sola.`);
+      } else {
+        toast.success(`Guardado en la campaña "${AI_CAMPAIGN_NAME}". Todavía no tenés pantallas online — asignala desde Display Hub cuando conectes una.`);
+      }
+    } catch (err: any) {
+      toast.error('No se pudo guardar la campaña: ' + (err?.message || 'error desconocido'));
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleTogglePlaylistItem = (id: string) => {
@@ -108,6 +161,10 @@ export const DisplayTvPreviewModal: React.FC<DisplayTvPreviewModalProps> = ({
   };
 
   const handleAddCurrentToPlaylist = () => {
+    if (!selectedPhoto) {
+      toast.error('Subí o elegí una foto de tu Biblioteca de Display Hub primero.');
+      return;
+    }
     const photo = catalogPhotos.find(p => p.url === selectedPhoto);
     const newItem: PlaylistItem = {
       id: `pl_${Date.now()}`,
@@ -142,9 +199,15 @@ export const DisplayTvPreviewModal: React.FC<DisplayTvPreviewModalProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-xl">
-              <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-              <span className="text-emerald-400 text-[11px] font-bold font-mono">3 Pantallas LIVE</span>
+            <div className={`flex items-center gap-1.5 border px-3 py-1.5 rounded-xl ${
+              onlineDevicesCount > 0 ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-slate-800/60 border-slate-700'
+            }`}>
+              <div className={`w-2 h-2 rounded-full ${onlineDevicesCount > 0 ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+              <span className={`text-[11px] font-bold font-mono ${onlineDevicesCount > 0 ? 'text-emerald-400' : 'text-slate-400'}`}>
+                {devices.length === 0
+                  ? 'Sin pantallas conectadas'
+                  : `${onlineDevicesCount} / ${devices.length} Pantallas Online`}
+              </span>
             </div>
             <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-100 hover:bg-slate-800 rounded-xl transition-colors">
               <X className="w-5 h-5" />
@@ -201,11 +264,17 @@ export const DisplayTvPreviewModal: React.FC<DisplayTvPreviewModalProps> = ({
 
                     <div className="grid grid-cols-12 gap-4 items-center z-10 my-auto">
                       <div className="col-span-5 relative">
-                        <img
-                          src={selectedPhoto}
-                          alt="Producto Catálogo"
-                          className="w-full h-36 object-cover rounded-2xl border-2 border-amber-500/40 shadow-xl"
-                        />
+                        {selectedPhoto ? (
+                          <img
+                            src={selectedPhoto}
+                            alt="Producto Catálogo"
+                            className="w-full h-36 object-cover rounded-2xl border-2 border-amber-500/40 shadow-xl"
+                          />
+                        ) : (
+                          <div className="w-full h-36 rounded-2xl border-2 border-dashed border-slate-700 flex items-center justify-center bg-slate-900">
+                            <ImageIcon className="w-6 h-6 text-slate-600" />
+                          </div>
+                        )}
                         <span className="absolute bottom-2 left-2 bg-slate-950/80 backdrop-blur-md text-amber-300 text-[9px] px-2 py-0.5 rounded-md font-semibold border border-amber-500/30">
                           Foto Real de tu Comercio
                         </span>
@@ -243,7 +312,13 @@ export const DisplayTvPreviewModal: React.FC<DisplayTvPreviewModalProps> = ({
                       </span>
                     </div>
                     <div className="relative z-10 my-2">
-                      <img src={selectedPhoto} alt="Producto" className="w-full h-40 object-cover rounded-2xl border-2 border-amber-500/40 shadow-xl" />
+                      {selectedPhoto ? (
+                        <img src={selectedPhoto} alt="Producto" className="w-full h-40 object-cover rounded-2xl border-2 border-amber-500/40 shadow-xl" />
+                      ) : (
+                        <div className="w-full h-40 rounded-2xl border-2 border-dashed border-slate-700 flex items-center justify-center bg-slate-900">
+                          <ImageIcon className="w-6 h-6 text-slate-600" />
+                        </div>
+                      )}
                       <span className="absolute bottom-2 left-2 bg-slate-950/80 text-amber-300 text-[8px] px-1.5 py-0.5 rounded border border-amber-500/30">Foto Real Catálogo</span>
                     </div>
                     <div className="space-y-1.5 text-center z-10">
@@ -312,25 +387,31 @@ export const DisplayTvPreviewModal: React.FC<DisplayTvPreviewModalProps> = ({
                     </span>
                     <span className="text-[10px] text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded-full border border-violet-500/20">Librería EventPix</span>
                   </label>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {catalogPhotos.map(photo => (
-                      <button
-                        key={photo.id}
-                        onClick={() => setSelectedPhoto(photo.url)}
-                        className={`relative rounded-xl overflow-hidden border-2 transition-all aspect-square ${
-                          selectedPhoto === photo.url ? 'border-amber-500 ring-2 ring-amber-500/40 scale-105' : 'border-slate-800 opacity-60 hover:opacity-90'
-                        }`}
-                        title={photo.name}
-                      >
-                        <img src={photo.url} alt={photo.name} className="w-full h-full object-cover" />
-                        {selectedPhoto === photo.url && (
-                          <div className="absolute inset-0 bg-amber-500/20 flex items-center justify-center">
-                            <CheckCircle2 className="w-5 h-5 text-amber-300 drop-shadow-md" />
-                          </div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
+                  {catalogPhotos.length === 0 ? (
+                    <div className="text-[11px] text-slate-500 bg-slate-950 border border-dashed border-slate-800 rounded-xl p-3 text-center">
+                      Todavía no subiste fotos a tu Biblioteca de Display Hub. Subí alguna desde ahí para poder elegirla acá.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {catalogPhotos.map(photo => (
+                        <button
+                          key={photo.id}
+                          onClick={() => setSelectedPhoto(photo.url)}
+                          className={`relative rounded-xl overflow-hidden border-2 transition-all aspect-square ${
+                            selectedPhoto === photo.url ? 'border-amber-500 ring-2 ring-amber-500/40 scale-105' : 'border-slate-800 opacity-60 hover:opacity-90'
+                          }`}
+                          title={photo.name}
+                        >
+                          <img src={photo.url} alt={photo.name} className="w-full h-full object-cover" />
+                          {selectedPhoto === photo.url && (
+                            <div className="absolute inset-0 bg-amber-500/20 flex items-center justify-center">
+                              <CheckCircle2 className="w-5 h-5 text-amber-300 drop-shadow-md" />
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Target Screens */}
@@ -344,9 +425,12 @@ export const DisplayTvPreviewModal: React.FC<DisplayTvPreviewModalProps> = ({
                       selectedScreen === 'all' ? 'bg-amber-950/40 border-amber-500/50 text-amber-200 font-bold' : 'bg-slate-950 border-slate-800 text-slate-300'
                     }`}
                   >
-                    <span>📺 3 Pantallas — {orientation}</span>
+                    <span>📺 {devices.length} Pantalla{devices.length === 1 ? '' : 's'} — {orientation}</span>
                     <CheckCircle2 className="w-4 h-4 text-amber-400" />
                   </button>
+                  <p className="text-[10px] text-slate-500">
+                    Se guarda como campaña en Display Hub. Para verla en una pantalla, asignala desde ahí si todavía no lo está.
+                  </p>
                 </div>
 
                 {/* Emit Button */}
