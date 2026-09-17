@@ -20,6 +20,7 @@ import { ContentDnaEngine } from '../../services/intelligence/ContentDnaEngine';
 import { hasValue } from '../../services/intelligence/metricUtils';
 
 interface MetaConnectionPanelProps {
+  businessId: string;
   onAddReelToCanvas?: (reel: MetaMediaItem & { insights?: MetaMediaInsights }) => void;
 }
 
@@ -40,9 +41,9 @@ function daysAgo(iso: string): string {
   return `hace ${diff} días`;
 }
 
-export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ onAddReelToCanvas }) => {
+export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ businessId, onAddReelToCanvas }) => {
   const [state, setState] = useState<PanelState>(
-    MetaGraphService.isConfigured() ? 'verifying' : 'not_connected'
+    MetaGraphService.isConfigured(businessId) ? 'verifying' : 'not_connected'
   );
   const [errorMsg, setErrorMsg] = useState('');
   const [warningMsg, setWarningMsg] = useState('');
@@ -53,6 +54,14 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ onAddR
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [directReelUrl, setDirectReelUrl] = useState('');
   const [isImportingDirect, setIsImportingDirect] = useState(false);
+  const [adAccountIdDraft, setAdAccountIdDraft] = useState(() => MetaGraphService.loadCredentials(businessId)?.adAccountId || '');
+
+  const handleSaveAdAccountId = () => {
+    const current = MetaGraphService.loadCredentials(businessId);
+    if (!current) return;
+    MetaGraphService.saveCredentials({ ...current, adAccountId: adAccountIdDraft.trim() }, businessId);
+    toast.success('Cuenta publicitaria guardada. Ya podés auditar tus anuncios en la pestaña "Ads".');
+  };
 
   // Manual credential form
   const [formCreds, setFormCreds] = useState<MetaCredentials>({
@@ -68,8 +77,8 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ onAddR
 
     try {
       const [profileData, reelsData] = await Promise.all([
-        MetaGraphService.getProfile(),
-        MetaGraphService.getReelsWithInsights(15),
+        MetaGraphService.getProfile(businessId),
+        MetaGraphService.getReelsWithInsights(15, businessId),
       ]);
       setProfile(profileData);
       setReels(reelsData);
@@ -77,7 +86,6 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ onAddR
 
       // Calcular inmediatamente el Benchmark de Medianas y minar Content DNA
       if (reelsData.length > 0) {
-        const businessId = IntelligenceStorageService.getActiveBusinessId() || 'tecno_eventos_arg';
         const benchmark = AccountBenchmarkService.calculateAccountBenchmark(
           businessId,
           profileData?.username,
@@ -98,12 +106,12 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ onAddR
     } finally {
       setIsLoadingData(false);
     }
-  }, []);
+  }, [businessId]);
 
   // Verify connection on mount if credentials exist
   useEffect(() => {
     if (state === 'verifying') {
-      const saved = MetaGraphService.loadCredentials();
+      const saved = MetaGraphService.loadCredentials(businessId);
       if (!saved?.accessToken) {
         setState('not_connected');
         return;
@@ -123,7 +131,7 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ onAddR
           setState('error');
         });
     }
-  }, [state, loadConnectedData]);
+  }, [state, loadConnectedData, businessId]);
 
   const handleTestAndDiscover = async () => {
     if (!formCreds.accessToken.trim()) {
@@ -165,7 +173,7 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ onAddR
           accountAvatar: acct.profilePictureUrl,
           isBasicDisplay: acct.isBasicDisplay,
         };
-        MetaGraphService.saveCredentials(updatedCreds);
+        MetaGraphService.saveCredentials(updatedCreds, businessId);
         toast.success(`🎉 Conectado exitosamente con @${acct.username}`);
         loadConnectedData();
       } else if (res.accounts.length > 1) {
@@ -198,13 +206,13 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ onAddR
       accountAvatar: acct.profilePictureUrl,
       isBasicDisplay: acct.isBasicDisplay,
     };
-    MetaGraphService.saveCredentials(updatedCreds);
+    MetaGraphService.saveCredentials(updatedCreds, businessId);
     toast.success(`🎉 Vinculado a @${acct.username}`);
     loadConnectedData();
   };
 
   const handleDisconnect = () => {
-    MetaGraphService.clearCredentials();
+    MetaGraphService.clearCredentials(businessId);
     setProfile(null);
     setReels([]);
     setState('not_connected');
@@ -367,7 +375,7 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ onAddR
         <div className="flex gap-2">
           <button
             onClick={() => {
-              MetaGraphService.clearCredentials();
+              MetaGraphService.clearCredentials(businessId);
               setState('not_connected');
             }}
             className="flex-1 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs transition-all"
@@ -468,6 +476,19 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ onAddR
                 onChange={(e) => setFormCreds((prev) => ({ ...prev, instagramAccountId: e.target.value }))}
                 placeholder="178414... (dejar vacío para detectar automáticamente)"
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-pink-500"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] text-slate-400 font-semibold block mb-1">
+                Cuenta Publicitaria de Meta Ads (Opcional — necesaria para auditar anuncios pagos)
+              </label>
+              <input
+                type="text"
+                value={formCreds.adAccountId || ''}
+                onChange={(e) => setFormCreds((prev) => ({ ...prev, adAccountId: e.target.value }))}
+                placeholder="act_1234567890 (la encontrás en Meta Ads Manager)"
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-pink-500 font-mono"
               />
             </div>
 
@@ -594,6 +615,23 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ onAddR
             </p>
             <p className="text-slate-500 text-[9px]">Reproducciones Totales</p>
           </div>
+        </div>
+
+        {/* Cuenta publicitaria de Meta Ads — se puede agregar/editar en cualquier momento sin reconectar Instagram */}
+        <div className="pt-1 flex gap-1.5">
+          <input
+            type="text"
+            value={adAccountIdDraft}
+            onChange={(e) => setAdAccountIdDraft(e.target.value)}
+            placeholder="Cuenta publicitaria: act_1234567890 (para auditar Ads)"
+            className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-pink-500 font-mono"
+          />
+          <button
+            onClick={handleSaveAdAccountId}
+            className="px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold transition-colors"
+          >
+            Guardar
+          </button>
         </div>
 
         {/* Input para agregar más Reels individuales si no aparecen todos */}

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { BusinessAuditReport, IntelligenceBusiness, IntelligencePost } from '../../types/intelligence';
 import { Activity, AlertTriangle, CheckCircle, Lightbulb, ChevronRight, ChevronLeft, ArrowUpRight, Share2, Sparkles, MessageSquare, Bot, FileImage, ShieldCheck, Tv, Users, Instagram, Target } from 'lucide-react';
 import { CompetitorAnalysisPanel } from './CompetitorAnalysisPanel';
@@ -6,8 +6,9 @@ import { MetaConnectionPanel } from './MetaConnectionPanel';
 import { MetaAdsAuditPanel } from './MetaAdsAuditPanel';
 import { MetaAdsIntelligenceEngine } from '../../services/intelligence/MetaAdsIntelligenceEngine';
 import { MetaAdCampaign } from '../../types/ads';
-import { MetaMediaItem, MetaMediaInsights } from '../../services/meta/MetaGraphService';
+import { MetaGraphService, MetaMediaItem, MetaMediaInsights } from '../../services/meta/MetaGraphService';
 import { toOptional, hasValue, averageAvailable } from '../../services/intelligence/metricUtils';
+import { toast } from 'sonner';
 
 import { UnifiedConnectionsState } from '../../types/connections';
 
@@ -62,9 +63,42 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
     return { myAvgViews: avgViews, myAvgLikes: avgLikes, myAvgComments: avgComments, myEngagementRate: engRate };
   }, [posts]);
 
+  const [adsCampaigns, setAdsCampaigns] = useState<MetaAdCampaign[]>([]);
+  const [isLoadingAds, setIsLoadingAds] = useState(false);
+
+  // Carga perezosa: recién pedimos campañas reales de Meta Ads cuando el
+  // usuario efectivamente abre la pestaña "Ads" de este negocio.
+  useEffect(() => {
+    if (activeTab !== 'ads') return;
+    let cancelled = false;
+
+    (async () => {
+      setIsLoadingAds(true);
+      try {
+        const campaigns = await MetaGraphService.getAdCampaigns(business.id);
+        if (!cancelled) setAdsCampaigns(campaigns);
+      } catch (err: any) {
+        if (!cancelled) {
+          setAdsCampaigns([]);
+          toast.error(err?.message || 'No se pudieron obtener las campañas reales de Meta Ads.');
+        }
+      } finally {
+        if (!cancelled) setIsLoadingAds(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [activeTab, business.id]);
+
   const adsReport = useMemo(() => {
-    return MetaAdsIntelligenceEngine.generateAdsReport();
-  }, []);
+    const creds = MetaGraphService.loadCredentials(business.id);
+    return MetaAdsIntelligenceEngine.generateAdsReport(
+      adsCampaigns,
+      posts,
+      business.name,
+      creds?.adAccountId || '—'
+    );
+  }, [adsCampaigns, posts, business.id, business.name]);
 
   if (!isOpen) {
     return (
@@ -281,15 +315,23 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
         )}
 
         {activeTab === 'instagram' && (
-          <MetaConnectionPanel onAddReelToCanvas={onAddReelToCanvas} />
+          <MetaConnectionPanel businessId={business.id} onAddReelToCanvas={onAddReelToCanvas} />
         )}
 
         {activeTab === 'ads' && (
-          <MetaAdsAuditPanel
-            report={adsReport}
-            onAddAdToCanvas={onAddAdToCanvas}
-            onPromoteReelToAd={onPromoteReelToAd}
-          />
+          isLoadingAds ? (
+            <div className="flex-1 p-6 flex flex-col items-center justify-center text-center gap-3 text-xs text-slate-400">
+              <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+              Consultando campañas reales en Meta Ads...
+            </div>
+          ) : (
+            <MetaAdsAuditPanel
+              report={adsReport}
+              onAddAdToCanvas={onAddAdToCanvas}
+              onPromoteReelToAd={onPromoteReelToAd}
+              businessId={business.id}
+            />
+          )
         )}
 
         {activeTab === 'integrations' && (

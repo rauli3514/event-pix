@@ -6,32 +6,46 @@
 
 import React, { useState } from 'react';
 import {
-  AlertTriangle, Target, Sparkles, Pause, Play, ArrowUpRight, Zap
+  AlertTriangle, Target, Sparkles, Pause, Play, ArrowUpRight, Zap, Loader2
 } from 'lucide-react';
 import { AdsIntelligenceReport, MetaAdCampaign } from '../../types/ads';
+import { MetaGraphService } from '../../services/meta/MetaGraphService';
 import { toast } from 'sonner';
 
 interface MetaAdsAuditPanelProps {
   report: AdsIntelligenceReport;
+  businessId: string;
   onAddAdToCanvas?: (campaign: MetaAdCampaign) => void;
   onPromoteReelToAd?: (reelTitle: string) => void;
 }
 
 export const MetaAdsAuditPanel: React.FC<MetaAdsAuditPanelProps> = ({
   report,
+  businessId,
   onAddAdToCanvas,
   onPromoteReelToAd,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'resumen' | 'campanas' | 'cruce_organico'>('resumen');
   const [pausedCampaignIds, setPausedCampaignIds] = useState<string[]>([]);
+  const [togglingCampaignId, setTogglingCampaignId] = useState<string | null>(null);
 
-  const handleTogglePause = (campaignId: string, campaignName: string) => {
-    if (pausedCampaignIds.includes(campaignId)) {
-      setPausedCampaignIds(prev => prev.filter(id => id !== campaignId));
-      toast.success(`Campaña "${campaignName}" reactivada.`);
-    } else {
-      setPausedCampaignIds(prev => [...prev, campaignId]);
-      toast.info(`⚡ Campaña "${campaignName}" pausada en Meta Ads Manager para frenar el gasto.`);
+  // Pausa/reactiva la campaña de verdad en Meta Ads Manager (no solo un toggle visual).
+  const handleTogglePause = async (campaignId: string, campaignName: string) => {
+    const isPaused = pausedCampaignIds.includes(campaignId);
+    setTogglingCampaignId(campaignId);
+    try {
+      await MetaGraphService.setCampaignStatus(campaignId, isPaused ? 'ACTIVE' : 'PAUSED', businessId);
+      if (isPaused) {
+        setPausedCampaignIds(prev => prev.filter(id => id !== campaignId));
+        toast.success(`Campaña "${campaignName}" reactivada en Meta Ads Manager.`);
+      } else {
+        setPausedCampaignIds(prev => [...prev, campaignId]);
+        toast.success(`Campaña "${campaignName}" pausada en Meta Ads Manager.`);
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'No se pudo actualizar el estado de la campaña en Meta.');
+    } finally {
+      setTogglingCampaignId(null);
     }
   };
 
@@ -260,13 +274,16 @@ export const MetaAdsAuditPanel: React.FC<MetaAdsAuditPanelProps> = ({
                   <div className="flex items-center justify-between pt-1 border-t border-slate-800/80">
                     <button
                       onClick={() => handleTogglePause(camp.id, camp.name)}
-                      className={`px-2.5 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all ${
+                      disabled={togglingCampaignId === camp.id}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all disabled:opacity-50 ${
                         isPaused
                           ? 'bg-emerald-600/20 text-emerald-300 hover:bg-emerald-600/30'
                           : 'bg-rose-600/20 text-rose-300 hover:bg-rose-600/30'
                       }`}
                     >
-                      {isPaused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
+                      {togglingCampaignId === camp.id ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : isPaused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
                       {isPaused ? 'Reanudar' : 'Pausar Anuncio'}
                     </button>
 

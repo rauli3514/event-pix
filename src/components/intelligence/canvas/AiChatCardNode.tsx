@@ -241,7 +241,7 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
       return;
     }
 
-    if (!MetaGraphService.isConfigured()) {
+    if (!MetaGraphService.isConfigured(businessId)) {
       toast.error('Conectá la cuenta de Instagram vía Meta Graph API para poder medir el resultado real.');
       return;
     }
@@ -250,7 +250,7 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
     const toastId = toast.loading('Consultando métricas reales del Reel en Meta...');
 
     try {
-      const reels = await MetaGraphService.getReelsWithInsights(50);
+      const reels = await MetaGraphService.getReelsWithInsights(50, businessId);
       const publishedReel = reels.find(r => r.id === exp.published_reel_id);
 
       if (!publishedReel) {

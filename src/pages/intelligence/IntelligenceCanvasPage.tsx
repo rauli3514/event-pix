@@ -74,7 +74,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
 
   // Cuenta activa (detecta credenciales reales de Meta si existen)
   const [accountHandle, setAccountHandle] = useState<string>(() => {
-    const creds = MetaGraphService.loadCredentials();
+    const creds = MetaGraphService.loadCredentials(IntelligenceStorageService.getActiveBusinessId() || undefined);
     if (creds?.accountUsername && !creds.accountUsername.includes('tecno_eventos')) {
       return `@${creds.accountUsername.replace('@', '')}`;
     }
@@ -769,7 +769,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
       const ownHandle = business.instagram_handle || accountHandle;
       await IntelligenceStorageService.clearAllData(business.id);
       CRMStorageService.clearAllData(business.id);
-      MetaGraphService.clearCredentials();
+      MetaGraphService.clearCredentials(business.id);
       setAccountHandle(ownHandle);
       setPosts([]);
       setNodes([]);

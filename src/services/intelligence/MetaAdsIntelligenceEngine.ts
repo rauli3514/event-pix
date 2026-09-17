@@ -8,88 +8,6 @@ import { MetaAdCampaign, AdsIntelligenceReport, CrossChannelOpportunity } from '
 import { IntelligencePost } from '../../types/intelligence';
 import { toOptional } from './metricUtils';
 
-// Campañas modelo del comercio Display Digital para benchmarking y auditoría
-export const INITIAL_DISPLAY_DIGITAL_CAMPAIGNS: MetaAdCampaign[] = [
-  {
-    id: 'camp_001',
-    name: 'Prospección B2B — Pantallas Verticales para Locales',
-    status: 'ACTIVE',
-    objective: 'LEADS',
-    daily_budget: 15,
-    spend: 285.50,
-    impressions: 24600,
-    clicks: 680,
-    ctr: 2.76,
-    cpc: 0.42,
-    cpm: 11.60,
-    conversions: 42,
-    cpa: 6.80,
-    roas: 4.8,
-    status_verdict: 'ganadora',
-    trend_vs_last_week: 'mejorando',
-    organic_counterpart_title: 'Cómo va display digital en tu negocio. @shop_plumas',
-    recommendation: 'Campaña GANADORA: Escalar presupuesto diario en +25% para captar más consultas comerciales.',
-  },
-  {
-    id: 'camp_002',
-    name: 'Tráfico Frío — Cartelería Tradicional vs Digital',
-    status: 'ACTIVE',
-    objective: 'TRAFFIC',
-    daily_budget: 10,
-    spend: 140.00,
-    impressions: 31200,
-    clicks: 410,
-    ctr: 1.31,
-    cpc: 0.34,
-    cpm: 4.48,
-    conversions: 3,
-    cpa: 46.66,
-    roas: 0.8,
-    status_verdict: 'desperdiciando_presupuesto',
-    trend_vs_last_week: 'deteriorandose',
-    recommendation: 'DESPERDICIO DETECTADO: El costo por consulta ($46.66) supera en 6.8x a la campaña ganadora. Pausar y redirigir el presupuesto a WhatsApp Leads.',
-  },
-  {
-    id: 'camp_003',
-    name: 'Retargeting — Modernización Inmediata Locales',
-    status: 'ACTIVE',
-    objective: 'LEADS',
-    daily_budget: 8,
-    spend: 96.00,
-    impressions: 8900,
-    clicks: 185,
-    ctr: 2.07,
-    cpc: 0.52,
-    cpm: 10.78,
-    conversions: 14,
-    cpa: 6.85,
-    roas: 3.9,
-    status_verdict: 'optima',
-    trend_vs_last_week: 'estable',
-    organic_counterpart_title: 'Modernización inmediata con Cartelería digital',
-    recommendation: 'Rendimiento Óptimo: Mantiene un CPA estable ($6.85) en audiencia tibia. Conservar activa.',
-  },
-  {
-    id: 'camp_004',
-    name: 'Brand Awareness — Tecno Eventos Branding General',
-    status: 'ACTIVE',
-    objective: 'ENGAGEMENT',
-    daily_budget: 5,
-    spend: 75.00,
-    impressions: 48500,
-    clicks: 220,
-    ctr: 0.45,
-    cpc: 0.34,
-    cpm: 1.54,
-    conversions: 0,
-    cpa: 75.00,
-    roas: 0.0,
-    status_verdict: 'fatiga',
-    trend_vs_last_week: 'deteriorandose',
-    recommendation: 'FATIGA SEVERA: CTR cayó por debajo del 0.5%. El anuncio ya no engancha a la audiencia. Reemplazar urgente por un Reel orgánico ganador.',
-  },
-];
-
 export class MetaAdsIntelligenceEngine {
   /**
    * Ejecuta el análisis determinístico completo de las campañas de Meta Ads
@@ -245,19 +163,6 @@ export class MetaAdsIntelligenceEngine {
           action_label: 'Exportar Creativo a Meta Ads',
         });
       }
-    }
-
-    // Si aún no hay posts con métricas cargadas, generamos la oportunidad del Reel estrella del comercio
-    if (opportunities.length === 0) {
-      opportunities.push({
-        reel_id: 'rec_reel_dd',
-        reel_title: 'Cómo va display digital en tu negocio. @shop_plumas',
-        organic_score: 92,
-        why_it_works: 'Muestra una instalación real en un comercio de moda con resultado visual inmediato. Convierte dudas de prospectos en prueba social tangible.',
-        suggested_ad_campaign: 'Reemplazar el anuncio fatigado "Brand Awareness" por este video en ubicación Reels de Instagram y Facebook.',
-        estimated_cpa_reduction_pct: 42,
-        action_label: 'Crear Anuncio con este Reel',
-      });
     }
 
     return opportunities;
