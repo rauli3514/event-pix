@@ -558,6 +558,18 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ busine
           <span>{warningMsg}</span>
         </div>
       )}
+
+      {/* Si ningún Reel trajo reach/impressions reales, mostramos el motivo
+          exacto que reportó Meta en vez de dejar "Sin dato" sin explicación. */}
+      {reels.length > 0 && reelsWithReach.length === 0 && (
+        <div className="mx-4 mt-3 flex items-start gap-2 text-[11px] text-rose-300 bg-rose-950/30 border border-rose-500/30 rounded-xl px-3 py-2">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+          <span>
+            Se sincronizaron tus Reels pero Meta no devolvió métricas de alcance/interacciones para ninguno.
+            {reels[0]?.insights?.unavailable_reason ? ` Motivo: ${reels[0].insights.unavailable_reason}` : ''}
+          </span>
+        </div>
+      )}
       {/* Profile Header */}
       <div className="px-4 pt-3 pb-2 space-y-2 shrink-0 bg-slate-900/40 border-b border-slate-800/60">
         <div className="flex items-center gap-3">
