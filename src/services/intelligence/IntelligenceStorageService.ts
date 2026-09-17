@@ -163,11 +163,16 @@ export class IntelligenceStorageService {
    * Registra una nueva cuenta de cliente / comercio (Onboarding Multi-Tenant)
    */
   static async registerClientAccount(params: NewClientRegistrationParams): Promise<IntelligenceBusiness> {
-    const cleanHandle = params.instagramHandle.trim().startsWith('@') 
-      ? params.instagramHandle.trim() 
+    const cleanHandle = params.instagramHandle.trim().startsWith('@')
+      ? params.instagramHandle.trim()
       : `@${params.instagramHandle.trim()}`;
-    
-    const newBizId = `biz_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+
+    // Antes esto generaba un id de texto ("biz_172...") que la columna
+    // UUID de Supabase rechazaba en silencio (atrapado por el try/catch de
+    // abajo): el negocio nunca se creaba de verdad en la base, solo vivía
+    // en localStorage. Un UUID real es indispensable para que el negocio
+    // exista de verdad y el webhook de WhatsApp/Instagram pueda encontrarlo.
+    const newBizId = crypto.randomUUID();
     const newBiz: IntelligenceBusiness = {
       id: newBizId,
       user_id: `user_${Date.now()}`,
@@ -184,14 +189,34 @@ export class IntelligenceStorageService {
     const isSupa = await this.testSupabase();
     if (isSupa) {
       try {
-        await supabase.from('intelligence_businesses').upsert({
-          id: newBiz.id,
-          name: newBiz.name,
-          instagram_handle: newBiz.instagram_handle,
-          niche: newBiz.niche,
-          target_audience: newBiz.target_audience,
-          brand_tone: newBiz.brand_tone
-        });
+        const { data: authData } = await supabase.auth.getUser();
+
+        if (authData?.user) {
+          // Hay una sesión real (recién registrado o el super_admin creando
+          // un cliente): usamos la función que crea el negocio Y lo vincula
+          // a esa cuenta en intelligence_business_users en el mismo paso.
+          // Las políticas RLS no dejan insertar intelligence_businesses
+          // directo a nadie que no sea super_admin, así que sin esto el
+          // dueño real del negocio quedaba sin acceso a su propio panel.
+          const { error: rpcError } = await supabase.rpc('register_intelligence_business', {
+            p_id: newBiz.id,
+            p_name: newBiz.name,
+            p_instagram_handle: newBiz.instagram_handle,
+            p_niche: newBiz.niche,
+            p_target_audience: newBiz.target_audience,
+            p_brand_tone: newBiz.brand_tone
+          });
+          if (rpcError) console.warn('Error vinculando negocio al usuario:', rpcError);
+        } else {
+          await supabase.from('intelligence_businesses').upsert({
+            id: newBiz.id,
+            name: newBiz.name,
+            instagram_handle: newBiz.instagram_handle,
+            niche: newBiz.niche,
+            target_audience: newBiz.target_audience,
+            brand_tone: newBiz.brand_tone
+          });
+        }
 
         // Crear también en display_commerces para Cartelería Digital
         await supabase.from('display_commerces').upsert({
