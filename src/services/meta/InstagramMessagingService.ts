@@ -4,8 +4,6 @@
 // EventPix Intelligence — SaaS Platform
 // ================================================================
 
-const GRAPH_BASE = 'https://graph.instagram.com/v21.0';
-
 export interface InstagramTestResult {
   success: boolean;
   instagramAccountId?: string;
@@ -17,6 +15,10 @@ export class InstagramMessagingService {
   /**
    * Prueba la validez del token y el ID de la cuenta de Instagram Business
    */
+  // graph.instagram.com no responde el preflight CORS que exige un fetch
+  // con header Authorization, así que llamarlo directo desde el navegador
+  // siempre falla con "Failed to fetch" sin importar si el token es válido.
+  // Pasa por un proxy serverless (server-to-server, sin problema de CORS).
   static async testConnection(
     accessToken: string,
     instagramAccountId: string
@@ -29,25 +31,23 @@ export class InstagramMessagingService {
     }
 
     try {
-      const url = `${GRAPH_BASE}/${instagramAccountId.trim()}?fields=id,username`;
-      const res = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${accessToken.trim()}`
-        }
+      const res = await fetch('/api/instagram-connection-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accessToken: accessToken.trim(),
+          instagramAccountId: instagramAccountId.trim()
+        })
       });
-
       const data = await res.json();
 
-      if (!res.ok || data.error) {
-        return {
-          success: false,
-          error: data.error?.message || `Error de Meta API (${res.status})`
-        };
+      if (!data.success) {
+        return { success: false, error: data.error || `Error de Meta API (${res.status})` };
       }
 
       return {
         success: true,
-        instagramAccountId: data.id,
+        instagramAccountId: data.instagramAccountId,
         username: data.username
       };
     } catch (err: any) {
