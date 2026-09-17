@@ -429,10 +429,14 @@ export class MetaGraphService {
     }
 
     try {
+      // "plays" fue reemplazado por "views" en versiones recientes de la
+      // Graph API — Meta rechaza la llamada ENTERA si incluye un nombre de
+      // métrica inválido, así que ese solo campo viejo tiraba abajo las
+      // insights de absolutamente todos los Reels, no solo esa métrica.
       const data = await MetaGraphService.apiFetch<{ data: Array<{ name: string; values: Array<{ value: number }> }> }>(
         `/${mediaId}/insights`,
         {
-          metric: 'impressions,reach,saved,shares,plays,total_interactions',
+          metric: 'impressions,reach,saved,shares,views,total_interactions',
         },
         businessId
       );
@@ -455,7 +459,7 @@ export class MetaGraphService {
         reach: metricsMap['reach'],
         saved: metricsMap['saved'],
         shares: metricsMap['shares'],
-        plays: metricsMap['plays'],
+        plays: metricsMap['views'],
         total_interactions: metricsMap['total_interactions'],
         unavailable: !hasAny,
         unavailable_reason: hasAny
