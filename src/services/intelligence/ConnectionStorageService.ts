@@ -115,6 +115,12 @@ export class ConnectionStorageService {
         isActive: false,
         status: 'disconnected'
       },
+      instagram: {
+        accessToken: '',
+        instagramAccountId: '',
+        isActive: false,
+        status: 'disconnected'
+      },
       shopDePlumas: {
         supabaseUrl: DEFAULT_SHOP_DE_PLUMAS_URL,
         supabaseAnonKey: DEFAULT_SHOP_DE_PLUMAS_KEY,
@@ -189,6 +195,12 @@ export class ConnectionStorageService {
             phoneNumberId: parsed.whatsapp?.phoneNumberId?.trim() || defaultState.whatsapp.phoneNumberId,
             wabaId: parsed.whatsapp?.wabaId?.trim() || defaultState.whatsapp.wabaId
           },
+          instagram: {
+            ...defaultState.instagram,
+            ...(parsed.instagram || {}),
+            accessToken: parsed.instagram?.accessToken?.trim() || defaultState.instagram.accessToken,
+            instagramAccountId: parsed.instagram?.instagramAccountId?.trim() || defaultState.instagram.instagramAccountId
+          },
           shopDePlumas: { ...defaultState.shopDePlumas, ...(parsed.shopDePlumas || {}) }
         };
       }
@@ -238,6 +250,7 @@ export class ConnectionStorageService {
     if (state.claude?.apiKey?.trim() && (state.claude.isActive || state.claude.status === 'connected')) count++;
     if (state.gemini?.apiKey?.trim() && (state.gemini.isActive || state.gemini.status === 'connected')) count++;
     if (state.whatsapp?.accessToken?.trim() && state.whatsapp.isActive) count++;
+    if (state.instagram?.accessToken?.trim() && state.instagram.isActive) count++;
     if (state.shopDePlumas?.isActive) count++;
     return count;
   }

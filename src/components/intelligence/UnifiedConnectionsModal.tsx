@@ -8,12 +8,13 @@ import React, { useState, useEffect } from 'react';
 import {
   X, CheckCircle2, Loader2, Sparkles,
   MessageSquare, ShoppingBag, Eye, EyeOff, Check,
-  Bot, RefreshCw, Key, ShieldCheck, Zap, AlertTriangle
+  Bot, RefreshCw, Key, ShieldCheck, Zap, AlertTriangle, Instagram
 } from 'lucide-react';
 import { UnifiedConnectionsState } from '../../types/connections';
 import { ConnectionStorageService } from '../../services/intelligence/ConnectionStorageService';
 import { AIProviderService } from '../../services/intelligence/AIProviderService';
 import { WhatsAppCloudService } from '../../services/meta/WhatsAppCloudService';
+import { InstagramMessagingService } from '../../services/meta/InstagramMessagingService';
 import { ShopDePlumasSyncService } from '../../services/intelligence/ShopDePlumasSyncService';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
@@ -42,7 +43,7 @@ export const UnifiedConnectionsModal: React.FC<UnifiedConnectionsModalProps> = (
     return ConnectionStorageService.loadConnections(businessId);
   });
 
-  const [activeTab, setActiveTab] = useState<'openai' | 'claude' | 'gemini' | 'whatsapp' | 'shop_plumas'>(
+  const [activeTab, setActiveTab] = useState<'openai' | 'claude' | 'gemini' | 'whatsapp' | 'instagram' | 'shop_plumas'>(
     isSuperAdmin ? 'openai' : 'whatsapp'
   );
 
@@ -65,12 +66,14 @@ export const UnifiedConnectionsModal: React.FC<UnifiedConnectionsModalProps> = (
   const [showKeyClaude, setShowKeyClaude] = useState(false);
   const [showKeyGemini, setShowKeyGemini] = useState(false);
   const [showTokenWhatsApp, setShowTokenWhatsApp] = useState(false);
+  const [showTokenInstagram, setShowTokenInstagram] = useState(false);
 
   // Estados de carga de tests
   const [isTestingOpenAI, setIsTestingOpenAI] = useState(false);
   const [isTestingClaude, setIsTestingClaude] = useState(false);
   const [isTestingGemini, setIsTestingGemini] = useState(false);
   const [isTestingWhatsApp, setIsTestingWhatsApp] = useState(false);
+  const [isTestingInstagram, setIsTestingInstagram] = useState(false);
   const [isSyncingPlumas, setIsSyncingPlumas] = useState(false);
 
   if (!isOpen) return null;
@@ -252,6 +255,59 @@ export const UnifiedConnectionsModal: React.FC<UnifiedConnectionsModalProps> = (
     }
   };
 
+  // 4b. Probar Instagram Messaging API
+  const handleTestInstagram = async () => {
+    setIsTestingInstagram(true);
+    const result = await InstagramMessagingService.testConnection(
+      connections.instagram.accessToken,
+      connections.instagram.instagramAccountId
+    );
+    setIsTestingInstagram(false);
+
+    if (result.success) {
+      const updated: UnifiedConnectionsState = {
+        ...connections,
+        instagram: {
+          ...connections.instagram,
+          status: 'connected',
+          isActive: true,
+          username: result.username,
+          errorMessage: undefined,
+          lastTestedAt: new Date().toISOString()
+        }
+      };
+      setConnections(updated);
+      ConnectionStorageService.saveConnections(businessId, updated);
+      onConnectionsUpdated?.(updated);
+      toast.success(`¡Instagram Verificado! @${result.username || 'OK'}`);
+
+      // El bot corre en el servidor: necesita poder leer esta cuenta/token
+      // desde la base de datos, no alcanza con guardarlo en este navegador.
+      try {
+        await supabase
+          .from('intelligence_businesses')
+          .update({
+            instagram_account_id: connections.instagram.instagramAccountId.trim(),
+            instagram_access_token: connections.instagram.accessToken.trim()
+          })
+          .eq('id', businessId);
+      } catch (err) {
+        console.warn('No se pudo sincronizar Instagram con Supabase:', err);
+      }
+    } else {
+      const updated: UnifiedConnectionsState = {
+        ...connections,
+        instagram: {
+          ...connections.instagram,
+          status: 'error',
+          errorMessage: result.error
+        }
+      };
+      setConnections(updated);
+      toast.error(`Fallo Instagram: ${result.error}`);
+    }
+  };
+
   // 4. Sincronizar Catálogo Shop de Plumas
   const handleSyncShopDePlumas = async () => {
     setIsSyncingPlumas(true);
@@ -362,7 +418,7 @@ export const UnifiedConnectionsModal: React.FC<UnifiedConnectionsModalProps> = (
                     ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' 
                     : 'bg-slate-800 text-slate-400'
                 }`}>
-                  {activeCount} / 5 Conectadas
+                  {activeCount} / 6 Conectadas
                 </span>
               </div>
               <p className="text-xs text-slate-400">
@@ -440,6 +496,21 @@ export const UnifiedConnectionsModal: React.FC<UnifiedConnectionsModalProps> = (
             <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
             <span>WhatsApp Cloud API</span>
             {connections.whatsapp.status === 'connected' && (
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('instagram')}
+            className={`px-3.5 py-2 rounded-xl flex items-center gap-2 font-semibold transition-all whitespace-nowrap ${
+              activeTab === 'instagram'
+                ? 'bg-violet-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+            }`}
+          >
+            <Instagram className="w-3.5 h-3.5 text-pink-400" />
+            <span>Instagram DM</span>
+            {connections.instagram.status === 'connected' && (
               <span className="w-2 h-2 rounded-full bg-emerald-400" />
             )}
           </button>
@@ -874,6 +945,94 @@ export const UnifiedConnectionsModal: React.FC<UnifiedConnectionsModalProps> = (
                   <div className="p-3 bg-emerald-950/20 border border-emerald-500/30 rounded-xl text-emerald-300 flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                     <span>Número activo en Meta: <strong>{connections.whatsapp.displayPhoneNumber}</strong> ({connections.whatsapp.verifiedName || 'Verificado'})</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: INSTAGRAM DM */}
+          {activeTab === 'instagram' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-3.5 bg-slate-950/60 border border-slate-800 rounded-2xl">
+                <div>
+                  <h4 className="font-bold text-slate-200 flex items-center gap-2">
+                    Instagram API (Mensajes Directos)
+                  </h4>
+                  <p className="text-slate-400 text-[11px]">
+                    Respuestas automáticas con IA a los DM de Instagram, grounded en tu catálogo real
+                  </p>
+                </div>
+                <span className={`px-2.5 py-1 rounded-xl font-bold flex items-center gap-1.5 ${
+                  connections.instagram.status === 'connected'
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                    : 'bg-slate-800 text-slate-400'
+                }`}>
+                  {connections.instagram.status === 'connected' ? <CheckCircle2 className="w-3.5 h-3.5" /> : null}
+                  {connections.instagram.status === 'connected' ? 'Verificado' : 'Sin Configurar'}
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">
+                    Access Token de Instagram:
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showTokenInstagram ? 'text' : 'password'}
+                      value={connections.instagram.accessToken}
+                      onChange={e => setConnections({
+                        ...connections,
+                        instagram: { ...connections.instagram, accessToken: e.target.value }
+                      })}
+                      placeholder="IGAA..."
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 pr-10 text-slate-200 font-mono focus:outline-none focus:border-pink-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowTokenInstagram(!showTokenInstagram)}
+                      className="absolute right-3 top-2.5 text-slate-500 hover:text-slate-300"
+                    >
+                      {showTokenInstagram ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">
+                      Instagram Account ID:
+                    </label>
+                    <input
+                      type="text"
+                      value={connections.instagram.instagramAccountId}
+                      onChange={e => setConnections({
+                        ...connections,
+                        instagram: { ...connections.instagram, instagramAccountId: e.target.value }
+                      })}
+                      placeholder="Ej: 178956234..."
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 font-mono focus:outline-none focus:border-pink-500"
+                    />
+                  </div>
+
+                  <div className="flex items-end">
+                    <button
+                      type="button"
+                      onClick={handleTestInstagram}
+                      disabled={isTestingInstagram || !connections.instagram.accessToken.trim() || !connections.instagram.instagramAccountId.trim()}
+                      className="w-full py-2 px-4 rounded-xl bg-pink-600 hover:bg-pink-500 disabled:bg-slate-800 disabled:text-slate-600 text-white font-bold flex items-center justify-center gap-2 transition-all"
+                    >
+                      {isTestingInstagram ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                      Verificar Cuenta en Meta
+                    </button>
+                  </div>
+                </div>
+
+                {connections.instagram.username && (
+                  <div className="p-3 bg-emerald-950/20 border border-emerald-500/30 rounded-xl text-emerald-300 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>Cuenta activa en Meta: <strong>@{connections.instagram.username}</strong></span>
                   </div>
                 )}
               </div>

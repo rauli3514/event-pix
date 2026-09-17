@@ -37,6 +37,16 @@ export interface WhatsAppConnection {
   lastTestedAt?: string;
 }
 
+export interface InstagramConnection {
+  accessToken: string;
+  instagramAccountId: string;
+  username?: string;
+  isActive: boolean;
+  status: ConnectionStatus;
+  errorMessage?: string;
+  lastTestedAt?: string;
+}
+
 export interface ShopProduct {
   id: string;
   code?: string;
@@ -81,5 +91,6 @@ export interface UnifiedConnectionsState {
   claude: ClaudeConnection;
   gemini: GeminiConnection;
   whatsapp: WhatsAppConnection;
+  instagram: InstagramConnection;
   shopDePlumas: ShopDePlumasConnection;
 }
