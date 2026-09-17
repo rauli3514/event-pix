@@ -163,7 +163,8 @@ export interface CRMFunnelMetrics {
   deals_lost: number;
   conversion_rate_pct: number;
   total_sales_value: number;
-  avg_response_time_minutes: number;
+  /** null cuando no hay suficientes mensajes reales para calcularlo (nunca se inventa un tiempo). */
+  avg_response_time_minutes: number | null;
   top_converting_content: {
     post_id: string;
     post_title: string;

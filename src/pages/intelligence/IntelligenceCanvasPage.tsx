@@ -1053,6 +1053,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
           <BusinessAuditPanel
             business={business}
             auditReport={auditReport}
+            brandDna={brandDna}
             isOpen={isAuditOpen}
             onToggle={() => setIsAuditOpen(!isAuditOpen)}
             onAddReelToCanvas={handleAddReelFromMeta}

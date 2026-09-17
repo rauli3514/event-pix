@@ -248,9 +248,36 @@ export class CRMIntelligenceEngine {
       deals_lost: dealsLost,
       conversion_rate_pct: conversionRatePct,
       total_sales_value: totalSalesValue,
-      avg_response_time_minutes: 8, // Tiempo promedio de respuesta
+      avg_response_time_minutes: this.calculateAvgResponseMinutes(conversations),
       top_converting_content: topConvertingContent
     };
+  }
+
+  /**
+   * Tiempo real de respuesta: mide el gap entre cada mensaje del lead y la
+   * siguiente respuesta del negocio (operador o IA), promediado sobre todos
+   * los pares reales disponibles. Devuelve null si no hay mensajes cargados
+   * todavía — nunca un número inventado.
+   */
+  private static calculateAvgResponseMinutes(conversations: CRMConversation[]): number | null {
+    const gapsMinutes: number[] = [];
+
+    for (const conv of conversations) {
+      const msgs = conv.messages || [];
+      for (let i = 0; i < msgs.length - 1; i++) {
+        const current = msgs[i];
+        const next = msgs[i + 1];
+        const isReply = current.sender_type === 'lead' &&
+          (next.sender_type === 'operator' || next.sender_type === 'ai_auto');
+        if (!isReply) continue;
+
+        const gapMs = new Date(next.created_at).getTime() - new Date(current.created_at).getTime();
+        if (gapMs > 0) gapsMinutes.push(gapMs / 60000);
+      }
+    }
+
+    if (gapsMinutes.length === 0) return null;
+    return Number((gapsMinutes.reduce((s, g) => s + g, 0) / gapsMinutes.length).toFixed(1));
   }
 
   /**
@@ -321,21 +348,39 @@ export class CRMIntelligenceEngine {
       }
     }
 
-    // 4. Insight de contenido comercial de alto rendimiento
-    const leadsWithSource = conversations.map(c => c.lead).filter(l => l.source?.post_title);
+    // 4. Insight de contenido comercial de alto rendimiento — rankeado por
+    //    cuántos leads reales atribuye cada post, no por el primero que aparezca.
+    const leadsWithSource = conversations.map(c => c.lead).filter(l => l.source?.post_id && l.source?.post_title);
     if (leadsWithSource.length > 0) {
-      const bestPost = leadsWithSource[0].source;
-      opportunities.push({
-        id: `opp_content_${bestPost.post_id || 'top'}`,
-        type: 'content_converting',
-        title: `Contenido con mayor conversión a ventas`,
-        description: `El Reel "${bestPost.post_title}" generó consultas calificadas de alta intención comercial. Te recomendamos pautarlo o crear una secuencia similar.`,
-        severity: 'info',
-        action_label: 'Ver en Canvas',
-        post_id: bestPost.post_id,
-        suggested_action_type: 'view_content',
-        metric_highlight: 'Mayor ROI comercial'
-      });
+      const grouped = new Map<string, { post_id: string; post_title: string; count: number; totalIntent: number }>();
+      for (const lead of leadsWithSource) {
+        const id = lead.source.post_id!;
+        const existing = grouped.get(id);
+        if (existing) {
+          existing.count += 1;
+          existing.totalIntent += lead.intent_score;
+        } else {
+          grouped.set(id, { post_id: id, post_title: lead.source.post_title!, count: 1, totalIntent: lead.intent_score });
+        }
+      }
+      const ranked = Array.from(grouped.values()).sort((a, b) => b.count - a.count || b.totalIntent - a.totalIntent);
+      const bestPost = ranked[0];
+
+      // Con un solo lead atribuido la señal es demasiado débil para afirmar "mayor conversión".
+      if (bestPost && bestPost.count >= 2) {
+        const avgIntent = Math.round(bestPost.totalIntent / bestPost.count);
+        opportunities.push({
+          id: `opp_content_${bestPost.post_id}`,
+          type: 'content_converting',
+          title: `Contenido con mayor conversión a ventas`,
+          description: `El Reel "${bestPost.post_title}" generó ${bestPost.count} consultas con un score de intención promedio de ${avgIntent}/100. Te recomendamos pautarlo o crear una secuencia similar.`,
+          severity: 'info',
+          action_label: 'Ver en Canvas',
+          post_id: bestPost.post_id,
+          suggested_action_type: 'view_content',
+          metric_highlight: `${bestPost.count} leads atribuidos`
+        });
+      }
     }
 
     return opportunities;
@@ -357,7 +402,7 @@ export class CRMIntelligenceEngine {
       if (/(app|demo|sistema|como funciona)/i.test(lastText)) demoCount++;
     }
 
-    const pricePct = Math.round((priceCount / total) * 100) || 45;
+    const pricePct = Math.round((priceCount / total) * 100);
 
     return [
       {

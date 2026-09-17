@@ -196,6 +196,39 @@ export interface BusinessAuditReport {
   updated_at: string;
 }
 
+/**
+ * Radiografía completa del negocio: cruza contenido orgánico + Meta Ads +
+ * mensajes/CRM en un solo puntaje con 5 categorías. `score: null` en una
+ * categoría significa "todavía no hay suficiente dato real para medir esto"
+ * — nunca se rellena con un número inventado.
+ */
+export interface AuditCategoryScore {
+  score: number | null;
+  label: string;
+  detail: string;
+}
+
+export interface UnifiedBusinessAudit {
+  generated_at: string;
+  overall_score: number | null;
+  categories: {
+    crecimiento: AuditCategoryScore;
+    engagement: AuditCategoryScore;
+    contenido: AuditCategoryScore;
+    oportunidades: AuditCategoryScore;
+    consistencia: AuditCategoryScore;
+  };
+  priority_finding: string;
+  whats_working: string[];
+  whats_to_improve: string[];
+  action_plan: Array<{
+    title: string;
+    description: string;
+    priority: 'URGENTE' | 'ALTA' | 'MEDIA';
+  }>;
+  bio_audit: BioAudit;
+}
+
 export type NodeType = 'reel' | 'synthesis' | 'meta_business' | 'chatgpt' | 'claude' | 'canva' | 'automation_action' | 'display_digital' | 'ai_chat';
 
 export interface CanvasNodeData {

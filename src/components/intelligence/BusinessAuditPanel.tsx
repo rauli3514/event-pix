@@ -1,12 +1,16 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { BusinessAuditReport, IntelligenceBusiness, IntelligencePost } from '../../types/intelligence';
+import { BusinessAuditReport, IntelligenceBusiness, IntelligencePost, BrandDNA, UnifiedBusinessAudit } from '../../types/intelligence';
 import { Activity, AlertTriangle, CheckCircle, Lightbulb, ChevronRight, ChevronLeft, ArrowUpRight, Share2, Sparkles, MessageSquare, Bot, FileImage, ShieldCheck, Tv, Users, Instagram, Target } from 'lucide-react';
 import { CompetitorAnalysisPanel } from './CompetitorAnalysisPanel';
 import { MetaConnectionPanel } from './MetaConnectionPanel';
 import { MetaAdsAuditPanel } from './MetaAdsAuditPanel';
 import { MetaAdsIntelligenceEngine } from '../../services/intelligence/MetaAdsIntelligenceEngine';
+import { ContentIntelligenceEngine } from '../../services/intelligence/ContentIntelligenceEngine';
+import { CRMIntelligenceEngine } from '../../services/intelligence/CRMIntelligenceEngine';
+import { CRMStorageService } from '../../services/intelligence/CRMStorageService';
+import { UnifiedAuditEngine } from '../../services/intelligence/UnifiedAuditEngine';
 import { MetaAdCampaign } from '../../types/ads';
-import { MetaGraphService, MetaMediaItem, MetaMediaInsights } from '../../services/meta/MetaGraphService';
+import { MetaGraphService, MetaMediaItem, MetaMediaInsights, MetaProfileInsights } from '../../services/meta/MetaGraphService';
 import { toOptional, hasValue, averageAvailable } from '../../services/intelligence/metricUtils';
 import { toast } from 'sonner';
 
@@ -15,6 +19,7 @@ import { UnifiedConnectionsState } from '../../types/connections';
 interface BusinessAuditPanelProps {
   business: IntelligenceBusiness;
   auditReport: BusinessAuditReport;
+  brandDna: BrandDNA;
   isOpen: boolean;
   onToggle: () => void;
   onAddReelToCanvas?: (reel: MetaMediaItem & { insights?: MetaMediaInsights }) => void;
@@ -30,6 +35,7 @@ interface BusinessAuditPanelProps {
 export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
   business,
   auditReport,
+  brandDna,
   isOpen,
   onToggle,
   onAddReelToCanvas,
@@ -67,9 +73,10 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
   const [isLoadingAds, setIsLoadingAds] = useState(false);
 
   // Carga perezosa: recién pedimos campañas reales de Meta Ads cuando el
-  // usuario efectivamente abre la pestaña "Ads" de este negocio.
+  // usuario efectivamente abre la pestaña "Ads" (o la auditoría unificada,
+  // que también las necesita) de este negocio.
   useEffect(() => {
-    if (activeTab !== 'ads') return;
+    if (activeTab !== 'ads' && activeTab !== 'audit') return;
     let cancelled = false;
 
     (async () => {
@@ -100,6 +107,55 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
     );
   }, [adsCampaigns, posts, business.id, business.name]);
 
+  // ---- Auditoría Personalizada (radiografía unificada) ----
+  // Cruza contenido orgánico real + Meta Ads real + mensajes/CRM real.
+  const [unifiedAudit, setUnifiedAudit] = useState<UnifiedBusinessAudit | null>(null);
+  const [isLoadingUnifiedAudit, setIsLoadingUnifiedAudit] = useState(false);
+
+  useEffect(() => {
+    if (activeTab !== 'audit') return;
+    let cancelled = false;
+
+    (async () => {
+      setIsLoadingUnifiedAudit(true);
+      try {
+        const [conversations, tasks, profile] = await Promise.all([
+          CRMStorageService.loadConversations(business.id),
+          CRMStorageService.loadTasks(business.id),
+          MetaGraphService.getProfile(business.id).catch(() => null),
+        ]);
+
+        if (cancelled) return;
+
+        const organicReport = ContentIntelligenceEngine.generateExecutiveReport(
+          posts,
+          brandDna,
+          accountHandle || business.instagram_handle || auditReport.instagram_handle
+        );
+        const funnelMetrics = CRMIntelligenceEngine.calculateFunnelMetrics(conversations);
+        const opportunities = CRMIntelligenceEngine.detectCommercialOpportunities(conversations, tasks);
+
+        const built = UnifiedAuditEngine.build({
+          posts,
+          organicReport,
+          adsReport: adsCampaigns.length > 0 ? adsReport : null,
+          funnelMetrics,
+          opportunities,
+          profile: profile as MetaProfileInsights | null,
+        });
+
+        if (!cancelled) setUnifiedAudit(built);
+      } catch (err) {
+        console.warn('No se pudo calcular la auditoría unificada:', err);
+      } finally {
+        if (!cancelled) setIsLoadingUnifiedAudit(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, business.id, posts, adsCampaigns]);
+
   if (!isOpen) {
     return (
       <button
@@ -114,7 +170,8 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
     );
   }
 
-  const needleRotation = (auditReport.health_score / 100) * 180 - 90;
+  const displayScore = unifiedAudit?.overall_score ?? auditReport.health_score;
+  const needleRotation = (displayScore / 100) * 180 - 90;
 
   return (
     <aside className="w-72 sm:w-80 lg:w-[320px] shrink-0 bg-slate-950/95 border-l border-slate-800/80 h-[calc(100vh-4rem)] flex flex-col z-30 shadow-2xl backdrop-blur-xl transition-all duration-300">
@@ -193,8 +250,13 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
           <>
             <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-2xl flex flex-col items-center relative overflow-hidden">
               <div className="w-full flex items-center justify-between text-[11px] text-slate-400 mb-1">
-                <span>Calificación general del perfil</span>
-                <span className="text-emerald-400 font-mono font-bold">{auditReport.health_score}/100</span>
+                <span>Auditoría Personalizada</span>
+                {isLoadingUnifiedAudit && !unifiedAudit && (
+                  <span className="text-slate-500 flex items-center gap-1">
+                    <span className="w-2.5 h-2.5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+                    Calculando...
+                  </span>
+                )}
               </div>
 
               <div className="relative w-44 h-24 my-2 flex items-end justify-center">
@@ -211,10 +273,40 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
               </div>
 
               <div className="text-center">
-                <span className="text-xl font-black text-slate-100 font-mono tracking-tight">{auditReport.health_score} <span className="text-xs font-normal text-slate-400">/100</span></span>
-                <p className="text-[11px] font-semibold text-emerald-400">Excelente, sigue así</p>
+                <span className="text-xl font-black text-slate-100 font-mono tracking-tight">{displayScore} <span className="text-xs font-normal text-slate-400">/100</span></span>
+                <p className="text-[11px] font-semibold text-slate-400">
+                  {displayScore >= 75 ? 'Sólido — enfocate en escalar lo que funciona' : displayScore >= 50 ? 'Hay margen de mejora real' : 'Necesita atención prioritaria'}
+                </p>
               </div>
+
+              {/* 5 sub-puntajes: Crecimiento, Engagement, Contenido, Oportunidades, Consistencia */}
+              {unifiedAudit && (
+                <div className="grid grid-cols-5 gap-1 w-full mt-3 pt-3 border-t border-slate-800/80">
+                  {Object.values(unifiedAudit.categories).map((cat) => (
+                    <div key={cat.label} className="flex flex-col items-center gap-0.5" title={cat.detail}>
+                      <span className={`text-xs font-mono font-black ${
+                        cat.score === null ? 'text-slate-600' : cat.score >= 70 ? 'text-emerald-400' : cat.score >= 40 ? 'text-amber-400' : 'text-rose-400'
+                      }`}>
+                        {cat.score === null ? '—' : cat.score}
+                      </span>
+                      <span className="text-[8px] text-slate-500 uppercase font-bold text-center leading-tight">{cat.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
+
+            {unifiedAudit && (
+              <div className="bg-violet-950/20 border border-violet-500/30 p-3.5 rounded-xl space-y-1.5">
+                <h4 className="font-bold text-violet-300 flex items-center gap-1.5 text-xs">
+                  <AlertTriangle className="w-4 h-4 text-violet-400" />
+                  Hallazgo Prioritario
+                </h4>
+                <p className="text-slate-300 leading-relaxed text-[11px]">
+                  {unifiedAudit.priority_finding}
+                </p>
+              </div>
+            )}
 
             <div className="bg-slate-900/60 border border-slate-800/80 p-3.5 rounded-xl space-y-1.5">
               <h4 className="font-bold text-slate-200 flex items-center gap-1.5 text-xs">
@@ -243,35 +335,39 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
               </h4>
               <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 font-mono text-[11px] text-slate-300 whitespace-pre-wrap leading-relaxed">
                 <span className="text-[10px] text-slate-500 font-sans block mb-1 uppercase font-bold">Bio Actual:</span>
-                {auditReport?.bio_audit?.current_bio || 'Sin biografía cargada'}
+                {unifiedAudit?.bio_audit?.current_bio || 'Conectá tu cuenta de Instagram para auditar tu biografía real.'}
               </div>
 
-              <div className="bg-rose-950/20 border border-rose-500/30 p-2.5 rounded-xl space-y-1">
-                <span className="font-bold text-rose-400 flex items-center gap-1 text-[11px]">
-                  <AlertTriangle className="w-3.5 h-3.5" /> Fuga de Conversión por Fecha
-                </span>
-                <p className="text-slate-300 text-[11px] leading-relaxed">
-                  {auditReport?.bio_audit?.weaknesses?.[0] || 'Optimizar llamado a la acción comercial.'}
-                </p>
-              </div>
+              {unifiedAudit?.bio_audit?.weaknesses?.[0] && (
+                <div className="bg-rose-950/20 border border-rose-500/30 p-2.5 rounded-xl space-y-1">
+                  <span className="font-bold text-rose-400 flex items-center gap-1 text-[11px]">
+                    <AlertTriangle className="w-3.5 h-3.5" /> A Mejorar
+                  </span>
+                  <p className="text-slate-300 text-[11px] leading-relaxed">
+                    {unifiedAudit.bio_audit.weaknesses[0]}
+                  </p>
+                </div>
+              )}
 
-              <div className="bg-emerald-950/20 border border-emerald-500/30 p-2.5 rounded-xl space-y-1">
-                <span className="font-bold text-emerald-400 flex items-center gap-1 text-[11px]">
-                  <CheckCircle className="w-3.5 h-3.5" /> Recomendación Evergreen (Atemporal)
-                </span>
-                <p className="text-slate-300 text-[11px] leading-relaxed">
-                  {auditReport?.bio_audit?.recommendations?.[0] || 'Agregar enlace directo a WhatsApp o catálogo.'}
-                </p>
-              </div>
+              {unifiedAudit?.bio_audit?.recommendations?.[0] && (
+                <div className="bg-emerald-950/20 border border-emerald-500/30 p-2.5 rounded-xl space-y-1">
+                  <span className="font-bold text-emerald-400 flex items-center gap-1 text-[11px]">
+                    <CheckCircle className="w-3.5 h-3.5" /> Recomendación
+                  </span>
+                  <p className="text-slate-300 text-[11px] leading-relaxed">
+                    {unifiedAudit.bio_audit.recommendations[0]}
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
               <h4 className="font-bold text-emerald-400 flex items-center gap-1.5 text-xs uppercase tracking-wider">
                 <CheckCircle className="w-4 h-4 text-emerald-400" />
-                Fortalezas Detectadas
+                Qué Está Funcionando
               </h4>
               <div className="space-y-2">
-                {auditReport.strengths.map((item, idx) => (
+                {(unifiedAudit?.whats_working ?? auditReport.strengths).map((item, idx) => (
                   <div key={idx} className="bg-emerald-950/20 border border-emerald-500/20 p-2.5 rounded-xl text-slate-300 leading-snug flex items-start gap-2">
                     <span className="text-emerald-400 font-bold">•</span>
                     <span>{item}</span>
@@ -280,19 +376,43 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
               </div>
             </div>
 
+            {unifiedAudit && unifiedAudit.whats_to_improve.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="font-bold text-rose-400 flex items-center gap-1.5 text-xs uppercase tracking-wider">
+                  <AlertTriangle className="w-4 h-4 text-rose-400" />
+                  Qué Mejorar
+                </h4>
+                <div className="space-y-2">
+                  {unifiedAudit.whats_to_improve.map((item, idx) => (
+                    <div key={idx} className="bg-rose-950/20 border border-rose-500/20 p-2.5 rounded-xl text-slate-300 leading-snug flex items-start gap-2">
+                      <span className="text-rose-400 font-bold">•</span>
+                      <span>{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2.5 pt-2 border-t border-slate-800/80">
               <h4 className="font-bold text-slate-200 flex items-center justify-between text-xs">
                 <span className="flex items-center gap-1.5">
                   <ArrowUpRight className="w-4 h-4 text-violet-400" />
-                  Acciones a Aplicar
+                  Tu Plan de Acción
                 </span>
               </h4>
-              
+
               <div className="space-y-2">
-                {auditReport.immediate_actions.map((action, idx) => (
+                {(unifiedAudit?.action_plan ?? auditReport.immediate_actions.map(a => ({ title: a.title, description: a.description, priority: 'MEDIA' as const }))).map((action, idx) => (
                   <div key={idx} className="bg-slate-900 border border-slate-800 p-3 rounded-xl space-y-1">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <span className="font-bold text-slate-200 text-[11px]">{action.title}</span>
+                      <span className={`shrink-0 px-1.5 py-0.5 rounded-md text-[9px] font-bold ${
+                        action.priority === 'URGENTE' ? 'bg-rose-500/20 text-rose-300' :
+                        action.priority === 'ALTA' ? 'bg-amber-500/20 text-amber-300' :
+                        'bg-slate-700/50 text-slate-400'
+                      }`}>
+                        {action.priority}
+                      </span>
                     </div>
                     <p className="text-slate-400 text-[11px] leading-relaxed">
                       {action.description}
