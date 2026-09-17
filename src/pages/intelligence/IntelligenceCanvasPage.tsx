@@ -765,10 +765,10 @@ export const IntelligenceCanvasPage: React.FC = () => {
   };
 
   const handleResetToZero = useCallback(async () => {
-    if (window.confirm('¿Seguro que querés reiniciar todo a 0? Se limpiarán los datos demo del CRM, lienzo y publicaciones para comenzar únicamente con tus datos reales.')) {
+    if (window.confirm('¿Seguro que querés reiniciar todo a 0? Se limpiarán el lienzo, publicaciones y reportes de este negocio para comenzar únicamente con tus datos reales. Las conversaciones reales del CRM no se tocan.')) {
       const ownHandle = business.instagram_handle || accountHandle;
-      IntelligenceStorageService.clearAllData();
-      CRMStorageService.clearAllData();
+      await IntelligenceStorageService.clearAllData(business.id);
+      CRMStorageService.clearAllData(business.id);
       MetaGraphService.clearCredentials();
       setAccountHandle(ownHandle);
       setPosts([]);

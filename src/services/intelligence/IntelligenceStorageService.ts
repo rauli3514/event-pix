@@ -477,9 +477,9 @@ export class IntelligenceStorageService {
   // =========================================================================
 
   static async savePosts(businessId: string, posts: IntelligencePost[]): Promise<boolean> {
-    // Cache local
+    // Cache local aislada a ESTE negocio
     try {
-      localStorage.setItem(LOCAL_STORAGE_KEYS.POSTS, JSON.stringify(posts));
+      localStorage.setItem(`${LOCAL_STORAGE_KEYS.POSTS}_${businessId}`, JSON.stringify(posts));
     } catch (e) {
       console.error(e);
     }
@@ -525,7 +525,11 @@ export class IntelligenceStorageService {
           .eq('business_id', businessId)
           .order('published_at', { ascending: false });
 
-        if (!error && data && data.length > 0) {
+        // Supabase respondió: confiamos en su resultado tal cual, incluso si
+        // está vacío (negocio nuevo sin posts todavía). Antes, un array vacío
+        // caía al cache local sin scopear y terminaba mostrando los posts de
+        // OTRO negocio.
+        if (!error && data) {
           return data.map(row => ({
             id: row.id,
             business_id: row.business_id,
@@ -545,7 +549,8 @@ export class IntelligenceStorageService {
       }
     }
 
-    const cached = localStorage.getItem(LOCAL_STORAGE_KEYS.POSTS);
+    // Supabase no disponible: fallback a caché local aislada a ESTE negocio.
+    const cached = localStorage.getItem(`${LOCAL_STORAGE_KEYS.POSTS}_${businessId}`);
     if (cached) {
       try {
         return JSON.parse(cached);
@@ -566,9 +571,9 @@ export class IntelligenceStorageService {
     report: ExecutiveIntelligenceReport
   ): Promise<boolean> {
     try {
-      const existing = this.loadLocalReports();
+      const existing = this.loadLocalReports(businessId);
       existing.unshift(report);
-      localStorage.setItem(LOCAL_STORAGE_KEYS.REPORTS, JSON.stringify(existing.slice(0, 10)));
+      localStorage.setItem(`${LOCAL_STORAGE_KEYS.REPORTS}_${businessId}`, JSON.stringify(existing.slice(0, 10)));
     } catch (e) {
       console.error(e);
     }
@@ -591,8 +596,8 @@ export class IntelligenceStorageService {
     return true;
   }
 
-  private static loadLocalReports(): ExecutiveIntelligenceReport[] {
-    const cached = localStorage.getItem(LOCAL_STORAGE_KEYS.REPORTS);
+  private static loadLocalReports(businessId: string): ExecutiveIntelligenceReport[] {
+    const cached = localStorage.getItem(`${LOCAL_STORAGE_KEYS.REPORTS}_${businessId}`);
     if (cached) {
       try {
         return JSON.parse(cached);
@@ -614,7 +619,7 @@ export class IntelligenceStorageService {
   ): Promise<boolean> {
     try {
       localStorage.setItem(
-        LOCAL_STORAGE_KEYS.CANVAS,
+        `${LOCAL_STORAGE_KEYS.CANVAS}_${businessId}`,
         JSON.stringify({ nodes, edges, updated_at: new Date().toISOString() })
       );
     } catch (e) {
@@ -656,18 +661,25 @@ export class IntelligenceStorageService {
           .eq('business_id', businessId)
           .maybeSingle();
 
-        if (!error && data && data.nodes) {
-          return {
-            nodes: data.nodes as CanvasNode[],
-            edges: (data.edges || []) as CanvasEdge[],
-          };
+        // Supabase respondió: confiamos en su resultado. Si este negocio no
+        // tiene canvas guardado todavía (data null), devolvemos null en vez
+        // de caer al cache sin scopear de OTRO negocio.
+        if (!error) {
+          if (data && data.nodes) {
+            return {
+              nodes: data.nodes as CanvasNode[],
+              edges: (data.edges || []) as CanvasEdge[],
+            };
+          }
+          return null;
         }
       } catch (err) {
         console.warn('Error al cargar estado del canvas desde Supabase:', err);
       }
     }
 
-    const cached = localStorage.getItem(LOCAL_STORAGE_KEYS.CANVAS);
+    // Supabase no disponible: fallback a caché local aislada a ESTE negocio.
+    const cached = localStorage.getItem(`${LOCAL_STORAGE_KEYS.CANVAS}_${businessId}`);
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
@@ -788,20 +800,65 @@ export class IntelligenceStorageService {
     }
   }
 
-  static clearAllData(): void {
+  /**
+   * "Reiniciar a 0" real: la versión anterior solo borraba claves globales
+   * legacy que ya nadie escribe (todo se guarda scopeado por negocio como
+   * `${KEY}_${businessId}`), así que en la práctica no borraba nada y el
+   * negocio seguía mostrando su contenido "viejo" después de resetear.
+   * Ahora borra el cache local de ESTE negocio y, cuando hay Supabase
+   * disponible, también su propio canvas/posts/reportes guardados (no toca
+   * conversaciones de CRM: esas son mensajes reales de clientes, no datos
+   * de análisis/estrategia, y no deben poder borrarse sin querer).
+   */
+  static async clearAllData(businessId: string): Promise<void> {
     try {
+      // Claves legacy sin scopear (por si quedó algo de versiones viejas)
       localStorage.removeItem(LOCAL_STORAGE_KEYS.BUSINESS);
       localStorage.removeItem(LOCAL_STORAGE_KEYS.BRAND_DNA);
       localStorage.removeItem(LOCAL_STORAGE_KEYS.POSTS);
       localStorage.removeItem(LOCAL_STORAGE_KEYS.REPORTS);
       localStorage.removeItem(LOCAL_STORAGE_KEYS.CANVAS);
-      localStorage.removeItem(LOCAL_STORAGE_KEYS.BENCHMARK);
-      localStorage.removeItem(LOCAL_STORAGE_KEYS.HYPOTHESES);
-      localStorage.removeItem(LOCAL_STORAGE_KEYS.EXPERIMENTS);
-      localStorage.removeItem(LOCAL_STORAGE_KEYS.LEARNED_INSIGHTS);
-      localStorage.removeItem('eventpix_competitors');
+      localStorage.removeItem(LOCAL_STORAGE_KEYS.PROFILE_CONTEXT);
+
+      // Claves reales, scopeadas a este negocio
+      localStorage.removeItem(`${LOCAL_STORAGE_KEYS.BRAND_DNA}_${businessId}`);
+      localStorage.removeItem(`${LOCAL_STORAGE_KEYS.PROFILE_CONTEXT}_${businessId}`);
+      localStorage.removeItem(`${LOCAL_STORAGE_KEYS.POSTS}_${businessId}`);
+      localStorage.removeItem(`${LOCAL_STORAGE_KEYS.REPORTS}_${businessId}`);
+      localStorage.removeItem(`${LOCAL_STORAGE_KEYS.CANVAS}_${businessId}`);
+
+      // Mapas compartidos: solo borrar la entrada de ESTE negocio, no el mapa entero
+      for (const key of [
+        LOCAL_STORAGE_KEYS.BENCHMARK,
+        LOCAL_STORAGE_KEYS.HYPOTHESES,
+        LOCAL_STORAGE_KEYS.EXPERIMENTS,
+        LOCAL_STORAGE_KEYS.LEARNED_INSIGHTS,
+      ]) {
+        const stored = localStorage.getItem(key);
+        if (!stored) continue;
+        try {
+          const map = JSON.parse(stored);
+          delete map[businessId];
+          localStorage.setItem(key, JSON.stringify(map));
+        } catch {
+          // ignore
+        }
+      }
     } catch (e) {
       console.error('Error al limpiar datos locales:', e);
+    }
+
+    const isSupa = await this.testSupabase();
+    if (!isSupa) return;
+
+    try {
+      await Promise.all([
+        supabase.from('intelligence_posts').delete().eq('business_id', businessId),
+        supabase.from('intelligence_reports').delete().eq('business_id', businessId),
+        supabase.from('intelligence_canvas_state').delete().eq('business_id', businessId),
+      ]);
+    } catch (err) {
+      console.warn('Error al limpiar datos de Supabase en el reset:', err);
     }
   }
 }

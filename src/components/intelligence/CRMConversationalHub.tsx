@@ -24,7 +24,6 @@ import {
 } from '../../types/crm';
 import { CRMIntelligenceEngine } from '../../services/intelligence/CRMIntelligenceEngine';
 import { CRMStorageService } from '../../services/intelligence/CRMStorageService';
-import { INITIAL_CRM_CONVERSATIONS } from '../../services/intelligence/mockCRMData';
 import { BrandDNA } from '../../types/intelligence';
 import { AutomationRuleBuilderModal } from './AutomationRuleBuilderModal';
 import { ConnectionStorageService } from '../../services/intelligence/ConnectionStorageService';
@@ -215,7 +214,12 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
   // Cambiar etapa del Lead
   const handleStageChange = async (newStage: LeadStage) => {
     if (!activeConversation) return;
-    const updated = await CRMStorageService.updateLeadStage(activeConversation.id, newStage);
+    await CRMStorageService.updateLeadStage(businessId, activeConversation.lead.id, newStage);
+    const updated = conversations.map(c =>
+      c.id === activeConversation.id
+        ? { ...c, lead: { ...c.lead, stage: newStage, updated_at: new Date().toISOString() }, updated_at: new Date().toISOString() }
+        : c
+    );
     setConversations(updated);
     toast.success(`Lead movido a etapa: ${newStage.toUpperCase()}`);
   };
@@ -276,7 +280,17 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
       });
 
       if (res.updatedScore && res.updatedScore !== activeConversation.lead.intent_score) {
-        const updated = await CRMStorageService.updateLeadScore(activeConversation.lead.id, res.updatedScore);
+        const newScore = res.updatedScore;
+        await CRMStorageService.updateLeadScore(businessId, activeConversation.lead.id, newScore);
+        let label = activeConversation.lead.intent_label;
+        if (newScore >= 80) label = 'Listo para Comprar';
+        else if (newScore >= 60) label = 'Alta Intención';
+        else if (newScore >= 40) label = 'Interesado';
+        const updated = conversations.map(c =>
+          c.lead.id === activeConversation.lead.id
+            ? { ...c, lead: { ...c.lead, intent_score: newScore, intent_label: label, updated_at: new Date().toISOString() }, updated_at: new Date().toISOString() }
+            : c
+        );
         setConversations(updated);
       }
 
@@ -396,7 +410,7 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
     const text = contentToSend || messageInput;
     if (!text.trim() || !activeConversation) return;
 
-    const { updated } = await CRMStorageService.sendMessage(activeConversation.id, {
+    const newMessage = await CRMStorageService.insertMessage(activeConversation.id, {
       conversation_id: activeConversation.id,
       sender_type: 'operator',
       sender_name: 'Asesor Comercial',
@@ -405,7 +419,20 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
       message_type: 'business_initiated'
     });
 
-    setConversations(updated);
+    if (newMessage) {
+      const updated = conversations.map(c =>
+        c.id === activeConversation.id
+          ? {
+              ...c,
+              unread_count: 0,
+              messages: [...(c.messages || []), newMessage],
+              last_message: newMessage,
+              updated_at: new Date().toISOString()
+            }
+          : c
+      );
+      setConversations(updated);
+    }
     setMessageInput('');
     setIsEditingSuggestion(false);
 
@@ -765,21 +792,6 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
                         </button>
                       )}
 
-                      {conversations.length === 0 && (
-                        <div>
-                          <button
-                            onClick={async () => {
-                              await CRMStorageService.saveConversations(businessId, INITIAL_CRM_CONVERSATIONS);
-                              setConversations(INITIAL_CRM_CONVERSATIONS);
-                              setSelectedConvId(INITIAL_CRM_CONVERSATIONS[0].id);
-                              toast.success('Leads de prueba cargados con éxito.');
-                            }}
-                            className="mt-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all inline-flex items-center gap-2 shadow-lg shadow-emerald-950"
-                          >
-                            🧪 Cargar Leads de Prueba
-                          </button>
-                        </div>
-                      )}
                     </div>
                   ) : (
                     filteredConversations.map(conv => {

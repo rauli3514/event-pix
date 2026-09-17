@@ -159,7 +159,7 @@ export class AutomationEngineService {
 
     if (rule.action_type === 'send_auto_reply' && shouldAutoSend) {
       // Envío automático al chat
-      const { newMessage } = await CRMStorageService.sendMessage(conversation.id, {
+      const newMessage = await CRMStorageService.insertMessage(conversation.id, {
         conversation_id: conversation.id,
         sender_type: 'operator',
         sender_name: 'Bot EventPix (Automatización)',
@@ -167,7 +167,7 @@ export class AutomationEngineService {
         status: 'sent',
         message_type: 'business_initiated'
       });
-      autoMessageSent = newMessage;
+      autoMessageSent = newMessage || undefined;
       notificationMessage = `⚡ Auto-respuesta despachada al cliente "${conversation.lead.name}".`;
     } else if (rule.action_type === 'suggest_ai_response' || !shouldAutoSend) {
       // Modo Asistido / Sugerencia Humana
@@ -178,7 +178,7 @@ export class AutomationEngineService {
     // 2. Actualización de Etapa en el Embudo (Pipeline)
     const targetStage = rule.action_payload?.target_stage;
     if (targetStage && targetStage !== conversation.lead.stage) {
-      await CRMStorageService.updateLeadStage(conversation.id, targetStage);
+      await CRMStorageService.updateLeadStage(businessId, conversation.lead.id, targetStage);
       stageUpdated = targetStage;
     }
 

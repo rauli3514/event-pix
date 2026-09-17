@@ -48,7 +48,11 @@ export class CRMStorageService {
           .eq('business_id', businessId)
           .order('updated_at', { ascending: false });
 
-        if (!error && data && data.length > 0) {
+        // Supabase respondió: confiamos en su resultado tal cual, incluso si
+        // está vacío (negocio real sin conversaciones todavía). Antes, un
+        // array vacío caía al fallback demo y un cliente real veía
+        // conversaciones inventadas en su propio panel.
+        if (!error && data) {
           return data as CRMConversation[];
         }
       } catch (err) {
@@ -56,12 +60,18 @@ export class CRMStorageService {
       }
     }
 
-    // LocalStorage Fallback
+    // Sin negocio real: modo demo/preview (no debería ocurrir en producción,
+    // todos los llamadores reales pasan businessId).
+    if (!businessId) {
+      return INITIAL_CRM_CONVERSATIONS;
+    }
+
+    // Supabase no disponible: fallback a caché local aislada a ESTE negocio.
     try {
-      const stored = localStorage.getItem(LOCAL_STORAGE_KEYS.CONVERSATIONS);
+      const stored = localStorage.getItem(`${LOCAL_STORAGE_KEYS.CONVERSATIONS}_${businessId}`);
       if (stored) {
         const parsed = JSON.parse(stored) as CRMConversation[];
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           return parsed;
         }
       }
@@ -69,17 +79,11 @@ export class CRMStorageService {
       console.error('Error reading conversations from localStorage', e);
     }
 
-    // Si está vacío, cargar conversaciones demo iniciales para que el usuario pueda interactuar
-    try {
-      this.saveConversationsLocally(INITIAL_CRM_CONVERSATIONS);
-    } catch {
-      // ignore
-    }
-    return INITIAL_CRM_CONVERSATIONS;
+    return [];
   }
 
   static async saveConversations(businessId: string, conversations: CRMConversation[]): Promise<void> {
-    this.saveConversationsLocally(conversations);
+    this.saveConversationsLocally(businessId, conversations);
 
     const isSupa = await this.testSupabase();
     if (!isSupa || !businessId) return;
@@ -127,89 +131,103 @@ export class CRMStorageService {
     }
   }
 
-  private static saveConversationsLocally(conversations: CRMConversation[]): void {
+  private static saveConversationsLocally(businessId: string, conversations: CRMConversation[]): void {
     try {
-      localStorage.setItem(LOCAL_STORAGE_KEYS.CONVERSATIONS, JSON.stringify(conversations));
+      localStorage.setItem(`${LOCAL_STORAGE_KEYS.CONVERSATIONS}_${businessId}`, JSON.stringify(conversations));
     } catch (e) {
       console.error('Error saving conversations to localStorage', e);
     }
   }
 
-  static async updateLeadStage(conversationId: string, newStage: LeadStage): Promise<CRMConversation[]> {
-    const current = await this.loadConversations();
-    const updated = current.map(c => {
-      if (c.id === conversationId) {
-        return {
-          ...c,
-          lead: {
-            ...c.lead,
-            stage: newStage,
-            updated_at: new Date().toISOString()
-          },
-          updated_at: new Date().toISOString()
-        };
-      }
-      return c;
-    });
+  // Las tres funciones de abajo antes operaban sobre un array cargado sin
+  // businessId (loadConversations() sin argumento), lo que las hacía
+  // trabajar sobre datos demo/fantasma en vez del negocio real: la etapa
+  // del lead, el score y hasta las respuestas del operador quedaban solo en
+  // un cache local sin scopear, nunca llegaban a Supabase, y por eso el
+  // polling de mensajes reales (loadMessages) las hacía "desaparecer" a los
+  // 15 segundos. Ahora escriben directo en Supabase, scopeadas al negocio.
 
-    this.saveConversationsLocally(updated);
-    return updated;
+  static async updateLeadStage(businessId: string, leadId: string, newStage: LeadStage): Promise<boolean> {
+    const isSupa = await this.testSupabase();
+    if (!isSupa) return false;
+    try {
+      const { error } = await supabase
+        .from('intelligence_crm_leads')
+        .update({ stage: newStage, updated_at: new Date().toISOString() })
+        .eq('id', leadId)
+        .eq('business_id', businessId);
+      return !error;
+    } catch (err) {
+      console.error('Error actualizando etapa del lead en Supabase:', err);
+      return false;
+    }
   }
 
-  static async updateLeadScore(leadId: string, newScore: number): Promise<CRMConversation[]> {
-    const current = await this.loadConversations();
-    const updated = current.map(c => {
-      if (c.lead.id === leadId) {
-        let label: CRMLead['intent_label'] = c.lead.intent_label;
-        if (newScore >= 80) label = 'Listo para Comprar';
-        else if (newScore >= 60) label = 'Alta Intención';
-        else if (newScore >= 40) label = 'Interesado';
+  static async updateLeadScore(businessId: string, leadId: string, newScore: number): Promise<boolean> {
+    let label: CRMLead['intent_label'] = 'Curiosidad';
+    if (newScore >= 80) label = 'Listo para Comprar';
+    else if (newScore >= 60) label = 'Alta Intención';
+    else if (newScore >= 40) label = 'Interesado';
 
-        return {
-          ...c,
-          lead: {
-            ...c.lead,
-            intent_score: newScore,
-            intent_label: label,
-            updated_at: new Date().toISOString()
-          },
-          updated_at: new Date().toISOString()
-        };
-      }
-      return c;
-    });
-
-    this.saveConversationsLocally(updated);
-    return updated;
+    const isSupa = await this.testSupabase();
+    if (!isSupa) return false;
+    try {
+      const { error } = await supabase
+        .from('intelligence_crm_leads')
+        .update({ intent_score: newScore, intent_label: label, updated_at: new Date().toISOString() })
+        .eq('id', leadId)
+        .eq('business_id', businessId);
+      return !error;
+    } catch (err) {
+      console.error('Error actualizando score del lead en Supabase:', err);
+      return false;
+    }
   }
 
-  static async sendMessage(conversationId: string, message: Omit<CRMMessage, 'id' | 'created_at'>): Promise<{ updated: CRMConversation[]; newMessage: CRMMessage }> {
-    const current = await this.loadConversations();
-    const newMessage: CRMMessage = {
-      ...message,
-      id: `msg_${Date.now()}`,
-      conversation_id: conversationId,
-      created_at: new Date().toISOString()
-    };
+  // Inserta un mensaje real (respuesta del operador o auto-respuesta de una
+  // automatización) en la misma tabla que llena el webhook, y limpia el
+  // contador de no leídos. Es lo que hace que la respuesta sobreviva al
+  // siguiente polling de loadMessages en vez de desaparecer.
+  static async insertMessage(conversationId: string, message: Omit<CRMMessage, 'id' | 'created_at'>): Promise<CRMMessage | null> {
+    const isSupa = await this.testSupabase();
+    if (!isSupa) return null;
+    try {
+      const { data, error } = await supabase
+        .from('intelligence_crm_messages')
+        .insert({
+          conversation_id: conversationId,
+          sender_type: message.sender_type,
+          sender_name: message.sender_name,
+          content: message.content,
+          status: message.status,
+          message_type: message.message_type,
+          ai_metadata: message.ai_metadata || null
+        })
+        .select('*')
+        .single();
 
-    const updated = current.map(c => {
-      if (c.id === conversationId) {
-        const prev = c.messages && c.messages.length > 0
-          ? c.messages
-          : (c.last_message ? [c.last_message] : []);
-        return {
-          ...c,
-          unread_count: 0,
-          messages: [...prev, newMessage],
-          last_message: newMessage,
-          updated_at: new Date().toISOString()
-        };
-      }
-      return c;
-    });
+      if (error || !data) return null;
 
-    this.saveConversationsLocally(updated);
-    return { updated, newMessage };
+      await supabase
+        .from('intelligence_crm_conversations')
+        .update({ unread_count: 0, updated_at: new Date().toISOString() })
+        .eq('id', conversationId);
+
+      return {
+        id: data.id,
+        conversation_id: data.conversation_id,
+        sender_type: data.sender_type,
+        sender_name: data.sender_name || undefined,
+        content: data.content,
+        status: data.status,
+        message_type: data.message_type,
+        ai_metadata: data.ai_metadata,
+        created_at: data.created_at
+      };
+    } catch (err) {
+      console.error('Error insertando mensaje real en Supabase:', err);
+      return null;
+    }
   }
 
   // =========================================================================
@@ -405,10 +423,15 @@ export class CRMStorageService {
     }
   }
 
-  static clearAllData(): void {
+  static clearAllData(businessId: string): void {
     try {
+      // Legacy sin scopear (versiones viejas)
       localStorage.removeItem(LOCAL_STORAGE_KEYS.CONVERSATIONS);
       localStorage.removeItem(LOCAL_STORAGE_KEYS.TASKS);
+      // Cache real de este negocio. Deliberadamente NO borramos conversaciones,
+      // leads ni mensajes reales de Supabase acá: son comunicaciones reales de
+      // clientes, no datos demo, y no deben poder perderse con un botón de reset.
+      localStorage.removeItem(`${LOCAL_STORAGE_KEYS.CONVERSATIONS}_${businessId}`);
     } catch (e) {
       console.error('Error clearing CRM data', e);
     }
