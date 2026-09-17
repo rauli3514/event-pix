@@ -229,6 +229,32 @@ export interface UnifiedBusinessAudit {
   bio_audit: BioAudit;
 }
 
+/**
+ * Métricas de soporte guardadas junto al puntaje al tomar una foto de la
+ * auditoría, para poder mostrar deltas concretos ("conseguiste 12 leads
+ * más") además de los 5 puntajes abstractos. Todo opcional: solo se guarda
+ * lo que efectivamente estaba disponible en el momento de la foto.
+ */
+export interface AuditSnapshotMetrics {
+  avg_reach?: number;
+  total_spend?: number;
+  budget_efficiency_score?: number;
+  total_leads?: number;
+  conversion_rate_pct?: number;
+  deals_won?: number;
+  total_sales_value?: number;
+}
+
+export interface AuditSnapshot {
+  id: string;
+  business_id: string;
+  is_baseline: boolean;
+  overall_score: number | null;
+  category_scores: UnifiedBusinessAudit['categories'];
+  supporting_metrics: AuditSnapshotMetrics;
+  created_at: string;
+}
+
 export type NodeType = 'reel' | 'synthesis' | 'meta_business' | 'chatgpt' | 'claude' | 'canva' | 'automation_action' | 'display_digital' | 'ai_chat';
 
 export interface CanvasNodeData {

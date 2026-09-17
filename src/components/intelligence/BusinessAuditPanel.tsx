@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { BusinessAuditReport, IntelligenceBusiness, IntelligencePost, BrandDNA, UnifiedBusinessAudit } from '../../types/intelligence';
-import { Activity, AlertTriangle, CheckCircle, Lightbulb, ChevronRight, ChevronLeft, ArrowUpRight, Share2, Sparkles, MessageSquare, Bot, FileImage, ShieldCheck, Tv, Users, Instagram, Target } from 'lucide-react';
+import { BusinessAuditReport, IntelligenceBusiness, IntelligencePost, BrandDNA, UnifiedBusinessAudit, AuditSnapshot, AuditSnapshotMetrics } from '../../types/intelligence';
+import { Activity, AlertTriangle, CheckCircle, Lightbulb, ChevronRight, ChevronLeft, ArrowUpRight, Share2, Sparkles, MessageSquare, Bot, FileImage, ShieldCheck, Tv, Users, Instagram, Target, Flag, TrendingUp, TrendingDown, Minus, Loader2 } from 'lucide-react';
 import { CompetitorAnalysisPanel } from './CompetitorAnalysisPanel';
 import { MetaConnectionPanel } from './MetaConnectionPanel';
 import { MetaAdsAuditPanel } from './MetaAdsAuditPanel';
@@ -9,6 +9,7 @@ import { ContentIntelligenceEngine } from '../../services/intelligence/ContentIn
 import { CRMIntelligenceEngine } from '../../services/intelligence/CRMIntelligenceEngine';
 import { CRMStorageService } from '../../services/intelligence/CRMStorageService';
 import { UnifiedAuditEngine } from '../../services/intelligence/UnifiedAuditEngine';
+import { AuditSnapshotService } from '../../services/intelligence/AuditSnapshotService';
 import { MetaAdCampaign } from '../../types/ads';
 import { MetaGraphService, MetaMediaItem, MetaMediaInsights, MetaProfileInsights } from '../../services/meta/MetaGraphService';
 import { toOptional, hasValue, averageAvailable } from '../../services/intelligence/metricUtils';
@@ -111,6 +112,9 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
   // Cruza contenido orgánico real + Meta Ads real + mensajes/CRM real.
   const [unifiedAudit, setUnifiedAudit] = useState<UnifiedBusinessAudit | null>(null);
   const [isLoadingUnifiedAudit, setIsLoadingUnifiedAudit] = useState(false);
+  const [supportingMetrics, setSupportingMetrics] = useState<AuditSnapshotMetrics>({});
+  const [baseline, setBaseline] = useState<AuditSnapshot | null>(null);
+  const [isSavingSnapshot, setIsSavingSnapshot] = useState(false);
 
   useEffect(() => {
     if (activeTab !== 'audit') return;
@@ -119,13 +123,15 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
     (async () => {
       setIsLoadingUnifiedAudit(true);
       try {
-        const [conversations, tasks, profile] = await Promise.all([
+        const [conversations, tasks, profile, baselineSnapshot] = await Promise.all([
           CRMStorageService.loadConversations(business.id),
           CRMStorageService.loadTasks(business.id),
           MetaGraphService.getProfile(business.id).catch(() => null),
+          AuditSnapshotService.getBaseline(business.id),
         ]);
 
         if (cancelled) return;
+        setBaseline(baselineSnapshot);
 
         const organicReport = ContentIntelligenceEngine.generateExecutiveReport(
           posts,
@@ -134,17 +140,29 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
         );
         const funnelMetrics = CRMIntelligenceEngine.calculateFunnelMetrics(conversations);
         const opportunities = CRMIntelligenceEngine.detectCommercialOpportunities(conversations, tasks);
+        const usedAdsReport = adsCampaigns.length > 0 ? adsReport : null;
 
         const built = UnifiedAuditEngine.build({
           posts,
           organicReport,
-          adsReport: adsCampaigns.length > 0 ? adsReport : null,
+          adsReport: usedAdsReport,
           funnelMetrics,
           opportunities,
           profile: profile as MetaProfileInsights | null,
         });
 
-        if (!cancelled) setUnifiedAudit(built);
+        if (!cancelled) {
+          setUnifiedAudit(built);
+          setSupportingMetrics({
+            avg_reach: organicReport.layer_averages.avg_reach || undefined,
+            total_spend: usedAdsReport?.total_spend,
+            budget_efficiency_score: usedAdsReport?.budget_efficiency_score,
+            total_leads: funnelMetrics.total_leads,
+            conversion_rate_pct: funnelMetrics.conversion_rate_pct,
+            deals_won: funnelMetrics.deals_won,
+            total_sales_value: funnelMetrics.total_sales_value,
+          });
+        }
       } catch (err) {
         console.warn('No se pudo calcular la auditoría unificada:', err);
       } finally {
@@ -155,6 +173,25 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, business.id, posts, adsCampaigns]);
+
+  const handleSaveSnapshot = async (asBaseline: boolean) => {
+    if (!unifiedAudit) return;
+    setIsSavingSnapshot(true);
+    try {
+      const ok = await AuditSnapshotService.saveSnapshot(business.id, unifiedAudit, supportingMetrics, asBaseline);
+      if (ok) {
+        toast.success(asBaseline ? '📍 Punto de partida guardado.' : 'Snapshot guardado.');
+        if (asBaseline) {
+          const fresh = await AuditSnapshotService.getBaseline(business.id);
+          setBaseline(fresh);
+        }
+      } else {
+        toast.error('No se pudo guardar el snapshot.');
+      }
+    } finally {
+      setIsSavingSnapshot(false);
+    }
+  };
 
   if (!isOpen) {
     return (
@@ -295,6 +332,74 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
                 </div>
               )}
             </div>
+
+            {unifiedAudit && !baseline && (
+              <button
+                onClick={() => handleSaveSnapshot(true)}
+                disabled={isSavingSnapshot}
+                className="w-full py-2.5 px-3 bg-slate-900 border border-violet-500/40 hover:border-violet-500 text-violet-300 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+              >
+                {isSavingSnapshot ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Flag className="w-3.5 h-3.5" />}
+                Guardar como Punto de Partida
+              </button>
+            )}
+
+            {unifiedAudit && baseline && (
+              <div className="bg-slate-900/70 border border-slate-800 p-3.5 rounded-xl space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-slate-200 flex items-center gap-1.5 text-xs">
+                    <Flag className="w-3.5 h-3.5 text-violet-400" />
+                    Vs. Punto de Partida
+                  </h4>
+                  <span className="text-[10px] text-slate-500">
+                    hace {Math.max(0, Math.round((Date.now() - new Date(baseline.created_at).getTime()) / 86400000))} días
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(['overall', ...Object.keys(unifiedAudit.categories)] as Array<'overall' | keyof typeof unifiedAudit.categories>).map((key) => {
+                    const current = key === 'overall' ? unifiedAudit.overall_score : unifiedAudit.categories[key].score;
+                    const base = key === 'overall' ? baseline.overall_score : baseline.category_scores?.[key]?.score;
+                    const label = key === 'overall' ? 'General' : unifiedAudit.categories[key].label;
+                    const delta = current !== null && current !== undefined && base !== null && base !== undefined ? current - base : null;
+
+                    return (
+                      <div key={key} className="bg-slate-950/60 border border-slate-800 rounded-lg p-1.5 flex flex-col items-center gap-0.5">
+                        <span className="text-[8px] text-slate-500 uppercase font-bold">{label}</span>
+                        <span className="text-[11px] font-mono font-black text-slate-200">{current ?? '—'}</span>
+                        {delta === null ? (
+                          <span className="flex items-center gap-0.5 text-[9px] text-slate-600"><Minus className="w-2.5 h-2.5" />s/d</span>
+                        ) : delta > 0 ? (
+                          <span className="flex items-center gap-0.5 text-[9px] text-emerald-400 font-bold"><TrendingUp className="w-2.5 h-2.5" />+{delta}</span>
+                        ) : delta < 0 ? (
+                          <span className="flex items-center gap-0.5 text-[9px] text-rose-400 font-bold"><TrendingDown className="w-2.5 h-2.5" />{delta}</span>
+                        ) : (
+                          <span className="flex items-center gap-0.5 text-[9px] text-slate-500"><Minus className="w-2.5 h-2.5" />0</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {(supportingMetrics.total_leads !== undefined && baseline.supporting_metrics?.total_leads !== undefined) && (
+                  <p className="text-[10px] text-slate-400">
+                    Leads: {baseline.supporting_metrics.total_leads} → {supportingMetrics.total_leads}
+                    {supportingMetrics.deals_won !== undefined && baseline.supporting_metrics?.deals_won !== undefined && (
+                      <> · Ventas ganadas: {baseline.supporting_metrics.deals_won} → {supportingMetrics.deals_won}</>
+                    )}
+                  </p>
+                )}
+
+                <button
+                  onClick={() => handleSaveSnapshot(false)}
+                  disabled={isSavingSnapshot}
+                  className="w-full py-1.5 px-3 bg-slate-800/60 hover:bg-slate-800 text-slate-300 rounded-lg font-semibold text-[10px] flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
+                >
+                  {isSavingSnapshot ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                  Guardar Snapshot de Hoy
+                </button>
+              </div>
+            )}
 
             {unifiedAudit && (
               <div className="bg-violet-950/20 border border-violet-500/30 p-3.5 rounded-xl space-y-1.5">
