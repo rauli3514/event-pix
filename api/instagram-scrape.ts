@@ -67,8 +67,12 @@ export default async function handler(req: any, res: any) {
       username: '',
       caption: '',
       imageUrl: '',
-      likes: 0,
-      commentsCount: 0,
+      // Instagram dejó de exponer conteos de likes/comentarios en el HTML público
+      // (og:description) y en el embed la mayoría de las veces. null = "no se pudo
+      // extraer", nunca 0: un 0 de arranque que nunca se sobrescribe se ve idéntico
+      // a un reel con cero interacciones reales y termina mostrándose como dato real.
+      likes: null as number | null,
+      commentsCount: null as number | null,
       comments: [] as any[],
       audioTrack: '',
       followers: '',
@@ -83,7 +87,7 @@ export default async function handler(req: any, res: any) {
     ];
 
     for (const ua of userAgentsToTry) {
-      if (scrapedResult.caption && scrapedResult.imageUrl && scrapedResult.likes > 0) break;
+      if (scrapedResult.caption && scrapedResult.imageUrl && scrapedResult.likes) break;
       try {
         const pageRes = await fetch(`https://www.instagram.com/p/${shortcode}/`, {
           headers: {
