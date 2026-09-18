@@ -49,6 +49,29 @@ async function sendInstagramImage(accessToken: string, igsid: string, imageUrl: 
   return res.ok;
 }
 
+// Respuesta pública debajo del comentario original (la que "multiplica alcance"
+// porque Instagram la lee como conversación orgánica).
+async function sendInstagramCommentPublicReply(accessToken: string, commentId: string, text: string) {
+  const res = await fetch(`https://graph.instagram.com/v21.0/${commentId}/replies`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: text })
+  });
+  return res.ok;
+}
+
+// DM privado al autor del comentario, usando la "private reply" de Meta:
+// solo válida un tiempo limitado después del comentario y solo funciona a
+// través de este endpoint (no es un mensaje directo común).
+async function sendInstagramCommentPrivateReply(accessToken: string, commentId: string, text: string) {
+  const res = await fetch(`https://graph.instagram.com/v21.0/${commentId}/private_replies`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: text })
+  });
+  return res.ok;
+}
+
 interface CatalogProduct {
   id: string;
   name: string;
@@ -155,7 +178,8 @@ export default async function handler(req: any, res: any) {
     for (const entry of entries) {
       const igAccountId = entry.id as string | undefined;
       const messagingEvents = entry.messaging || [];
-      if (!igAccountId || messagingEvents.length === 0) continue;
+      const commentChanges = (entry.changes || []).filter((c: any) => c.field === 'comments');
+      if (!igAccountId || (messagingEvents.length === 0 && commentChanges.length === 0)) continue;
 
       const { data: business } = await supabase
         .from('intelligence_businesses')
@@ -244,7 +268,10 @@ export default async function handler(req: any, res: any) {
 
         if (conversation.ai_mode === 'disabled') continue;
 
-        // 4. Automatizaciones por palabra clave (mismas reglas que WhatsApp)
+        // 4. Automatizaciones por palabra clave (mismas reglas que WhatsApp).
+        // Las reglas creadas para comentarios (trigger_channel: 'comment', ver
+        // más abajo) no deben disparar acá: están pensadas para responder
+        // públicamente a un comentario, no para un DM directo.
         const { data: automations } = await supabase
           .from('intelligence_crm_automations')
           .select('*')
@@ -254,7 +281,9 @@ export default async function handler(req: any, res: any) {
 
         const lowerText = text.toLowerCase();
         const matched = (automations || []).find((a: any) =>
-          a.trigger_keyword && lowerText.includes(String(a.trigger_keyword).toLowerCase())
+          a.trigger_keyword &&
+          a.action_payload?.trigger_channel !== 'comment' &&
+          lowerText.includes(String(a.trigger_keyword).toLowerCase())
         );
 
         if (matched) {
@@ -346,6 +375,168 @@ export default async function handler(req: any, res: any) {
             }
           });
         }
+      }
+
+      // 6. Comentarios en Reels/posts: reglas armadas desde el "Auto-DM Studio"
+      // (action_payload.trigger_channel === 'comment'). Responden públicamente
+      // rotando entre las frases configuradas y mandan un DM privado real vía
+      // la "private reply" de Meta — no un mensaje directo común.
+      for (const change of commentChanges) {
+        const value = change.value || {};
+        const commentId = value.id as string | undefined;
+        const commentText = value.text as string | undefined;
+        const commenterId = value.from?.id as string | undefined;
+        const commenterUsername = value.from?.username as string | undefined;
+        if (!commentId || !commentText || !commenterId) continue;
+        // Nuestra propia respuesta pública también llega como evento de
+        // "comments": sin este filtro el bot termina respondiéndose a sí mismo.
+        if (commenterId === igAccountId) continue;
+
+        const { data: commentAutomations } = await supabase
+          .from('intelligence_crm_automations')
+          .select('*')
+          .eq('business_id', business.id)
+          .eq('trigger_event', 'keyword_match')
+          .eq('is_active', true);
+
+        const lowerComment = commentText.toLowerCase();
+        const matchedComment = (commentAutomations || []).find((a: any) =>
+          a.trigger_keyword &&
+          a.action_payload?.trigger_channel === 'comment' &&
+          lowerComment.includes(String(a.trigger_keyword).toLowerCase())
+        );
+        if (!matchedComment || !business.instagram_access_token) continue;
+
+        const privateMessage = matchedComment.action_payload?.message_template;
+        if (!privateMessage) continue;
+
+        const publicTemplates: string[] = matchedComment.action_payload?.public_reply_templates || [];
+        const publicMessage = publicTemplates.length > 0
+          ? publicTemplates[Math.floor(Math.random() * publicTemplates.length)]
+          : null;
+
+        const leadName = commenterUsername ? `@${commenterUsername}` : `Instagram ${commenterId.slice(-6)}`;
+
+        // Mismo instagram_scoped_id que usaría un DM directo: si esta persona
+        // después escribe por mensaje directo, cae en la misma conversación.
+        let { data: lead } = await supabase
+          .from('intelligence_crm_leads')
+          .select('id')
+          .eq('business_id', business.id)
+          .eq('instagram_scoped_id', commenterId)
+          .maybeSingle();
+
+        if (!lead) {
+          const { data: newLead } = await supabase
+            .from('intelligence_crm_leads')
+            .insert({
+              business_id: business.id,
+              name: leadName,
+              instagram_username: commenterUsername || null,
+              instagram_scoped_id: commenterId,
+              channel: 'instagram_dm',
+              source: {
+                type: 'instagram_organic',
+                keyword_triggered: matchedComment.trigger_keyword,
+                attribution_confidence: 'alta'
+              }
+            })
+            .select('id')
+            .single();
+          lead = newLead;
+        }
+        if (!lead) continue;
+
+        let { data: commentConv } = await supabase
+          .from('intelligence_crm_conversations')
+          .select('id, unread_count')
+          .eq('business_id', business.id)
+          .eq('lead_id', lead.id)
+          .maybeSingle();
+
+        if (!commentConv) {
+          const { data: newConv } = await supabase
+            .from('intelligence_crm_conversations')
+            .insert({ business_id: business.id, lead_id: lead.id, channel: 'instagram_dm' })
+            .select('id, unread_count')
+            .single();
+          commentConv = newConv;
+        }
+        if (!commentConv) continue;
+
+        await supabase.from('intelligence_crm_messages').insert({
+          conversation_id: commentConv.id,
+          sender_type: 'lead',
+          sender_name: leadName,
+          content: `Comentó "${commentText}" en un Reel`,
+          status: 'received',
+          message_type: 'incoming'
+        });
+
+        if (matchedComment.requires_human_approval) {
+          // Modo sugerencia: nadie responde solo, queda registrado en el CRM
+          // para que un humano lo vea y actúe manualmente desde Instagram.
+          if (publicMessage) {
+            await supabase.from('intelligence_crm_messages').insert({
+              conversation_id: commentConv.id,
+              sender_type: 'ai_suggested',
+              sender_name: business.name,
+              content: publicMessage,
+              status: 'suggested',
+              message_type: 'auto_reply',
+              ai_metadata: { automation_id: matchedComment.id, reasoning: `Respuesta pública sugerida por comentario con palabra clave: "${matchedComment.trigger_keyword}"` }
+            });
+          }
+          await supabase.from('intelligence_crm_messages').insert({
+            conversation_id: commentConv.id,
+            sender_type: 'ai_suggested',
+            sender_name: business.name,
+            content: privateMessage,
+            status: 'suggested',
+            message_type: 'auto_reply',
+            ai_metadata: { automation_id: matchedComment.id, reasoning: `DM privado sugerido por comentario con palabra clave: "${matchedComment.trigger_keyword}"` }
+          });
+        } else {
+          const publicSent = publicMessage
+            ? await sendInstagramCommentPublicReply(business.instagram_access_token, commentId, publicMessage)
+            : false;
+          const privateSent = await sendInstagramCommentPrivateReply(business.instagram_access_token, commentId, privateMessage);
+
+          if (publicMessage) {
+            await supabase.from('intelligence_crm_messages').insert({
+              conversation_id: commentConv.id,
+              sender_type: 'ai_auto',
+              sender_name: business.name,
+              content: publicMessage,
+              status: publicSent ? 'sent' : 'rejected',
+              message_type: 'auto_reply',
+              ai_metadata: { automation_id: matchedComment.id, reasoning: `Respuesta pública por comentario con palabra clave: "${matchedComment.trigger_keyword}"` }
+            });
+          }
+          await supabase.from('intelligence_crm_messages').insert({
+            conversation_id: commentConv.id,
+            sender_type: 'ai_auto',
+            sender_name: business.name,
+            content: privateMessage,
+            status: privateSent ? 'sent' : 'rejected',
+            message_type: 'auto_reply',
+            ai_metadata: { automation_id: matchedComment.id, reasoning: `DM privado disparado por comentario con palabra clave: "${matchedComment.trigger_keyword}"` }
+          });
+        }
+
+        await supabase
+          .from('intelligence_crm_conversations')
+          .update({
+            unread_count: (commentConv.unread_count || 0) + 1,
+            last_interaction_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', commentConv.id);
+
+        await supabase
+          .from('intelligence_crm_leads')
+          .update({ last_interaction_at: new Date().toISOString() })
+          .eq('id', lead.id);
       }
     }
 
