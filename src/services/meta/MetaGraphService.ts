@@ -125,8 +125,22 @@ export class MetaGraphService {
   static loadCredentials(businessId?: string): MetaCredentials | null {
     try {
       const raw = localStorage.getItem(this.getStorageKey(businessId));
-      if (!raw) return null;
-      return JSON.parse(raw) as MetaCredentials;
+      if (raw) return JSON.parse(raw) as MetaCredentials;
+
+      // Migración única: "Display Digital" (biz_001) es el único negocio
+      // que llegó a guardar sus credenciales bajo la clave global vieja,
+      // de cuando biz_001 todavía compartía esa clave a propósito. Si
+      // todavía viven ahí, las adoptamos a su clave propia una sola vez
+      // en vez de dejarlas huérfanas (lo que hacía que "desaparecieran").
+      if (businessId === 'biz_001') {
+        const legacyRaw = localStorage.getItem(CREDENTIALS_KEY);
+        if (legacyRaw) {
+          localStorage.setItem(this.getStorageKey(businessId), legacyRaw);
+          return JSON.parse(legacyRaw) as MetaCredentials;
+        }
+      }
+
+      return null;
     } catch {
       return null;
     }
