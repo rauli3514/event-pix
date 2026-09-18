@@ -6,14 +6,18 @@ import {
   Trash2, Play, ShieldCheck, Link2
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { MetricValue, NO_DATA } from '../../types/intelligence';
+import { hasValue, averageAvailable, formatMetric } from '../../services/intelligence/metricUtils';
 
 export interface AuditedCompetitorReel {
   id: string;
   url: string;
   thumbnail_url?: string;
   caption?: string;
-  likes: number;
-  comments_count: number;
+  // Instagram no siempre expone likes/comentarios en el scraping público de un
+  // perfil ajeno: NO_DATA cuando no se pudo extraer, nunca un 0 fabricado.
+  likes: MetricValue;
+  comments_count: MetricValue;
   audio_track?: string;
   hook_extracted?: string;
   cta_extracted?: string;
@@ -27,8 +31,8 @@ export interface CompetitorProfile {
   avatar_url?: string;
   niche?: string;
   reels: AuditedCompetitorReel[];
-  avg_likes: number;
-  avg_comments: number;
+  avg_likes: MetricValue;
+  avg_comments: MetricValue;
   top_hook?: string;
   top_cta?: string;
   top_audio?: string;
@@ -59,15 +63,13 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
       // Limpiar posibles reels con métricas vacías de pruebas anteriores
       return parsed.map((comp) => {
         const validReels = (comp.reels || []).filter(
-          (r) => r.likes > 0 || r.comments_count > 0 || r.thumbnail_url
+          (r) => hasValue(r.likes) || hasValue(r.comments_count) || r.thumbnail_url
         );
-        const totalLikes = validReels.reduce((s, r) => s + r.likes, 0);
-        const totalComms = validReels.reduce((s, r) => s + r.comments_count, 0);
         return {
           ...comp,
           reels: validReels,
-          avg_likes: validReels.length > 0 ? Math.round(totalLikes / validReels.length) : 0,
-          avg_comments: validReels.length > 0 ? Math.round((totalComms / validReels.length) * 10) / 10 : 0,
+          avg_likes: averageAvailable(validReels.map((r) => r.likes)),
+          avg_comments: averageAvailable(validReels.map((r) => r.comments_count)),
         };
       });
     } catch {
@@ -141,8 +143,8 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
           throw new Error(data.error || 'No se pudo extraer métricas de este Reel.');
         }
 
-        const likes = typeof data.likes === 'number' ? data.likes : 0;
-        const commentsCount = typeof data.commentsCount === 'number' ? data.commentsCount : 0;
+        const likes: MetricValue = typeof data.likes === 'number' ? data.likes : NO_DATA;
+        const commentsCount: MetricValue = typeof data.commentsCount === 'number' ? data.commentsCount : NO_DATA;
         const shortcode = data.shortcode || raw.match(/(?:p|reel|reels)\/([A-Za-z0-9_-]+)/)?.[1] || `${Date.now()}`;
         const cleanUsername = data.username ? data.username.replace('@', '') : '';
         const caption = data.caption || (cleanUsername ? `Reel de @${cleanUsername}` : 'Reel de Instagram');
@@ -193,15 +195,13 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
           if (compIndex >= 0) {
             const comp = prev[compIndex];
             const updatedReels = [newReel, ...comp.reels.filter((r) => r.url !== raw && r.id !== newReel.id)];
-            const totalLikes = updatedReels.reduce((s, r) => s + r.likes, 0);
-            const totalComms = updatedReels.reduce((s, r) => s + r.comments_count, 0);
 
             const updated: CompetitorProfile = {
               ...comp,
               avatar_url: imageUrl || comp.avatar_url,
               reels: updatedReels,
-              avg_likes: Math.round(totalLikes / updatedReels.length),
-              avg_comments: Math.round((totalComms / updatedReels.length) * 10) / 10,
+              avg_likes: averageAvailable(updatedReels.map((r) => r.likes)),
+              avg_comments: averageAvailable(updatedReels.map((r) => r.comments_count)),
               top_hook: hookText,
               top_cta: ctaText,
               top_audio: data.audioTrack || comp.top_audio,
@@ -231,9 +231,17 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
           setReelInputByComp((prev) => ({ ...prev, [targetCompId]: '' }));
         }
 
-        toast.success(`✅ Reel auditado para ${associatedHandle} (${likes} likes, ${commentsCount} comentarios reales)`, {
-          id: toastId,
-        });
+        if (hasValue(likes) || hasValue(commentsCount)) {
+          toast.success(
+            `✅ Reel auditado para ${associatedHandle} (${formatMetric(likes)} likes, ${formatMetric(commentsCount)} comentarios reales)`,
+            { id: toastId }
+          );
+        } else {
+          toast.warning(
+            `Reel agregado para ${associatedHandle}, pero Instagram no expuso likes ni comentarios en la página pública. Se guardó el resto de los datos (miniatura, gancho, CTA).`,
+            { id: toastId, duration: 7000 }
+          );
+        }
       } else {
         // --- ES UN PERFIL O @HANDLE ---
         const detectedHandle = extractHandle(raw);
@@ -254,8 +262,8 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
           handle: detectedHandle,
           display_name: detectedHandle.replace('@', ''),
           reels: [],
-          avg_likes: 0,
-          avg_comments: 0,
+          avg_likes: NO_DATA,
+          avg_comments: NO_DATA,
         };
 
         setCompetitors((prev) => [newProfile, ...prev]);
@@ -283,13 +291,11 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
       prev.map((comp) => {
         if (comp.id !== compId) return comp;
         const updatedReels = comp.reels.filter((r) => r.id !== reelId);
-        const totalLikes = updatedReels.reduce((s, r) => s + r.likes, 0);
-        const totalComms = updatedReels.reduce((s, r) => s + r.comments_count, 0);
         return {
           ...comp,
           reels: updatedReels,
-          avg_likes: updatedReels.length > 0 ? Math.round(totalLikes / updatedReels.length) : 0,
-          avg_comments: updatedReels.length > 0 ? Math.round((totalComms / updatedReels.length) * 10) / 10 : 0,
+          avg_likes: averageAvailable(updatedReels.map((r) => r.likes)),
+          avg_comments: averageAvailable(updatedReels.map((r) => r.comments_count)),
         };
       })
     );
@@ -378,10 +384,7 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
             <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2">
               <span className="text-[10px] text-slate-400 block">Competidores Promedio (Likes)</span>
               <span className="font-mono font-black text-amber-400 text-sm">
-                {Math.round(
-                  competitors.filter((c) => c.reels.length > 0).reduce((s, c) => s + c.avg_likes, 0) /
-                    (competitors.filter((c) => c.reels.length > 0).length || 1)
-                )}
+                {formatMetric(averageAvailable(competitors.map((c) => c.avg_likes)))}
               </span>
             </div>
           </div>
@@ -441,10 +444,10 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
                     {hasReels && (
                       <div className="text-right text-[11px]">
                         <span className="text-pink-400 font-mono font-bold flex items-center gap-0.5 justify-end">
-                          <Heart className="w-3 h-3" /> {comp.avg_likes}
+                          <Heart className="w-3 h-3" /> {formatMetric(comp.avg_likes)}
                         </span>
                         <span className="text-blue-400 font-mono text-[10px] flex items-center gap-0.5 justify-end">
-                          <MessageCircle className="w-2.5 h-2.5" /> {comp.avg_comments}
+                          <MessageCircle className="w-2.5 h-2.5" /> {formatMetric(comp.avg_comments)}
                         </span>
                       </div>
                     )}
@@ -555,8 +558,8 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
                                   {reel.caption || 'Reel sin descripción'}
                                 </p>
                                 <div className="flex items-center gap-2 text-[9px] text-slate-400">
-                                  <span className="text-pink-400 font-bold">❤️ {reel.likes}</span>
-                                  <span className="text-blue-400 font-bold">💬 {reel.comments_count}</span>
+                                  <span className="text-pink-400 font-bold">❤️ {formatMetric(reel.likes)}</span>
+                                  <span className="text-blue-400 font-bold">💬 {formatMetric(reel.comments_count)}</span>
                                 </div>
                               </div>
                             </div>
@@ -581,8 +584,10 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
                                       permalink: reel.url,
                                       caption: reel.caption || `Reel de ${comp.handle}`,
                                       timestamp: reel.timestamp,
-                                      like_count: reel.likes,
-                                      comments_count: reel.comments_count,
+                                      // undefined (no 0) cuando Instagram no expuso el dato:
+                                      // el Canvas ya sabe mostrar "Sin dato" para eso.
+                                      like_count: hasValue(reel.likes) ? reel.likes : undefined,
+                                      comments_count: hasValue(reel.comments_count) ? reel.comments_count : undefined,
                                     });
                                     toast.success(`🎬 Reel de ${comp.handle} agregado al Canvas!`);
                                   }}

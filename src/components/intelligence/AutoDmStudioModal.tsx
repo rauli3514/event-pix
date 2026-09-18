@@ -6,12 +6,12 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  X, Zap, MessageSquare, Send,
+  X, Zap, Send,
   Smartphone, RefreshCw, Play, Flame
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { CRMStorageService } from '../../services/intelligence/CRMStorageService';
-import { CRMAutomationRule, CRMConversation } from '../../types/crm';
+import { CRMAutomationRule } from '../../types/crm';
 
 interface AutoDmStudioModalProps {
   isOpen: boolean;
@@ -38,7 +38,6 @@ export const AutoDmStudioModal: React.FC<AutoDmStudioModalProps> = ({
   })();
 
   const [keyword, setKeyword] = useState(detectedKeyword);
-  const [triggerScope, setTriggerScope] = useState<'current_reel' | 'all_reels'>('current_reel');
   
   // Respuestas públicas rotativas para evitar detección de spam y alimentar el algoritmo
   const [publicReplies, setPublicReplies] = useState<string[]>([
@@ -55,7 +54,6 @@ export const AutoDmStudioModal: React.FC<AutoDmStudioModalProps> = ({
     `¿Tenés un local comercial, showroom o restaurante? Contame y te paso la medida ideal.`
   );
 
-  const [directToWhatsApp, setDirectToWhatsApp] = useState(true);
 
   // Estados del Simulador de iPhone
   const [simulationState, setSimulationState] = useState<'idle' | 'commented' | 'replied' | 'dm_received' | 'chat_open'>('idle');
@@ -109,90 +107,24 @@ export const AutoDmStudioModal: React.FC<AutoDmStudioModalProps> = ({
       action_payload: {
         message_template: privateDmMessage,
         target_stage: 'contactado',
-        task_title: `Lead originado por Reel con palabra clave ${keyword}`
+        task_title: `Lead originado por Reel con palabra clave ${keyword}`,
+        trigger_channel: 'comment',
+        public_reply_templates: publicReplies.map(r => r.trim()).filter(Boolean)
       },
       requires_human_approval: false,
       is_active: true
     };
 
-    // Crear un Lead de demostración en el CRM para mostrar cómo queda el flujo activado
-    const now = Date.now();
-    const conversationId = `conv_lead_${now}`;
-    const newLeadConv: CRMConversation = {
-      id: conversationId,
-      business_id: businessId,
-      lead_id: `lead_${now}`,
-      channel: 'instagram_dm',
-      unread_count: 0,
-      ai_mode: 'suggestion',
-      ai_summary: 'Solicitud de catálogo y precios por Reel',
-      ai_detected_intent: 'Solicitud de catálogo y precios por Reel',
-      ai_purchase_intent_score: 92,
-      messaging_window: {
-        is_open: true,
-        expires_at: new Date(now + 24 * 60 * 60 * 1000).toISOString(),
-        hours_remaining: 24
-      },
-      lead: {
-        id: `lead_${now}`,
-        business_id: businessId,
-        name: 'Martín Comercio (Vidrieras & Retail)',
-        instagram_username: 'martin_retail_ba',
-        channel: 'instagram_dm',
-        stage: 'contactado',
-        intent_score: 92,
-        intent_label: 'Alta Intención',
-        primary_interest: `Pantalla Vertical Display Hub (${keyword})`,
-        source: {
-          type: 'instagram_organic',
-          keyword_triggered: keyword,
-          attribution_confidence: 'alta'
-        },
-        tags: ['Reel Viral', `Keyword: ${keyword}`, 'Auto-DM Meta', 'Display Hub'],
-        last_interaction_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      },
-      messages: [
-        {
-          id: `msg_1_${now}`,
-          conversation_id: conversationId,
-          sender_type: 'lead',
-          content: `Comentario en Reel: "${keyword}"`,
-          status: 'received',
-          message_type: 'incoming',
-          created_at: new Date(now - 60000).toISOString()
-        },
-        {
-          id: `msg_2_${now}`,
-          conversation_id: conversationId,
-          sender_type: 'ai_auto',
-          content: publicReplies[0],
-          status: 'sent',
-          message_type: 'auto_reply',
-          created_at: new Date(now - 50000).toISOString()
-        },
-        {
-          id: `msg_3_${now}`,
-          conversation_id: conversationId,
-          sender_type: 'ai_auto',
-          content: privateDmMessage,
-          status: 'sent',
-          message_type: 'auto_reply',
-          created_at: new Date().toISOString()
-        }
-      ],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-
-    const existingConvs = await CRMStorageService.loadConversations(businessId);
-    await CRMStorageService.saveConversations(businessId, [newLeadConv, ...existingConvs]);
-
+    // Antes acá se inyectaba un lead/conversación/mensajes 100% inventados
+    // ("Martín Comercio", score de intención 92) directo en el CRM real del
+    // negocio, mezclado con leads verdaderos sin forma de distinguirlos. La
+    // regla ya queda activa y el webhook de Instagram la va a disparar de
+    // verdad la próxima vez que alguien comente la palabra clave — no hace
+    // falta simular un cliente falso para "mostrar cómo queda".
     const existingRules = await CRMStorageService.loadRules(businessId);
     await CRMStorageService.saveRules(businessId, [newRule, ...existingRules]);
 
-    toast.success(`¡Automatización "${newRule.name}" activada y sincronizada con el CRM!`);
+    toast.success(`¡Automatización "${newRule.name}" activada! Se va a disparar la próxima vez que alguien comente "${keyword}" en tus Reels.`);
     onClose();
 
     if (onOpenCrm) {
@@ -311,25 +243,18 @@ export const AutoDmStudioModal: React.FC<AutoDmStudioModalProps> = ({
               <div className="flex gap-2 text-xs">
                 <button
                   type="button"
-                  onClick={() => setTriggerScope('current_reel')}
-                  className={`flex-1 py-1.5 px-3 rounded-lg font-medium border text-[11px] transition-all ${
-                    triggerScope === 'current_reel'
-                      ? 'bg-pink-600/20 border-pink-500/50 text-pink-300'
-                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-                  }`}
+                  disabled
+                  title="Todavía no disponible: por ahora la regla aplica a todos tus Reels"
+                  className="flex-1 py-1.5 px-3 rounded-lg font-medium border text-[11px] bg-slate-950 border-slate-800/60 text-slate-600 cursor-not-allowed"
                 >
-                  Solo en el Reel actual
+                  Solo en el Reel actual (pronto)
                 </button>
                 <button
                   type="button"
-                  onClick={() => setTriggerScope('all_reels')}
-                  className={`flex-1 py-1.5 px-3 rounded-lg font-medium border text-[11px] transition-all ${
-                    triggerScope === 'all_reels'
-                      ? 'bg-pink-600/20 border-pink-500/50 text-pink-300'
-                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-                  }`}
+                  disabled
+                  className="flex-1 py-1.5 px-3 rounded-lg font-medium border text-[11px] bg-pink-600/20 border-pink-500/50 text-pink-300 cursor-default"
                 >
-                  En todos mis Reels futuros
+                  En todos mis Reels ✓
                 </button>
               </div>
             </div>
@@ -390,26 +315,6 @@ export const AutoDmStudioModal: React.FC<AutoDmStudioModalProps> = ({
                   <span>Variables disponibles: <code className="text-violet-400">@usuario</code>, <code className="text-violet-400">#catalogo</code></span>
                   <span>{privateDmMessage.length} caracteres</span>
                 </div>
-              </div>
-
-              {/* Toggle WhatsApp Derivation */}
-              <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
-                    <MessageSquare className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-bold text-slate-200 block">Derivar a WhatsApp Directo</span>
-                    <span className="text-[10px] text-slate-400">Añade botón de WhatsApp con mensaje prefijado</span>
-                  </div>
-                </div>
-
-                <input
-                  type="checkbox"
-                  checked={directToWhatsApp}
-                  onChange={e => setDirectToWhatsApp(e.target.checked)}
-                  className="w-4 h-4 rounded text-emerald-500 bg-slate-900 border-slate-700 focus:ring-0 cursor-pointer"
-                />
               </div>
             </div>
 

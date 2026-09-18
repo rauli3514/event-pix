@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { IntelligencePost, NodeType } from '../../types/intelligence';
 import {
@@ -141,6 +141,24 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
   };
 
   const canvasRef = useRef<HTMLDivElement>(null);
+  const nodeElRefs = useRef<{ [id: string]: HTMLDivElement | null }>({});
+  const knownNodeIdsRef = useRef<Set<string>>(new Set(nodes.map(n => n.id)));
+
+  // Cuando se crea la tarjeta de Chat IA (botón directo o conectando un Reel),
+  // hereda la posición Y del Reel que la originó, que crece 280px por cada
+  // Reel agregado al lienzo. Con varios Reels ya analizados la tarjeta nace
+  // bien abajo, fuera de la vista, y nada la traía a pantalla. La llevamos
+  // a la vista apenas aparece en vez de dejar al usuario buscándola.
+  useEffect(() => {
+    const knownIds = knownNodeIdsRef.current;
+    const newAiChatNode = nodes.find(n => n.type === 'ai_chat' && !knownIds.has(n.id));
+    if (newAiChatNode) {
+      requestAnimationFrame(() => {
+        nodeElRefs.current[newAiChatNode.id]?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+      });
+    }
+    knownNodeIdsRef.current = new Set(nodes.map(n => n.id));
+  }, [nodes]);
 
   const handleMouseDownCanvas = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
@@ -1306,6 +1324,7 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
             return (
               <div
                 key={node.id}
+                ref={(el) => { nodeElRefs.current[node.id] = el; }}
                 onMouseDown={(e) => handleMouseDownNode(node.id, e)}
                 style={{ left: `${pos.x}px`, top: `${pos.y}px` }}
                 className="canvas-node absolute z-30"
