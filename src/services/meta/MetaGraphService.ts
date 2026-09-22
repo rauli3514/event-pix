@@ -62,6 +62,28 @@ export interface MetaMediaItem {
   comments_count?: number;
 }
 
+/** Un post público de OTRA cuenta, devuelto por `business_discovery`. */
+export interface BusinessDiscoveryMedia {
+  id: string;
+  caption?: string;
+  media_type: 'IMAGE' | 'VIDEO' | 'CAROUSEL_ALBUM';
+  media_url?: string;
+  thumbnail_url?: string;
+  permalink: string;
+  timestamp: string;
+  like_count?: number;
+  comments_count?: number;
+}
+
+export interface BusinessDiscoveryResult {
+  username: string;
+  name?: string;
+  profile_picture_url?: string;
+  followers_count?: number;
+  media_count?: number;
+  media: BusinessDiscoveryMedia[];
+}
+
 /**
  * Insights de un medio. TODOS los campos numéricos son opcionales a propósito:
  * `undefined` significa "Meta no reportó esta métrica" y es distinto de `0`,
@@ -400,6 +422,69 @@ export class MetaGraphService {
       },
       businessId
     );
+  }
+
+  /**
+   * Consulta métricas PÚBLICAS reales de OTRA cuenta de Instagram (competencia)
+   * usando el token de nuestra propia cuenta conectada — el campo oficial de
+   * Meta para esto (`business_discovery`), sin necesitar login ni token de esa
+   * cuenta. Solo funciona si la cuenta consultada también es Business/Creator
+   * y pública: Meta nunca expone esto para cuentas personales, ni con este ni
+   * con ningún otro método (scraping incluido). No devuelve reach, impressions
+   * ni guardados de esa cuenta — eso es privado del dueño, siempre.
+   */
+  static async getBusinessDiscovery(
+    targetUsername: string,
+    businessId?: string,
+    mediaLimit = 25
+  ): Promise<{ success: true; data: BusinessDiscoveryResult } | { success: false; error: string }> {
+    const creds = MetaGraphService.loadCredentials(businessId);
+    if (!creds?.accessToken || !creds.instagramAccountId) {
+      return { success: false, error: 'No hay una cuenta de Instagram conectada.' };
+    }
+    if (creds.isBasicDisplay) {
+      return {
+        success: false,
+        error: 'Tu cuenta está conectada con Instagram Basic Display, que no permite consultar otras cuentas. Necesitás Instagram Graph API con una cuenta Business/Creator vinculada a una página de Facebook.',
+      };
+    }
+
+    const cleanUsername = targetUsername.replace('@', '').trim();
+    if (!cleanUsername) {
+      return { success: false, error: 'Nombre de usuario vacío.' };
+    }
+
+    const fields = `business_discovery.username(${cleanUsername}){username,name,profile_picture_url,followers_count,media_count,media.limit(${mediaLimit}){id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count}}`;
+
+    try {
+      const data = await MetaGraphService.apiFetch<{ business_discovery?: any }>(
+        `/${creds.instagramAccountId}`,
+        { fields },
+        businessId
+      );
+
+      if (!data.business_discovery) {
+        return {
+          success: false,
+          error: `"@${cleanUsername}" no es una cuenta Business/Creator pública de Instagram (o no existe), así que Meta no permite consultar sus métricas por este medio.`,
+        };
+      }
+
+      const bd = data.business_discovery;
+      return {
+        success: true,
+        data: {
+          username: bd.username,
+          name: bd.name,
+          profile_picture_url: bd.profile_picture_url,
+          followers_count: bd.followers_count,
+          media_count: bd.media_count,
+          media: (bd.media?.data || []) as BusinessDiscoveryMedia[],
+        },
+      };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Error consultando la cuenta en Meta.' };
+    }
   }
 
   /** Obtiene los últimos media posts (filtra por REELS y VIDEO) */

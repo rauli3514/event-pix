@@ -531,6 +531,7 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
 
         {activeTab === 'competitors' && (
           <CompetitorAnalysisPanel
+            businessId={business.id}
             myAvgViews={myAvgViews}
             myAvgLikes={myAvgLikes}
             myAvgComments={myAvgComments}
