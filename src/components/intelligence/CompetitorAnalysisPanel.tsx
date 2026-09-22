@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { MetricValue, NO_DATA } from '../../types/intelligence';
 import { hasValue, averageAvailable, formatMetric } from '../../services/intelligence/metricUtils';
 import { MetaGraphService, BusinessDiscoveryMedia } from '../../services/meta/MetaGraphService';
+import { TikTokPanel } from './TikTokPanel';
 
 export interface AuditedCompetitorReel {
   id: string;
@@ -89,6 +90,7 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
   onAddReelToCanvas,
 }) => {
   const [competitors, setCompetitors] = useState<CompetitorProfile[]>([]);
+  const [platformTab, setPlatformTab] = useState<'instagram' | 'tiktok'>('instagram');
 
   const [mainInput, setMainInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -447,6 +449,31 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
         </p>
       </div>
 
+      {/* Selector de Plataforma: Instagram (business_discovery, necesita tu
+          cuenta conectada) vs TikTok (perfil público, sin conectar nada) */}
+      <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-950 border border-slate-800 rounded-xl text-xs font-bold shrink-0">
+        <button
+          onClick={() => setPlatformTab('instagram')}
+          className={`py-1.5 rounded-lg transition-all ${
+            platformTab === 'instagram' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          Instagram
+        </button>
+        <button
+          onClick={() => setPlatformTab('tiktok')}
+          className={`py-1.5 rounded-lg transition-all ${
+            platformTab === 'tiktok' ? 'bg-cyan-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          TikTok
+        </button>
+      </div>
+
+      {platformTab === 'tiktok' && <TikTokPanel businessId={businessId} />}
+
+      {platformTab === 'instagram' && (
+      <>
       {/* Input Principal Inteligente */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-2.5 shrink-0">
         <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
@@ -742,6 +769,8 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
             );
           })}
         </div>
+      )}
+      </>
       )}
     </div>
   );

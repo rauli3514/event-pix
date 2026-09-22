@@ -237,6 +237,14 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ busine
         throw new Error(data.error || 'No se pudo extraer información de este Reel.');
       }
 
+      // El scraper devuelve null (no 0) cuando Instagram no expuso el dato en
+      // la página pública — un 0 acá se vería idéntico a un Reel con cero
+      // interacciones reales, que es exactamente el bug que ya arreglamos en
+      // el scraper de competidores.
+      const likes = typeof data.likes === 'number' ? data.likes : undefined;
+      const commentsCount = typeof data.commentsCount === 'number' ? data.commentsCount : undefined;
+      const interactionParts = [likes, commentsCount].filter((v): v is number => typeof v === 'number');
+
       const importedReel: MetaMediaItem & { insights?: MetaMediaInsights } = {
         id: `reel_${data.shortcode || Date.now()}`,
         media_type: 'REELS',
@@ -245,15 +253,15 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ busine
         permalink: directReelUrl.trim(),
         caption: data.caption || 'Reel de Instagram',
         timestamp: new Date().toISOString(),
-        like_count: data.likes || 0,
-        comments_count: data.commentsCount || 0,
+        like_count: likes,
+        comments_count: commentsCount,
         insights: {
           media_id: `reel_${data.shortcode || Date.now()}`,
           // El scraper público solo expone likes/comentarios visibles en la página.
           // Reach, impressions y plays son insights privados que Instagram no
           // publica en el HTML: no se estiman a partir de likes, quedan
           // ausentes hasta que se conecten por Meta Graph API.
-          total_interactions: (data.likes || 0) + (data.commentsCount || 0),
+          total_interactions: interactionParts.length > 0 ? interactionParts.reduce((a, b) => a + b, 0) : undefined,
           unavailable: true,
           unavailable_reason: 'Reel importado por scraping público: Instagram no expone reach/impressions/plays fuera de Meta Graph API.',
         },
@@ -261,9 +269,12 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ busine
 
       setReels((prev) => [importedReel, ...prev.filter((r) => r.permalink !== importedReel.permalink)]);
       setDirectReelUrl('');
-      toast.success(`✅ Reel importado con éxito (${importedReel.like_count} likes, ${importedReel.comments_count} comentarios)`, {
-        id: toastId,
-      });
+      toast.success(
+        hasValue(likes) || hasValue(commentsCount)
+          ? `✅ Reel importado con éxito (${likes ?? 'sin dato'} likes, ${commentsCount ?? 'sin dato'} comentarios)`
+          : '✅ Reel importado, pero Instagram no expuso likes ni comentarios en la página pública.',
+        { id: toastId }
+      );
 
       if (onAddReelToCanvas) {
         onAddReelToCanvas(importedReel);
@@ -450,6 +461,23 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ busine
             >
               Abrir Graph Explorer <ExternalLink className="w-2.5 h-2.5" />
             </a>
+          </div>
+
+          {/* Qué permisos tildar en el Graph Explorer — para que conectar esto
+              no obligue a pedir permisos de mensajes/publicación que esta
+              pantalla ni usa. Ver tus Reels y auditar competencia nunca
+              necesita que el token pueda leer tus DMs. */}
+          <div className="p-2.5 bg-slate-950/60 border border-slate-800 rounded-xl text-[10px] text-slate-400 space-y-1.5">
+            <p className="font-semibold text-slate-300">¿Qué permisos tildar al generar el token?</p>
+            <p>
+              <strong className="text-emerald-400">Para esto (métricas propias y de competencia):</strong>{' '}
+              <code className="text-pink-400">instagram_basic</code>, <code className="text-pink-400">instagram_manage_insights</code>,{' '}
+              <code className="text-pink-400">pages_show_list</code>. Nada más — no hace falta permiso de mensajes ni de publicación.
+            </p>
+            <p>
+              <strong className="text-amber-400">Solo si además vas a usar el Auto-DM</strong> (desde el conector "Meta Suite" del lienzo),
+              agregale <code className="text-pink-400">instagram_manage_messages</code> al mismo token.
+            </p>
           </div>
 
           <div className="space-y-2.5">
@@ -757,10 +785,10 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ busine
                         <p className="text-[9px] text-slate-500">{daysAgo(reel.timestamp)}</p>
                         <div className="flex items-center gap-2.5 text-[10px] text-slate-400">
                           <span className="flex items-center gap-0.5">
-                            <Heart className="w-2.5 h-2.5 text-pink-400" /> {formatNumber(reel.like_count ?? 0)}
+                            <Heart className="w-2.5 h-2.5 text-pink-400" /> {hasValue(reel.like_count) ? formatNumber(reel.like_count) : 'Sin dato'}
                           </span>
                           <span className="flex items-center gap-0.5">
-                            <MessageCircle className="w-2.5 h-2.5 text-blue-400" /> {reel.comments_count ?? 0}
+                            <MessageCircle className="w-2.5 h-2.5 text-blue-400" /> {hasValue(reel.comments_count) ? reel.comments_count : 'Sin dato'}
                           </span>
                           {reel.insights?.plays ? (
                             <span className="flex items-center gap-0.5">
