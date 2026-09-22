@@ -75,7 +75,7 @@ export const MetaAdsAuditPanel: React.FC<MetaAdsAuditPanelProps> = ({
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden text-xs">
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden text-xs">
       {/* Header Banner de Cuenta Publicitaria */}
       <div className="p-4 bg-slate-950/80 border-b border-slate-800 space-y-3 shrink-0">
         <div className="flex items-center justify-between">

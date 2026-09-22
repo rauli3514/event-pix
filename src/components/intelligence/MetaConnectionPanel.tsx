@@ -551,7 +551,7 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ busine
   const totalPlays = reels.reduce((s, r) => s + (r.insights?.plays || 0), 0);
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
       {warningMsg && (
         <div className="mx-4 mt-3 flex items-start gap-2 text-[11px] text-amber-300 bg-amber-950/30 border border-amber-500/30 rounded-xl px-3 py-2">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
