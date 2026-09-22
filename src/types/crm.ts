@@ -135,6 +135,12 @@ export interface CRMAutomationRule {
     message_template?: string;
     target_stage?: LeadStage;
     task_title?: string;
+    // Solo para trigger_event 'keyword_match': dónde se busca la palabra clave.
+    // 'dm' (default si falta, compatibilidad con reglas viejas): un mensaje directo.
+    // 'comment': un comentario público en un Reel — dispara también una
+    // respuesta pública rotativa (public_reply_templates) además del DM privado.
+    trigger_channel?: 'dm' | 'comment';
+    public_reply_templates?: string[];
   };
   requires_human_approval: boolean; // Modo sugerencia
   is_active: boolean;

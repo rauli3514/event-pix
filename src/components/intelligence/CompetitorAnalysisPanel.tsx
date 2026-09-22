@@ -6,14 +6,19 @@ import {
   Trash2, Play, ShieldCheck, Link2
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { MetricValue, NO_DATA } from '../../types/intelligence';
+import { hasValue, averageAvailable, formatMetric } from '../../services/intelligence/metricUtils';
+import { MetaGraphService, BusinessDiscoveryMedia } from '../../services/meta/MetaGraphService';
 
 export interface AuditedCompetitorReel {
   id: string;
   url: string;
   thumbnail_url?: string;
   caption?: string;
-  likes: number;
-  comments_count: number;
+  // Instagram no siempre expone likes/comentarios en el scraping público de un
+  // perfil ajeno: NO_DATA cuando no se pudo extraer, nunca un 0 fabricado.
+  likes: MetricValue;
+  comments_count: MetricValue;
   audio_track?: string;
   hook_extracted?: string;
   cta_extracted?: string;
@@ -25,16 +30,18 @@ export interface CompetitorProfile {
   handle: string;
   display_name: string;
   avatar_url?: string;
+  followers_count?: number;
   niche?: string;
   reels: AuditedCompetitorReel[];
-  avg_likes: number;
-  avg_comments: number;
+  avg_likes: MetricValue;
+  avg_comments: MetricValue;
   top_hook?: string;
   top_cta?: string;
   top_audio?: string;
 }
 
 interface CompetitorAnalysisPanelProps {
+  businessId?: string;
   myAvgViews?: number;
   myAvgLikes?: number;
   myAvgComments?: number;
@@ -44,59 +51,89 @@ interface CompetitorAnalysisPanelProps {
 }
 
 const STORAGE_KEY = 'eventpix_real_competitors';
+const getStorageKey = (businessId?: string) => (businessId ? `${STORAGE_KEY}_${businessId}` : STORAGE_KEY);
+
+// Gancho y CTA preliminares a partir de un caption real, sea que venga de
+// business_discovery o del scraper público — mismo criterio para ambos.
+function extractHookAndCta(caption: string, username?: string): { hookText: string; ctaText: string } {
+  const firstLine = caption.split('\n')[0] || caption.slice(0, 80);
+  const hookText = firstLine.length > 5 ? firstLine : (username ? `Contenido de @${username}` : 'Gancho visual de Instagram');
+  const ctaMatch = caption.match(/(coment[áa]|escrib[íi]|segu[íi]|link in bio|link en bio|guard[áa]|compart[íi]|particip[áa]|mencion[áa])[^\.\n]*/i);
+  const ctaText = ctaMatch ? ctaMatch[0] : 'Interacción y participación';
+  return { hookText, ctaText };
+}
+
+// Convierte un post de business_discovery (dato real de Meta, con el token de
+// NUESTRA cuenta) en el mismo formato que usa el resto del panel.
+function businessDiscoveryMediaToReel(m: BusinessDiscoveryMedia, username?: string): AuditedCompetitorReel {
+  const caption = m.caption || (username ? `Reel de @${username}` : 'Reel de Instagram');
+  const { hookText, ctaText } = extractHookAndCta(caption, username);
+  return {
+    id: `reel_${m.id}`,
+    url: m.permalink,
+    thumbnail_url: m.thumbnail_url || m.media_url,
+    caption,
+    likes: typeof m.like_count === 'number' ? m.like_count : NO_DATA,
+    comments_count: typeof m.comments_count === 'number' ? m.comments_count : NO_DATA,
+    hook_extracted: hookText,
+    cta_extracted: ctaText,
+    timestamp: m.timestamp,
+  };
+}
 
 export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = ({
+  businessId,
   myAvgViews = 0,
   myAvgLikes = 0,
   myAvgComments = 0,
   onAddReelToCanvas,
 }) => {
-  const [competitors, setCompetitors] = useState<CompetitorProfile[]>(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return [];
-      const parsed: CompetitorProfile[] = JSON.parse(raw);
-      // Limpiar posibles reels con métricas vacías de pruebas anteriores
-      return parsed.map((comp) => {
-        const validReels = (comp.reels || []).filter(
-          (r) => r.likes > 0 || r.comments_count > 0 || r.thumbnail_url
-        );
-        const totalLikes = validReels.reduce((s, r) => s + r.likes, 0);
-        const totalComms = validReels.reduce((s, r) => s + r.comments_count, 0);
-        return {
-          ...comp,
-          reels: validReels,
-          avg_likes: validReels.length > 0 ? Math.round(totalLikes / validReels.length) : 0,
-          avg_comments: validReels.length > 0 ? Math.round((totalComms / validReels.length) * 10) / 10 : 0,
-        };
-      });
-    } catch {
-      return [];
-    }
-  });
+  const [competitors, setCompetitors] = useState<CompetitorProfile[]>([]);
 
   const [mainInput, setMainInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [reelInputByComp, setReelInputByComp] = useState<Record<string, string>>({});
 
+  // Cargar competidores del negocio activo. Antes vivían en una única clave
+  // de localStorage compartida por todos los negocios de la cuenta — el
+  // mismo tipo de fuga entre clientes ya corregido en perfil, CRM y Meta.
   useEffect(() => {
+    if (!businessId) return;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(competitors));
+      const raw = localStorage.getItem(getStorageKey(businessId));
+      if (!raw) {
+        setCompetitors([]);
+        return;
+      }
+      const parsed: CompetitorProfile[] = JSON.parse(raw);
+      // Limpiar posibles reels con métricas vacías de pruebas anteriores
+      setCompetitors(
+        parsed.map((comp) => {
+          const validReels = (comp.reels || []).filter(
+            (r) => hasValue(r.likes) || hasValue(r.comments_count) || r.thumbnail_url
+          );
+          return {
+            ...comp,
+            reels: validReels,
+            avg_likes: averageAvailable(validReels.map((r) => r.likes)),
+            avg_comments: averageAvailable(validReels.map((r) => r.comments_count)),
+          };
+        })
+      );
+    } catch {
+      setCompetitors([]);
+    }
+  }, [businessId]);
+
+  useEffect(() => {
+    if (!businessId) return;
+    try {
+      localStorage.setItem(getStorageKey(businessId), JSON.stringify(competitors));
     } catch (e) {
       console.warn('Error saving competitors:', e);
     }
-  }, [competitors]);
-
-  // Auto-cargar métricas reales de Shop de Plumas si no las tiene aún
-  useEffect(() => {
-    const plumasComp = competitors.find(
-      (c) => c.handle.toLowerCase().includes('plumas') && c.reels.length === 0
-    );
-    if (plumasComp) {
-      handleAddOrAudit('https://www.instagram.com/p/DcveKFpx1eP/', plumasComp.id);
-    }
-  }, []);
+  }, [competitors, businessId]);
 
   // Helper para extraer handle limpio desde cualquier formato
   const extractHandle = (raw: string): string | null => {
@@ -133,7 +170,51 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
       const isReelUrl = /(?:p|reel|reels)\/([A-Za-z0-9_-]+)/.test(raw);
 
       if (isReelUrl) {
-        // --- ES UN REEL: EXTRAER MÉTRICAS REALES CON EL SCRAPER ---
+        const shortcode = raw.match(/(?:p|reel|reels)\/([A-Za-z0-9_-]+)/)?.[1];
+        const existingHandle = targetCompId
+          ? competitors.find((c) => c.id === targetCompId)?.handle
+          : undefined;
+
+        // --- INTENTO 1: business_discovery (dato real de Meta, con nuestro
+        // propio token, sin scrapear nada). Solo posible si ya sabemos el
+        // handle del competidor y el Reel está entre sus últimos posteos
+        // públicos que Meta nos deja consultar.
+        if (existingHandle && shortcode && MetaGraphService.isConfigured(businessId)) {
+          const discovery = await MetaGraphService.getBusinessDiscovery(existingHandle.replace('@', ''), businessId);
+          if (discovery.success) {
+            const match = discovery.data.media.find((m) => m.permalink.includes(shortcode));
+            if (match) {
+              const newReel = businessDiscoveryMediaToReel(match, discovery.data.username);
+              setCompetitors((prev) =>
+                prev.map((comp) => {
+                  if (comp.id !== targetCompId) return comp;
+                  const updatedReels = [newReel, ...comp.reels.filter((r) => r.id !== newReel.id)];
+                  return {
+                    ...comp,
+                    avatar_url: discovery.data.profile_picture_url || comp.avatar_url,
+                    followers_count: discovery.data.followers_count ?? comp.followers_count,
+                    reels: updatedReels,
+                    avg_likes: averageAvailable(updatedReels.map((r) => r.likes)),
+                    avg_comments: averageAvailable(updatedReels.map((r) => r.comments_count)),
+                    top_hook: newReel.hook_extracted,
+                    top_cta: newReel.cta_extracted,
+                  };
+                })
+              );
+              setReelInputByComp((prev) => ({ ...prev, [targetCompId!]: '' }));
+              toast.success(
+                `✅ Reel auditado con datos verificados de Meta (${formatMetric(newReel.likes)} likes, ${formatMetric(newReel.comments_count)} comentarios)`,
+                { id: toastId }
+              );
+              return;
+            }
+          }
+        }
+
+        // --- INTENTO 2 (respaldo): SCRAPER PÚBLICO ---
+        // Necesario cuando no conocemos el handle todavía (primer Reel
+        // pegado sin haber agregado el competidor antes) o cuando el Reel
+        // es más viejo que lo que business_discovery nos deja ver.
         const res = await fetch(`/api/instagram-scrape?url=${encodeURIComponent(raw)}`);
         const data = await res.json();
 
@@ -141,18 +222,29 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
           throw new Error(data.error || 'No se pudo extraer métricas de este Reel.');
         }
 
-        const likes = typeof data.likes === 'number' ? data.likes : 0;
-        const commentsCount = typeof data.commentsCount === 'number' ? data.commentsCount : 0;
-        const shortcode = data.shortcode || raw.match(/(?:p|reel|reels)\/([A-Za-z0-9_-]+)/)?.[1] || `${Date.now()}`;
+        let likes: MetricValue = typeof data.likes === 'number' ? data.likes : NO_DATA;
+        let commentsCount: MetricValue = typeof data.commentsCount === 'number' ? data.commentsCount : NO_DATA;
+        const shortcodeForId = data.shortcode || shortcode || `${Date.now()}`;
         const cleanUsername = data.username ? data.username.replace('@', '') : '';
         const caption = data.caption || (cleanUsername ? `Reel de @${cleanUsername}` : 'Reel de Instagram');
         const imageUrl = data.imageUrl || '';
-        
-        // Extraer gancho preliminar y CTA
-        const firstLine = caption.split('\n')[0] || caption.slice(0, 80);
-        const hookText = firstLine.length > 5 ? firstLine : (cleanUsername ? `Contenido de @${cleanUsername}` : 'Gancho visual de Instagram');
-        const ctaMatch = caption.match(/(coment[áa]|escrib[íi]|segu[íi]|link in bio|link en bio|guard[áa]|compart[íi]|particip[áa]|mencion[áa])[^\.\n]*/i);
-        const ctaText = ctaMatch ? ctaMatch[0] : 'Interacción y participación';
+
+        // Ahora que sabemos el usuario, un último intento de reemplazar lo
+        // scrapeado (que Instagram frecuentemente no expone) por el dato
+        // real vía business_discovery.
+        let usedRealMetrics = hasValue(likes) || hasValue(commentsCount);
+        if (cleanUsername && shortcode && MetaGraphService.isConfigured(businessId)) {
+          const discovery = await MetaGraphService.getBusinessDiscovery(cleanUsername, businessId);
+          if (discovery.success) {
+            const match = discovery.data.media.find((m) => m.permalink.includes(shortcode));
+            if (match) {
+              if (typeof match.like_count === 'number') { likes = match.like_count; usedRealMetrics = true; }
+              if (typeof match.comments_count === 'number') { commentsCount = match.comments_count; usedRealMetrics = true; }
+            }
+          }
+        }
+
+        const { hookText, ctaText } = extractHookAndCta(caption, cleanUsername);
 
         // Determinar a qué competidor asociar
         let associatedHandle = targetCompId
@@ -173,7 +265,7 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
         }
 
         const newReel: AuditedCompetitorReel = {
-          id: `reel_${shortcode}`,
+          id: `reel_${shortcodeForId}`,
           url: raw,
           thumbnail_url: imageUrl,
           caption,
@@ -193,15 +285,13 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
           if (compIndex >= 0) {
             const comp = prev[compIndex];
             const updatedReels = [newReel, ...comp.reels.filter((r) => r.url !== raw && r.id !== newReel.id)];
-            const totalLikes = updatedReels.reduce((s, r) => s + r.likes, 0);
-            const totalComms = updatedReels.reduce((s, r) => s + r.comments_count, 0);
 
             const updated: CompetitorProfile = {
               ...comp,
               avatar_url: imageUrl || comp.avatar_url,
               reels: updatedReels,
-              avg_likes: Math.round(totalLikes / updatedReels.length),
-              avg_comments: Math.round((totalComms / updatedReels.length) * 10) / 10,
+              avg_likes: averageAvailable(updatedReels.map((r) => r.likes)),
+              avg_comments: averageAvailable(updatedReels.map((r) => r.comments_count)),
               top_hook: hookText,
               top_cta: ctaText,
               top_audio: data.audioTrack || comp.top_audio,
@@ -231,9 +321,17 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
           setReelInputByComp((prev) => ({ ...prev, [targetCompId]: '' }));
         }
 
-        toast.success(`✅ Reel auditado para ${associatedHandle} (${likes} likes, ${commentsCount} comentarios reales)`, {
-          id: toastId,
-        });
+        if (usedRealMetrics) {
+          toast.success(
+            `✅ Reel auditado para ${associatedHandle} (${formatMetric(likes)} likes, ${formatMetric(commentsCount)} comentarios reales)`,
+            { id: toastId }
+          );
+        } else {
+          toast.warning(
+            `Reel agregado para ${associatedHandle}, pero Instagram no expuso likes ni comentarios en la página pública. Se guardó el resto de los datos (miniatura, gancho, CTA).`,
+            { id: toastId, duration: 7000 }
+          );
+        }
       } else {
         // --- ES UN PERFIL O @HANDLE ---
         const detectedHandle = extractHandle(raw);
@@ -249,21 +347,58 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
           return;
         }
 
+        // --- INTENTO 1: business_discovery. Trae de una todos los posteos
+        // públicos recientes con likes/comentarios reales verificados por
+        // Meta — sin pegar un solo Reel a mano. Solo funciona si la cuenta
+        // es Business/Creator pública (igual que la nuestra necesita serlo).
+        const cleanHandle = detectedHandle.replace('@', '');
+        const discovery = MetaGraphService.isConfigured(businessId)
+          ? await MetaGraphService.getBusinessDiscovery(cleanHandle, businessId)
+          : { success: false as const, error: 'Todavía no conectaste tu propia cuenta de Instagram Business/Creator.' };
+
+        if (discovery.success) {
+          const bd = discovery.data;
+          const reels = bd.media.map((m) => businessDiscoveryMediaToReel(m, bd.username));
+          const newProfile: CompetitorProfile = {
+            id: `comp_${Date.now()}`,
+            handle: `@${bd.username}`,
+            display_name: bd.name || bd.username,
+            avatar_url: bd.profile_picture_url,
+            followers_count: bd.followers_count,
+            reels,
+            avg_likes: averageAvailable(reels.map((r) => r.likes)),
+            avg_comments: averageAvailable(reels.map((r) => r.comments_count)),
+            top_hook: reels[0]?.hook_extracted,
+            top_cta: reels[0]?.cta_extracted,
+          };
+          setCompetitors((prev) => [newProfile, ...prev]);
+          setExpandedId(newProfile.id);
+          setMainInput('');
+          toast.success(
+            `🎯 @${bd.username} agregado con ${reels.length} posteo${reels.length === 1 ? '' : 's'} real${reels.length === 1 ? '' : 'es'} (likes y comentarios verificados por Meta).`,
+            { id: toastId }
+          );
+          return;
+        }
+
+        // --- INTENTO 2 (respaldo): agregar el competidor vacío y dejar que
+        // audite Reels puntuales pegando el enlace (usa el scraper público).
         const newProfile: CompetitorProfile = {
           id: `comp_${Date.now()}`,
           handle: detectedHandle,
           display_name: detectedHandle.replace('@', ''),
           reels: [],
-          avg_likes: 0,
-          avg_comments: 0,
+          avg_likes: NO_DATA,
+          avg_comments: NO_DATA,
         };
 
         setCompetitors((prev) => [newProfile, ...prev]);
         setExpandedId(newProfile.id);
         setMainInput('');
-        toast.success(`🎯 Competidor ${detectedHandle} agregado! Ahora podés auditar cualquiera de sus Reels.`, {
-          id: toastId,
-        });
+        toast.warning(
+          `${detectedHandle} agregado, pero no se pudo auto-completar con datos de Meta (${discovery.error}). Podés auditar Reels puntuales pegando su enlace.`,
+          { id: toastId, duration: 8000 }
+        );
       }
     } catch (err: any) {
       toast.error(`Error: ${err.message}`, { id: toastId });
@@ -283,13 +418,11 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
       prev.map((comp) => {
         if (comp.id !== compId) return comp;
         const updatedReels = comp.reels.filter((r) => r.id !== reelId);
-        const totalLikes = updatedReels.reduce((s, r) => s + r.likes, 0);
-        const totalComms = updatedReels.reduce((s, r) => s + r.comments_count, 0);
         return {
           ...comp,
           reels: updatedReels,
-          avg_likes: updatedReels.length > 0 ? Math.round(totalLikes / updatedReels.length) : 0,
-          avg_comments: updatedReels.length > 0 ? Math.round((totalComms / updatedReels.length) * 10) / 10 : 0,
+          avg_likes: averageAvailable(updatedReels.map((r) => r.likes)),
+          avg_comments: averageAvailable(updatedReels.map((r) => r.comments_count)),
         };
       })
     );
@@ -378,10 +511,7 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
             <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2">
               <span className="text-[10px] text-slate-400 block">Competidores Promedio (Likes)</span>
               <span className="font-mono font-black text-amber-400 text-sm">
-                {Math.round(
-                  competitors.filter((c) => c.reels.length > 0).reduce((s, c) => s + c.avg_likes, 0) /
-                    (competitors.filter((c) => c.reels.length > 0).length || 1)
-                )}
+                {formatMetric(averageAvailable(competitors.map((c) => c.avg_likes)))}
               </span>
             </div>
           </div>
@@ -433,6 +563,7 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
                         {hasReels
                           ? `${comp.reels.length} reel${comp.reels.length > 1 ? 's' : ''} auditado${comp.reels.length > 1 ? 's' : ''}`
                           : 'Listo para auditar Reels'}
+                        {hasValue(comp.followers_count) && ` • ${formatMetric(comp.followers_count)} seguidores`}
                       </p>
                     </div>
                   </div>
@@ -441,10 +572,10 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
                     {hasReels && (
                       <div className="text-right text-[11px]">
                         <span className="text-pink-400 font-mono font-bold flex items-center gap-0.5 justify-end">
-                          <Heart className="w-3 h-3" /> {comp.avg_likes}
+                          <Heart className="w-3 h-3" /> {formatMetric(comp.avg_likes)}
                         </span>
                         <span className="text-blue-400 font-mono text-[10px] flex items-center gap-0.5 justify-end">
-                          <MessageCircle className="w-2.5 h-2.5" /> {comp.avg_comments}
+                          <MessageCircle className="w-2.5 h-2.5" /> {formatMetric(comp.avg_comments)}
                         </span>
                       </div>
                     )}
@@ -555,8 +686,8 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
                                   {reel.caption || 'Reel sin descripción'}
                                 </p>
                                 <div className="flex items-center gap-2 text-[9px] text-slate-400">
-                                  <span className="text-pink-400 font-bold">❤️ {reel.likes}</span>
-                                  <span className="text-blue-400 font-bold">💬 {reel.comments_count}</span>
+                                  <span className="text-pink-400 font-bold">❤️ {formatMetric(reel.likes)}</span>
+                                  <span className="text-blue-400 font-bold">💬 {formatMetric(reel.comments_count)}</span>
                                 </div>
                               </div>
                             </div>
@@ -581,8 +712,10 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
                                       permalink: reel.url,
                                       caption: reel.caption || `Reel de ${comp.handle}`,
                                       timestamp: reel.timestamp,
-                                      like_count: reel.likes,
-                                      comments_count: reel.comments_count,
+                                      // undefined (no 0) cuando Instagram no expuso el dato:
+                                      // el Canvas ya sabe mostrar "Sin dato" para eso.
+                                      like_count: hasValue(reel.likes) ? reel.likes : undefined,
+                                      comments_count: hasValue(reel.comments_count) ? reel.comments_count : undefined,
                                     });
                                     toast.success(`🎬 Reel de ${comp.handle} agregado al Canvas!`);
                                   }}
