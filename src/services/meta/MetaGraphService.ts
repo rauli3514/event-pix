@@ -4,6 +4,8 @@
 // App: eventPix intelligence (ID: 2345235469580053)
 // ================================================================
 
+import { MetaAdCampaign } from '../../types/ads';
+
 const META_GRAPH_BASE = 'https://graph.facebook.com/v19.0';
 const INSTAGRAM_GRAPH_BASE = 'https://graph.instagram.com';
 const CREDENTIALS_KEY = 'eventpix_meta_credentials';
@@ -22,6 +24,8 @@ export interface MetaCredentials {
   accountName?: string;
   accountAvatar?: string;
   isBasicDisplay?: boolean;
+  /** Cuenta publicitaria de Meta Ads, formato "act_1234567890". */
+  adAccountId?: string;
 }
 
 export interface DiscoveredAccount {
@@ -56,6 +60,28 @@ export interface MetaMediaItem {
   timestamp: string;
   like_count?: number;
   comments_count?: number;
+}
+
+/** Un post público de OTRA cuenta, devuelto por `business_discovery`. */
+export interface BusinessDiscoveryMedia {
+  id: string;
+  caption?: string;
+  media_type: 'IMAGE' | 'VIDEO' | 'CAROUSEL_ALBUM';
+  media_url?: string;
+  thumbnail_url?: string;
+  permalink: string;
+  timestamp: string;
+  like_count?: number;
+  comments_count?: number;
+}
+
+export interface BusinessDiscoveryResult {
+  username: string;
+  name?: string;
+  profile_picture_url?: string;
+  followers_count?: number;
+  media_count?: number;
+  media: BusinessDiscoveryMedia[];
 }
 
 /**
@@ -102,40 +128,48 @@ export class MetaGraphService {
   // ----- Credential Management -----
 
   private static getStorageKey(businessId?: string): string {
-    if (!businessId || businessId === 'biz_default' || businessId === 'biz_001') {
+    if (!businessId || businessId === 'biz_default') {
       return CREDENTIALS_KEY;
     }
     return `${CREDENTIALS_KEY}_${businessId}`;
   }
 
   static saveCredentials(creds: MetaCredentials, businessId?: string): void {
-    const key = this.getStorageKey(businessId);
-    localStorage.setItem(key, JSON.stringify(creds));
-    // Guardar también en la global si es default
-    if (!businessId || businessId === 'biz_default') {
-      localStorage.setItem(CREDENTIALS_KEY, JSON.stringify(creds));
-    }
+    localStorage.setItem(this.getStorageKey(businessId), JSON.stringify(creds));
   }
 
+  // Antes, un negocio nuevo sin token propio caía a la clave global
+  // compartida (`CREDENTIALS_KEY`) y terminaba usando el Access Token /
+  // Instagram Account ID de OTRO negocio — mismo patrón de fuga ya
+  // corregido en el perfil y el CRM. Ahora cada negocio está aislado a
+  // su propia clave; si no tiene credenciales, simplemente no está
+  // conectado todavía (no hereda las de otro).
   static loadCredentials(businessId?: string): MetaCredentials | null {
     try {
-      if (businessId && businessId !== 'biz_default' && businessId !== 'biz_001') {
-        const tenantRaw = localStorage.getItem(`${CREDENTIALS_KEY}_${businessId}`);
-        if (tenantRaw) return JSON.parse(tenantRaw) as MetaCredentials;
+      const raw = localStorage.getItem(this.getStorageKey(businessId));
+      if (raw) return JSON.parse(raw) as MetaCredentials;
+
+      // Migración única: "Display Digital" (biz_001) es el único negocio
+      // que llegó a guardar sus credenciales bajo la clave global vieja,
+      // de cuando biz_001 todavía compartía esa clave a propósito. Si
+      // todavía viven ahí, las adoptamos a su clave propia una sola vez
+      // en vez de dejarlas huérfanas (lo que hacía que "desaparecieran").
+      if (businessId === 'biz_001') {
+        const legacyRaw = localStorage.getItem(CREDENTIALS_KEY);
+        if (legacyRaw) {
+          localStorage.setItem(this.getStorageKey(businessId), legacyRaw);
+          return JSON.parse(legacyRaw) as MetaCredentials;
+        }
       }
-      const raw = localStorage.getItem(CREDENTIALS_KEY);
-      if (!raw) return null;
-      return JSON.parse(raw) as MetaCredentials;
+
+      return null;
     } catch {
       return null;
     }
   }
 
   static clearCredentials(businessId?: string): void {
-    if (businessId) {
-      localStorage.removeItem(`${CREDENTIALS_KEY}_${businessId}`);
-    }
-    localStorage.removeItem(CREDENTIALS_KEY);
+    localStorage.removeItem(this.getStorageKey(businessId));
   }
 
   static isConfigured(businessId?: string): boolean {
@@ -315,9 +349,10 @@ export class MetaGraphService {
 
   private static async apiFetch<T>(
     path: string,
-    params: Record<string, string> = {}
+    params: Record<string, string> = {},
+    businessId?: string
   ): Promise<T> {
-    const creds = MetaGraphService.loadCredentials();
+    const creds = MetaGraphService.loadCredentials(businessId);
     if (!creds?.accessToken) {
       throw new Error('No hay credenciales de Meta configuradas. Por favor conectá tu cuenta primero.');
     }
@@ -344,9 +379,9 @@ export class MetaGraphService {
   // ----- API Methods -----
 
   /** Verifica que el token sea válido llamando a /me */
-  static async testConnection(): Promise<boolean> {
+  static async testConnection(businessId?: string): Promise<boolean> {
     try {
-      const creds = MetaGraphService.loadCredentials();
+      const creds = MetaGraphService.loadCredentials(businessId);
       if (!creds?.accessToken) return false;
       const res = await MetaGraphService.testAndDiscoverAccounts(creds.accessToken, creds.instagramAccountId);
       return res.success;
@@ -356,8 +391,8 @@ export class MetaGraphService {
   }
 
   /** Obtiene el perfil de la cuenta de Instagram Business */
-  static async getProfile(): Promise<MetaProfileInsights> {
-    const creds = MetaGraphService.loadCredentials();
+  static async getProfile(businessId?: string): Promise<MetaProfileInsights> {
+    const creds = MetaGraphService.loadCredentials(businessId);
     if (!creds) throw new Error('Credenciales no configuradas');
 
     if (creds.isBasicDisplay) {
@@ -368,7 +403,7 @@ export class MetaGraphService {
         media_count?: number;
       }>('/me', {
         fields: 'id,username,account_type,media_count',
-      });
+      }, businessId);
       return {
         id: data.id,
         name: creds.accountName || data.username,
@@ -384,20 +419,84 @@ export class MetaGraphService {
       `/${creds.instagramAccountId}`,
       {
         fields: 'id,name,biography,username,followers_count,media_count,profile_picture_url,website',
-      }
+      },
+      businessId
     );
   }
 
+  /**
+   * Consulta métricas PÚBLICAS reales de OTRA cuenta de Instagram (competencia)
+   * usando el token de nuestra propia cuenta conectada — el campo oficial de
+   * Meta para esto (`business_discovery`), sin necesitar login ni token de esa
+   * cuenta. Solo funciona si la cuenta consultada también es Business/Creator
+   * y pública: Meta nunca expone esto para cuentas personales, ni con este ni
+   * con ningún otro método (scraping incluido). No devuelve reach, impressions
+   * ni guardados de esa cuenta — eso es privado del dueño, siempre.
+   */
+  static async getBusinessDiscovery(
+    targetUsername: string,
+    businessId?: string,
+    mediaLimit = 25
+  ): Promise<{ success: true; data: BusinessDiscoveryResult } | { success: false; error: string }> {
+    const creds = MetaGraphService.loadCredentials(businessId);
+    if (!creds?.accessToken || !creds.instagramAccountId) {
+      return { success: false, error: 'No hay una cuenta de Instagram conectada.' };
+    }
+    if (creds.isBasicDisplay) {
+      return {
+        success: false,
+        error: 'Tu cuenta está conectada con Instagram Basic Display, que no permite consultar otras cuentas. Necesitás Instagram Graph API con una cuenta Business/Creator vinculada a una página de Facebook.',
+      };
+    }
+
+    const cleanUsername = targetUsername.replace('@', '').trim();
+    if (!cleanUsername) {
+      return { success: false, error: 'Nombre de usuario vacío.' };
+    }
+
+    const fields = `business_discovery.username(${cleanUsername}){username,name,profile_picture_url,followers_count,media_count,media.limit(${mediaLimit}){id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count}}`;
+
+    try {
+      const data = await MetaGraphService.apiFetch<{ business_discovery?: any }>(
+        `/${creds.instagramAccountId}`,
+        { fields },
+        businessId
+      );
+
+      if (!data.business_discovery) {
+        return {
+          success: false,
+          error: `"@${cleanUsername}" no es una cuenta Business/Creator pública de Instagram (o no existe), así que Meta no permite consultar sus métricas por este medio.`,
+        };
+      }
+
+      const bd = data.business_discovery;
+      return {
+        success: true,
+        data: {
+          username: bd.username,
+          name: bd.name,
+          profile_picture_url: bd.profile_picture_url,
+          followers_count: bd.followers_count,
+          media_count: bd.media_count,
+          media: (bd.media?.data || []) as BusinessDiscoveryMedia[],
+        },
+      };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Error consultando la cuenta en Meta.' };
+    }
+  }
+
   /** Obtiene los últimos media posts (filtra por REELS y VIDEO) */
-  static async getReels(limit = 20): Promise<MetaMediaItem[]> {
-    const creds = MetaGraphService.loadCredentials();
+  static async getReels(limit = 20, businessId?: string): Promise<MetaMediaItem[]> {
+    const creds = MetaGraphService.loadCredentials(businessId);
     if (!creds) return [];
 
     if (creds.isBasicDisplay) {
       const data = await MetaGraphService.apiFetch<{ data: MetaMediaItem[] }>('/me/media', {
         fields: 'id,media_type,media_url,thumbnail_url,permalink,caption,timestamp',
         limit: String(limit),
-      });
+      }, businessId);
       return (data.data || []).filter(
         (item) => item.media_type === 'REELS' || item.media_type === 'VIDEO'
       );
@@ -408,7 +507,8 @@ export class MetaGraphService {
       {
         fields: 'id,media_type,media_url,thumbnail_url,permalink,caption,timestamp,like_count,comments_count',
         limit: String(limit),
-      }
+      },
+      businessId
     );
     return (data.data || []).filter(
       (item) => item.media_type === 'REELS' || item.media_type === 'VIDEO'
@@ -416,8 +516,8 @@ export class MetaGraphService {
   }
 
   /** Obtiene insights de un media específico */
-  static async getMediaInsights(mediaId: string): Promise<MetaMediaInsights> {
-    const creds = MetaGraphService.loadCredentials();
+  static async getMediaInsights(mediaId: string, businessId?: string): Promise<MetaMediaInsights> {
+    const creds = MetaGraphService.loadCredentials(businessId);
     if (creds?.isBasicDisplay) {
       // Basic Display no expone insights. Declararlo, no simular ceros.
       return {
@@ -428,11 +528,18 @@ export class MetaGraphService {
     }
 
     try {
+      // "impressions" y "total_interactions" combinados con "views" (el
+      // reemplazo de "plays") hacen que Meta rechace la llamada ENTERA con
+      // error #100 ("metric[4] must be one of the following values..."),
+      // tirando abajo las insights de todos los Reels de una — no solo esas
+      // métricas. "views,reach,saved,shares,likes,comments" es el set que
+      // Meta efectivamente acepta junto a nivel de media individual.
       const data = await MetaGraphService.apiFetch<{ data: Array<{ name: string; values: Array<{ value: number }> }> }>(
         `/${mediaId}/insights`,
         {
-          metric: 'impressions,reach,saved,shares,plays,total_interactions',
-        }
+          metric: 'views,reach,saved,shares,likes,comments',
+        },
+        businessId
       );
 
       // Solo se registran las métricas efectivamente devueltas por Meta.
@@ -447,14 +554,22 @@ export class MetaGraphService {
 
       const hasAny = Object.keys(metricsMap).length > 0;
 
+      // Meta ya no devuelve "total_interactions" en este mismo llamado (ver
+      // comentario arriba), así que se suma a partir de las métricas reales
+      // que sí llegaron. Si ninguna llegó, queda undefined — no se inventa 0.
+      const interactionParts = [metricsMap['likes'], metricsMap['comments'], metricsMap['shares'], metricsMap['saved']]
+        .filter((v): v is number => typeof v === 'number');
+      const totalInteractions = interactionParts.length > 0
+        ? interactionParts.reduce((a, b) => a + b, 0)
+        : undefined;
+
       return {
         media_id: mediaId,
-        impressions: metricsMap['impressions'],
         reach: metricsMap['reach'],
         saved: metricsMap['saved'],
         shares: metricsMap['shares'],
-        plays: metricsMap['plays'],
-        total_interactions: metricsMap['total_interactions'],
+        plays: metricsMap['views'],
+        total_interactions: totalInteractions,
         unavailable: !hasAny,
         unavailable_reason: hasAny
           ? undefined
@@ -473,14 +588,15 @@ export class MetaGraphService {
 
   /** Obtiene Reels con sus insights combinados */
   static async getReelsWithInsights(
-    limit = 10
+    limit = 10,
+    businessId?: string
   ): Promise<Array<MetaMediaItem & { insights?: MetaMediaInsights }>> {
-    const reels = await MetaGraphService.getReels(limit);
+    const reels = await MetaGraphService.getReels(limit, businessId);
 
     const reelsWithInsights = await Promise.allSettled(
       reels.map(async (reel) => {
         try {
-          const insights = await MetaGraphService.getMediaInsights(reel.id);
+          const insights = await MetaGraphService.getMediaInsights(reel.id, businessId);
           return { ...reel, insights };
         } catch {
           return { ...reel };
@@ -491,5 +607,213 @@ export class MetaGraphService {
     return reelsWithInsights
       .filter((r) => r.status === 'fulfilled')
       .map((r) => (r as PromiseFulfilledResult<MetaMediaItem & { insights?: MetaMediaInsights }>).value);
+  }
+
+  // =========================================================================
+  // META ADS (MARKETING API) — campañas y presupuesto pago reales
+  // =========================================================================
+
+  private static formatDate(d: Date): string {
+    return d.toISOString().slice(0, 10);
+  }
+
+  /**
+   * Suma el/los tipo/s de acción de Meta que representan una conversión real
+   * (compra, lead o conversación de WhatsApp iniciada). Nunca inventa un
+   * número: si Meta no reportó ninguna de estas acciones, devuelve 0.
+   */
+  private static extractConversions(actions?: Array<{ action_type: string; value: string }>): number {
+    if (!actions || actions.length === 0) return 0;
+    const priority = [
+      'purchase',
+      'offsite_conversion.fb_pixel_purchase',
+      'lead',
+      'onsite_conversion.lead_grouped',
+      'onsite_conversion.messaging_conversation_started_7d',
+      'onsite_conversion.total_messaging_connection',
+    ];
+    for (const type of priority) {
+      const match = actions.find(a => a.action_type === type);
+      if (match) return Math.round(Number(match.value) || 0);
+    }
+    return 0;
+  }
+
+  private static async fetchAdInsights(
+    adAccountId: string,
+    since: string,
+    until: string,
+    businessId?: string
+  ): Promise<Map<string, { spend: number; impressions: number; clicks: number; ctr: number; cpc: number; cpm: number; conversions: number; roas?: number }>> {
+    const data = await MetaGraphService.apiFetch<{
+      data: Array<{
+        campaign_id: string;
+        spend?: string;
+        impressions?: string;
+        clicks?: string;
+        ctr?: string;
+        cpc?: string;
+        cpm?: string;
+        actions?: Array<{ action_type: string; value: string }>;
+        purchase_roas?: Array<{ value: string }>;
+      }>;
+    }>(
+      `/${adAccountId}/insights`,
+      {
+        level: 'campaign',
+        fields: 'campaign_id,spend,impressions,clicks,ctr,cpc,cpm,actions,purchase_roas',
+        time_range: JSON.stringify({ since, until }),
+      },
+      businessId
+    );
+
+    const map = new Map<string, { spend: number; impressions: number; clicks: number; ctr: number; cpc: number; cpm: number; conversions: number; roas?: number }>();
+    for (const row of data.data || []) {
+      map.set(row.campaign_id, {
+        spend: Number(row.spend) || 0,
+        impressions: Number(row.impressions) || 0,
+        clicks: Number(row.clicks) || 0,
+        ctr: Number(row.ctr) || 0,
+        cpc: Number(row.cpc) || 0,
+        cpm: Number(row.cpm) || 0,
+        conversions: MetaGraphService.extractConversions(row.actions),
+        roas: row.purchase_roas?.[0]?.value ? Number(row.purchase_roas[0].value) : undefined,
+      });
+    }
+    return map;
+  }
+
+  /**
+   * Trae las campañas reales de la cuenta publicitaria de Meta Ads y las
+   * clasifica (ganadora / desperdiciando presupuesto / fatiga / óptima /
+   * en aprendizaje) comparando cada una contra el promedio de la propia
+   * cuenta — nunca contra umbrales absolutos inventados. La tendencia
+   * semanal compara los últimos 7 días reales contra los 7 anteriores.
+   */
+  static async getAdCampaigns(businessId?: string): Promise<MetaAdCampaign[]> {
+    const creds = MetaGraphService.loadCredentials(businessId);
+    if (!creds?.adAccountId) {
+      throw new Error('No hay una cuenta publicitaria de Meta Ads conectada para este negocio.');
+    }
+
+    const adAccountId = creds.adAccountId.startsWith('act_') ? creds.adAccountId : `act_${creds.adAccountId}`;
+
+    const campaignsData = await MetaGraphService.apiFetch<{
+      data: Array<{ id: string; name: string; status: string; objective: string; daily_budget?: string }>;
+    }>(
+      `/${adAccountId}/campaigns`,
+      { fields: 'id,name,status,objective,daily_budget', limit: '100' },
+      businessId
+    );
+
+    const campaigns = campaignsData.data || [];
+    if (campaigns.length === 0) return [];
+
+    const now = new Date();
+    const last7Start = new Date(now.getTime() - 7 * 24 * 3600 * 1000);
+    const prev7Start = new Date(now.getTime() - 14 * 24 * 3600 * 1000);
+    const prev7End = new Date(now.getTime() - 8 * 24 * 3600 * 1000);
+    const last30Start = new Date(now.getTime() - 30 * 24 * 3600 * 1000);
+
+    const [last30Insights, last7Insights, prev7Insights] = await Promise.all([
+      MetaGraphService.fetchAdInsights(adAccountId, MetaGraphService.formatDate(last30Start), MetaGraphService.formatDate(now), businessId),
+      MetaGraphService.fetchAdInsights(adAccountId, MetaGraphService.formatDate(last7Start), MetaGraphService.formatDate(now), businessId),
+      MetaGraphService.fetchAdInsights(adAccountId, MetaGraphService.formatDate(prev7Start), MetaGraphService.formatDate(prev7End), businessId),
+    ]);
+
+    const OBJECTIVE_MAP: Record<string, MetaAdCampaign['objective']> = {
+      OUTCOME_LEADS: 'LEADS', LEAD_GENERATION: 'LEADS',
+      OUTCOME_SALES: 'SALES', CONVERSIONS: 'SALES',
+      OUTCOME_TRAFFIC: 'TRAFFIC', LINK_CLICKS: 'TRAFFIC',
+      OUTCOME_ENGAGEMENT: 'ENGAGEMENT', POST_ENGAGEMENT: 'ENGAGEMENT', MESSAGES: 'ENGAGEMENT',
+    };
+
+    const built: Array<Omit<MetaAdCampaign, 'status_verdict' | 'trend_vs_last_week' | 'recommendation'> & { _prevCpa: number | null; _last7Cpa: number | null }> = campaigns.map(c => {
+      const insights = last30Insights.get(c.id);
+      const spend = insights?.spend ?? 0;
+      const conversions = insights?.conversions ?? 0;
+      const cpa = conversions > 0 ? Number((spend / conversions).toFixed(2)) : 0;
+
+      // Comparación semana vs. semana anterior (misma cantidad de días en ambos períodos)
+      const last7 = last7Insights.get(c.id);
+      const last7Cpa = last7 && last7.conversions > 0 ? last7.spend / last7.conversions : null;
+      const prev = prev7Insights.get(c.id);
+      const prevConversions = prev?.conversions ?? 0;
+      const prevCpa = prev && prevConversions > 0 ? prev.spend / prevConversions : null;
+
+      return {
+        id: c.id,
+        name: c.name,
+        status: (c.status === 'ACTIVE' ? 'ACTIVE' : c.status === 'PAUSED' ? 'PAUSED' : 'ARCHIVED'),
+        objective: OBJECTIVE_MAP[c.objective] || 'TRAFFIC',
+        daily_budget: c.daily_budget ? Number(c.daily_budget) / 100 : 0,
+        spend,
+        impressions: insights?.impressions ?? 0,
+        clicks: insights?.clicks ?? 0,
+        ctr: insights?.ctr ?? 0,
+        cpc: insights?.cpc ?? 0,
+        cpm: insights?.cpm ?? 0,
+        conversions,
+        cpa,
+        roas: insights?.roas,
+        _prevCpa: prevCpa,
+        _last7Cpa: last7Cpa,
+      };
+    });
+
+    // Promedio de la propia cuenta (solo campañas con conversiones reales) para clasificar sin umbrales inventados
+    const withCpa = built.filter(c => c.conversions > 0);
+    const accountAvgCpa = withCpa.length > 0
+      ? withCpa.reduce((s, c) => s + c.cpa, 0) / withCpa.length
+      : 0;
+
+    return built.map(c => {
+      let trend: MetaAdCampaign['trend_vs_last_week'] = 'estable';
+      if (c._prevCpa !== null && c._last7Cpa !== null) {
+        if (c._last7Cpa <= c._prevCpa * 0.85) trend = 'mejorando';
+        else if (c._last7Cpa >= c._prevCpa * 1.2) trend = 'deteriorandose';
+      }
+
+      let verdict: MetaAdCampaign['status_verdict'] = 'en_aprendizaje';
+      let recommendation = `"${c.name}" todavía no acumuló suficientes conversiones para evaluar su rendimiento con confianza.`;
+
+      if (c.conversions === 0 && c.spend > 30) {
+        verdict = 'desperdiciando_presupuesto';
+        recommendation = `Gastó $${c.spend.toFixed(2)} sin generar ninguna conversión registrada. Revisar segmentación o pausar.`;
+      } else if (accountAvgCpa > 0 && c.conversions > 0) {
+        if (c.cpa <= accountAvgCpa * 0.6) {
+          verdict = 'ganadora';
+          recommendation = `Costo por conversión de $${c.cpa.toFixed(2)}, muy por debajo del promedio de la cuenta ($${accountAvgCpa.toFixed(2)}). Candidata a escalar presupuesto.`;
+        } else if (c.cpa >= accountAvgCpa * 1.8) {
+          verdict = 'desperdiciando_presupuesto';
+          recommendation = `Costo por conversión de $${c.cpa.toFixed(2)}, muy por encima del promedio de la cuenta ($${accountAvgCpa.toFixed(2)}). Evaluar pausar o rehacer la segmentación.`;
+        } else if (trend === 'deteriorandose') {
+          verdict = 'fatiga';
+          recommendation = `El costo por conversión empeoró frente a la semana anterior. Posible fatiga de audiencia: renovar creativo.`;
+        } else {
+          verdict = 'optima';
+          recommendation = `Rinde en línea con el promedio de la cuenta ($${c.cpa.toFixed(2)} por conversión).`;
+        }
+      }
+
+      const { _prevCpa, _last7Cpa, ...rest } = c;
+      return { ...rest, status_verdict: verdict, trend_vs_last_week: trend, recommendation };
+    });
+  }
+
+  /** Pausa o reactiva una campaña real en Meta Ads Manager */
+  static async setCampaignStatus(campaignId: string, status: 'ACTIVE' | 'PAUSED', businessId?: string): Promise<void> {
+    const creds = MetaGraphService.loadCredentials(businessId);
+    if (!creds?.accessToken) throw new Error('No hay credenciales de Meta configuradas.');
+
+    const res = await fetch(`${META_GRAPH_BASE}/${campaignId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ status, access_token: creds.accessToken }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      throw new Error(data.error?.message || `No se pudo actualizar el estado de la campaña (${res.status})`);
+    }
   }
 }

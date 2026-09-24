@@ -1,93 +1,85 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { requireAuthenticatedUser } from './_lib/auth.js';
-import { scrapeInstagramUrl, isSinglePostUrl } from './_lib/instagramScraper.js';
-import { getErrorMessage } from './_lib/errors.js';
+// ================================================================
+// api/instagram-transcribe.ts
+// Función serverless de Vercel — transcribe el audio de un Reel con
+// OpenAI Whisper.
+//
+// A diferencia del middleware de desarrollo (vite.config.ts), que baja
+// el video con yt-dlp a partir del link público del Reel, esta función
+// NO puede ejecutar yt-dlp (las funciones serverless de Vercel no
+// corren binarios externos). En su lugar, requiere `mediaUrl`: el link
+// directo y descargable al archivo de video que Meta Graph API entrega
+// para los Reels de una cuenta conectada (`IntelligencePost.meta_media_url`).
+// Por eso esta función solo transcribe Reels importados por una cuenta
+// de Instagram conectada por Meta Graph API, no cualquier link público.
+// ================================================================
 
-/**
- * POST /api/instagram-transcribe
- * Body: { "url": "https://www.instagram.com/reel/...", "videoUrl"?: string }
- *
- * Transcribe el audio de un Reel con OpenAI Whisper. La API key de OpenAI se
- * lee EXCLUSIVAMENTE de las variables de entorno del servidor (OPENAI_API_KEY):
- * el cliente ya no puede ni debe mandarla en el body — antes viajaba una clave
- * privada desde el navegador en cada llamada, exponiendola en el trafico de red
- * y en cualquier log de cliente.
- */
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export const config = { maxDuration: 60 };
+
+export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Metodo no permitido.' });
-    return;
-  }
-
-  const auth = await requireAuthenticatedUser(req);
-  if (!auth.ok) {
-    res.status(auth.status).json({ error: auth.error });
-    return;
-  }
-
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    res.status(503).json({ error: 'La transcripcion no esta configurada en el servidor (falta OPENAI_API_KEY).' });
-    return;
-  }
-
-  const { url, videoUrl: providedVideoUrl } = (req.body || {}) as { url?: string; videoUrl?: string };
-  if (!url && !providedVideoUrl) {
-    res.status(400).json({ error: 'Falta "url" (o "videoUrl") del Reel a transcribir.' });
+    res.status(405).json({ error: 'Method not allowed' });
     return;
   }
 
   try {
-    let videoUrl = providedVideoUrl;
+    const { mediaUrl, apiKey } = req.body || {};
 
-    if (!videoUrl) {
-      if (!isSinglePostUrl(url!)) {
-        res.status(400).json({ error: 'La transcripcion solo aplica a un Reel/Post especifico, no a un perfil.' });
-        return;
-      }
-      const scraped = await scrapeInstagramUrl(url!);
-      if (!scraped.success) {
-        res.status(scraped.configured === false ? 503 : 502).json({ error: scraped.error });
-        return;
-      }
-      if (scraped.isProfile || !scraped.videoUrl) {
-        res.status(422).json({ error: 'Este post no tiene un video del que extraer audio.', hasSpeech: false });
-        return;
-      }
-      videoUrl = scraped.videoUrl;
-    }
-
-    const videoRes = await fetch(videoUrl);
-    if (!videoRes.ok) {
-      res.status(502).json({ error: `No se pudo descargar el video del Reel (HTTP ${videoRes.status}).` });
+    if (!apiKey) {
+      res.status(400).json({ error: 'Se requiere una API Key de OpenAI para transcribir con Whisper.' });
       return;
     }
-    const videoBlob = await videoRes.blob();
+    if (!mediaUrl) {
+      res.status(400).json({
+        error: 'Este Reel no tiene un archivo de video descargable. La transcripción automática en producción solo funciona con Reels importados desde una cuenta de Instagram conectada por Meta Graph API.'
+      });
+      return;
+    }
 
-    const form = new FormData();
-    form.append('file', videoBlob, 'reel.mp4');
-    form.append('model', 'whisper-1');
+    const videoRes = await fetch(mediaUrl);
+    if (!videoRes.ok) {
+      res.status(502).json({ error: 'No se pudo descargar el video del Reel desde Meta.' });
+      return;
+    }
+    const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
+    const blob = new Blob([videoBuffer], { type: 'video/mp4' });
+
+    const formData = new FormData();
+    formData.append('file', blob, 'reel.mp4');
+    formData.append('model', 'whisper-1');
+    formData.append('language', 'es');
+    formData.append('response_format', 'verbose_json');
 
     const whisperRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}` },
-      body: form,
+      headers: { 'Authorization': `Bearer ${apiKey}` },
+      body: formData
     });
 
     if (!whisperRes.ok) {
-      const errText = await whisperRes.text();
-      res.status(502).json({ error: `Whisper devolvio un error: ${errText}` });
+      const errJson: any = await whisperRes.json().catch(() => ({}));
+      res.status(whisperRes.status).json({ error: errJson?.error?.message || 'Error en la llamada a Whisper API' });
       return;
     }
 
-    const data = (await whisperRes.json()) as { text?: string };
-    const transcript = data.text?.trim() || '';
+    const whisperData: any = await whisperRes.json();
+    const text = (whisperData.text || '').trim();
+    const segments = (whisperData.segments || []).map((s: any) => ({
+      range: `${Math.round(s.start)}-${Math.round(s.end)}s`,
+      content: s.text.trim()
+    }));
+
+    const hasSpeech = text.length > 5;
 
     res.status(200).json({
-      transcript,
-      hasSpeech: transcript.length > 0,
+      success: true,
+      hasSpeech,
+      transcript: text,
+      segments: segments.length > 0 ? segments : (text ? [{ range: '0-25s', content: text }] : []),
+      message: hasSpeech
+        ? 'Transcripción completada automáticamente palabra por palabra.'
+        : 'Audio analizado: Es una pista musical sin diálogo de voz detectado.'
     });
-  } catch (err) {
-    res.status(500).json({ error: getErrorMessage(err) });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Error al transcribir Reel' });
   }
 }

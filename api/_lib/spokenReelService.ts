@@ -91,8 +91,8 @@ function validateScript(parsed: unknown): SpokenReelScript {
   };
 }
 
-async function generateWithClaude(req: GenerateSpokenScriptRequest): Promise<SpokenReelScript> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+async function generateWithClaude(req: GenerateSpokenScriptRequest, apiKey: string): Promise<SpokenReelScript> {
+  const client = new Anthropic({ apiKey });
   const response = await client.messages.create({
     model: 'claude-opus-5',
     max_tokens: 2000,
@@ -105,8 +105,8 @@ async function generateWithClaude(req: GenerateSpokenScriptRequest): Promise<Spo
   return validateScript(JSON.parse(extractJson(raw)));
 }
 
-async function generateWithOpenAI(req: GenerateSpokenScriptRequest): Promise<SpokenReelScript> {
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+async function generateWithOpenAI(req: GenerateSpokenScriptRequest, apiKey: string): Promise<SpokenReelScript> {
+  const client = new OpenAI({ apiKey });
   const completion = await client.chat.completions.create({
     model: 'gpt-4o',
     response_format: { type: 'json_object' },
@@ -123,18 +123,31 @@ async function generateWithOpenAI(req: GenerateSpokenScriptRequest): Promise<Spo
 /**
  * Motor 2 (Spoken Content Engine): genera un guion hablado Hook-Retain-Sell
  * a partir del Brand DNA del negocio y un tema ganador (propio o de un
- * competidor). Usa Claude si ANTHROPIC_API_KEY esta configurada en el
- * servidor; si no, cae a OpenAI GPT-4o si esta configurada esa. Nunca recibe
- * ni usa una API key mandada por el cliente.
+ * competidor). Modelo "bring your own key" (igual que /api/claude-messages y
+ * /api/gemini-generate): usa la clave que el negocio conectó desde "Conectar
+ * APIs"; si no conectó ninguna, cae a ANTHROPIC_API_KEY/OPENAI_API_KEY de la
+ * plataforma como fallback opcional para poder probar la función igual.
  */
 export async function generateSpokenReelScript(
   req: GenerateSpokenScriptRequest
 ): Promise<{ script: SpokenReelScript; provider: 'claude' | 'openai' }> {
+  const wantsOpenAI = req.provider === 'openai';
+  const businessKey = req.apiKey?.trim();
+
+  if (businessKey) {
+    return wantsOpenAI
+      ? { script: await generateWithOpenAI(req, businessKey), provider: 'openai' }
+      : { script: await generateWithClaude(req, businessKey), provider: 'claude' };
+  }
+
   if (process.env.ANTHROPIC_API_KEY) {
-    return { script: await generateWithClaude(req), provider: 'claude' };
+    return { script: await generateWithClaude(req, process.env.ANTHROPIC_API_KEY), provider: 'claude' };
   }
   if (process.env.OPENAI_API_KEY) {
-    return { script: await generateWithOpenAI(req), provider: 'openai' };
+    return { script: await generateWithOpenAI(req, process.env.OPENAI_API_KEY), provider: 'openai' };
   }
-  throw new Error('No hay ningun proveedor de IA configurado en el servidor (ANTHROPIC_API_KEY u OPENAI_API_KEY).');
+
+  throw new Error(
+    'Conectá tu clave de Claude u OpenAI desde "Conectar APIs" para generar guiones con IA.'
+  );
 }

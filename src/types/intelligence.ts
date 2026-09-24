@@ -8,6 +8,9 @@ export interface IntelligenceBusiness {
   instagram_handle?: string;
   created_at: string;
   updated_at: string;
+  // Integración de catálogo de e-commerce propia de este negocio (opcional).
+  // 'none' o ausente = el comercio no tiene catálogo conectado.
+  catalog_provider?: 'shop_de_plumas' | 'none';
 }
 
 export interface IntegrationConnector {
@@ -60,6 +63,14 @@ export interface IntelligencePost {
   business_id: string;
   title: string;
   video_url?: string;
+  /**
+   * Link directo y descargable al archivo de video (CDN de Meta), disponible
+   * solo cuando el Reel se importó por Meta Graph API con una cuenta
+   * conectada. `video_url` es el permalink público (para abrir en
+   * Instagram); este campo es el que puede usarse para bajar los bytes
+   * reales del video, por ejemplo para transcribir con Whisper.
+   */
+  meta_media_url?: string;
   thumbnail_url?: string;
   duration_seconds: number;
   objective: 'engagement' | 'sales' | 'brand_awareness' | 'community';
@@ -183,6 +194,65 @@ export interface BusinessAuditReport {
     effort: 'Bajo' | 'Medio' | 'Alto';
   }>;
   updated_at: string;
+}
+
+/**
+ * Radiografía completa del negocio: cruza contenido orgánico + Meta Ads +
+ * mensajes/CRM en un solo puntaje con 5 categorías. `score: null` en una
+ * categoría significa "todavía no hay suficiente dato real para medir esto"
+ * — nunca se rellena con un número inventado.
+ */
+export interface AuditCategoryScore {
+  score: number | null;
+  label: string;
+  detail: string;
+}
+
+export interface UnifiedBusinessAudit {
+  generated_at: string;
+  overall_score: number | null;
+  categories: {
+    crecimiento: AuditCategoryScore;
+    engagement: AuditCategoryScore;
+    contenido: AuditCategoryScore;
+    oportunidades: AuditCategoryScore;
+    consistencia: AuditCategoryScore;
+  };
+  priority_finding: string;
+  whats_working: string[];
+  whats_to_improve: string[];
+  action_plan: Array<{
+    title: string;
+    description: string;
+    priority: 'URGENTE' | 'ALTA' | 'MEDIA';
+  }>;
+  bio_audit: BioAudit;
+}
+
+/**
+ * Métricas de soporte guardadas junto al puntaje al tomar una foto de la
+ * auditoría, para poder mostrar deltas concretos ("conseguiste 12 leads
+ * más") además de los 5 puntajes abstractos. Todo opcional: solo se guarda
+ * lo que efectivamente estaba disponible en el momento de la foto.
+ */
+export interface AuditSnapshotMetrics {
+  avg_reach?: number;
+  total_spend?: number;
+  budget_efficiency_score?: number;
+  total_leads?: number;
+  conversion_rate_pct?: number;
+  deals_won?: number;
+  total_sales_value?: number;
+}
+
+export interface AuditSnapshot {
+  id: string;
+  business_id: string;
+  is_baseline: boolean;
+  overall_score: number | null;
+  category_scores: UnifiedBusinessAudit['categories'];
+  supporting_metrics: AuditSnapshotMetrics;
+  created_at: string;
 }
 
 export type NodeType = 'reel' | 'synthesis' | 'meta_business' | 'chatgpt' | 'claude' | 'canva' | 'automation_action' | 'display_digital' | 'ai_chat';

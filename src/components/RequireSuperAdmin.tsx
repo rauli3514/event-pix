@@ -27,7 +27,12 @@ export const RequireSuperAdmin = () => {
     }
 
     if (isLoading) {
-        return null; // Loading state, igual criterio que ProtectedRoute
+        return (
+            <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-300">
+                <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mb-3" />
+                <p className="text-xs text-slate-400">Verificando permisos...</p>
+            </div>
+        );
     }
 
     if (!profile || profile.role !== 'super_admin') {
@@ -50,7 +55,7 @@ function AccessDenied() {
                     error, contactá a un super administrador de la cuenta.
                 </p>
                 <a
-                    href="/usuarios"
+                    href="/intelligence/login"
                     className="inline-block mt-5 text-sm font-semibold text-violet-400 hover:text-violet-300"
                 >
                     Volver al inicio

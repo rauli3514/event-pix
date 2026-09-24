@@ -22,14 +22,9 @@ import {
   FlaskConical,
   TrendingUp,
   BrainCircuit,
-  Eye,
-  Bookmark,
-  Share2,
-  CheckCircle2,
-  AlertCircle,
   ExternalLink,
-  HelpCircle,
-  Play
+  Play,
+  Loader2
 } from 'lucide-react';
 import {
   IntelligencePost,
@@ -43,11 +38,9 @@ import {
 import { AIProviderService } from '../../../services/intelligence/AIProviderService';
 import { IntelligenceStorageService } from '../../../services/intelligence/IntelligenceStorageService';
 import { ExperimentationService } from '../../../services/intelligence/ExperimentationService';
-import { AccountBenchmarkService } from '../../../services/intelligence/AccountBenchmarkService';
 import { ConnectionStorageService } from '../../../services/intelligence/ConnectionStorageService';
 import { MetaGraphService } from '../../../services/meta/MetaGraphService';
-import { formatMetric } from '../../../services/intelligence/metricUtils';
-import { UnifiedConnectionsModal } from '../UnifiedConnectionsModal';
+import { formatMetric, hasValue } from '../../../services/intelligence/metricUtils';
 import { toast } from 'sonner';
 
 export type ContentFormatMode = 'reel_hablado' | 'b_roll' | 'carrusel' | 'tweet' | 'stories';
@@ -118,8 +111,8 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
   } | null>(null);
   const [selectedVariantKey, setSelectedVariantKey] = useState<'A' | 'B' | 'C'>('A');
   const [benchmark, setBenchmark] = useState<AccountMedianBenchmark | null>(null);
-  const [patterns, setPatterns] = useState<EmpiricalPattern[]>([]);
-  const [winningRules, setWinningRules] = useState<string[]>([]);
+  const [, setPatterns] = useState<EmpiricalPattern[]>([]);
+  const [, setWinningRules] = useState<string[]>([]);
 
   // Estado de experimentos y bucle de aprendizaje
   const [experiments, setExperiments] = useState<ContentExperiment[]>([]);
@@ -248,7 +241,7 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
       return;
     }
 
-    if (!MetaGraphService.isConfigured()) {
+    if (!MetaGraphService.isConfigured(businessId)) {
       toast.error('Conectá la cuenta de Instagram vía Meta Graph API para poder medir el resultado real.');
       return;
     }
@@ -257,7 +250,7 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
     const toastId = toast.loading('Consultando métricas reales del Reel en Meta...');
 
     try {
-      const reels = await MetaGraphService.getReelsWithInsights(50);
+      const reels = await MetaGraphService.getReelsWithInsights(50, businessId);
       const publishedReel = reels.find(r => r.id === exp.published_reel_id);
 
       if (!publishedReel) {
@@ -547,11 +540,11 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
                   <div className="grid grid-cols-2 gap-2 text-left bg-slate-950 p-2.5 rounded-lg border border-slate-800 text-[10px]">
                     <div>
                       <span className="text-slate-500 block">Mediana Reproducciones:</span>
-                      <span className="font-mono font-bold text-slate-200">{benchmark.median_views.toLocaleString()}</span>
+                      <span className="font-mono font-bold text-slate-200">{formatMetric(benchmark.median_views)}</span>
                     </div>
                     <div>
                       <span className="text-slate-500 block">Mediana Guardados:</span>
-                      <span className="font-mono font-bold text-emerald-400">{benchmark.median_saves}</span>
+                      <span className="font-mono font-bold text-emerald-400">{formatMetric(benchmark.median_saves)}</span>
                     </div>
                   </div>
                 )}
@@ -822,17 +815,23 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
                           <div>
                             <span className="text-slate-500 block">Guardados vs Mediana:</span>
                             <span className={`font-mono font-bold text-xs ${
-                              (exp.delta_vs_median.saves_pct || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                              !hasValue(exp.delta_vs_median.saves_pct)
+                                ? 'text-slate-500'
+                                : exp.delta_vs_median.saves_pct >= 0 ? 'text-emerald-400' : 'text-rose-400'
                             }`}>
-                              {(exp.delta_vs_median.saves_pct || 0) >= 0 ? '+' : ''}{exp.delta_vs_median.saves_pct}%
+                              {hasValue(exp.delta_vs_median.saves_pct) && exp.delta_vs_median.saves_pct >= 0 ? '+' : ''}
+                              {formatMetric(exp.delta_vs_median.saves_pct, { suffix: '%' })}
                             </span>
                           </div>
                           <div>
                             <span className="text-slate-500 block">Vistas vs Mediana:</span>
                             <span className={`font-mono font-bold text-xs ${
-                              (exp.delta_vs_median.views_pct || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                              !hasValue(exp.delta_vs_median.views_pct)
+                                ? 'text-slate-500'
+                                : exp.delta_vs_median.views_pct >= 0 ? 'text-emerald-400' : 'text-rose-400'
                             }`}>
-                              {(exp.delta_vs_median.views_pct || 0) >= 0 ? '+' : ''}{exp.delta_vs_median.views_pct}%
+                              {hasValue(exp.delta_vs_median.views_pct) && exp.delta_vs_median.views_pct >= 0 ? '+' : ''}
+                              {formatMetric(exp.delta_vs_median.views_pct, { suffix: '%' })}
                             </span>
                           </div>
                         </div>
@@ -899,10 +898,15 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
                       <button
                         type="button"
                         onClick={() => handleEvaluateExperiment(exp)}
-                        className="w-full py-1.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-[11px] flex items-center justify-center gap-1.5 shadow-md"
+                        disabled={evaluatingExpId === exp.experiment_id}
+                        className="w-full py-1.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold text-[11px] flex items-center justify-center gap-1.5 shadow-md"
                       >
-                        <TrendingUp className="w-3.5 h-3.5" />
-                        <span>Sincronizar Métricas & Evaluar vs Mediana</span>
+                        {evaluatingExpId === exp.experiment_id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <TrendingUp className="w-3.5 h-3.5" />
+                        )}
+                        <span>{evaluatingExpId === exp.experiment_id ? 'Sincronizando con Meta...' : 'Sincronizar Métricas & Evaluar vs Mediana'}</span>
                       </button>
                     )}
                   </div>

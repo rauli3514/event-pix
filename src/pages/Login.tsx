@@ -25,7 +25,7 @@ const Login = () => {
             return;
         }
 
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
             email,
             password,
         });
@@ -34,9 +34,34 @@ const Login = () => {
             toast.error(error.message);
         } else {
             toast.success("Bienvenido de nuevo");
-            navigate("/admin/display");
+            navigate(await resolvePostLoginRoute(data.user?.id));
         }
         setLoading(false);
+    };
+
+    // Un super_admin va al hub de Cartelería (comportamiento actual).
+    // Un cliente de Intelligence sin ese rol va directo a su negocio.
+    const resolvePostLoginRoute = async (userId?: string): Promise<string> => {
+        if (!userId) return "/admin/display";
+
+        const { data: profile } = await supabase
+            .from("profiles")
+            .select("role")
+            .eq("id", userId)
+            .maybeSingle();
+
+        if (profile?.role === "super_admin") {
+            return "/admin/display";
+        }
+
+        const { data: membership } = await supabase
+            .from("intelligence_business_users")
+            .select("business_id")
+            .eq("user_id", userId)
+            .limit(1)
+            .maybeSingle();
+
+        return membership ? "/intelligence" : "/admin/display";
     };
 
     return (
@@ -88,12 +113,20 @@ const Login = () => {
                         </Button>
                     </form>
 
-                    <div className="text-center pt-8">
-                        <p className="text-sm text-slate-500">
-                            ¿No tienes cuenta?{' '}
-                            <Link to="/register" className="font-semibold text-blue-400 hover:text-blue-300 transition-colors">
-                                Solicitar acceso
+                    <div className="text-center pt-6 space-y-3">
+                        <div className="p-3 bg-violet-950/30 border border-violet-500/25 rounded-xl">
+                            <p className="text-xs text-slate-300 font-medium">
+                                ¿Querés sumar tu local a EventPix?
+                            </p>
+                            <Link 
+                                to="/register" 
+                                className="inline-block mt-1.5 text-xs font-bold text-violet-400 hover:text-violet-300 transition-colors"
+                            >
+                                ✨ Registrá tu comercio y conectá tu Instagram →
                             </Link>
+                        </div>
+                        <p className="text-xs text-slate-500">
+                            Acceso general para clientes de cartelería e inteligencia
                         </p>
                     </div>
                 </CardContent>

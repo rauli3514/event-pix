@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { X, Loader2, Zap, Clock, Type, Video, Copy, Check, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { getAuthHeaders } from '../../lib/apiAuth';
+import { ConnectionStorageService } from '../../services/intelligence/ConnectionStorageService';
 import { BrandDNA } from '../../types/intelligence';
 import { GenerateSpokenScriptResponse, SpokenReelScript, WinningTopicInput } from '../../types/spokenReel';
 
@@ -33,10 +34,16 @@ export function SpokenReelGeneratorModal({ isOpen, onClose, businessId, brandDna
     setScript(null);
     try {
       const authHeaders = await getAuthHeaders();
+      const connections = ConnectionStorageService.loadConnections(businessId);
+      // "Bring your own key": usa la clave que el negocio ya conectó (Claude u OpenAI).
+      const useOpenAI = connections.preferredAIProvider === 'openai' && connections.openai.apiKey;
+      const provider: 'claude' | 'openai' = useOpenAI ? 'openai' : 'claude';
+      const apiKey = useOpenAI ? connections.openai.apiKey : connections.claude.apiKey;
+
       const res = await fetch('/api/reels/generate-spoken-script', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders },
-        body: JSON.stringify({ businessId, topic, brandDna }),
+        body: JSON.stringify({ businessId, topic, brandDna, provider, apiKey: apiKey || undefined }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) {

@@ -11,10 +11,9 @@ import {
   AccountMedianBenchmark,
   Hypothesis,
   ScriptVariant,
-  ContentExperiment,
-  LearnedInsight,
   ContentDnaItem,
-  EmpiricalPattern
+  EmpiricalPattern,
+  NO_DATA
 } from '../../types/intelligence';
 import { CRMLead, CRMMessage } from '../../types/crm';
 import { ReelSynthesisResult } from './reelAnalyzerService';
@@ -24,6 +23,16 @@ import { UserProfileContext } from '../../types/strategicProfile';
 import { AccountBenchmarkService } from './AccountBenchmarkService';
 import { ContentDnaEngine } from './ContentDnaEngine';
 import { IntelligenceStorageService } from './IntelligenceStorageService';
+import {
+  hasValue,
+  fromApi,
+  formatMetric,
+  formatForPrompt,
+  rate,
+  compareDesc,
+  exceeds,
+  postToMetaItem
+} from './metricUtils';
 import { toast } from 'sonner';
 
 export class AIProviderService {
@@ -81,7 +90,7 @@ export class AIProviderService {
     apiKey: string,
     preferredModel: string = 'claude-3-5-sonnet-20241022',
     workspaceId?: string
-  ): Promise<{ success: boolean; error?: string; workspaceId?: string }> {
+  ): Promise<{ success: boolean; error?: string; workspaceId?: string; model?: string }> {
     if (!apiKey.trim()) {
       return { success: false, error: 'API Key de Claude vacía.' };
     }
@@ -591,7 +600,7 @@ Devolvé un JSON estricto con esta estructura:
     updatedScore?: number;
     providerUsed: string;
   }> {
-    const { lead, chatHistory, brandDna, catalogProducts = [], connections, clientInquiry, overrideProvider } = params;
+    const { lead, chatHistory, catalogProducts = [], connections, clientInquiry, overrideProvider } = params;
 
     const provider = overrideProvider || connections.preferredAIProvider || 'claude';
     const hasClaude = connections.claude.isActive && connections.claude.apiKey;
@@ -1109,22 +1118,6 @@ Devolvé un JSON estricto con:
     const hasClaude = Boolean(connections.claude?.isActive && connections.claude?.apiKey?.trim());
     const hasGemini = Boolean(connections.gemini?.isActive && connections.gemini?.apiKey?.trim());
 
-    // Priorizar inteligentemente el motor que tenga API key activa
-    let providerToUse: 'gemini' | 'claude' | 'openai' | 'offline' = 'offline';
-    if (connections.preferredAIProvider === 'gemini' && hasGemini) {
-      providerToUse = 'gemini';
-    } else if (connections.preferredAIProvider === 'claude' && hasClaude) {
-      providerToUse = 'claude';
-    } else if (connections.preferredAIProvider === 'openai' && hasOpenAI) {
-      providerToUse = 'openai';
-    } else if (hasGemini) {
-      providerToUse = 'gemini';
-    } else if (hasClaude) {
-      providerToUse = 'claude';
-    } else if (hasOpenAI) {
-      providerToUse = 'openai';
-    }
-
     // 1. Detectar si el usuario especificó una temática o nicho concreto en su mensaje
     let userSpecifiedTopic: string | null = null;
     const cleanInstruction = (userInstruction || '').trim();
@@ -1271,6 +1264,7 @@ FUENTES DE REELS CONECTADAS (${sourcePosts.length} activas):
 ${sourcesSummary}
 
 CONTEXTO DEL PERFIL:
+- Nicho: ${niche}
 - Tono de voz: ${profileTone}
 - Reglas OBLIGATORIAS:
 - ${mustDos}
@@ -1481,7 +1475,6 @@ Devuelve un JSON con este formato exacto:
     const isAskingAlternative = userLower.includes('otro') || userLower.includes('otra') || userLower.includes('cambia') || userLower.includes('diferente') || userLower.includes('nuevo');
 
     const cleanTopic = effectiveTargetTopic.replace(/[¿?¡!]/g, '').trim();
-    const sourceTranscript = relevantSource?.raw_transcript || relevantSource?.analysis?.hook_data?.text || '';
 
     const dynamicAngles = [
       {
@@ -1700,6 +1693,8 @@ ${pastLearningsText}
 CONTEXTO DEL NEGOCIO:
 - Nicho: ${niche}
 - Tono: ${profileTone}
+- Reglas OBLIGATORIAS: ${mustDos}
+- Reglas PROHIBIDAS: ${forbiddens}
 - CTA preferido: "${favoriteCta}"
 - Formato solicitado: ${mode.toUpperCase()}
 - Objetivo / Tema: ${userGoal || 'Superar la mediana histórica de guardados y consultas comerciales'}`;
@@ -1829,7 +1824,6 @@ CONTEXTO DEL NEGOCIO:
     }
 
     // Variantes estructuradas por defecto (fallback determinístico riguroso basado en evidencia)
-    const cleanGoal = userGoal || niche;
     const fallbackVariants = {
       variantA: {
         variant_key: 'A' as const,

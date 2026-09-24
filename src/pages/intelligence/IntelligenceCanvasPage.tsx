@@ -3,7 +3,7 @@ import {
   INITIAL_BUSINESS,
   INITIAL_BRAND_DNA
 } from '../../services/intelligence/mockData';
-import { BrandDNA, IntelligencePost, BusinessAuditReport, NodeType, NO_DATA } from '../../types/intelligence';
+import { BrandDNA, IntelligencePost, BusinessAuditReport, NodeType, NO_DATA, IntelligenceBusiness } from '../../types/intelligence';
 import { fromApi, rate } from '../../services/intelligence/metricUtils';
 import { BrandDnaPanel } from '../../components/intelligence/BrandDnaPanel';
 import { BusinessAuditPanel } from '../../components/intelligence/BusinessAuditPanel';
@@ -16,7 +16,8 @@ import { ReelAnalyzerService } from '../../services/intelligence/reelAnalyzerSer
 import { ContentIntelligenceEngine } from '../../services/intelligence/ContentIntelligenceEngine';
 import { IntelligenceStorageService } from '../../services/intelligence/IntelligenceStorageService';
 import { CRMStorageService } from '../../services/intelligence/CRMStorageService';
-import { MetaGraphService, MetaMediaItem, MetaMediaInsights } from '../../services/meta/MetaGraphService';
+import { MetaGraphService, MetaMediaItem, MetaMediaInsights, BusinessDiscoveryResult } from '../../services/meta/MetaGraphService';
+import { supabase } from '../../lib/supabase';
 import { UnifiedConnectionsModal } from '../../components/intelligence/UnifiedConnectionsModal';
 import { ConnectionStorageService } from '../../services/intelligence/ConnectionStorageService';
 import { AIProviderService } from '../../services/intelligence/AIProviderService';
@@ -24,23 +25,40 @@ import { UnifiedConnectionsState } from '../../types/connections';
 import { MetaAdCampaign } from '../../types/ads';
 import { BusinessSwitcher } from '../../components/intelligence/BusinessSwitcher';
 import { NewClientRegistrationModal } from '../../components/intelligence/NewClientRegistrationModal';
+import { SpokenReelGeneratorModal } from '../../components/intelligence/SpokenReelGeneratorModal';
+import { WinningTopicInput } from '../../types/spokenReel';
 import { ProfileAndAiContextView } from '../../components/intelligence/profile/ProfileAndAiContextView';
 import { ChatMessage, ContentFormatMode } from '../../components/intelligence/canvas/AiChatCardNode';
-import { Brain, Activity, Tv, Sparkles, Cloud, Loader2, MessageSquare, LayoutDashboard, Network, Radio, Trash2, Bot, Plus, User, Zap, TrendingUp } from 'lucide-react';
+import { Brain, Activity, Tv, Sparkles, Cloud, Loader2, MessageSquare, LayoutDashboard, Network, Radio, Trash2, Bot, User, Zap } from 'lucide-react';
 import { toast } from 'sonner';
-import { getAuthHeaders } from '../../lib/apiAuth';
-import { CompetitorAnalysisModal } from '../../components/intelligence/CompetitorAnalysisModal';
-import { InstagramScrapeResponse } from '../../types/instagramScrape';
 
 export const IntelligenceCanvasPage: React.FC = () => {
   const [business, setBusiness] = useState(INITIAL_BUSINESS);
   const [brandDna, setBrandDna] = useState<BrandDNA>(INITIAL_BRAND_DNA);
   const [posts, setPosts] = useState<IntelligencePost[]>([]);
   const [syncStatus, setSyncStatus] = useState<'synced' | 'saving'>('synced');
-  const [isCrmOpen, setIsCrmOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'canvas' | 'profile' | 'dashboard'>('profile');
+  const [viewMode, setViewMode] = useState<'canvas' | 'messages' | 'profile' | 'dashboard'>('profile');
   const [isNewClientModalOpen, setIsNewClientModalOpen] = useState(false);
-  const [isCompetitorAnalysisOpen, setIsCompetitorAnalysisOpen] = useState(false);
+  const [isSpokenReelModalOpen, setIsSpokenReelModalOpen] = useState(false);
+  const [spokenReelTopic, setSpokenReelTopic] = useState<WinningTopicInput | null>(null);
+
+  // Rol del usuario logueado: un cliente normal solo ve/gestiona su propio negocio
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !isMounted) return;
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (isMounted) setIsSuperAdmin(profile?.role === 'super_admin');
+    })();
+    return () => { isMounted = false; };
+  }, []);
 
   // Estado de Conexiones Unificadas (Shop de Plumas, Meta/WhatsApp, OpenAI, Claude)
   const [connections, setConnections] = useState<UnifiedConnectionsState>(() => {
@@ -60,7 +78,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
 
   // Cuenta activa (detecta credenciales reales de Meta si existen)
   const [accountHandle, setAccountHandle] = useState<string>(() => {
-    const creds = MetaGraphService.loadCredentials();
+    const creds = MetaGraphService.loadCredentials(IntelligenceStorageService.getActiveBusinessId() || undefined);
     if (creds?.accountUsername && !creds.accountUsername.includes('tecno_eventos')) {
       return `@${creds.accountUsername.replace('@', '')}`;
     }
@@ -98,7 +116,9 @@ export const IntelligenceCanvasPage: React.FC = () => {
 
         if (!isMounted || !activeBiz) return;
         setBusiness(activeBiz);
-        setAccountHandle(activeBiz.instagram_handle);
+        if (activeBiz.instagram_handle) {
+          setAccountHandle(activeBiz.instagram_handle);
+        }
 
         // Cargar Brand DNA guardado
         const savedDna = await IntelligenceStorageService.loadBrandDna(activeBiz.id);
@@ -154,7 +174,9 @@ export const IntelligenceCanvasPage: React.FC = () => {
   // Cambio dinámico de Negocio / Cliente activo (Multi-Tenant)
   const handleSelectBusiness = async (newBiz: IntelligenceBusiness) => {
     setBusiness(newBiz);
-    setAccountHandle(newBiz.instagram_handle);
+    if (newBiz.instagram_handle) {
+      setAccountHandle(newBiz.instagram_handle);
+    }
     IntelligenceStorageService.setActiveBusinessId(newBiz.id);
 
     // 1. Cargar Brand DNA del nuevo negocio
@@ -218,66 +240,53 @@ export const IntelligenceCanvasPage: React.FC = () => {
     };
   }, [nodes, edges, business.id]);
 
-  // Importa en lote los últimos posts públicos de un PERFIL completo (no un Reel puntual):
-  // trae metadata real (likes/comentarios/miniatura) sin pasar por el análisis IA
-  // profundo de Scripty, igual que la sincronización directa desde Meta.
-  const handleImportProfilePosts = useCallback(async (profile: {
-    username: string;
-    posts: Array<{
-      shortcode: string;
-      caption?: string;
-      likes?: number;
-      commentsCount?: number;
-      imageUrl?: string;
-      videoUrl?: string;
-      timestamp?: string;
-      type: 'reel' | 'image' | 'carousel';
-      url: string;
-    }>;
-  }) => {
+  // Importa en lote los últimos posts públicos de un PERFIL completo (no un Reel puntual),
+  // vía Meta Business Discovery (requiere una cuenta de Instagram Business/Creator
+  // conectada — es la única forma en que Meta expone media de OTRAS cuentas públicas).
+  const handleImportProfilePosts = useCallback(async (profile: BusinessDiscoveryResult) => {
     const existingIds = new Set(posts.map(p => p.id));
     const newPosts: IntelligencePost[] = [];
     const newNodes: CanvasNode[] = [];
 
-    profile.posts.forEach((p) => {
-      if (!p.shortcode || existingIds.has(p.shortcode)) return;
+    profile.media.forEach((m) => {
+      if (!m.id || existingIds.has(m.id)) return;
 
-      const cleanCaption = p.caption || '';
+      const cleanCaption = m.caption || '';
       const cleanTitle = cleanCaption
         ? (cleanCaption.slice(0, 70) + (cleanCaption.length > 70 ? '...' : ''))
-        : `Publicación ${p.shortcode}`;
+        : `Publicación de @${profile.username}`;
 
       const newPost: IntelligencePost = {
-        id: p.shortcode,
+        id: m.id,
         business_id: business.id,
         title: cleanTitle,
-        video_url: p.videoUrl || p.url,
-        thumbnail_url: p.imageUrl,
+        video_url: m.media_url || m.permalink,
+        thumbnail_url: m.thumbnail_url || m.media_url,
         duration_seconds: 0,
         objective: 'sales',
-        published_at: p.timestamp || new Date().toISOString(),
+        published_at: m.timestamp || new Date().toISOString(),
         created_at: new Date().toISOString(),
         raw_transcript: cleanCaption || cleanTitle,
         metrics: {
-          post_id: p.shortcode,
+          post_id: m.id,
           views: NO_DATA,
           reach: NO_DATA,
-          likes: fromApi(p.likes),
-          comments: fromApi(p.commentsCount),
+          likes: fromApi(m.like_count),
+          comments: fromApi(m.comments_count),
           shares: NO_DATA,
           saves: NO_DATA,
           followers_gained: NO_DATA,
           profile_visits: NO_DATA,
           average_watch_time_seconds: NO_DATA,
           total_watch_time_seconds: NO_DATA,
-          source: 'instagram_scrape',
+          source: 'meta_graph_api',
           synced_at: new Date().toISOString()
         }
       };
 
       newPosts.push(newPost);
       newNodes.push({
-        id: `node_${p.shortcode}`,
+        id: `node_${m.id}`,
         x: 40,
         y: 220 + (nodes.filter(n => n.type === 'reel').length + newNodes.length) * 280,
         type: 'reel',
@@ -308,17 +317,27 @@ export const IntelligenceCanvasPage: React.FC = () => {
     const toastId = toast.loading('Extrayendo contenido real desde Instagram...');
     const effectiveUrl = url.trim();
 
-    let scrapeResult: InstagramScrapeResponse | null = null;
+    let scrapeResult: {
+      success?: boolean;
+      isProfile?: boolean;
+      username?: string;
+      error?: string;
+      caption?: string;
+      imageUrl?: string;
+      shortcode?: string;
+      likes?: number | null;
+      commentsCount?: number | null;
+      audioTrack?: string;
+      followers?: string;
+      videoUrl?: string;
+    } | null = null;
+
     try {
-      const authHeaders = await getAuthHeaders();
-      const res = await fetch(`/api/instagram-scrape?url=${encodeURIComponent(effectiveUrl)}`, {
-        headers: authHeaders
-      });
-      scrapeResult = (await res.json()) as InstagramScrapeResponse;
-      if (!res.ok || !scrapeResult.success) {
+      const res = await fetch(`/api/instagram-scrape?url=${encodeURIComponent(effectiveUrl)}`);
+      scrapeResult = await res.json();
+      if (!res.ok || !scrapeResult?.success) {
         toast.error(
-          (scrapeResult && !scrapeResult.success ? scrapeResult.error : null) ||
-            'No se pudo extraer información. Verificá que el enlace o usuario sea público.',
+          scrapeResult?.error || 'No se pudo extraer información. Verificá que el enlace o usuario sea público.',
           { id: toastId }
         );
         return;
@@ -329,12 +348,19 @@ export const IntelligenceCanvasPage: React.FC = () => {
       return;
     }
 
-    if (!scrapeResult || !scrapeResult.success) return;
+    if (!scrapeResult?.success) return;
 
-    // URL/handle de PERFIL completo: importa sus últimos posts en lote, en vez de exigir un Reel puntual.
+    // URL/handle de PERFIL completo: en vez de exigir un Reel puntual, se importan
+    // en lote sus últimos posts públicos vía Meta Business Discovery.
     if (scrapeResult.isProfile) {
+      toast.loading(`Buscando publicaciones públicas de @${scrapeResult.username}...`, { id: toastId });
+      const discovery = await MetaGraphService.getBusinessDiscovery(scrapeResult.username!, business.id);
+      if (!discovery.success) {
+        toast.error(discovery.error, { id: toastId });
+        return;
+      }
       toast.dismiss(toastId);
-      await handleImportProfilePosts(scrapeResult);
+      await handleImportProfilePosts(discovery.data);
       return;
     }
 
@@ -343,18 +369,15 @@ export const IntelligenceCanvasPage: React.FC = () => {
     try {
       const currentConns = ConnectionStorageService.loadConnections(business.id);
 
-      // Transcripción automática opcional con Whisper si OpenAI está activo.
-      // La API key de OpenAI vive únicamente en el servidor (OPENAI_API_KEY):
-      // el cliente solo indica que la función está activa, nunca envía la clave.
+      // Transcripción automática opcional con Whisper si OpenAI está configurado.
       let transcriptData: { transcript?: string; hasSpeech?: boolean } | null = null;
-      if (currentConns.openai.isActive && scrapedData.videoUrl) {
+      if (currentConns.openai.isActive && currentConns.openai.apiKey && scrapedData.videoUrl) {
         try {
           toast.loading('🎙️ Analizando pista de audio con Whisper AI...', { id: toastId });
-          const authHeaders = await getAuthHeaders();
           const transcribeRes = await fetch('/api/instagram-transcribe', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...authHeaders },
-            body: JSON.stringify({ url: effectiveUrl, videoUrl: scrapedData.videoUrl })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mediaUrl: scrapedData.videoUrl, apiKey: currentConns.openai.apiKey })
           });
           if (transcribeRes.ok) {
             transcriptData = await transcribeRes.json();
@@ -375,8 +398,8 @@ export const IntelligenceCanvasPage: React.FC = () => {
         connections: currentConns,
         brandDna,
         realMetrics: {
-          likes: scrapedData?.likes,
-          commentsCount: scrapedData?.commentsCount,
+          likes: scrapedData?.likes ?? undefined,
+          commentsCount: scrapedData?.commentsCount ?? undefined,
           audioTrack: scrapedData?.audioTrack,
           followers: scrapedData?.followers
         },
@@ -446,7 +469,10 @@ export const IntelligenceCanvasPage: React.FC = () => {
       business_id: business.id,
       title: cleanTitle,
       video_url: reel.permalink,
-      thumbnail_url: reel.thumbnail_url || reel.media_url,
+      // Solo presente cuando media_type es un video real (REELS/VIDEO);
+      // para imágenes reel.media_url no es un archivo de video descargable.
+      meta_media_url: reel.media_type !== 'IMAGE' ? reel.media_url : undefined,
+      thumbnail_url: reel.thumbnail_url || (reel.media_type === 'IMAGE' ? reel.media_url : undefined),
       // Meta no devuelve la duración en los campos consultados; 0 = desconocida.
       duration_seconds: 0,
       objective: 'sales',
@@ -520,6 +546,8 @@ export const IntelligenceCanvasPage: React.FC = () => {
         ],
         cta: nextPost.cta,
         full_script: `[HOOK (0-3s)]\n"${nextPost.hook}"\n\n[ESTRUCTURA]\n${nextPost.structure}\n\n[LLAMADO A LA ACCIÓN]\n"${nextPost.cta}"`,
+        teleprompter_clean_script: `${nextPost.hook}\n\n${nextPost.structure}\n\n${nextPost.cta}`,
+        alternative_hooks: [],
         why_it_works: nextPost.justification,
         expected_impact: 'Diseñado a partir de los patrones con mayor tasa de interés e intención comercial de tu cuenta.'
       }
@@ -831,24 +859,25 @@ export const IntelligenceCanvasPage: React.FC = () => {
   };
 
   const handleResetToZero = useCallback(async () => {
-    if (window.confirm('¿Seguro que querés reiniciar todo a 0? Se limpiarán los datos demo del CRM, lienzo y publicaciones para comenzar únicamente con tus datos reales.')) {
-      IntelligenceStorageService.clearAllData();
-      CRMStorageService.clearAllData();
-      MetaGraphService.clearCredentials();
-      setAccountHandle('@display_digital');
+    if (window.confirm('¿Seguro que querés reiniciar todo a 0? Se limpiarán el lienzo, publicaciones y reportes de este negocio para comenzar únicamente con tus datos reales. Las conversaciones reales del CRM no se tocan.')) {
+      const ownHandle = business.instagram_handle || accountHandle;
+      await IntelligenceStorageService.clearAllData(business.id);
+      CRMStorageService.clearAllData(business.id);
+      MetaGraphService.clearCredentials(business.id);
+      setAccountHandle(ownHandle);
       setPosts([]);
       setNodes([]);
       setEdges([]);
-      const emptyAudit = ReelAnalyzerService.calculateAuditReport([], brandDna, '@display_digital');
+      const emptyAudit = ReelAnalyzerService.calculateAuditReport([], brandDna, ownHandle);
       setAuditReport(emptyAudit);
-      toast.success('✨ Sistema reiniciado a 0 con @display_digital. Listo para cargar tus datos reales.');
+      toast.success(`✨ Sistema reiniciado a 0 con ${ownHandle}. Listo para cargar tus datos reales.`);
     }
-  }, [brandDna]);
+  }, [brandDna, business.instagram_handle, accountHandle]);
 
   return (
     <div className="h-screen w-screen bg-[#080C14] text-slate-100 flex flex-col overflow-hidden font-sans select-none">
       {/* Header Superior Reorganizado y Orientado a Decisiones */}
-      <header className="h-14 border-b border-slate-800/80 bg-slate-950/80 px-4 flex items-center justify-between z-30 shrink-0 backdrop-blur-md">
+      <header className="min-h-14 border-b border-slate-800/80 bg-slate-950/80 px-4 py-2 flex flex-wrap items-center justify-between gap-y-2 z-30 shrink-0 backdrop-blur-md">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-violet-600/30">
             <Brain className="w-5 h-5" />
@@ -873,6 +902,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
               currentBusiness={business}
               onSelectBusiness={handleSelectBusiness}
               onOpenNewClientModal={() => setIsNewClientModalOpen(true)}
+              readOnly={!isSuperAdmin}
             />
           </div>
         </div>
@@ -890,6 +920,19 @@ export const IntelligenceCanvasPage: React.FC = () => {
           >
             <Network className="w-3.5 h-3.5" />
             <span>Lienzo (Board)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setViewMode('messages')}
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
+              viewMode === 'messages'
+                ? 'bg-gradient-to-r from-emerald-600 to-teal-500 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span>Mensajes</span>
           </button>
 
           <button
@@ -1009,25 +1052,18 @@ export const IntelligenceCanvasPage: React.FC = () => {
             </button>
           )}
 
-          {/* Botón Analizar Competidor / Perfil (Motor 1) */}
+          {/* Botón Generar Reel Hablado con IA (Hook-Retain-Sell a partir del Brand DNA) */}
           <button
-            onClick={() => setIsCompetitorAnalysisOpen(true)}
-            className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-violet-500/50 text-slate-200 px-3 py-1.5 rounded-xl font-bold text-xs transition-all hover:scale-105 shadow-sm"
-            title="Analizar un perfil público de Instagram (propio o de un competidor)"
+            onClick={() => {
+              setSpokenReelTopic({ source: 'brand_dna' });
+              setIsSpokenReelModalOpen(true);
+            }}
+            className="flex items-center gap-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 px-3 py-1.5 rounded-xl font-bold text-xs transition-all hover:scale-105"
+            title="Generar un guion de Reel hablado (Hook-Retain-Sell) con IA a partir del Brand DNA"
           >
-            <TrendingUp className="w-3.5 h-3.5 text-violet-400" />
-            <span className="hidden sm:inline">Analizar Competidor / Perfil</span>
-            <span className="sm:hidden">Analizar</span>
-          </button>
-
-          {/* Botón CRM & WhatsApp */}
-          <button
-            onClick={() => setIsCrmOpen(true)}
-            className="flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white px-3 py-1.5 rounded-xl font-bold text-xs shadow-lg shadow-emerald-600/30 transition-all hover:scale-105"
-            title="Abrir CRM Conversacional y Mensajería Meta/WhatsApp"
-          >
-            <MessageSquare className="w-3.5 h-3.5 text-emerald-200" />
-            <span className="hidden sm:inline">CRM & WhatsApp</span>
+            <Zap className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Crear Reel Hablado (IA)</span>
+            <span className="sm:hidden">Reel IA</span>
           </button>
 
           {/* Botón Destacado: INFORME DE INTELIGENCIA */}
@@ -1062,13 +1098,21 @@ export const IntelligenceCanvasPage: React.FC = () => {
             }
           }}
         />
+      ) : viewMode === 'messages' ? (
+        <CRMConversationalHub
+          isOpen={true}
+          onClose={() => setViewMode('canvas')}
+          brandDna={brandDna}
+          businessId={business.id}
+          variant="inline"
+        />
       ) : viewMode === 'dashboard' ? (
         <ExecutiveDecisionDashboard
           posts={posts}
           brandDna={brandDna}
           accountHandle={accountHandle}
           onSwitchToCanvas={() => setViewMode('canvas')}
-          onOpenCrm={() => setIsCrmOpen(true)}
+          onOpenCrm={() => setViewMode('messages')}
           onOpenExecutiveReport={() => setIsExecutiveReportOpen(true)}
           onInspectPost={setInspectedPost}
           onApplyRecommendationToCanvas={handleApplyRecommendationToCanvas}
@@ -1104,7 +1148,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
             isAuditOpen={isAuditOpen}
             onToggleAudit={() => setIsAuditOpen(!isAuditOpen)}
             onToggleFullScreenCanvas={handleToggleFullScreenCanvas}
-            onOpenCrm={() => setIsCrmOpen(true)}
+            onOpenCrm={() => setViewMode('messages')}
             onToggleConnectEdge={handleToggleConnectEdge}
             onDisconnectAllFromTarget={handleDisconnectAllFromTarget}
             onSendChatMessage={handleSendChatMessage}
@@ -1117,6 +1161,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
           <BusinessAuditPanel
             business={business}
             auditReport={auditReport}
+            brandDna={brandDna}
             isOpen={isAuditOpen}
             onToggle={() => setIsAuditOpen(!isAuditOpen)}
             onAddReelToCanvas={handleAddReelFromMeta}
@@ -1161,13 +1206,8 @@ export const IntelligenceCanvasPage: React.FC = () => {
         onClose={() => setIsConnectionsOpen(false)}
         businessId={business.id}
         onConnectionsUpdated={(newConns) => setConnections(newConns)}
-      />
-
-      <CRMConversationalHub
-        isOpen={isCrmOpen}
-        onClose={() => setIsCrmOpen(false)}
-        brandDna={brandDna}
-        businessId={business.id}
+        isSuperAdmin={isSuperAdmin}
+        catalogProvider={business.catalog_provider}
       />
 
       <NewClientRegistrationModal
@@ -1176,12 +1216,12 @@ export const IntelligenceCanvasPage: React.FC = () => {
         onClientRegistered={handleSelectBusiness}
       />
 
-      <CompetitorAnalysisModal
-        isOpen={isCompetitorAnalysisOpen}
-        onClose={() => setIsCompetitorAnalysisOpen(false)}
+      <SpokenReelGeneratorModal
+        isOpen={isSpokenReelModalOpen}
+        onClose={() => setIsSpokenReelModalOpen(false)}
         businessId={business.id}
-        ownInstagramHandle={accountHandle}
         brandDna={brandDna}
+        topic={spokenReelTopic}
       />
     </div>
   );

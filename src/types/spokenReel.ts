@@ -31,6 +31,14 @@ export interface GenerateSpokenScriptRequest {
   businessId: string;
   topic: WinningTopicInput;
   brandDna: BrandDNA;
+  /**
+   * "Bring your own key": el negocio conecta su propia clave de Claude u OpenAI
+   * desde "Conectar APIs" (igual que /api/claude-messages y /api/gemini-generate).
+   * Si no manda una, el servidor intenta con ANTHROPIC_API_KEY/OPENAI_API_KEY
+   * propias de la plataforma como fallback opcional.
+   */
+  provider?: 'claude' | 'openai';
+  apiKey?: string;
 }
 
 export interface GenerateSpokenScriptResponse {

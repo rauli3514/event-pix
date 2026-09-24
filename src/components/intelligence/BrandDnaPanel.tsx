@@ -89,7 +89,7 @@ export const BrandDnaPanel: React.FC<BrandDnaPanelProps> = ({
   }
 
   return (
-    <aside className="w-80 lg:w-96 bg-slate-950/95 border-r border-slate-800/80 h-[calc(100vh-4rem)] flex flex-col z-30 shadow-2xl backdrop-blur-xl transition-all duration-300">
+    <aside className="w-72 sm:w-80 lg:w-[320px] shrink-0 bg-slate-950/95 border-r border-slate-800/80 h-[calc(100vh-4rem)] flex flex-col z-30 shadow-2xl backdrop-blur-xl transition-all duration-300">
       {/* Header Panel */}
       <div className="p-4 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/50">
         <div className="flex items-center gap-2.5">

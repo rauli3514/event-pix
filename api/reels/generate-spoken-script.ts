@@ -6,12 +6,13 @@ import type { GenerateSpokenScriptRequest } from '../../src/types/spokenReel.js'
 
 /**
  * POST /api/reels/generate-spoken-script
- * Body: GenerateSpokenScriptRequest { businessId, topic, brandDna }
+ * Body: GenerateSpokenScriptRequest { businessId, topic, brandDna, provider?, apiKey? }
  *
  * Motor 2 (Spoken Content Engine): genera un guion hablado completo
  * (Hook -> Retain -> Sell) a partir del Brand DNA del negocio y un tema
- * ganador detectado por el Motor 1. La API key del LLM (Claude/OpenAI) se lee
- * unicamente de las variables de entorno del servidor.
+ * ganador. Usa la clave de Claude/OpenAI que el negocio conectó ("bring your
+ * own key", igual que /api/claude-messages), con fallback opcional a
+ * ANTHROPIC_API_KEY/OPENAI_API_KEY del servidor.
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -35,7 +36,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { script, provider } = await generateSpokenReelScript(body as GenerateSpokenScriptRequest);
     res.status(200).json({ success: true, script, provider });
   } catch (err) {
-    const notConfigured = /no hay ningun proveedor de ia configurado/i.test(getErrorMessage(err));
+    const notConfigured = /conectá tu clave/i.test(getErrorMessage(err));
     res.status(notConfigured ? 503 : 502).json({ success: false, error: getErrorMessage(err) || 'Error al generar el guion.' });
   }
 }
