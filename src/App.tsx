@@ -34,6 +34,7 @@ import AIKnowledgeManager from "@/pages/display-hub/AIKnowledgeManager";
 import WorkspaceTemplates from "./pages/display-hub/WorkspaceTemplates";
 import { StickerEditor } from "./components/stickers/StickerEditor";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { RequireSuperAdmin } from "./components/RequireSuperAdmin";
 import { EventProvider } from "./context/EventContext";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
@@ -60,7 +61,9 @@ const App = () => (
               <Route element={<ProtectedRoute />}>
                 <Route path="/admin" element={<AdminDashboard />} />
                 <Route path="/admin/providers" element={<ProvidersList />} />
-                <Route path="/admin/intelligence" element={<IntelligenceCanvasPage />} />
+                <Route element={<RequireSuperAdmin />}>
+                  <Route path="/admin/intelligence" element={<IntelligenceCanvasPage />} />
+                </Route>
                 <Route path="/admin/kiosco-manager" element={<KioskManager />} />
                 <Route path="/admin/display" element={<DisplayHubMain />} />
                 

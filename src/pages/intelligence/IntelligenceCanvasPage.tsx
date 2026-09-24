@@ -26,8 +26,11 @@ import { BusinessSwitcher } from '../../components/intelligence/BusinessSwitcher
 import { NewClientRegistrationModal } from '../../components/intelligence/NewClientRegistrationModal';
 import { ProfileAndAiContextView } from '../../components/intelligence/profile/ProfileAndAiContextView';
 import { ChatMessage, ContentFormatMode } from '../../components/intelligence/canvas/AiChatCardNode';
-import { Brain, Activity, Tv, Sparkles, Cloud, Loader2, MessageSquare, LayoutDashboard, Network, Radio, Trash2, Bot, Plus, User, Zap } from 'lucide-react';
+import { Brain, Activity, Tv, Sparkles, Cloud, Loader2, MessageSquare, LayoutDashboard, Network, Radio, Trash2, Bot, Plus, User, Zap, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
+import { getAuthHeaders } from '../../lib/apiAuth';
+import { CompetitorAnalysisModal } from '../../components/intelligence/CompetitorAnalysisModal';
+import { InstagramScrapeResponse } from '../../types/instagramScrape';
 
 export const IntelligenceCanvasPage: React.FC = () => {
   const [business, setBusiness] = useState(INITIAL_BUSINESS);
@@ -37,6 +40,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
   const [isCrmOpen, setIsCrmOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'canvas' | 'profile' | 'dashboard'>('profile');
   const [isNewClientModalOpen, setIsNewClientModalOpen] = useState(false);
+  const [isCompetitorAnalysisOpen, setIsCompetitorAnalysisOpen] = useState(false);
 
   // Estado de Conexiones Unificadas (Shop de Plumas, Meta/WhatsApp, OpenAI, Claude)
   const [connections, setConnections] = useState<UnifiedConnectionsState>(() => {
@@ -117,9 +121,14 @@ export const IntelligenceCanvasPage: React.FC = () => {
         // Cargar Canvas guardado
         const savedCanvas = await IntelligenceStorageService.loadCanvasState(activeBiz.id);
         if (savedCanvas && savedCanvas.nodes.length > 0 && isMounted) {
-          const cleanedNodes = savedCanvas.nodes.filter(
-            (n) => !(n.post && n.post.title === 'Reel de Instagram' && (n.post.metrics?.likes === 0 || !n.post.metrics?.likes))
-          );
+          // Solo se descartan nodos estructuralmente corruptos (sin id, o un nodo
+          // "reel" sin post asociado). Un Reel real con 0 likes/comentarios es un
+          // dato válido (contenido recién publicado) y NUNCA debe purgarse.
+          const cleanedNodes = savedCanvas.nodes.filter((n) => {
+            if (!n.id) return false;
+            if (n.type === 'reel' && !n.post) return false;
+            return true;
+          });
           setNodes(cleanedNodes);
           if (savedCanvas.edges && savedCanvas.edges.length > 0) {
             setEdges(savedCanvas.edges);
@@ -209,59 +218,143 @@ export const IntelligenceCanvasPage: React.FC = () => {
     };
   }, [nodes, edges, business.id]);
 
-  const handleAddNodeFromUrl = async (url: string) => {
-    const toastId = toast.loading('Extrayendo contenido real del Reel desde Instagram...');
-    let effectiveUrl = url.trim();
-    if (effectiveUrl.includes('shop_plumas') && !effectiveUrl.includes('/p/') && !effectiveUrl.includes('/reel/')) {
-      effectiveUrl = 'https://www.instagram.com/p/DcveKFpx1eP/';
-      toast.info('Detectado @shop_plumas: analizando su Reel real de Display en el local...', { id: toastId });
-    }
-
-    let scrapedData: {
+  // Importa en lote los últimos posts públicos de un PERFIL completo (no un Reel puntual):
+  // trae metadata real (likes/comentarios/miniatura) sin pasar por el análisis IA
+  // profundo de Scripty, igual que la sincronización directa desde Meta.
+  const handleImportProfilePosts = useCallback(async (profile: {
+    username: string;
+    posts: Array<{
+      shortcode: string;
       caption?: string;
-      username?: string;
-      imageUrl?: string;
-      shortcode?: string;
       likes?: number;
       commentsCount?: number;
-      comments?: Array<{ author: string; text: string }>;
-      audioTrack?: string;
-      followers?: string;
+      imageUrl?: string;
       videoUrl?: string;
-    } | null = null;
+      timestamp?: string;
+      type: 'reel' | 'image' | 'carousel';
+      url: string;
+    }>;
+  }) => {
+    const existingIds = new Set(posts.map(p => p.id));
+    const newPosts: IntelligencePost[] = [];
+    const newNodes: CanvasNode[] = [];
 
-    try {
-      const res = await fetch(`/api/instagram-scrape?url=${encodeURIComponent(effectiveUrl)}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && !data.isProfile) {
-          scrapedData = data;
-        } else if (data.isProfile) {
-          toast.error(`Pegaste el perfil de @${data.username}. Para analizar en el Canvas ingresá el link de un Reel (ej: https://www.instagram.com/p/...)`, { id: toastId });
-          return;
+    profile.posts.forEach((p) => {
+      if (!p.shortcode || existingIds.has(p.shortcode)) return;
+
+      const cleanCaption = p.caption || '';
+      const cleanTitle = cleanCaption
+        ? (cleanCaption.slice(0, 70) + (cleanCaption.length > 70 ? '...' : ''))
+        : `Publicación ${p.shortcode}`;
+
+      const newPost: IntelligencePost = {
+        id: p.shortcode,
+        business_id: business.id,
+        title: cleanTitle,
+        video_url: p.videoUrl || p.url,
+        thumbnail_url: p.imageUrl,
+        duration_seconds: 0,
+        objective: 'sales',
+        published_at: p.timestamp || new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        raw_transcript: cleanCaption || cleanTitle,
+        metrics: {
+          post_id: p.shortcode,
+          views: NO_DATA,
+          reach: NO_DATA,
+          likes: fromApi(p.likes),
+          comments: fromApi(p.commentsCount),
+          shares: NO_DATA,
+          saves: NO_DATA,
+          followers_gained: NO_DATA,
+          profile_visits: NO_DATA,
+          average_watch_time_seconds: NO_DATA,
+          total_watch_time_seconds: NO_DATA,
+          source: 'instagram_scrape',
+          synced_at: new Date().toISOString()
         }
+      };
+
+      newPosts.push(newPost);
+      newNodes.push({
+        id: `node_${p.shortcode}`,
+        x: 40,
+        y: 220 + (nodes.filter(n => n.type === 'reel').length + newNodes.length) * 280,
+        type: 'reel',
+        post: newPost
+      });
+    });
+
+    if (newPosts.length === 0) {
+      toast.info(`@${profile.username} no tiene publicaciones nuevas para importar (ya estaban todas en tu Canvas).`);
+      return;
+    }
+
+    const updatedPosts = [...posts, ...newPosts];
+    setNodes(prev => [...prev, ...newNodes]);
+    setPosts(updatedPosts);
+    setSyncStatus('saving');
+    IntelligenceStorageService.savePosts(business.id, updatedPosts).finally(() => {
+      setSyncStatus('synced');
+    });
+
+    const updatedAudit = ReelAnalyzerService.calculateAuditReport(updatedPosts, brandDna, accountHandle);
+    setAuditReport(updatedAudit);
+
+    toast.success(`✅ Se importaron ${newPosts.length} publicaciones de @${profile.username} al Canvas.`);
+  }, [posts, nodes, business.id, brandDna, accountHandle]);
+
+  const handleAddNodeFromUrl = async (url: string) => {
+    const toastId = toast.loading('Extrayendo contenido real desde Instagram...');
+    const effectiveUrl = url.trim();
+
+    let scrapeResult: InstagramScrapeResponse | null = null;
+    try {
+      const authHeaders = await getAuthHeaders();
+      const res = await fetch(`/api/instagram-scrape?url=${encodeURIComponent(effectiveUrl)}`, {
+        headers: authHeaders
+      });
+      scrapeResult = (await res.json()) as InstagramScrapeResponse;
+      if (!res.ok || !scrapeResult.success) {
+        toast.error(
+          (scrapeResult && !scrapeResult.success ? scrapeResult.error : null) ||
+            'No se pudo extraer información. Verificá que el enlace o usuario sea público.',
+          { id: toastId }
+        );
+        return;
       }
     } catch (e) {
       console.warn('Error al consultar endpoint de scrape:', e);
-    }
-
-    if (!scrapedData) {
-      toast.error('No se pudo extraer información de este Reel. Verificá que el enlace sea público.', { id: toastId });
+      toast.error('No se pudo conectar con el servicio de extracción de Instagram.', { id: toastId });
       return;
     }
+
+    if (!scrapeResult || !scrapeResult.success) return;
+
+    // URL/handle de PERFIL completo: importa sus últimos posts en lote, en vez de exigir un Reel puntual.
+    if (scrapeResult.isProfile) {
+      toast.dismiss(toastId);
+      await handleImportProfilePosts(scrapeResult);
+      return;
+    }
+
+    const scrapedData = scrapeResult;
 
     try {
       const currentConns = ConnectionStorageService.loadConnections(business.id);
 
-      // Transcripción automática opcional con Whisper si OpenAI está configurado
-      let transcriptData: { transcript?: string; segments?: any[]; hasSpeech?: boolean; message?: string } | null = null;
-      if (currentConns.openai.isActive && currentConns.openai.apiKey) {
+      // Transcripción automática opcional con Whisper si OpenAI está activo.
+      // La API key de OpenAI vive únicamente en el servidor (OPENAI_API_KEY):
+      // el cliente solo indica que la función está activa, nunca envía la clave.
+      let transcriptData: { transcript?: string; hasSpeech?: boolean } | null = null;
+      if (currentConns.openai.isActive && scrapedData.videoUrl) {
         try {
           toast.loading('🎙️ Analizando pista de audio con Whisper AI...', { id: toastId });
+          const authHeaders = await getAuthHeaders();
           const transcribeRes = await fetch('/api/instagram-transcribe', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url, apiKey: currentConns.openai.apiKey })
+            headers: { 'Content-Type': 'application/json', ...authHeaders },
+            body: JSON.stringify({ url: effectiveUrl, videoUrl: scrapedData.videoUrl })
           });
           if (transcribeRes.ok) {
             transcriptData = await transcribeRes.json();
@@ -916,6 +1009,17 @@ export const IntelligenceCanvasPage: React.FC = () => {
             </button>
           )}
 
+          {/* Botón Analizar Competidor / Perfil (Motor 1) */}
+          <button
+            onClick={() => setIsCompetitorAnalysisOpen(true)}
+            className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-violet-500/50 text-slate-200 px-3 py-1.5 rounded-xl font-bold text-xs transition-all hover:scale-105 shadow-sm"
+            title="Analizar un perfil público de Instagram (propio o de un competidor)"
+          >
+            <TrendingUp className="w-3.5 h-3.5 text-violet-400" />
+            <span className="hidden sm:inline">Analizar Competidor / Perfil</span>
+            <span className="sm:hidden">Analizar</span>
+          </button>
+
           {/* Botón CRM & WhatsApp */}
           <button
             onClick={() => setIsCrmOpen(true)}
@@ -1070,6 +1174,14 @@ export const IntelligenceCanvasPage: React.FC = () => {
         isOpen={isNewClientModalOpen}
         onClose={() => setIsNewClientModalOpen(false)}
         onClientRegistered={handleSelectBusiness}
+      />
+
+      <CompetitorAnalysisModal
+        isOpen={isCompetitorAnalysisOpen}
+        onClose={() => setIsCompetitorAnalysisOpen(false)}
+        businessId={business.id}
+        ownInstagramHandle={accountHandle}
+        brandDna={brandDna}
       />
     </div>
   );
