@@ -84,9 +84,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     `media.limit(${mediaLimit}){id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count}}`;
 
   try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
     const metaRes = await fetch(
-      `${META_GRAPH_BASE}/${viewerId}?fields=${encodeURIComponent(fields)}&access_token=${encodeURIComponent(token)}`
-    );
+      `${META_GRAPH_BASE}/${viewerId}?fields=${encodeURIComponent(fields)}&access_token=${encodeURIComponent(token)}`,
+      { signal: controller.signal }
+    ).finally(() => clearTimeout(timer));
     const data = (await metaRes.json()) as {
       business_discovery?: BusinessDiscoveryPayload;
       error?: { message?: string };
@@ -118,6 +121,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     });
   } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      res.status(504).json({ success: false, error: 'Meta no respondió a tiempo. Probá de nuevo en unos segundos.' });
+      return;
+    }
     res.status(500).json({ success: false, error: getErrorMessage(err) });
   }
 }

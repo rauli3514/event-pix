@@ -8,7 +8,7 @@ import {
 import { toast } from 'sonner';
 import { MetricValue, NO_DATA } from '../../types/intelligence';
 import { hasValue, averageAvailable, formatMetric } from '../../services/intelligence/metricUtils';
-import { MetaGraphService, BusinessDiscoveryMedia } from '../../services/meta/MetaGraphService';
+import { MetaGraphService, BusinessDiscoveryMedia, fetchWithTimeout } from '../../services/meta/MetaGraphService';
 
 export interface AuditedCompetitorReel {
   id: string;
@@ -215,7 +215,7 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
         // Necesario cuando no conocemos el handle todavía (primer Reel
         // pegado sin haber agregado el competidor antes) o cuando el Reel
         // es más viejo que lo que business_discovery nos deja ver.
-        const res = await fetch(`/api/instagram-scrape?url=${encodeURIComponent(raw)}`);
+        const res = await fetchWithTimeout(`/api/instagram-scrape?url=${encodeURIComponent(raw)}`);
         const data = await res.json();
 
         if (!res.ok || !data.success) {
@@ -401,7 +401,10 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
         );
       }
     } catch (err: any) {
-      toast.error(`Error: ${err.message}`, { id: toastId });
+      const message = err?.name === 'AbortError'
+        ? 'El servidor no respondió a tiempo. Probá de nuevo en unos segundos.'
+        : err?.message || 'Error desconocido.';
+      toast.error(`Error: ${message}`, { id: toastId });
     } finally {
       setIsProcessing(false);
     }

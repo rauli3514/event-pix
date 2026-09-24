@@ -11,6 +11,19 @@ const META_GRAPH_BASE = 'https://graph.facebook.com/v19.0';
 const INSTAGRAM_GRAPH_BASE = 'https://graph.instagram.com';
 const CREDENTIALS_KEY = 'eventpix_meta_credentials';
 
+/**
+ * Un `fetch` sin limite de tiempo puede colgarse indefinidamente si Meta
+ * tarda o no cierra la conexion — el usuario se queda mirando un toast de
+ * "Procesando..." para siempre, sin error ni forma de saber que paso. Este
+ * wrapper corta el pedido a los `timeoutMs` y lo convierte en un error
+ * manejable por los `catch` que ya existen en cada llamado.
+ */
+export function fetchWithTimeout(url: string, timeoutMs = 15000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
 // ---- Types ----
 
 export interface MetaCredentials {
@@ -366,7 +379,15 @@ export class MetaGraphService {
       url.searchParams.set(key, val);
     }
 
-    const res = await fetch(url.toString());
+    let res: Response;
+    try {
+      res = await fetchWithTimeout(url.toString());
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        throw new Error('Meta Graph API no respondió a tiempo. Probá de nuevo en unos segundos.');
+      }
+      throw err;
+    }
     const data = await res.json();
 
     if (!res.ok || data.error) {
@@ -497,16 +518,21 @@ export class MetaGraphService {
   ): Promise<{ success: true; data: BusinessDiscoveryResult } | { success: false; error: string }> {
     try {
       const authHeaders = await getAuthHeaders();
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
       const res = await fetch(
         `/api/meta-business-discovery?username=${encodeURIComponent(cleanUsername)}&limit=${mediaLimit}`,
-        { headers: authHeaders }
-      );
+        { headers: authHeaders, signal: controller.signal }
+      ).finally(() => clearTimeout(timer));
       const data = await res.json();
       if (!res.ok || !data.success) {
         return { success: false, error: data.error || 'No se pudo consultar el perfil.' };
       }
       return { success: true, data: data.data as BusinessDiscoveryResult };
     } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        return { success: false, error: 'El servidor no respondió a tiempo. Probá de nuevo en unos segundos.' };
+      }
       return { success: false, error: err?.message || 'Error consultando el perfil.' };
     }
   }
