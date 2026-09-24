@@ -92,6 +92,7 @@ export interface BusinessDiscoveryMedia {
 export interface BusinessDiscoveryResult {
   username: string;
   name?: string;
+  biography?: string;
   profile_picture_url?: string;
   followers_count?: number;
   media_count?: number;
@@ -478,7 +479,7 @@ export class MetaGraphService {
       return MetaGraphService.getBusinessDiscoveryViaPlatform(cleanUsername, mediaLimit);
     }
 
-    const fields = `business_discovery.username(${cleanUsername}){username,name,profile_picture_url,followers_count,media_count,media.limit(${mediaLimit}){id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count}}`;
+    const fields = `business_discovery.username(${cleanUsername}){username,name,biography,profile_picture_url,followers_count,media_count,media.limit(${mediaLimit}){id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count}}`;
 
     try {
       const data = await MetaGraphService.apiFetch<{ business_discovery?: any }>(
@@ -500,6 +501,7 @@ export class MetaGraphService {
         data: {
           username: bd.username,
           name: bd.name,
+          biography: bd.biography,
           profile_picture_url: bd.profile_picture_url,
           followers_count: bd.followers_count,
           media_count: bd.media_count,

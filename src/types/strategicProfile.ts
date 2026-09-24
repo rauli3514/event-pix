@@ -10,6 +10,10 @@ export interface ProfileIdentity {
   niche: string;
   language: string;
   about_content: string; // "De qué hablas en tu contenido y a quién ayudas"
+  /** true cuando el handle fue confirmado contra una cuenta real de Instagram (no texto libre). */
+  verified?: boolean;
+  display_name?: string;
+  followers_count?: number;
 }
 
 export interface AiPermanentContext {

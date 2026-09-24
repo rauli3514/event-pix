@@ -21,6 +21,7 @@ interface BusinessDiscoveryMedia {
 interface BusinessDiscoveryPayload {
   username: string;
   name?: string;
+  biography?: string;
   profile_picture_url?: string;
   followers_count?: number;
   media_count?: number;
@@ -80,7 +81,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const mediaLimit = Number.isFinite(parsedLimit) ? Math.min(50, Math.max(1, parsedLimit)) : 25;
 
   const fields =
-    `business_discovery.username(${username}){username,name,profile_picture_url,followers_count,media_count,` +
+    `business_discovery.username(${username}){username,name,biography,profile_picture_url,followers_count,media_count,` +
     `media.limit(${mediaLimit}){id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count}}`;
 
   try {
@@ -114,6 +115,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       data: {
         username: bd.username,
         name: bd.name,
+        biography: bd.biography,
         profile_picture_url: bd.profile_picture_url,
         followers_count: bd.followers_count,
         media_count: bd.media_count,
