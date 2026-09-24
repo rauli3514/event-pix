@@ -5,6 +5,7 @@
 // ================================================================
 
 import { MetaAdCampaign } from '../../types/ads';
+import { getAuthHeaders } from '../../lib/apiAuth';
 
 const META_GRAPH_BASE = 'https://graph.facebook.com/v19.0';
 const INSTAGRAM_GRAPH_BASE = 'https://graph.instagram.com';
@@ -425,40 +426,42 @@ export class MetaGraphService {
   }
 
   /**
-   * Consulta métricas PÚBLICAS reales de OTRA cuenta de Instagram (competencia)
-   * usando el token de nuestra propia cuenta conectada — el campo oficial de
-   * Meta para esto (`business_discovery`), sin necesitar login ni token de esa
-   * cuenta. Solo funciona si la cuenta consultada también es Business/Creator
-   * y pública: Meta nunca expone esto para cuentas personales, ni con este ni
-   * con ningún otro método (scraping incluido). No devuelve reach, impressions
-   * ni guardados de esa cuenta — eso es privado del dueño, siempre.
+   * Consulta métricas PÚBLICAS reales de OTRA cuenta de Instagram (competencia,
+   * o un perfil pegado en el Canvas) usando el campo oficial de Meta para esto
+   * (`business_discovery`), sin necesitar login ni token de esa cuenta. Solo
+   * funciona si la cuenta consultada también es Business/Creator y pública:
+   * Meta nunca expone esto para cuentas personales, ni con este ni con ningún
+   * otro método (scraping incluido). No devuelve reach, impressions ni
+   * guardados de esa cuenta — eso es privado del dueño, siempre.
+   *
+   * Si el negocio todavía no conectó su propia cuenta de Meta, esta función
+   * cae automáticamente en `/api/meta-business-discovery`, que usa la cuenta
+   * de la plataforma (configurada una sola vez por el Admin en el servidor)
+   * como "llave" — así ningún cliente nuevo necesita conectar nada para poder
+   * analizar perfiles públicos.
    */
   static async getBusinessDiscovery(
     targetUsername: string,
     businessId?: string,
     mediaLimit = 25
   ): Promise<{ success: true; data: BusinessDiscoveryResult } | { success: false; error: string }> {
-    const creds = MetaGraphService.loadCredentials(businessId);
-    if (!creds?.accessToken || !creds.instagramAccountId) {
-      return { success: false, error: 'No hay una cuenta de Instagram conectada.' };
-    }
-    if (creds.isBasicDisplay) {
-      return {
-        success: false,
-        error: 'Tu cuenta está conectada con Instagram Basic Display, que no permite consultar otras cuentas. Necesitás Instagram Graph API con una cuenta Business/Creator vinculada a una página de Facebook.',
-      };
-    }
-
     const cleanUsername = targetUsername.replace('@', '').trim();
     if (!cleanUsername) {
       return { success: false, error: 'Nombre de usuario vacío.' };
+    }
+
+    const creds = MetaGraphService.loadCredentials(businessId);
+    const hasOwnAccount = !!(creds?.accessToken && creds.instagramAccountId && !creds.isBasicDisplay);
+
+    if (!hasOwnAccount) {
+      return MetaGraphService.getBusinessDiscoveryViaPlatform(cleanUsername, mediaLimit);
     }
 
     const fields = `business_discovery.username(${cleanUsername}){username,name,profile_picture_url,followers_count,media_count,media.limit(${mediaLimit}){id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count}}`;
 
     try {
       const data = await MetaGraphService.apiFetch<{ business_discovery?: any }>(
-        `/${creds.instagramAccountId}`,
+        `/${creds!.instagramAccountId}`,
         { fields },
         businessId
       );
@@ -484,6 +487,27 @@ export class MetaGraphService {
       };
     } catch (err: any) {
       return { success: false, error: err?.message || 'Error consultando la cuenta en Meta.' };
+    }
+  }
+
+  /** Fallback server-side de `getBusinessDiscovery` usando la cuenta de la plataforma (Admin). */
+  private static async getBusinessDiscoveryViaPlatform(
+    cleanUsername: string,
+    mediaLimit: number
+  ): Promise<{ success: true; data: BusinessDiscoveryResult } | { success: false; error: string }> {
+    try {
+      const authHeaders = await getAuthHeaders();
+      const res = await fetch(
+        `/api/meta-business-discovery?username=${encodeURIComponent(cleanUsername)}&limit=${mediaLimit}`,
+        { headers: authHeaders }
+      );
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        return { success: false, error: data.error || 'No se pudo consultar el perfil.' };
+      }
+      return { success: true, data: data.data as BusinessDiscoveryResult };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Error consultando el perfil.' };
     }
   }
 
