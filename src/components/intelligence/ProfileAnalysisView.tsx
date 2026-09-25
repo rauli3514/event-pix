@@ -17,8 +17,9 @@ import {
 } from 'lucide-react';
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, BarChart, Bar } from 'recharts';
 import { toast } from 'sonner';
-import { MetaGraphService, MetaMediaItem, MetaMediaInsights } from '../../services/meta/MetaGraphService';
+import { MetaGraphService, MetaMediaItem, MetaMediaInsights, BusinessDiscoveryMedia } from '../../services/meta/MetaGraphService';
 import { ProfileSnapshotService } from '../../services/intelligence/ProfileSnapshotService';
+import { IntelligenceStorageService } from '../../services/intelligence/IntelligenceStorageService';
 import { hasValue, formatMetric, averageAvailable } from '../../services/intelligence/metricUtils';
 import { CompetitorProfile } from './CompetitorAnalysisPanel';
 import { TikTokProfile } from './TikTokPanel';
@@ -79,6 +80,23 @@ function competitorReelToPost(r: CompetitorProfile['reels'][number]): UnifiedPos
     commentCount: hasValue(r.comments_count) ? (r.comments_count as number) : null,
     // Meta nunca expone vistas/guardados de una cuenta ajena, ni a nosotros
     // ni a ningún tercero — no es un hueco nuestro, es un límite real.
+    viewCount: null,
+    shareCount: null,
+    saveCount: null,
+  };
+}
+
+function businessDiscoveryMediaToPost(m: BusinessDiscoveryMedia): UnifiedPost {
+  return {
+    id: m.id,
+    thumbnailUrl: m.thumbnail_url || m.media_url,
+    caption: m.caption,
+    permalink: m.permalink,
+    timestamp: m.timestamp,
+    likeCount: typeof m.like_count === 'number' ? m.like_count : null,
+    commentCount: typeof m.comments_count === 'number' ? m.comments_count : null,
+    // business_discovery nunca expone vistas/guardados, ni de la cuenta
+    // propia consultada así ni de ninguna otra — límite real de Meta.
     viewCount: null,
     shareCount: null,
     saveCount: null,
@@ -159,6 +177,43 @@ export const ProfileAnalysisView: React.FC<ProfileAnalysisViewProps> = ({ busine
         });
       } catch (err) {
         console.warn('ProfileAnalysisView: no se pudo cargar la cuenta propia de Instagram', err);
+      }
+    } else {
+      // Sin conexión propia de Meta: si ya completó su @handle en Perfil &
+      // Contexto IA, mostramos igual sus métricas públicas vía la cuenta
+      // compartida de la plataforma (mismo camino que un competidor). Solo
+      // faltan los insights privados (alcance, guardados, reproducciones)
+      // que Meta nunca expone sin el token propio del dueño de la cuenta.
+      try {
+        const ctx = await IntelligenceStorageService.loadProfileContext(businessId);
+        const ownHandle = ctx.profile.instagram_handle?.trim();
+        if (ownHandle) {
+          const discovery = await MetaGraphService.getBusinessDiscovery(ownHandle, businessId);
+          if (discovery.success) {
+            const bd = discovery.data;
+            loaded.push({
+              id: 'own_instagram',
+              platform: 'instagram',
+              isOwn: true,
+              handle: bd.username,
+              displayName: bd.name || bd.username,
+              avatarUrl: bd.profile_picture_url,
+              followerCount: bd.followers_count ?? null,
+              mediaCount: bd.media_count ?? null,
+              posts: bd.media.map(businessDiscoveryMediaToPost),
+            });
+            ProfileSnapshotService.recordSnapshotIfNeeded({
+              businessId,
+              kind: 'own',
+              platform: 'instagram',
+              handle: bd.username,
+              followerCount: bd.followers_count,
+              mediaCount: bd.media_count,
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('ProfileAnalysisView: no se pudo cargar la cuenta propia vía la plataforma', err);
       }
     }
 
@@ -270,9 +325,6 @@ export const ProfileAnalysisView: React.FC<ProfileAnalysisViewProps> = ({ busine
         toast.success(`@${data.username} agregado.`, { id: toastId });
       } else {
         const cleanHandle = raw.replace('@', '').replace(/https?:\/\/(www\.)?instagram\.com\//i, '').replace(/\/$/, '');
-        if (!MetaGraphService.isConfigured(businessId)) {
-          throw new Error('Conectá tu propia cuenta de Instagram en Auditoría → Instagram para poder buscar otros perfiles.');
-        }
         const discovery = await MetaGraphService.getBusinessDiscovery(cleanHandle, businessId);
         if (!discovery.success) throw new Error(discovery.error);
 

@@ -438,6 +438,14 @@ export class MetaGraphService {
    * y pública: Meta nunca expone esto para cuentas personales, ni con este ni
    * con ningún otro método (scraping incluido). No devuelve reach, impressions
    * ni guardados de esa cuenta — eso es privado del dueño, siempre.
+   *
+   * Si el negocio activo no conectó su propia cuenta de Meta, cae a la cuenta
+   * compartida de la plataforma (`/api/meta-platform-discovery`, respaldada
+   * por META_PLATFORM_ACCESS_TOKEN en el servidor): business_discovery solo
+   * necesita el token de UNA cuenta Business/Creator cualquiera para consultar
+   * los datos públicos de cualquier otra, así que un solo token de la
+   * plataforma alcanza para los clientes que no quieren pasar por el OAuth
+   * de Meta ellos mismos.
    */
   static async getBusinessDiscovery(
     targetUsername: string,
@@ -446,7 +454,7 @@ export class MetaGraphService {
   ): Promise<{ success: true; data: BusinessDiscoveryResult } | { success: false; error: string }> {
     const creds = MetaGraphService.loadCredentials(businessId);
     if (!creds?.accessToken || !creds.instagramAccountId) {
-      return { success: false, error: 'No hay una cuenta de Instagram conectada.' };
+      return MetaGraphService.getBusinessDiscoveryViaPlatform(targetUsername, mediaLimit);
     }
     if (creds.isBasicDisplay) {
       return {
@@ -488,6 +496,35 @@ export class MetaGraphService {
           media: (bd.media?.data || []) as BusinessDiscoveryMedia[],
         },
       };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Error consultando la cuenta en Meta.' };
+    }
+  }
+
+  /**
+   * business_discovery vía la cuenta compartida de la plataforma (server-side,
+   * el token nunca llega al cliente). Ver `getBusinessDiscovery` — es el
+   * respaldo que usa cuando el negocio activo no tiene su propia cuenta de
+   * Meta conectada.
+   */
+  private static async getBusinessDiscoveryViaPlatform(
+    targetUsername: string,
+    mediaLimit: number
+  ): Promise<{ success: true; data: BusinessDiscoveryResult } | { success: false; error: string }> {
+    const cleanUsername = targetUsername.replace('@', '').trim();
+    if (!cleanUsername) {
+      return { success: false, error: 'Nombre de usuario vacío.' };
+    }
+
+    try {
+      const res = await fetch(
+        `/api/meta-platform-discovery?username=${encodeURIComponent(cleanUsername)}&limit=${mediaLimit}`
+      );
+      const data = await res.json();
+      if (!data.success) {
+        return { success: false, error: data.error || 'No se pudo consultar la cuenta en Meta.' };
+      }
+      return { success: true, data: data.data as BusinessDiscoveryResult };
     } catch (err: any) {
       return { success: false, error: err?.message || 'Error consultando la cuenta en Meta.' };
     }
