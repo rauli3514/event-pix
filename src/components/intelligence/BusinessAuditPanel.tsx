@@ -31,6 +31,10 @@ interface BusinessAuditPanelProps {
   accountHandle?: string;
   connections?: UnifiedConnectionsState;
   onOpenConnections?: () => void;
+  // Se incrementa desde afuera (botón "Buscar Perfil" en el header) para
+  // abrir directo en la pestaña Competencia sin pasar por "Registrar Nuevo
+  // Cliente" — son cosas distintas: esto es solo consulta, no crea un negocio.
+  openCompetitorSearchSignal?: number;
 }
 
 export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
@@ -46,9 +50,15 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
   posts = [],
   accountHandle,
   connections,
-  onOpenConnections
+  onOpenConnections,
+  openCompetitorSearchSignal
 }) => {
   const [activeTab, setActiveTab] = useState<'audit' | 'integrations' | 'competitors' | 'instagram' | 'ads'>('audit');
+
+  useEffect(() => {
+    if (openCompetitorSearchSignal) setActiveTab('competitors');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openCompetitorSearchSignal]);
 
   const { myAvgViews, myAvgLikes, myAvgComments, myEngagementRate } = useMemo(() => {
     if (!posts || posts.length === 0) {
@@ -532,6 +542,7 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
         {activeTab === 'competitors' && (
           <CompetitorAnalysisPanel
             businessId={business.id}
+            businessName={business.name}
             myAvgViews={myAvgViews}
             myAvgLikes={myAvgLikes}
             myAvgComments={myAvgComments}

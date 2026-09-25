@@ -264,6 +264,50 @@ export class IntelligenceStorageService {
     return newBiz;
   }
 
+  /**
+   * Elimina un negocio/cliente registrado. Restringido a super_admin a nivel
+   * de RLS (intelligence_businesses_delete) — si la sesión no tiene ese rol,
+   * Supabase rechaza el delete y esto devuelve false sin borrar nada local.
+   * El resto de las tablas del negocio (posts, CRM, conexiones) cuelgan de
+   * business_id con ON DELETE CASCADE, así que se limpian solas en la base.
+   */
+  static async deleteBusiness(businessId: string): Promise<boolean> {
+    const isSupa = await this.testSupabase();
+    if (isSupa) {
+      try {
+        const { error } = await supabase.from('intelligence_businesses').delete().eq('id', businessId);
+        if (error) {
+          console.error('No se pudo eliminar el negocio en Supabase (¿falta permiso de super_admin?):', error);
+          return false;
+        }
+        await supabase.from('display_commerces').delete().eq('id', businessId);
+      } catch (err) {
+        console.error('Error eliminando negocio en Supabase:', err);
+        return false;
+      }
+    }
+
+    // Cache local de la lista de negocios
+    try {
+      const stored = localStorage.getItem(LOCAL_STORAGE_KEYS.BUSINESSES_LIST);
+      if (stored) {
+        const list = (JSON.parse(stored) as IntelligenceBusiness[]).filter(b => b.id !== businessId);
+        localStorage.setItem(LOCAL_STORAGE_KEYS.BUSINESSES_LIST, JSON.stringify(list));
+      }
+    } catch (e) {
+      console.warn('Error actualizando cache local de negocios tras borrar:', e);
+    }
+
+    // Si era el negocio activo, pasar a otro que quede (o al default).
+    if (this.getActiveBusinessId() === businessId) {
+      const remaining = (await this.listBusinesses()).filter(b => b.id !== businessId);
+      this.setActiveBusinessId(remaining[0]?.id || 'biz_001');
+    }
+
+    await this.clearAllData(businessId);
+    return true;
+  }
+
   static async getOrCreateBusiness(
     handle = '@display_digital',
     name = 'Display Digital & Tecno eventos'

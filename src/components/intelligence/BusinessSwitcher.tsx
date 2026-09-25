@@ -11,8 +11,10 @@ import {
   Plus,
   Check,
   Instagram,
-  Store
+  Store,
+  Trash2
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { IntelligenceBusiness } from '../../types/intelligence';
 import { IntelligenceStorageService } from '../../services/intelligence/IntelligenceStorageService';
 
@@ -37,6 +39,37 @@ export const BusinessSwitcher: React.FC<BusinessSwitcherProps> = ({
   const loadList = async () => {
     const list = await IntelligenceStorageService.listBusinesses();
     setBusinesses(list);
+  };
+
+  const handleDeleteBusiness = async (e: React.MouseEvent, biz: IntelligenceBusiness) => {
+    e.stopPropagation();
+    if (businesses.length <= 1) {
+      toast.error('No podés borrar el único negocio registrado.');
+      return;
+    }
+    if (
+      !window.confirm(
+        `¿Seguro que querés borrar "${biz.name}" (${biz.instagram_handle || 'sin handle'})? Se pierden sus datos reales: publicaciones, CRM, conexiones y reportes. No se puede deshacer.`
+      )
+    ) {
+      return;
+    }
+
+    const wasActive = biz.id === currentBusiness?.id;
+    const ok = await IntelligenceStorageService.deleteBusiness(biz.id);
+    if (!ok) {
+      toast.error('No se pudo borrar. Puede que tu cuenta no tenga permiso de administrador.');
+      return;
+    }
+
+    toast.success(`"${biz.name}" eliminado.`);
+    const updatedList = await IntelligenceStorageService.listBusinesses();
+    setBusinesses(updatedList);
+
+    if (wasActive) {
+      const nextActive = updatedList.find(b => b.id === IntelligenceStorageService.getActiveBusinessId()) || updatedList[0];
+      if (nextActive) onSelectBusiness(nextActive);
+    }
   };
 
   useEffect(() => {
@@ -145,11 +178,21 @@ export const BusinessSwitcher: React.FC<BusinessSwitcherProps> = ({
                     </div>
                   </div>
 
-                  {isSelected && (
-                    <div className="w-4 h-4 rounded-full bg-violet-600 flex items-center justify-center text-white shrink-0">
-                      <Check className="w-2.5 h-2.5 stroke-[3]" />
-                    </div>
-                  )}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {isSelected && (
+                      <div className="w-4 h-4 rounded-full bg-violet-600 flex items-center justify-center text-white">
+                        <Check className="w-2.5 h-2.5 stroke-[3]" />
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => handleDeleteBusiness(e, biz)}
+                      title="Borrar este negocio"
+                      className="p-1 text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg transition-colors"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
               );
             })}

@@ -43,6 +43,7 @@ export interface CompetitorProfile {
 
 interface CompetitorAnalysisPanelProps {
   businessId?: string;
+  businessName?: string;
   myAvgViews?: number;
   myAvgLikes?: number;
   myAvgComments?: number;
@@ -84,6 +85,7 @@ function businessDiscoveryMediaToReel(m: BusinessDiscoveryMedia, username?: stri
 
 export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = ({
   businessId,
+  businessName,
   myAvgViews = 0,
   myAvgLikes = 0,
   myAvgComments = 0,
@@ -354,9 +356,16 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
         // Meta — sin pegar un solo Reel a mano. Solo funciona si la cuenta
         // es Business/Creator pública (igual que la nuestra necesita serlo).
         const cleanHandle = detectedHandle.replace('@', '');
+        // El token de Instagram está aislado por negocio (evita que un
+        // negocio use sin querer los datos de otro cliente de la cuenta):
+        // si el que está ACTIVO ahora mismo no tiene Instagram conectado,
+        // esto falla aunque otro de tus negocios sí lo tenga.
         const discovery = MetaGraphService.isConfigured(businessId)
           ? await MetaGraphService.getBusinessDiscovery(cleanHandle, businessId)
-          : { success: false as const, error: 'Todavía no conectaste tu propia cuenta de Instagram Business/Creator.' };
+          : {
+              success: false as const,
+              error: `"${businessName || 'Este negocio'}" (el que tenés activo ahora) todavía no tiene su propia cuenta de Instagram conectada. Conectala en la pestaña "Instagram" — cada negocio necesita la suya, no se comparte entre negocios.`,
+            };
 
         if (discovery.success) {
           const bd = discovery.data;

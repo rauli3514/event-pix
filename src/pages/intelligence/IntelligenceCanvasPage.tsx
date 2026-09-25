@@ -27,7 +27,7 @@ import { BusinessSwitcher } from '../../components/intelligence/BusinessSwitcher
 import { NewClientRegistrationModal } from '../../components/intelligence/NewClientRegistrationModal';
 import { ProfileAndAiContextView } from '../../components/intelligence/profile/ProfileAndAiContextView';
 import { ChatMessage, ContentFormatMode } from '../../components/intelligence/canvas/AiChatCardNode';
-import { Brain, Activity, Tv, Sparkles, Cloud, Loader2, MessageSquare, LayoutDashboard, Network, Radio, Trash2, Bot, User, Zap } from 'lucide-react';
+import { Brain, Activity, Tv, Sparkles, Cloud, Loader2, MessageSquare, LayoutDashboard, Network, Radio, Trash2, Bot, User, Zap, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
 export const IntelligenceCanvasPage: React.FC = () => {
@@ -37,6 +37,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
   const [syncStatus, setSyncStatus] = useState<'synced' | 'saving'>('synced');
   const [viewMode, setViewMode] = useState<'canvas' | 'messages' | 'profile' | 'dashboard'>('profile');
   const [isNewClientModalOpen, setIsNewClientModalOpen] = useState(false);
+  const [openCompetitorSearchSignal, setOpenCompetitorSearchSignal] = useState(0);
 
   // Rol del usuario logueado: un cliente normal solo ve/gestiona su propio negocio
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
@@ -811,6 +812,23 @@ export const IntelligenceCanvasPage: React.FC = () => {
               readOnly={!isSuperAdmin}
             />
           </div>
+
+          {/* Buscar un perfil de Instagram/TikTok (propio o de competencia):
+              a propósito NO es lo mismo que "Registrar Nuevo Cliente" de
+              arriba — esto solo consulta datos públicos, no crea un negocio. */}
+          <button
+            type="button"
+            onClick={() => {
+              setViewMode('canvas');
+              setIsAuditOpen(true);
+              setOpenCompetitorSearchSignal((s) => s + 1);
+            }}
+            title="Buscar cualquier perfil de Instagram o TikTok (el tuyo o de la competencia)"
+            className="hidden md:flex items-center gap-1.5 ml-2 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-violet-500/50 text-slate-200 text-xs font-semibold transition-all"
+          >
+            <Search className="w-3.5 h-3.5 text-violet-400" />
+            <span>Buscar Perfil</span>
+          </button>
         </div>
 
         {/* Selector Central de Vistas: Lienzo (Board) vs Perfil & Contexto IA vs Métricas */}
@@ -1064,6 +1082,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
             accountHandle={accountHandle}
             connections={connections}
             onOpenConnections={() => setIsConnectionsOpen(true)}
+            openCompetitorSearchSignal={openCompetitorSearchSignal}
           />
         </div>
       )}
