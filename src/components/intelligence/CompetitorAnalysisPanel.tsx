@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { MetricValue, NO_DATA } from '../../types/intelligence';
 import { hasValue, averageAvailable, formatMetric } from '../../services/intelligence/metricUtils';
 import { MetaGraphService, BusinessDiscoveryMedia } from '../../services/meta/MetaGraphService';
+import { ProfileSnapshotService } from '../../services/intelligence/ProfileSnapshotService';
 import { TikTokPanel } from './TikTokPanel';
 
 export interface AuditedCompetitorReel {
@@ -385,6 +386,16 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
           setCompetitors((prev) => [newProfile, ...prev]);
           setExpandedId(newProfile.id);
           setMainInput('');
+          if (businessId) {
+            ProfileSnapshotService.recordSnapshotIfNeeded({
+              businessId,
+              kind: 'competitor',
+              platform: 'instagram',
+              handle: bd.username,
+              followerCount: bd.followers_count,
+              mediaCount: bd.media_count,
+            });
+          }
           toast.success(
             `🎯 @${bd.username} agregado con ${reels.length} posteo${reels.length === 1 ? '' : 's'} real${reels.length === 1 ? '' : 'es'} (likes y comentarios verificados por Meta).`,
             { id: toastId }

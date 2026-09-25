@@ -65,6 +65,15 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
   const [saving, setSaving] = useState(false);
   const [context, setContext] = useState<UserProfileContext | null>(null);
 
+  // Condición para guardar: el @handle de Instagram tiene que existir de
+  // verdad. Se confirma leyendo la página pública (sin depender del Meta
+  // Graph API, que recién se conecta más adelante). `verifiedHandle` guarda
+  // el último handle que pasó la verificación — si el usuario lo edita después,
+  // deja de matchear y hay que verificar de nuevo.
+  const [verifiedHandle, setVerifiedHandle] = useState<string | null>(null);
+  const [isVerifyingHandle, setIsVerifyingHandle] = useState(false);
+  const [handleVerifyError, setHandleVerifyError] = useState<string | null>(null);
+
   // Estados locales para nuevos items
   const [newMustDo, setNewMustDo] = useState('');
   const [newForbidden, setNewForbidden] = useState('');
@@ -83,6 +92,12 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
       const data = await IntelligenceStorageService.loadProfileContext(businessId);
       if (isMounted) {
         setContext(data);
+        // Un handle que ya estaba guardado pasó la verificación quien sabe
+        // cuándo (o es un perfil viejo de antes de este control) — confiamos
+        // en él para no obligar a reverificar cada vez que se abre la pantalla.
+        if (data.profile.instagram_handle.trim()) {
+          setVerifiedHandle(data.profile.instagram_handle.trim().toLowerCase());
+        }
         setLoading(false);
       }
     }
@@ -90,8 +105,52 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
     return () => { isMounted = false; };
   }, [businessId]);
 
+  const currentHandle = context?.profile.instagram_handle.trim().toLowerCase() || '';
+  const isHandleVerified = currentHandle.length > 0 && currentHandle === verifiedHandle;
+
+  const handleVerifyInstagram = async () => {
+    if (!context) return;
+    const username = context.profile.instagram_handle.trim().replace(/^@/, '');
+    if (!username) {
+      setHandleVerifyError('Ingresá tu @usuario de Instagram primero.');
+      return;
+    }
+    setIsVerifyingHandle(true);
+    setHandleVerifyError(null);
+    try {
+      const res = await fetch(`/api/instagram-verify-profile?username=${encodeURIComponent(username)}`);
+      const data = await res.json();
+      if (!data.success) {
+        setHandleVerifyError(data.error || 'No pudimos verificar ese perfil ahora mismo.');
+        return;
+      }
+      if (!data.exists) {
+        setHandleVerifyError(`No encontramos ninguna cuenta pública @${username} en Instagram. Revisá que esté bien escrito.`);
+        return;
+      }
+      setVerifiedHandle(username.toLowerCase());
+      setContext({
+        ...context,
+        profile: {
+          ...context.profile,
+          instagram_handle: username,
+          avatar_url: context.profile.avatar_url || data.avatarUrl || context.profile.avatar_url
+        }
+      });
+      toast.success(`✓ @${username} confirmado en Instagram.`);
+    } catch {
+      setHandleVerifyError('No pudimos conectar para verificar el perfil. Probá de nuevo.');
+    } finally {
+      setIsVerifyingHandle(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!context) return;
+    if (!isHandleVerified) {
+      toast.error('Primero confirmá que tu @usuario de Instagram existe de verdad.');
+      return;
+    }
     setSaving(true);
     try {
       await IntelligenceStorageService.saveProfileContext(businessId, context);
@@ -185,8 +244,9 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
           <button
             type="button"
             onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-bold border border-slate-700 transition-all hover:border-pink-500/50 shadow-sm"
+            disabled={saving || !isHandleVerified}
+            title={!isHandleVerified ? 'Confirmá tu @usuario de Instagram antes de guardar' : undefined}
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-bold border border-slate-700 transition-all hover:border-pink-500/50 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Save className="w-3.5 h-3.5 text-pink-400" />
             {saving ? 'Guardando...' : 'Guardar Cambios'}
@@ -244,28 +304,54 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
               {/* Formulario de Campos */}
               <div className="md:col-span-8 space-y-4">
                 
-                {/* Usuario de Instagram */}
+                {/* Usuario de Instagram — condición: tiene que existir de verdad */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
                     <Instagram className="w-3.5 h-3.5 text-pink-400" />
                     Instagram
                   </label>
-                  <div className="flex items-center rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-xs">
+                  <div className={`flex items-center gap-2 rounded-xl bg-slate-950 border px-3 py-2 text-xs transition-colors ${
+                    isHandleVerified ? 'border-emerald-500/50' : handleVerifyError ? 'border-rose-500/50' : 'border-slate-800'
+                  }`}>
                     <span className="text-slate-500 font-mono pr-1">@</span>
                     <input
                       type="text"
                       value={context.profile.instagram_handle}
-                      onChange={(e) => setContext({
-                        ...context,
-                        profile: { ...context.profile, instagram_handle: e.target.value.replace('@', '') }
-                      })}
-                      className="bg-transparent text-slate-100 flex-1 outline-none font-mono"
+                      onChange={(e) => {
+                        setHandleVerifyError(null);
+                        setContext({
+                          ...context,
+                          profile: { ...context.profile, instagram_handle: e.target.value.replace('@', '').trim() }
+                        });
+                      }}
+                      onKeyDown={(e) => e.key === 'Enter' && !isHandleVerified && handleVerifyInstagram()}
+                      className="bg-transparent text-slate-100 flex-1 outline-none font-mono min-w-0"
                       placeholder="tu_usuario"
                     />
+                    {isHandleVerified ? (
+                      <span className="flex items-center gap-1 text-emerald-400 text-[11px] font-bold shrink-0">
+                        <Check className="w-3.5 h-3.5" /> Verificado
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleVerifyInstagram}
+                        disabled={isVerifyingHandle || !context.profile.instagram_handle.trim()}
+                        className="shrink-0 px-2.5 py-1 rounded-lg bg-pink-600 hover:bg-pink-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-[11px] font-bold transition-colors"
+                      >
+                        {isVerifyingHandle ? 'Verificando...' : 'Verificar'}
+                      </button>
+                    )}
                   </div>
-                  <p className="text-[10px] text-slate-500">
-                    El usuario de Instagram se utiliza para auditar métricas reales de Reels y competidores.
-                  </p>
+                  {handleVerifyError ? (
+                    <p className="text-[10px] text-rose-400">{handleVerifyError}</p>
+                  ) : (
+                    <p className="text-[10px] text-slate-500">
+                      {isHandleVerified
+                        ? 'Confirmamos que esta cuenta existe en Instagram.'
+                        : 'Tenés que confirmar que este @usuario existe de verdad antes de guardar.'}
+                    </p>
+                  )}
                 </div>
 
                 {/* Nicho que abordas */}

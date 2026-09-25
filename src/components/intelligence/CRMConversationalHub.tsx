@@ -4,7 +4,7 @@
 // EventPix Intelligence — SaaS Platform
 // ================================================================
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   MessageSquare, Users, Sparkles, Send,
   Clock, ShieldAlert, Check,
@@ -31,6 +31,10 @@ import { WhatsAppCloudService } from '../../services/meta/WhatsAppCloudService';
 import { AIProviderService } from '../../services/intelligence/AIProviderService';
 import { AutomationEngineService } from '../../services/intelligence/AutomationEngineService';
 import { UnifiedConnectionsState } from '../../types/connections';
+import { MetaAdCampaign } from '../../types/ads';
+import { MetaGraphService } from '../../services/meta/MetaGraphService';
+import { MetaAdsIntelligenceEngine } from '../../services/intelligence/MetaAdsIntelligenceEngine';
+import { MetaAdsAuditPanel } from './MetaAdsAuditPanel';
 import { toast } from 'sonner';
 
 interface CRMConversationalHubProps {
@@ -39,6 +43,9 @@ interface CRMConversationalHubProps {
   brandDna?: BrandDNA;
   onNavigateToPost?: (postId: string) => void;
   businessId?: string;
+  businessName?: string;
+  onAddAdToCanvas?: (campaign: MetaAdCampaign) => void;
+  onPromoteReelToAd?: (reelTitle: string) => void;
   // 'modal' (default): overlay flotante, como siempre.
   // 'inline': pantalla completa igual de jerarquía que Lienzo/Perfil/Métricas.
   variant?: 'modal' | 'inline';
@@ -50,6 +57,9 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
   brandDna,
   onNavigateToPost,
   businessId = 'biz_default',
+  businessName,
+  onAddAdToCanvas,
+  onPromoteReelToAd,
   variant = 'modal'
 }) => {
   const [conversations, setConversations] = useState<CRMConversation[]>([]);
@@ -57,7 +67,43 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
   const [tasks, setTasks] = useState<CRMTask[]>([]);
   const [automationLogs, setAutomationLogs] = useState<CRMAutomationLog[]>([]);
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'inbox' | 'opportunities' | 'pipeline' | 'automations' | 'attribution'>('inbox');
+  const [activeTab, setActiveTab] = useState<'inbox' | 'opportunities' | 'pipeline' | 'automations' | 'attribution' | 'ads'>('inbox');
+
+  // Auditoría de Meta Ads — se mudó acá desde el lienzo, porque en el fondo
+  // es parte del embudo comercial (leads que vienen de campañas pagas), no
+  // una métrica de contenido orgánico. Carga perezosa: solo al abrir la pestaña.
+  const [adsCampaigns, setAdsCampaigns] = useState<MetaAdCampaign[]>([]);
+  const [isLoadingAds, setIsLoadingAds] = useState(false);
+
+  useEffect(() => {
+    if (activeTab !== 'ads') return;
+    let cancelled = false;
+    (async () => {
+      setIsLoadingAds(true);
+      try {
+        const campaigns = await MetaGraphService.getAdCampaigns(businessId);
+        if (!cancelled) setAdsCampaigns(campaigns);
+      } catch (err: any) {
+        if (!cancelled) {
+          setAdsCampaigns([]);
+          toast.error(err?.message || 'No se pudieron obtener las campañas reales de Meta Ads.');
+        }
+      } finally {
+        if (!cancelled) setIsLoadingAds(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeTab, businessId]);
+
+  const adsReport = useMemo(() => {
+    const creds = MetaGraphService.loadCredentials(businessId);
+    return MetaAdsIntelligenceEngine.generateAdsReport(
+      adsCampaigns,
+      [],
+      businessName || businessId,
+      creds?.adAccountId || '—'
+    );
+  }, [adsCampaigns, businessId, businessName]);
   const [isRuleBuilderOpen, setIsRuleBuilderOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<Partial<CRMAutomationRule> | null>(null);
   const [activeTriggerAlert, setActiveTriggerAlert] = useState<{
@@ -689,6 +735,15 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
             >
               <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
               Atribución de Ventas
+            </button>
+            <button
+              onClick={() => setActiveTab('ads')}
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
+                activeTab === 'ads' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <DollarSign className="w-3.5 h-3.5 text-violet-400" />
+              Meta Ads
             </button>
           </div>
 
@@ -2091,6 +2146,27 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
                 </div>
               </div>
             </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* TAB 5: META ADS (mudado desde Lienzo — es parte del embudo comercial) */}
+          {/* ========================================================================= */}
+          {activeTab === 'ads' && (
+            isLoadingAds ? (
+              <div className="flex-1 p-6 flex flex-col items-center justify-center text-center gap-3 text-xs text-slate-400">
+                <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+                Consultando campañas reales en Meta Ads...
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto custom-scrollbar">
+                <MetaAdsAuditPanel
+                  report={adsReport}
+                  businessId={businessId}
+                  onAddAdToCanvas={onAddAdToCanvas}
+                  onPromoteReelToAd={onPromoteReelToAd}
+                />
+              </div>
+            )
           )}
 
         </div>

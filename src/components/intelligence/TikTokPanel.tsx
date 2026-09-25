@@ -9,9 +9,10 @@
 import React, { useState, useEffect } from 'react';
 import {
   Music2, Plus, RefreshCw, Trash2, ExternalLink, Heart, MessageCircle,
-  Eye, Share2, Users, Play, Clock, ShieldCheck
+  Eye, Share2, Users, Play, Clock, ShieldCheck, Star
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { ProfileSnapshotService } from '../../services/intelligence/ProfileSnapshotService';
 
 export interface TikTokVideoStat {
   id: string;
@@ -38,6 +39,10 @@ export interface TikTokProfile {
   videoCount: number | null;
   videos: TikTokVideoStat[];
   fetchedAt: string;
+  // TikTok no distingue "cuenta propia" de "competencia" a nivel técnico
+  // (ambas se leen igual, por scraping público) — esta marca es manual,
+  // para que el Análisis de Comercio sepa cuál mostrar como "tu cuenta".
+  isOwn?: boolean;
 }
 
 interface TikTokPanelProps {
@@ -118,6 +123,7 @@ export const TikTokPanel: React.FC<TikTokPanelProps> = ({ businessId }) => {
         throw new Error(data.error || 'No se pudo extraer información de este perfil de TikTok.');
       }
 
+      const existing = profiles.find((p) => p.username === data.username);
       const newProfile: TikTokProfile = {
         id: `tiktok_${data.username}`,
         username: data.username,
@@ -131,11 +137,24 @@ export const TikTokPanel: React.FC<TikTokPanelProps> = ({ businessId }) => {
         videoCount: data.videoCount,
         videos: data.videos || [],
         fetchedAt: new Date().toISOString(),
+        isOwn: existing?.isOwn,
       };
 
       setProfiles((prev) => [newProfile, ...prev.filter((p) => p.username !== newProfile.username)]);
       setExpandedId(newProfile.id);
       setInput('');
+      if (businessId) {
+        ProfileSnapshotService.recordSnapshotIfNeeded({
+          businessId,
+          kind: newProfile.isOwn ? 'own' : 'competitor',
+          platform: 'tiktok',
+          handle: newProfile.username,
+          followerCount: newProfile.followerCount,
+          followingCount: newProfile.followingCount,
+          mediaCount: newProfile.videoCount,
+          totalLikes: newProfile.heartCount,
+        });
+      }
       toast.success(
         `✅ @${data.username} agregado (${formatNumber(data.followerCount)} seguidores, ${newProfile.videos.length} videos reales)`,
         { id: toastId }
@@ -150,6 +169,11 @@ export const TikTokPanel: React.FC<TikTokPanelProps> = ({ businessId }) => {
   const handleRemove = (id: string) => {
     setProfiles((prev) => prev.filter((p) => p.id !== id));
     toast.success('Perfil de TikTok eliminado.');
+  };
+
+  // Solo puede haber un perfil marcado como "mi cuenta" a la vez.
+  const handleToggleOwn = (id: string) => {
+    setProfiles((prev) => prev.map((p) => ({ ...p, isOwn: p.id === id ? !p.isOwn : false })));
   };
 
   return (
@@ -216,18 +240,34 @@ export const TikTokPanel: React.FC<TikTokPanelProps> = ({ businessId }) => {
                       </div>
                     )}
                     <div className="min-w-0">
-                      <p className="font-bold text-slate-100 text-xs truncate">@{profile.username}</p>
+                      <p className="font-bold text-slate-100 text-xs truncate flex items-center gap-1.5">
+                        @{profile.username}
+                        {profile.isOwn && (
+                          <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded-full font-bold uppercase shrink-0">
+                            Mi cuenta
+                          </span>
+                        )}
+                      </p>
                       <p className="text-[10px] text-slate-400 font-mono">
                         {formatNumber(profile.followerCount)} seguidores • {profile.videos.length} videos
                       </p>
                     </div>
                   </div>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleRemove(profile.id); }}
-                    className="p-1 text-slate-500 hover:text-red-400 rounded-lg hover:bg-slate-800"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleToggleOwn(profile.id); }}
+                      title={profile.isOwn ? 'Quitar marca de "mi cuenta"' : 'Marcar como mi cuenta'}
+                      className={`p-1 rounded-lg hover:bg-slate-800 ${profile.isOwn ? 'text-amber-400' : 'text-slate-500 hover:text-amber-400'}`}
+                    >
+                      <Star className="w-3.5 h-3.5" fill={profile.isOwn ? 'currentColor' : 'none'} />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleRemove(profile.id); }}
+                      className="p-1 text-slate-500 hover:text-red-400 rounded-lg hover:bg-slate-800"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
 
                 {isExpanded && (

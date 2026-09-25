@@ -484,8 +484,8 @@ export default defineConfig({
                 username: '',
                 caption: '',
                 imageUrl: '',
-                likes: 0,
-                commentsCount: 0,
+                likes: null as number | null,
+                commentsCount: null as number | null,
                 comments: [] as any[],
                 audioTrack: '',
                 followers: '',
@@ -706,6 +706,130 @@ export default defineConfig({
               res.statusCode = 500;
               res.setHeader('Content-Type', 'application/json');
               res.end(JSON.stringify({ error: err.message || 'Error al procesar Instagram' }));
+            }
+            return;
+          }
+          next();
+        });
+
+        // Middleware: confirmar si un @usuario de Instagram existe de verdad
+        // (condición para guardar el handle en "Perfil & Contexto IA").
+        server.middlewares.use(async (req, res, next) => {
+          if (req.url && req.url.startsWith('/api/instagram-verify-profile')) {
+            const urlObj = new URL(req.url, 'http://localhost');
+            const raw = urlObj.searchParams.get('username');
+            if (!raw) {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: false, error: 'Falta el parámetro username' }));
+              return;
+            }
+
+            const username = raw.trim().replace(/^@/, '').replace(/\/$/, '');
+            if (!/^[A-Za-z0-9_.]{1,30}$/.test(username)) {
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: false, error: 'Ese nombre de usuario no tiene un formato válido de Instagram.' }));
+              return;
+            }
+
+            function decodeEntities(str: string) {
+              if (!str) return '';
+              return str
+                .replace(/&amp;/g, '&')
+                .replace(/&quot;/g, '"')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&apos;/g, "'");
+            }
+
+            function parseCompact(raw2: string): number | null {
+              const clean = raw2.trim().replace(/,/g, '');
+              const m = clean.match(/^([0-9.]+)\s*([kKmM]?)$/);
+              if (!m) return null;
+              const value = parseFloat(m[1]);
+              if (Number.isNaN(value)) return null;
+              const suffix = m[2].toLowerCase();
+              if (suffix === 'k') return Math.round(value * 1_000);
+              if (suffix === 'm') return Math.round(value * 1_000_000);
+              return Math.round(value);
+            }
+
+            const userAgentsToTry = [
+              'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+              'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
+              'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
+            ];
+
+            let handled = false;
+            for (const ua of userAgentsToTry) {
+              if (handled) break;
+              try {
+                const pageRes = await fetch(`https://www.instagram.com/${username}/`, {
+                  headers: {
+                    'User-Agent': ua,
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'es-419,es;q=0.9,en;q=0.8'
+                  }
+                });
+
+                if (pageRes.status === 404) {
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ success: true, exists: false, username }));
+                  handled = true;
+                  break;
+                }
+
+                if (pageRes.ok) {
+                  const html = await pageRes.text();
+
+                  if (/Sorry, this page isn't available/i.test(html) || /Página no disponible/i.test(html)) {
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({ success: true, exists: false, username }));
+                    handled = true;
+                    break;
+                  }
+
+                  const metaDesc = html.match(/<meta[^>]*property="og:description"[^>]*content="([^"]+)"/i);
+                  const metaImg = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]+)"/i);
+                  const metaTitle = html.match(/<meta[^>]*property="og:title"[^>]*content="([^"]+)"/i);
+
+                  if (metaDesc || metaTitle) {
+                    let followerCount: number | null = null;
+                    let displayName: string | null = null;
+
+                    if (metaDesc) {
+                      const followersMatch = metaDesc[1].match(/([0-9.,]+[KMkm]?)\s+Followers/i);
+                      if (followersMatch) followerCount = parseCompact(followersMatch[1]);
+                    }
+                    if (metaTitle) {
+                      const nameMatch = metaTitle[1].match(/^([^(]+)\(@/);
+                      if (nameMatch) displayName = decodeEntities(nameMatch[1].trim());
+                    }
+
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({
+                      success: true,
+                      exists: true,
+                      username,
+                      displayName,
+                      avatarUrl: metaImg ? decodeEntities(metaImg[1]) : null,
+                      followerCount
+                    }));
+                    handled = true;
+                    break;
+                  }
+                }
+              } catch (e) {
+                console.warn('Error verifying IG profile with UA', ua, e);
+              }
+            }
+
+            if (!handled) {
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({
+                success: false,
+                error: 'No pudimos confirmar ese perfil ahora mismo (Instagram puede estar bloqueando la verificación). Probá de nuevo en unos segundos.'
+              }));
             }
             return;
           }
