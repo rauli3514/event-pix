@@ -86,7 +86,6 @@ function businessDiscoveryMediaToReel(m: BusinessDiscoveryMedia, username?: stri
 
 export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = ({
   businessId,
-  businessName,
   myAvgViews = 0,
   myAvgLikes = 0,
   myAvgComments = 0,
@@ -184,7 +183,7 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
         // propio token, sin scrapear nada). Solo posible si ya sabemos el
         // handle del competidor y el Reel está entre sus últimos posteos
         // públicos que Meta nos deja consultar.
-        if (existingHandle && shortcode && MetaGraphService.isConfigured(businessId)) {
+        if (existingHandle && shortcode) {
           const discovery = await MetaGraphService.getBusinessDiscovery(existingHandle.replace('@', ''), businessId);
           if (discovery.success) {
             const match = discovery.data.media.find((m) => m.permalink.includes(shortcode));
@@ -238,7 +237,7 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
         // scrapeado (que Instagram frecuentemente no expone) por el dato
         // real vía business_discovery.
         let usedRealMetrics = hasValue(likes) || hasValue(commentsCount);
-        if (cleanUsername && shortcode && MetaGraphService.isConfigured(businessId)) {
+        if (cleanUsername && shortcode) {
           const discovery = await MetaGraphService.getBusinessDiscovery(cleanUsername, businessId);
           if (discovery.success) {
             const match = discovery.data.media.find((m) => m.permalink.includes(shortcode));
@@ -356,17 +355,10 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
         // públicos recientes con likes/comentarios reales verificados por
         // Meta — sin pegar un solo Reel a mano. Solo funciona si la cuenta
         // es Business/Creator pública (igual que la nuestra necesita serlo).
+        // Si este negocio no conectó su propia cuenta de Meta, MetaGraphService
+        // cae solo a la cuenta compartida de la plataforma.
         const cleanHandle = detectedHandle.replace('@', '');
-        // El token de Instagram está aislado por negocio (evita que un
-        // negocio use sin querer los datos de otro cliente de la cuenta):
-        // si el que está ACTIVO ahora mismo no tiene Instagram conectado,
-        // esto falla aunque otro de tus negocios sí lo tenga.
-        const discovery = MetaGraphService.isConfigured(businessId)
-          ? await MetaGraphService.getBusinessDiscovery(cleanHandle, businessId)
-          : {
-              success: false as const,
-              error: `"${businessName || 'Este negocio'}" (el que tenés activo ahora) todavía no tiene su propia cuenta de Instagram conectada. Conectala en la pestaña "Instagram" — cada negocio necesita la suya, no se comparte entre negocios.`,
-            };
+        const discovery = await MetaGraphService.getBusinessDiscovery(cleanHandle, businessId);
 
         if (discovery.success) {
           const bd = discovery.data;

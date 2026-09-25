@@ -835,6 +835,85 @@ export default defineConfig({
           }
           next();
         });
+
+        // Middleware: business_discovery con la cuenta compartida de la
+        // plataforma (respaldo para negocios sin su propia cuenta de Meta).
+        server.middlewares.use(async (req, res, next) => {
+          if (req.url && req.url.startsWith('/api/meta-platform-discovery')) {
+            const accessToken = process.env.META_PLATFORM_ACCESS_TOKEN;
+            const igAccountId = process.env.META_PLATFORM_IG_ACCOUNT_ID;
+
+            if (!accessToken || !igAccountId) {
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({
+                success: false,
+                error: 'La cuenta compartida de la plataforma todavía no está configurada (faltan META_PLATFORM_ACCESS_TOKEN / META_PLATFORM_IG_ACCOUNT_ID).'
+              }));
+              return;
+            }
+
+            const urlObj = new URL(req.url, 'http://localhost');
+            const rawUsername = urlObj.searchParams.get('username');
+            if (!rawUsername) {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: false, error: 'Falta el parámetro username' }));
+              return;
+            }
+
+            const username = rawUsername.trim().replace(/^@/, '');
+            if (!username) {
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: false, error: 'Nombre de usuario vacío.' }));
+              return;
+            }
+
+            const limitParam = parseInt(urlObj.searchParams.get('limit') || '25', 10);
+            const mediaLimit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 50) : 25;
+            const fields = `business_discovery.username(${username}){username,name,profile_picture_url,followers_count,media_count,media.limit(${mediaLimit}){id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count}}`;
+
+            try {
+              const metaUrl = new URL(`https://graph.facebook.com/v19.0/${igAccountId}`);
+              metaUrl.searchParams.set('fields', fields);
+              metaUrl.searchParams.set('access_token', accessToken);
+
+              const metaRes = await fetch(metaUrl.toString());
+              const data = await metaRes.json();
+
+              res.setHeader('Content-Type', 'application/json');
+
+              if (!metaRes.ok || data.error) {
+                res.end(JSON.stringify({ success: false, error: data.error?.message || `Error de Meta (${metaRes.status})` }));
+                return;
+              }
+              if (!data.business_discovery) {
+                res.end(JSON.stringify({
+                  success: false,
+                  error: `"@${username}" no es una cuenta Business/Creator pública de Instagram (o no existe).`
+                }));
+                return;
+              }
+
+              const bd = data.business_discovery;
+              res.end(JSON.stringify({
+                success: true,
+                data: {
+                  username: bd.username,
+                  name: bd.name,
+                  profile_picture_url: bd.profile_picture_url,
+                  followers_count: bd.followers_count,
+                  media_count: bd.media_count,
+                  media: bd.media?.data || []
+                }
+              }));
+            } catch (err: any) {
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: false, error: err.message || 'Error consultando la cuenta en Meta.' }));
+            }
+            return;
+          }
+          next();
+        });
       }
     },
     VitePWA({
