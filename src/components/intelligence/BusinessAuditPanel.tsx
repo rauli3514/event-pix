@@ -1,9 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { BusinessAuditReport, IntelligenceBusiness, IntelligencePost, BrandDNA, UnifiedBusinessAudit, AuditSnapshot, AuditSnapshotMetrics } from '../../types/intelligence';
-import { Activity, AlertTriangle, CheckCircle, Lightbulb, ChevronRight, ChevronLeft, ArrowUpRight, Share2, Sparkles, MessageSquare, Bot, FileImage, ShieldCheck, Tv, Users, Instagram, Target, Flag, TrendingUp, TrendingDown, Minus, Loader2 } from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle, Lightbulb, ChevronRight, ChevronLeft, ArrowUpRight, Sparkles, Users, Instagram, Flag, TrendingUp, TrendingDown, Minus, Loader2 } from 'lucide-react';
 import { CompetitorAnalysisPanel } from './CompetitorAnalysisPanel';
 import { MetaConnectionPanel } from './MetaConnectionPanel';
-import { MetaAdsAuditPanel } from './MetaAdsAuditPanel';
 import { MetaAdsIntelligenceEngine } from '../../services/intelligence/MetaAdsIntelligenceEngine';
 import { ContentIntelligenceEngine } from '../../services/intelligence/ContentIntelligenceEngine';
 import { CRMIntelligenceEngine } from '../../services/intelligence/CRMIntelligenceEngine';
@@ -15,8 +14,6 @@ import { MetaGraphService, MetaMediaItem, MetaMediaInsights, MetaProfileInsights
 import { toOptional, hasValue, averageAvailable } from '../../services/intelligence/metricUtils';
 import { toast } from 'sonner';
 
-import { UnifiedConnectionsState } from '../../types/connections';
-
 interface BusinessAuditPanelProps {
   business: IntelligenceBusiness;
   auditReport: BusinessAuditReport;
@@ -25,12 +22,9 @@ interface BusinessAuditPanelProps {
   onToggle: () => void;
   onAddReelToCanvas?: (reel: MetaMediaItem & { insights?: MetaMediaInsights }) => void;
   onOpenExecutiveReport?: () => void;
-  onAddAdToCanvas?: (campaign: MetaAdCampaign) => void;
-  onPromoteReelToAd?: (reelTitle: string) => void;
+  onOpenFullAnalysis?: () => void;
   posts?: IntelligencePost[];
   accountHandle?: string;
-  connections?: UnifiedConnectionsState;
-  onOpenConnections?: () => void;
 }
 
 export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
@@ -41,14 +35,11 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
   onToggle,
   onAddReelToCanvas,
   onOpenExecutiveReport,
-  onAddAdToCanvas,
-  onPromoteReelToAd,
+  onOpenFullAnalysis,
   posts = [],
   accountHandle,
-  connections,
-  onOpenConnections
 }) => {
-  const [activeTab, setActiveTab] = useState<'audit' | 'integrations' | 'competitors' | 'instagram' | 'ads'>('audit');
+  const [activeTab, setActiveTab] = useState<'audit' | 'competitors' | 'instagram'>('audit');
 
   const { myAvgViews, myAvgLikes, myAvgComments, myEngagementRate } = useMemo(() => {
     if (!posts || posts.length === 0) {
@@ -71,17 +62,15 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
   }, [posts]);
 
   const [adsCampaigns, setAdsCampaigns] = useState<MetaAdCampaign[]>([]);
-  const [isLoadingAds, setIsLoadingAds] = useState(false);
 
-  // Carga perezosa: recién pedimos campañas reales de Meta Ads cuando el
-  // usuario efectivamente abre la pestaña "Ads" (o la auditoría unificada,
-  // que también las necesita) de este negocio.
+  // Carga perezosa: las campañas de Meta Ads ya no tienen pestaña propia acá
+  // (se mudó a Mensajes/CRM, donde vive el embudo comercial). Acá solo se
+  // usan para calcular el puntaje de la Auditoría Personalizada.
   useEffect(() => {
-    if (activeTab !== 'ads' && activeTab !== 'audit') return;
+    if (activeTab !== 'audit') return;
     let cancelled = false;
 
     (async () => {
-      setIsLoadingAds(true);
       try {
         const campaigns = await MetaGraphService.getAdCampaigns(business.id);
         if (!cancelled) setAdsCampaigns(campaigns);
@@ -90,8 +79,6 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
           setAdsCampaigns([]);
           toast.error(err?.message || 'No se pudieron obtener las campañas reales de Meta Ads.');
         }
-      } finally {
-        if (!cancelled) setIsLoadingAds(false);
       }
     })();
 
@@ -233,7 +220,7 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
         </button>
       </div>
 
-      <div className="grid grid-cols-5 p-1 bg-slate-900/80 border-b border-slate-800/60 text-[8px] font-medium gap-0.5">
+      <div className="grid grid-cols-3 p-1 bg-slate-900/80 border-b border-slate-800/60 text-[9px] font-medium gap-0.5">
         <button
           onClick={() => setActiveTab('audit')}
           className={`py-1.5 rounded-lg flex items-center justify-center gap-0.5 transition-all ${
@@ -253,15 +240,6 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
           Instagram
         </button>
         <button
-          onClick={() => setActiveTab('ads')}
-          className={`py-1.5 rounded-lg flex items-center justify-center gap-0.5 transition-all ${
-            activeTab === 'ads' ? 'bg-cyan-600 text-white shadow-md font-bold' : 'text-cyan-400 hover:text-cyan-300'
-          }`}
-        >
-          <Target className="w-3 h-3" />
-          Meta Ads
-        </button>
-        <button
           onClick={() => setActiveTab('competitors')}
           className={`py-1.5 rounded-lg flex items-center justify-center gap-0.5 transition-all ${
             activeTab === 'competitors' ? 'bg-violet-600 text-white shadow-md font-bold' : 'text-slate-400 hover:text-slate-200'
@@ -270,18 +248,9 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
           <Users className="w-3 h-3" />
           Competencia
         </button>
-        <button
-          onClick={() => setActiveTab('integrations')}
-          className={`py-1.5 rounded-lg flex items-center justify-center gap-0.5 transition-all ${
-            activeTab === 'integrations' ? 'bg-emerald-600 text-white shadow-md font-bold' : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Share2 className="w-3 h-3" />
-          Conectores
-        </button>
       </div>
 
-      <div className={`flex-1 min-h-0 text-xs ${activeTab === 'competitors' || activeTab === 'instagram' || activeTab === 'ads' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto p-4 space-y-5 custom-scrollbar'}`}>
+      <div className={`flex-1 min-h-0 text-xs ${activeTab === 'competitors' || activeTab === 'instagram' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto p-4 space-y-5 custom-scrollbar'}`}>
 
         {activeTab === 'audit' && (
           <>
@@ -532,6 +501,7 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
         {activeTab === 'competitors' && (
           <CompetitorAnalysisPanel
             businessId={business.id}
+            businessName={business.name}
             myAvgViews={myAvgViews}
             myAvgLikes={myAvgLikes}
             myAvgComments={myAvgComments}
@@ -541,169 +511,7 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
         )}
 
         {activeTab === 'instagram' && (
-          <MetaConnectionPanel businessId={business.id} onAddReelToCanvas={onAddReelToCanvas} />
-        )}
-
-        {activeTab === 'ads' && (
-          isLoadingAds ? (
-            <div className="flex-1 p-6 flex flex-col items-center justify-center text-center gap-3 text-xs text-slate-400">
-              <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
-              Consultando campañas reales en Meta Ads...
-            </div>
-          ) : (
-            <MetaAdsAuditPanel
-              report={adsReport}
-              onAddAdToCanvas={onAddAdToCanvas}
-              onPromoteReelToAd={onPromoteReelToAd}
-              businessId={business.id}
-            />
-          )
-        )}
-
-        {activeTab === 'integrations' && (
-          <div className="space-y-3">
-            <div className="p-3 bg-violet-950/30 border border-violet-500/30 rounded-xl space-y-1">
-              <h4 className="font-bold text-violet-300 text-xs flex items-center gap-1.5">
-                <Share2 className="w-4 h-4 text-violet-400" />
-                Matriz de Conectores e Integraciones
-              </h4>
-              <p className="text-slate-400 text-[11px]">
-                Estado real de tus canales para automatización, captación de leads y pantallas.
-              </p>
-            </div>
-
-            <div className="space-y-2.5">
-              {/* 1. Display Hub */}
-              <div className="bg-slate-900 border border-slate-800 p-3 rounded-2xl space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Tv className="w-4 h-4 text-amber-400" />
-                    <span className="font-bold text-slate-200 text-xs">Display Hub (Pantallas TV)</span>
-                  </div>
-                  <span className="text-[10px] bg-slate-800 text-slate-400 border border-slate-700 px-2 py-0.5 rounded-full font-mono">
-                    0 Pantallas
-                  </span>
-                </div>
-                <p className="text-slate-500 text-[11px] font-mono">
-                  Sincronización con vidrieras físicas de comercios.
-                </p>
-              </div>
-
-              {/* 2. WhatsApp Cloud API */}
-              <div className="bg-slate-900 border border-slate-800 p-3 rounded-2xl space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="w-4 h-4 text-emerald-400" />
-                    <span className="font-bold text-slate-200 text-xs">WhatsApp Cloud API (Meta)</span>
-                  </div>
-                  {connections?.whatsapp?.status === 'connected' ? (
-                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono flex items-center gap-1">
-                      <ShieldCheck className="w-3 h-3" /> Activo
-                    </span>
-                  ) : (
-                    <span className="text-[10px] bg-slate-800 text-slate-400 border border-slate-700 px-2 py-0.5 rounded-full font-mono">
-                      No vinculado
-                    </span>
-                  )}
-                </div>
-                <p className="text-slate-400 text-[11px] font-mono">
-                  Estado: <span className="text-slate-200 font-semibold">{connections?.whatsapp?.status === 'connected' ? 'Número vinculado' : 'Sin configurar'}</span>
-                </p>
-              </div>
-
-              {/* 3. OpenAI GPT-4o */}
-              <div className="bg-slate-900 border border-slate-800 p-3 rounded-2xl space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Bot className="w-4 h-4 text-emerald-400" />
-                    <span className="font-bold text-slate-200 text-xs">OpenAI (GPT-4o)</span>
-                  </div>
-                  {connections?.openai?.status === 'connected' ? (
-                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono flex items-center gap-1">
-                      <ShieldCheck className="w-3 h-3" /> Activo
-                    </span>
-                  ) : (
-                    <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full font-mono">
-                      Requiere saldo
-                    </span>
-                  )}
-                </div>
-                <p className="text-slate-400 text-[11px] font-mono">
-                  Cuenta: <span className="text-slate-200 font-semibold">{connections?.openai?.apiKey ? 'API Key guardada' : 'Sin API Key'}</span>
-                </p>
-              </div>
-
-              {/* 4. Claude 3.5 */}
-              <div className="bg-slate-900 border border-slate-800 p-3 rounded-2xl space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-amber-400" />
-                    <span className="font-bold text-slate-200 text-xs">Claude 3.5 Sonnet</span>
-                  </div>
-                  {connections?.claude?.status === 'connected' ? (
-                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono flex items-center gap-1">
-                      <ShieldCheck className="w-3 h-3" /> Activo
-                    </span>
-                  ) : (
-                    <span className="text-[10px] bg-slate-800 text-slate-400 border border-slate-700 px-2 py-0.5 rounded-full font-mono">
-                      No vinculado
-                    </span>
-                  )}
-                </div>
-                <p className="text-slate-400 text-[11px] font-mono">
-                  Cuenta: <span className="text-slate-200 font-semibold">{connections?.claude?.apiKey ? 'Clave guardada' : 'Sin configurar'}</span>
-                </p>
-              </div>
-
-              {/* 5. Shop de Plumas */}
-              <div className="bg-slate-900 border border-slate-800 p-3 rounded-2xl space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Target className="w-4 h-4 text-violet-400" />
-                    <span className="font-bold text-slate-200 text-xs">Catálogo Shop de Plumas</span>
-                  </div>
-                  {connections?.shopDePlumas?.status === 'connected' ? (
-                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono flex items-center gap-1">
-                      <ShieldCheck className="w-3 h-3" /> Conectado
-                    </span>
-                  ) : (
-                    <span className="text-[10px] bg-slate-800 text-slate-400 border border-slate-700 px-2 py-0.5 rounded-full font-mono">
-                      No sincronizado
-                    </span>
-                  )}
-                </div>
-                <p className="text-slate-400 text-[11px] font-mono">
-                  Productos: <span className="text-slate-200 font-semibold">{connections?.shopDePlumas?.syncedProducts?.length || 0} sincronizados</span>
-                </p>
-              </div>
-
-              {/* 6. Canva */}
-              <div className="bg-slate-900 border border-slate-800 p-3 rounded-2xl space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <FileImage className="w-4 h-4 text-violet-400" />
-                    <span className="font-bold text-slate-200 text-xs">Canva Design Kit</span>
-                  </div>
-                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono">
-                    Listo
-                  </span>
-                </div>
-                <p className="text-slate-500 text-[11px] font-mono">
-                  Exportación de plantillas para pantalla vertical.
-                </p>
-              </div>
-            </div>
-
-            {onOpenConnections && (
-              <button
-                onClick={onOpenConnections}
-                className="w-full py-2.5 px-3 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-violet-600/20 transition-all mt-2"
-              >
-                <Share2 className="w-3.5 h-3.5" />
-                <span>Gestionar Conexiones & APIs</span>
-              </button>
-            )}
-          </div>
+          <MetaConnectionPanel businessId={business.id} onAddReelToCanvas={onAddReelToCanvas} onOpenFullAnalysis={onOpenFullAnalysis} />
         )}
       </div>
     </aside>

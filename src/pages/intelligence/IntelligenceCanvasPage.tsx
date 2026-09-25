@@ -7,6 +7,7 @@ import { BrandDNA, IntelligencePost, BusinessAuditReport, NodeType, NO_DATA, Int
 import { fromApi, rate } from '../../services/intelligence/metricUtils';
 import { BrandDnaPanel } from '../../components/intelligence/BrandDnaPanel';
 import { BusinessAuditPanel } from '../../components/intelligence/BusinessAuditPanel';
+import { ProfileAnalysisView } from '../../components/intelligence/ProfileAnalysisView';
 import { StrategyCanvas, CanvasNode, CanvasEdge } from '../../components/intelligence/StrategyCanvas';
 import { ReelBreakdownModal } from '../../components/intelligence/ReelBreakdownModal';
 import { ExecutiveIntelligenceReportModal } from '../../components/intelligence/ExecutiveIntelligenceReportModal';
@@ -27,7 +28,7 @@ import { BusinessSwitcher } from '../../components/intelligence/BusinessSwitcher
 import { NewClientRegistrationModal } from '../../components/intelligence/NewClientRegistrationModal';
 import { ProfileAndAiContextView } from '../../components/intelligence/profile/ProfileAndAiContextView';
 import { ChatMessage, ContentFormatMode } from '../../components/intelligence/canvas/AiChatCardNode';
-import { Brain, Activity, Tv, Sparkles, Cloud, Loader2, MessageSquare, LayoutDashboard, Network, Radio, Trash2, Bot, User, Zap } from 'lucide-react';
+import { Brain, Activity, Tv, Sparkles, Cloud, Loader2, MessageSquare, LayoutDashboard, Network, Radio, Trash2, Bot, User, Zap, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
 export const IntelligenceCanvasPage: React.FC = () => {
@@ -35,8 +36,35 @@ export const IntelligenceCanvasPage: React.FC = () => {
   const [brandDna, setBrandDna] = useState<BrandDNA>(INITIAL_BRAND_DNA);
   const [posts, setPosts] = useState<IntelligencePost[]>([]);
   const [syncStatus, setSyncStatus] = useState<'synced' | 'saving'>('synced');
-  const [viewMode, setViewMode] = useState<'canvas' | 'messages' | 'profile' | 'dashboard'>('profile');
+  const [viewMode, setViewMode] = useState<'canvas' | 'messages' | 'profile' | 'dashboard' | 'analysis'>('profile');
   const [isNewClientModalOpen, setIsNewClientModalOpen] = useState(false);
+
+  // "Perfil & Contexto IA" es la pantalla obligatoria de entrada solo hasta
+  // que se guarda por primera vez (con el @handle de Instagram ya
+  // verificado) — a partir de ahí deja de ser una pestaña permanente y
+  // Lienzo pasa a ser el punto de entrada normal.
+  const [profileCompleted, setProfileCompleted] = useState<boolean | null>(null);
+  const hasAutoRoutedToCanvasRef = useRef(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      const ctx = await IntelligenceStorageService.loadProfileContext(business.id);
+      if (!isMounted) return;
+      const completed = !!ctx.profile.instagram_handle?.trim();
+      setProfileCompleted(completed);
+      if (completed && !hasAutoRoutedToCanvasRef.current) {
+        hasAutoRoutedToCanvasRef.current = true;
+        setViewMode((vm) => (vm === 'profile' ? 'canvas' : vm));
+      } else if (!completed) {
+        // Cambiaste a un negocio/cliente que todavía no completó su perfil:
+        // vuelve a ser la pantalla obligatoria de entrada para ese negocio.
+        hasAutoRoutedToCanvasRef.current = false;
+        setViewMode('profile');
+      }
+    })();
+    return () => { isMounted = false; };
+  }, [business.id]);
 
   // Rol del usuario logueado: un cliente normal solo ve/gestiona su propio negocio
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
@@ -811,14 +839,34 @@ export const IntelligenceCanvasPage: React.FC = () => {
               readOnly={!isSuperAdmin}
             />
           </div>
+
+          {/* Buscar un perfil de Instagram/TikTok (propio o de competencia):
+              a propósito NO es lo mismo que "Registrar Nuevo Cliente" de
+              arriba — esto solo consulta datos públicos, no crea un negocio.
+              Abre la pantalla completa de Análisis (Resumen/Contenido/
+              Engagement/Comparar), no el panel angosto del lienzo. */}
+          <button
+            type="button"
+            onClick={() => setViewMode('analysis')}
+            disabled={profileCompleted === false}
+            title={profileCompleted === false ? 'Completá tu Perfil & Contexto IA primero' : 'Buscar cualquier perfil de Instagram o TikTok (el tuyo o de la competencia) y ver su análisis completo'}
+            className="hidden md:flex items-center gap-1.5 ml-2 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-violet-500/50 text-slate-200 text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-slate-900"
+          >
+            <Search className="w-3.5 h-3.5 text-violet-400" />
+            <span>Buscar Perfil</span>
+          </button>
         </div>
 
-        {/* Selector Central de Vistas: Lienzo (Board) vs Perfil & Contexto IA vs Métricas */}
+        {/* Selector Central de Vistas: Lienzo (Board) vs Perfil & Contexto IA vs Métricas.
+            Mientras no se completó el perfil (primera vez), solo se puede estar acá:
+            las demás pestañas quedan deshabilitadas hasta guardar. */}
         <div className="hidden sm:flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-800 text-xs font-semibold shadow-sm">
           <button
             type="button"
             onClick={() => setViewMode('canvas')}
-            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
+            disabled={profileCompleted === false}
+            title={profileCompleted === false ? 'Completá tu Perfil & Contexto IA primero' : undefined}
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
               viewMode === 'canvas'
                 ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
@@ -831,7 +879,9 @@ export const IntelligenceCanvasPage: React.FC = () => {
           <button
             type="button"
             onClick={() => setViewMode('messages')}
-            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
+            disabled={profileCompleted === false}
+            title={profileCompleted === false ? 'Completá tu Perfil & Contexto IA primero' : undefined}
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
               viewMode === 'messages'
                 ? 'bg-gradient-to-r from-emerald-600 to-teal-500 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
@@ -841,23 +891,27 @@ export const IntelligenceCanvasPage: React.FC = () => {
             <span>Mensajes</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setViewMode('profile')}
-            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
-              viewMode === 'profile'
-                ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-md shadow-pink-600/20'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-            }`}
-          >
-            <User className="w-3.5 h-3.5 text-pink-300" />
-            <span>Perfil & Contexto IA</span>
-          </button>
+          {profileCompleted !== true && (
+            <button
+              type="button"
+              onClick={() => setViewMode('profile')}
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
+                viewMode === 'profile'
+                  ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-md shadow-pink-600/20'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+              }`}
+            >
+              <User className="w-3.5 h-3.5 text-pink-300" />
+              <span>Perfil & Contexto IA</span>
+            </button>
+          )}
 
           <button
             type="button"
             onClick={() => setViewMode('dashboard')}
-            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
+            disabled={profileCompleted === false}
+            title={profileCompleted === false ? 'Completá tu Perfil & Contexto IA primero' : undefined}
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
               viewMode === 'dashboard'
                 ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
@@ -895,6 +949,17 @@ export const IntelligenceCanvasPage: React.FC = () => {
               </>
             )}
           </div>
+
+          {/* Acceso rápido a Perfil & Contexto IA una vez que ya no es pestaña fija */}
+          {profileCompleted === true && (
+            <button
+              onClick={() => setViewMode('profile')}
+              className="hidden sm:flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-pink-500/50 text-slate-300 hover:text-pink-300 p-1.5 rounded-xl transition-all"
+              title="Editar Perfil & Contexto IA"
+            >
+              <User className="w-4 h-4" />
+            </button>
+          )}
 
           {/* Botón Central de Conexiones & APIs */}
           <button
@@ -988,6 +1053,12 @@ export const IntelligenceCanvasPage: React.FC = () => {
             if (updated.profile.instagram_handle) {
               setAccountHandle(`@${updated.profile.instagram_handle}`);
             }
+            const wasFirstCompletion = !profileCompleted && !!updated.profile.instagram_handle?.trim();
+            setProfileCompleted(!!updated.profile.instagram_handle?.trim());
+            if (wasFirstCompletion) {
+              hasAutoRoutedToCanvasRef.current = true;
+              setViewMode('canvas');
+            }
           }}
         />
       ) : viewMode === 'messages' ? (
@@ -996,7 +1067,15 @@ export const IntelligenceCanvasPage: React.FC = () => {
           onClose={() => setViewMode('canvas')}
           brandDna={brandDna}
           businessId={business.id}
+          businessName={business.name}
+          onAddAdToCanvas={handleAddAdToCanvas}
+          onPromoteReelToAd={handlePromoteReelToAd}
           variant="inline"
+        />
+      ) : viewMode === 'analysis' ? (
+        <ProfileAnalysisView
+          businessId={business.id}
+          onClose={() => setViewMode('canvas')}
         />
       ) : viewMode === 'dashboard' ? (
         <ExecutiveDecisionDashboard
@@ -1023,6 +1102,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
             onUpdateDna={handleUpdateBrandDna}
             isOpen={isBrandDnaOpen}
             onToggle={() => setIsBrandDnaOpen(!isBrandDnaOpen)}
+            onEditFullProfile={() => setViewMode('profile')}
           />
 
           <StrategyCanvas
@@ -1058,12 +1138,9 @@ export const IntelligenceCanvasPage: React.FC = () => {
             onToggle={() => setIsAuditOpen(!isAuditOpen)}
             onAddReelToCanvas={handleAddReelFromMeta}
             onOpenExecutiveReport={() => setIsExecutiveReportOpen(true)}
-            onAddAdToCanvas={handleAddAdToCanvas}
-            onPromoteReelToAd={handlePromoteReelToAd}
+            onOpenFullAnalysis={() => setViewMode('analysis')}
             posts={posts}
             accountHandle={accountHandle}
-            connections={connections}
-            onOpenConnections={() => setIsConnectionsOpen(true)}
           />
         </div>
       )}

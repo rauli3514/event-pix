@@ -178,21 +178,27 @@ export class MetaGraphService {
   }
 
   // ----- OAuth URL Builder -----
+  // Dos niveles de permiso, no uno solo: pedir de una todos los scopes
+  // (mensajes, publicar, ads) para poder ver "qué Reel tiene más vistas" es
+  // pedirle al usuario permisos sensibles (leer sus DMs) que esa pantalla ni
+  // necesita. "básico" alcanza para reels/insights propios y para auditar
+  // competencia (business_discovery); "completo" solo se pide cuando el
+  // usuario activa el Auto-DM o quiere publicar contenido desde acá.
+  static readonly BASIC_SCOPES = ['instagram_basic', 'instagram_manage_insights', 'pages_show_list'];
+  static readonly FULL_SCOPES = [
+    ...MetaGraphService.BASIC_SCOPES,
+    'instagram_manage_messages',
+    'instagram_manage_comments',
+    'instagram_content_publish',
+    'pages_read_engagement',
+  ];
 
-  static buildOAuthUrl(): string {
+  static buildOAuthUrl(tier: 'basic' | 'full' = 'basic'): string {
     const appId = import.meta.env.VITE_META_APP_ID || '2345235469580053';
     const redirectUri = encodeURIComponent(
       import.meta.env.VITE_META_REDIRECT_URI || `${window.location.origin}/auth/meta/callback`
     );
-    const scopes = [
-      'instagram_basic',
-      'instagram_content_publish',
-      'instagram_manage_insights',
-      'instagram_manage_comments',
-      'instagram_manage_messages',
-      'pages_read_engagement',
-      'pages_show_list',
-    ].join(',');
+    const scopes = (tier === 'full' ? MetaGraphService.FULL_SCOPES : MetaGraphService.BASIC_SCOPES).join(',');
 
     return (
       `https://www.facebook.com/v19.0/dialog/oauth` +
@@ -200,7 +206,7 @@ export class MetaGraphService {
       `&redirect_uri=${redirectUri}` +
       `&scope=${encodeURIComponent(scopes)}` +
       `&response_type=code` +
-      `&state=eventpix_meta_auth`
+      `&state=eventpix_meta_auth_${tier}`
     );
   }
 

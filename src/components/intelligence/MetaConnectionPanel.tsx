@@ -15,6 +15,7 @@ import {
   DiscoveredAccount
 } from '../../services/meta/MetaGraphService';
 import { AccountBenchmarkService } from '../../services/intelligence/AccountBenchmarkService';
+import { ProfileSnapshotService } from '../../services/intelligence/ProfileSnapshotService';
 import { IntelligenceStorageService } from '../../services/intelligence/IntelligenceStorageService';
 import { ContentDnaEngine } from '../../services/intelligence/ContentDnaEngine';
 import { hasValue } from '../../services/intelligence/metricUtils';
@@ -22,10 +23,10 @@ import { hasValue } from '../../services/intelligence/metricUtils';
 interface MetaConnectionPanelProps {
   businessId: string;
   onAddReelToCanvas?: (reel: MetaMediaItem & { insights?: MetaMediaInsights }) => void;
+  onOpenFullAnalysis?: () => void;
 }
 
 type PanelState = 'not_connected' | 'verifying' | 'select_account' | 'connected' | 'error';
-type ConnectedTab = 'reels' | 'metrics';
 
 function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -41,7 +42,7 @@ function daysAgo(iso: string): string {
   return `hace ${diff} días`;
 }
 
-export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ businessId, onAddReelToCanvas }) => {
+export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ businessId, onAddReelToCanvas, onOpenFullAnalysis }) => {
   const [state, setState] = useState<PanelState>(
     MetaGraphService.isConfigured(businessId) ? 'verifying' : 'not_connected'
   );
@@ -50,7 +51,6 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ busine
   const [discoveredAccounts, setDiscoveredAccounts] = useState<DiscoveredAccount[]>([]);
   const [profile, setProfile] = useState<MetaProfileInsights | null>(null);
   const [reels, setReels] = useState<Array<MetaMediaItem & { insights?: MetaMediaInsights }>>([]);
-  const [connectedTab, setConnectedTab] = useState<ConnectedTab>('reels');
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [directReelUrl, setDirectReelUrl] = useState('');
   const [isImportingDirect, setIsImportingDirect] = useState(false);
@@ -83,6 +83,17 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ busine
       setProfile(profileData);
       setReels(reelsData);
       setState('connected');
+
+      if (profileData?.username) {
+        ProfileSnapshotService.recordSnapshotIfNeeded({
+          businessId,
+          kind: 'own',
+          platform: 'instagram',
+          handle: profileData.username,
+          followerCount: profileData.followers_count,
+          mediaCount: profileData.media_count,
+        });
+      }
 
       // Calcular inmediatamente el Benchmark de Medianas y minar Content DNA
       if (reelsData.length > 0) {
@@ -237,6 +248,14 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ busine
         throw new Error(data.error || 'No se pudo extraer información de este Reel.');
       }
 
+      // El scraper devuelve null (no 0) cuando Instagram no expuso el dato en
+      // la página pública — un 0 acá se vería idéntico a un Reel con cero
+      // interacciones reales, que es exactamente el bug que ya arreglamos en
+      // el scraper de competidores.
+      const likes = typeof data.likes === 'number' ? data.likes : undefined;
+      const commentsCount = typeof data.commentsCount === 'number' ? data.commentsCount : undefined;
+      const interactionParts = [likes, commentsCount].filter((v): v is number => typeof v === 'number');
+
       const importedReel: MetaMediaItem & { insights?: MetaMediaInsights } = {
         id: `reel_${data.shortcode || Date.now()}`,
         media_type: 'REELS',
@@ -245,15 +264,15 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ busine
         permalink: directReelUrl.trim(),
         caption: data.caption || 'Reel de Instagram',
         timestamp: new Date().toISOString(),
-        like_count: data.likes || 0,
-        comments_count: data.commentsCount || 0,
+        like_count: likes,
+        comments_count: commentsCount,
         insights: {
           media_id: `reel_${data.shortcode || Date.now()}`,
           // El scraper público solo expone likes/comentarios visibles en la página.
           // Reach, impressions y plays son insights privados que Instagram no
           // publica en el HTML: no se estiman a partir de likes, quedan
           // ausentes hasta que se conecten por Meta Graph API.
-          total_interactions: (data.likes || 0) + (data.commentsCount || 0),
+          total_interactions: interactionParts.length > 0 ? interactionParts.reduce((a, b) => a + b, 0) : undefined,
           unavailable: true,
           unavailable_reason: 'Reel importado por scraping público: Instagram no expone reach/impressions/plays fuera de Meta Graph API.',
         },
@@ -261,9 +280,12 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ busine
 
       setReels((prev) => [importedReel, ...prev.filter((r) => r.permalink !== importedReel.permalink)]);
       setDirectReelUrl('');
-      toast.success(`✅ Reel importado con éxito (${importedReel.like_count} likes, ${importedReel.comments_count} comentarios)`, {
-        id: toastId,
-      });
+      toast.success(
+        hasValue(likes) || hasValue(commentsCount)
+          ? `✅ Reel importado con éxito (${likes ?? 'sin dato'} likes, ${commentsCount ?? 'sin dato'} comentarios)`
+          : '✅ Reel importado, pero Instagram no expuso likes ni comentarios en la página pública.',
+        { id: toastId }
+      );
 
       if (onAddReelToCanvas) {
         onAddReelToCanvas(importedReel);
@@ -450,6 +472,23 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ busine
             >
               Abrir Graph Explorer <ExternalLink className="w-2.5 h-2.5" />
             </a>
+          </div>
+
+          {/* Qué permisos tildar en el Graph Explorer — para que conectar esto
+              no obligue a pedir permisos de mensajes/publicación que esta
+              pantalla ni usa. Ver tus Reels y auditar competencia nunca
+              necesita que el token pueda leer tus DMs. */}
+          <div className="p-2.5 bg-slate-950/60 border border-slate-800 rounded-xl text-[10px] text-slate-400 space-y-1.5">
+            <p className="font-semibold text-slate-300">¿Qué permisos tildar al generar el token?</p>
+            <p>
+              <strong className="text-emerald-400">Para esto (métricas propias y de competencia):</strong>{' '}
+              <code className="text-pink-400">instagram_basic</code>, <code className="text-pink-400">instagram_manage_insights</code>,{' '}
+              <code className="text-pink-400">pages_show_list</code>. Nada más — no hace falta permiso de mensajes ni de publicación.
+            </p>
+            <p>
+              <strong className="text-amber-400">Solo si además vas a usar el Auto-DM</strong> (desde el conector "Meta Suite" del lienzo),
+              agregale <code className="text-pink-400">instagram_manage_messages</code> al mismo token.
+            </p>
           </div>
 
           <div className="space-y-2.5">
@@ -667,22 +706,23 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ busine
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="grid grid-cols-2 px-4 py-2 gap-1 shrink-0">
-        {(['reels', 'metrics'] as ConnectedTab[]).map((tab) => (
+      {/* Header de sección: acá el foco es arrastrar Reels al Canvas.
+          Las métricas detalladas viven en Análisis de Comercio. */}
+      <div className="px-4 py-2 shrink-0 flex items-center justify-between gap-2">
+        <span className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
+          <Play className="w-3.5 h-3.5 text-pink-400" />
+          Reels Reales ({reels.length})
+        </span>
+        {onOpenFullAnalysis && (
           <button
-            key={tab}
-            onClick={() => setConnectedTab(tab)}
-            className={`py-1.5 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 transition-all ${
-              connectedTab === tab
-                ? 'bg-gradient-to-r from-pink-600 to-violet-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
+            onClick={onOpenFullAnalysis}
+            className="flex items-center gap-1 text-[10px] font-bold text-violet-300 hover:text-violet-200 transition-colors"
           >
-            {tab === 'reels' ? <Play className="w-3 h-3" /> : <TrendingUp className="w-3 h-3" />}
-            {tab === 'reels' ? `Reels Reales (${reels.length})` : 'Métricas'}
+            <TrendingUp className="w-3 h-3" />
+            Ver métricas completas
+            <ArrowRight className="w-3 h-3" />
           </button>
-        ))}
+        )}
       </div>
 
       {/* Content */}
@@ -695,8 +735,7 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ busine
           </div>
         )}
 
-        {/* Reels Tab */}
-        {connectedTab === 'reels' && !isLoadingData && (
+        {!isLoadingData && (
           <>
             {reels.length === 0 ? (
               <div className="text-center py-10 px-4 space-y-3">
@@ -757,10 +796,10 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ busine
                         <p className="text-[9px] text-slate-500">{daysAgo(reel.timestamp)}</p>
                         <div className="flex items-center gap-2.5 text-[10px] text-slate-400">
                           <span className="flex items-center gap-0.5">
-                            <Heart className="w-2.5 h-2.5 text-pink-400" /> {formatNumber(reel.like_count ?? 0)}
+                            <Heart className="w-2.5 h-2.5 text-pink-400" /> {hasValue(reel.like_count) ? formatNumber(reel.like_count) : 'Sin dato'}
                           </span>
                           <span className="flex items-center gap-0.5">
-                            <MessageCircle className="w-2.5 h-2.5 text-blue-400" /> {reel.comments_count ?? 0}
+                            <MessageCircle className="w-2.5 h-2.5 text-blue-400" /> {hasValue(reel.comments_count) ? reel.comments_count : 'Sin dato'}
                           </span>
                           {reel.insights?.plays ? (
                             <span className="flex items-center gap-0.5">
@@ -802,55 +841,6 @@ export const MetaConnectionPanel: React.FC<MetaConnectionPanelProps> = ({ busine
               </>
             )}
           </>
-        )}
-
-        {/* Metrics Tab */}
-        {connectedTab === 'metrics' && !isLoadingData && (
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-1">
-                <span className="text-slate-400 text-[10px] flex items-center gap-1">
-                  <Heart className="w-3 h-3 text-pink-400" /> Likes Totales
-                </span>
-                <p className="text-lg font-black text-slate-100 font-mono">
-                  {formatNumber(reels.reduce((s, r) => s + (r.like_count || 0), 0))}
-                </p>
-                <p className="text-[9px] text-slate-500">{reels.length} reels auditados</p>
-              </div>
-
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-1">
-                <span className="text-slate-400 text-[10px] flex items-center gap-1">
-                  <MessageCircle className="w-3 h-3 text-blue-400" /> Comentarios
-                </span>
-                <p className="text-lg font-black text-slate-100 font-mono">
-                  {reels.reduce((s, r) => s + (r.comments_count || 0), 0)}
-                </p>
-                <p className="text-[9px] text-slate-500">Conversaciones reales</p>
-              </div>
-            </div>
-
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-2">
-              <h5 className="text-xs font-bold text-slate-200">Rendimiento Promedio por Reel</h5>
-              <div className="space-y-1.5 text-xs text-slate-300">
-                <div className="flex justify-between py-1 border-b border-slate-800 text-[11px]">
-                  <span className="text-slate-400">Promedio de Likes</span>
-                  <span className="font-mono font-bold text-slate-100">
-                    {reels.length > 0
-                      ? Math.round(reels.reduce((s, r) => s + (r.like_count || 0), 0) / reels.length)
-                      : 0}
-                  </span>
-                </div>
-                <div className="flex justify-between py-1 text-[11px]">
-                  <span className="text-slate-400">Promedio de Comentarios</span>
-                  <span className="font-mono font-bold text-slate-100">
-                    {reels.length > 0
-                      ? (reels.reduce((s, r) => s + (r.comments_count || 0), 0) / reels.length).toFixed(1)
-                      : '0'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
         )}
       </div>
     </div>

@@ -9,6 +9,8 @@ import { toast } from 'sonner';
 import { MetricValue, NO_DATA } from '../../types/intelligence';
 import { hasValue, averageAvailable, formatMetric } from '../../services/intelligence/metricUtils';
 import { MetaGraphService, BusinessDiscoveryMedia } from '../../services/meta/MetaGraphService';
+import { ProfileSnapshotService } from '../../services/intelligence/ProfileSnapshotService';
+import { TikTokPanel } from './TikTokPanel';
 
 export interface AuditedCompetitorReel {
   id: string;
@@ -42,6 +44,7 @@ export interface CompetitorProfile {
 
 interface CompetitorAnalysisPanelProps {
   businessId?: string;
+  businessName?: string;
   myAvgViews?: number;
   myAvgLikes?: number;
   myAvgComments?: number;
@@ -83,12 +86,14 @@ function businessDiscoveryMediaToReel(m: BusinessDiscoveryMedia, username?: stri
 
 export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = ({
   businessId,
+  businessName,
   myAvgViews = 0,
   myAvgLikes = 0,
   myAvgComments = 0,
   onAddReelToCanvas,
 }) => {
   const [competitors, setCompetitors] = useState<CompetitorProfile[]>([]);
+  const [platformTab, setPlatformTab] = useState<'instagram' | 'tiktok'>('instagram');
 
   const [mainInput, setMainInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -352,9 +357,16 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
         // Meta — sin pegar un solo Reel a mano. Solo funciona si la cuenta
         // es Business/Creator pública (igual que la nuestra necesita serlo).
         const cleanHandle = detectedHandle.replace('@', '');
+        // El token de Instagram está aislado por negocio (evita que un
+        // negocio use sin querer los datos de otro cliente de la cuenta):
+        // si el que está ACTIVO ahora mismo no tiene Instagram conectado,
+        // esto falla aunque otro de tus negocios sí lo tenga.
         const discovery = MetaGraphService.isConfigured(businessId)
           ? await MetaGraphService.getBusinessDiscovery(cleanHandle, businessId)
-          : { success: false as const, error: 'Todavía no conectaste tu propia cuenta de Instagram Business/Creator.' };
+          : {
+              success: false as const,
+              error: `"${businessName || 'Este negocio'}" (el que tenés activo ahora) todavía no tiene su propia cuenta de Instagram conectada. Conectala en la pestaña "Instagram" — cada negocio necesita la suya, no se comparte entre negocios.`,
+            };
 
         if (discovery.success) {
           const bd = discovery.data;
@@ -374,6 +386,16 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
           setCompetitors((prev) => [newProfile, ...prev]);
           setExpandedId(newProfile.id);
           setMainInput('');
+          if (businessId) {
+            ProfileSnapshotService.recordSnapshotIfNeeded({
+              businessId,
+              kind: 'competitor',
+              platform: 'instagram',
+              handle: bd.username,
+              followerCount: bd.followers_count,
+              mediaCount: bd.media_count,
+            });
+          }
           toast.success(
             `🎯 @${bd.username} agregado con ${reels.length} posteo${reels.length === 1 ? '' : 's'} real${reels.length === 1 ? '' : 'es'} (likes y comentarios verificados por Meta).`,
             { id: toastId }
@@ -447,6 +469,31 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
         </p>
       </div>
 
+      {/* Selector de Plataforma: Instagram (business_discovery, necesita tu
+          cuenta conectada) vs TikTok (perfil público, sin conectar nada) */}
+      <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-950 border border-slate-800 rounded-xl text-xs font-bold shrink-0">
+        <button
+          onClick={() => setPlatformTab('instagram')}
+          className={`py-1.5 rounded-lg transition-all ${
+            platformTab === 'instagram' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          Instagram
+        </button>
+        <button
+          onClick={() => setPlatformTab('tiktok')}
+          className={`py-1.5 rounded-lg transition-all ${
+            platformTab === 'tiktok' ? 'bg-cyan-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          TikTok
+        </button>
+      </div>
+
+      {platformTab === 'tiktok' && <TikTokPanel businessId={businessId} />}
+
+      {platformTab === 'instagram' && (
+      <>
       {/* Input Principal Inteligente */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-2.5 shrink-0">
         <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
@@ -742,6 +789,8 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
             );
           })}
         </div>
+      )}
+      </>
       )}
     </div>
   );
