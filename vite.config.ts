@@ -878,7 +878,7 @@ export default defineConfig({
               metaUrl.searchParams.set('access_token', accessToken);
 
               const metaRes = await fetch(metaUrl.toString());
-              const data = await metaRes.json();
+              const data: any = await metaRes.json();
 
               res.setHeader('Content-Type', 'application/json');
 
