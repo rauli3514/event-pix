@@ -732,6 +732,39 @@ export default defineConfig({
               return;
             }
 
+            // Intento 1: business_discovery con la cuenta compartida de la
+            // plataforma (Meta Graph API oficial) — no lo bloquea el
+            // anti-scraping de Instagram como al leer el HTML público.
+            const platformAccessToken = process.env.META_PLATFORM_ACCESS_TOKEN;
+            const platformIgAccountId = process.env.META_PLATFORM_IG_ACCOUNT_ID;
+            if (platformAccessToken && platformIgAccountId) {
+              try {
+                const fields = `business_discovery.username(${username}){username,name,profile_picture_url,followers_count}`;
+                const platformUrl = new URL(`https://graph.facebook.com/v19.0/${platformIgAccountId}`);
+                platformUrl.searchParams.set('fields', fields);
+                platformUrl.searchParams.set('access_token', platformAccessToken);
+
+                const platformRes = await fetch(platformUrl.toString());
+                const platformData: any = await platformRes.json();
+
+                if (platformRes.ok && !platformData.error && platformData.business_discovery) {
+                  const bd = platformData.business_discovery;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({
+                    success: true,
+                    exists: true,
+                    username: bd.username,
+                    displayName: bd.name || null,
+                    avatarUrl: bd.profile_picture_url || null,
+                    followerCount: typeof bd.followers_count === 'number' ? bd.followers_count : null
+                  }));
+                  return;
+                }
+              } catch {
+                // Seguir con el scraping público como respaldo
+              }
+            }
+
             function decodeEntities(str: string) {
               if (!str) return '';
               return str

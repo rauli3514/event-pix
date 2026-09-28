@@ -73,6 +73,12 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
   const [verifiedHandle, setVerifiedHandle] = useState<string | null>(null);
   const [isVerifyingHandle, setIsVerifyingHandle] = useState(false);
   const [handleVerifyError, setHandleVerifyError] = useState<string | null>(null);
+  // true solo cuando NINGÚN método pudo determinar si la cuenta existe
+  // (bloqueo/red, no "confirmamos que no existe") — ahí sí dejamos
+  // continuar sin verificar, para no encerrar al usuario por una falla
+  // de infraestructura ajena a que su cuenta sea real o no.
+  const [verifyInconclusive, setVerifyInconclusive] = useState(false);
+  const [handleOverridden, setHandleOverridden] = useState<string | null>(null);
 
   // Estados locales para nuevos items
   const [newMustDo, setNewMustDo] = useState('');
@@ -107,6 +113,7 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
 
   const currentHandle = context?.profile.instagram_handle.trim().toLowerCase() || '';
   const isHandleVerified = currentHandle.length > 0 && currentHandle === verifiedHandle;
+  const canSaveHandle = isHandleVerified || (currentHandle.length > 0 && currentHandle === handleOverridden);
 
   const handleVerifyInstagram = async () => {
     if (!context) return;
@@ -117,11 +124,13 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
     }
     setIsVerifyingHandle(true);
     setHandleVerifyError(null);
+    setVerifyInconclusive(false);
     try {
       const res = await fetch(`/api/instagram-verify-profile?username=${encodeURIComponent(username)}`);
       const data = await res.json();
       if (!data.success) {
         setHandleVerifyError(data.error || 'No pudimos verificar ese perfil ahora mismo.');
+        setVerifyInconclusive(true);
         return;
       }
       if (!data.exists) {
@@ -140,14 +149,24 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
       toast.success(`✓ @${username} confirmado en Instagram.`);
     } catch {
       setHandleVerifyError('No pudimos conectar para verificar el perfil. Probá de nuevo.');
+      setVerifyInconclusive(true);
     } finally {
       setIsVerifyingHandle(false);
     }
   };
 
+  const handleAcceptUnverifiedHandle = () => {
+    if (!context) return;
+    const username = context.profile.instagram_handle.trim().replace(/^@/, '');
+    if (!username) return;
+    setHandleOverridden(username.toLowerCase());
+    setHandleVerifyError(null);
+    toast.warning(`Guardando @${username} sin poder confirmarlo — revisá que esté bien escrito.`);
+  };
+
   const handleSave = async () => {
     if (!context) return;
-    if (!isHandleVerified) {
+    if (!canSaveHandle) {
       toast.error('Primero confirmá que tu @usuario de Instagram existe de verdad.');
       return;
     }
@@ -244,8 +263,8 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
           <button
             type="button"
             onClick={handleSave}
-            disabled={saving || !isHandleVerified}
-            title={!isHandleVerified ? 'Confirmá tu @usuario de Instagram antes de guardar' : undefined}
+            disabled={saving || !canSaveHandle}
+            title={!canSaveHandle ? 'Confirmá tu @usuario de Instagram antes de guardar' : undefined}
             className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-bold border border-slate-700 transition-all hover:border-pink-500/50 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Save className="w-3.5 h-3.5 text-pink-400" />
@@ -311,7 +330,7 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
                     Instagram
                   </label>
                   <div className={`flex items-center gap-2 rounded-xl bg-slate-950 border px-3 py-2 text-xs transition-colors ${
-                    isHandleVerified ? 'border-emerald-500/50' : handleVerifyError ? 'border-rose-500/50' : 'border-slate-800'
+                    isHandleVerified ? 'border-emerald-500/50' : canSaveHandle ? 'border-amber-500/50' : handleVerifyError ? 'border-rose-500/50' : 'border-slate-800'
                   }`}>
                     <span className="text-slate-500 font-mono pr-1">@</span>
                     <input
@@ -319,6 +338,8 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
                       value={context.profile.instagram_handle}
                       onChange={(e) => {
                         setHandleVerifyError(null);
+                        setVerifyInconclusive(false);
+                        setHandleOverridden(null);
                         setContext({
                           ...context,
                           profile: { ...context.profile, instagram_handle: e.target.value.replace('@', '').trim() }
@@ -332,6 +353,8 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
                       <span className="flex items-center gap-1 text-emerald-400 text-[11px] font-bold shrink-0">
                         <Check className="w-3.5 h-3.5" /> Verificado
                       </span>
+                    ) : canSaveHandle ? (
+                      <span className="text-amber-400 text-[11px] font-bold shrink-0">Sin verificar</span>
                     ) : (
                       <button
                         type="button"
@@ -344,11 +367,24 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
                     )}
                   </div>
                   {handleVerifyError ? (
-                    <p className="text-[10px] text-rose-400">{handleVerifyError}</p>
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-rose-400">{handleVerifyError}</p>
+                      {verifyInconclusive && !canSaveHandle && (
+                        <button
+                          type="button"
+                          onClick={handleAcceptUnverifiedHandle}
+                          className="text-[10px] text-amber-400 hover:text-amber-300 underline underline-offset-2"
+                        >
+                          No pudimos verificarlo por un problema técnico — continuar sin verificar
+                        </button>
+                      )}
+                    </div>
                   ) : (
                     <p className="text-[10px] text-slate-500">
                       {isHandleVerified
                         ? 'Confirmamos que esta cuenta existe en Instagram.'
+                        : canSaveHandle
+                        ? 'Guardando sin poder confirmarlo — revisá que esté bien escrito.'
                         : 'Tenés que confirmar que este @usuario existe de verdad antes de guardar.'}
                     </p>
                   )}

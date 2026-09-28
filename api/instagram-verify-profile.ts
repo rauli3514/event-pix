@@ -43,6 +43,43 @@ function parseCompactNumber(raw: string): number | null {
   return Math.round(value);
 }
 
+async function verifyViaPlatform(username: string): Promise<{
+  success: true;
+  exists: boolean;
+  username: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  followerCount: number | null;
+} | null> {
+  const accessToken = process.env.META_PLATFORM_ACCESS_TOKEN;
+  const igAccountId = process.env.META_PLATFORM_IG_ACCOUNT_ID;
+  if (!accessToken || !igAccountId) return null;
+
+  try {
+    const fields = `business_discovery.username(${username}){username,name,profile_picture_url,followers_count}`;
+    const url = new URL(`https://graph.facebook.com/v19.0/${igAccountId}`);
+    url.searchParams.set('fields', fields);
+    url.searchParams.set('access_token', accessToken);
+
+    const metaRes = await fetch(url.toString());
+    const data: any = await metaRes.json();
+
+    if (!metaRes.ok || data.error || !data.business_discovery) return null;
+
+    const bd = data.business_discovery;
+    return {
+      success: true,
+      exists: true,
+      username: bd.username,
+      displayName: bd.name || null,
+      avatarUrl: bd.profile_picture_url || null,
+      followerCount: typeof bd.followers_count === 'number' ? bd.followers_count : null
+    };
+  } catch {
+    return null;
+  }
+}
+
 export default async function handler(req: any, res: any) {
   const raw = req.query?.username as string | undefined;
   if (!raw) {
@@ -53,6 +90,17 @@ export default async function handler(req: any, res: any) {
   const username = raw.trim().replace(/^@/, '').replace(/\/$/, '');
   if (!/^[A-Za-z0-9_.]{1,30}$/.test(username)) {
     res.status(200).json({ success: false, error: 'Ese nombre de usuario no tiene un formato válido de Instagram.' });
+    return;
+  }
+
+  // Intento 1: business_discovery con la cuenta compartida de la plataforma
+  // (Meta Graph API oficial, con nuestro propio token — no depende de leer
+  // el HTML público, así que no lo bloquea el anti-scraping de Instagram).
+  // Solo confirma cuentas Business/Creator; si no aplica, null y seguimos
+  // con el scraping — no concluimos "no existe" solo por esto.
+  const platformResult = await verifyViaPlatform(username);
+  if (platformResult) {
+    res.status(200).json(platformResult);
     return;
   }
 
