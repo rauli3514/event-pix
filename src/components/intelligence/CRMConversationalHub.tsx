@@ -211,7 +211,7 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
     if (lastLeadMessage?.ai_metadata?.suggested_reply) {
       return {
         reply: lastLeadMessage.ai_metadata.suggested_reply,
-        reasoning: lastLeadMessage.ai_metadata.reasoning || 'El cliente demostró alto interés en pantallas verticales.',
+        reasoning: lastLeadMessage.ai_metadata.reasoning || 'El cliente demostró alto interés en avanzar la conversación.',
         intent: lastLeadMessage.ai_metadata.detected_intent || 'Solicitud de Presupuesto',
         providerUsed: 'IA Sugerida'
       };
@@ -222,7 +222,7 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
       : [];
 
     const generated = CRMIntelligenceEngine.generateAISuggestion(
-      lastLeadMessage?.content || activeConversation.lead.primary_interest || 'Cotización de pantalla vertical',
+      lastLeadMessage?.content || activeConversation.lead.primary_interest || 'Consultó por nuestros productos o servicios',
       activeConversation.lead,
       brandDna,
       catalogProducts
@@ -303,7 +303,7 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
       ? connections.shopDePlumas.syncedProducts
       : [];
 
-    const inquiryToUse = customInquiry || lastLeadMessage?.content || activeConversation.lead.primary_interest || 'Cotización de pantalla vertical';
+    const inquiryToUse = customInquiry || lastLeadMessage?.content || activeConversation.lead.primary_interest || 'Consultó por nuestros productos o servicios';
 
     toast.info(`🧠 ${providerToUse === 'claude' ? 'Claude Sonnet 4.6' : 'GPT-4o'} analizando la consulta...`);
 
@@ -312,6 +312,7 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
         lead: activeConversation.lead,
         chatHistory: msgs,
         brandDna,
+        businessName,
         catalogProducts,
         connections,
         clientInquiry: inquiryToUse,
