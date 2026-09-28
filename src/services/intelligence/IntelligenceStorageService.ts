@@ -470,6 +470,39 @@ export class IntelligenceStorageService {
     } catch (e) {
       console.error('Error guardando perfil y contexto IA:', e);
     }
+    // El @handle vivía duplicado: acá y en el registro del negocio
+    // (intelligence_businesses / la lista de "Comercios & Clientes"). Guardar
+    // solo acá dejaba el resto de la app — header, Informe de Inteligencia,
+    // Métricas — mostrando el @handle viejo para siempre, porque todos leen
+    // del registro del negocio, no de este contexto.
+    if (context.profile.instagram_handle) {
+      await this.updateBusinessInstagramHandle(businessId, context.profile.instagram_handle);
+    }
+    return true;
+  }
+
+  /** Mantiene sincronizado el @handle del negocio (Supabase + caché local) con el que se confirma en Perfil & Contexto IA. */
+  static async updateBusinessInstagramHandle(businessId: string, handle: string): Promise<boolean> {
+    const cleanHandle = handle.trim().startsWith('@') ? handle.trim() : `@${handle.trim()}`;
+
+    const isSupa = await this.testSupabase();
+    if (isSupa) {
+      try {
+        await supabase.from('intelligence_businesses').update({ instagram_handle: cleanHandle }).eq('id', businessId);
+      } catch (err) {
+        console.warn('Error actualizando el @handle del negocio en Supabase:', err);
+      }
+    }
+
+    try {
+      const stored = localStorage.getItem(LOCAL_STORAGE_KEYS.BUSINESSES_LIST);
+      const list: IntelligenceBusiness[] = stored ? JSON.parse(stored) : [];
+      const updated = list.map((b) => (b.id === businessId ? { ...b, instagram_handle: cleanHandle } : b));
+      localStorage.setItem(LOCAL_STORAGE_KEYS.BUSINESSES_LIST, JSON.stringify(updated));
+    } catch (e) {
+      console.warn('Error actualizando el @handle del negocio en localStorage:', e);
+    }
+
     return true;
   }
 

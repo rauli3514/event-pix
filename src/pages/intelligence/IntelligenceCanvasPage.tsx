@@ -100,13 +100,15 @@ export const IntelligenceCanvasPage: React.FC = () => {
     return count;
   }, [connections]);
 
-  // Cuenta activa (detecta credenciales reales de Meta si existen)
+  // Cuenta activa (detecta credenciales reales de Meta si existen). El valor
+  // real se corrige apenas hydrate() carga el negocio activo — esto es solo
+  // el placeholder del primer render.
   const [accountHandle, setAccountHandle] = useState<string>(() => {
     const creds = MetaGraphService.loadCredentials(IntelligenceStorageService.getActiveBusinessId() || undefined);
-    if (creds?.accountUsername && !creds.accountUsername.includes('tecno_eventos')) {
+    if (creds?.accountUsername) {
       return `@${creds.accountUsername.replace('@', '')}`;
     }
-    return '@display_digital';
+    return INITIAL_BUSINESS.instagram_handle || '@tu_negocio';
   });
 
   // Cálculo dinámico del informe determinístico de inteligencia
@@ -1051,7 +1053,9 @@ export const IntelligenceCanvasPage: React.FC = () => {
           businessId={business.id}
           onProfileUpdated={(updated) => {
             if (updated.profile.instagram_handle) {
-              setAccountHandle(`@${updated.profile.instagram_handle}`);
+              const cleanHandle = `@${updated.profile.instagram_handle}`;
+              setAccountHandle(cleanHandle);
+              setBusiness((prev) => ({ ...prev, instagram_handle: cleanHandle }));
             }
             const wasFirstCompletion = !profileCompleted && !!updated.profile.instagram_handle?.trim();
             setProfileCompleted(!!updated.profile.instagram_handle?.trim());
