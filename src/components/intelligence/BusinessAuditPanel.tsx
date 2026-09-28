@@ -21,6 +21,7 @@ interface BusinessAuditPanelProps {
   isOpen: boolean;
   onToggle: () => void;
   onAddReelToCanvas?: (reel: MetaMediaItem & { insights?: MetaMediaInsights }) => void;
+  onSyncAllReels?: (reels: Array<MetaMediaItem & { insights?: MetaMediaInsights }>) => void;
   onOpenExecutiveReport?: () => void;
   onOpenFullAnalysis?: () => void;
   posts?: IntelligencePost[];
@@ -34,6 +35,7 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
   isOpen,
   onToggle,
   onAddReelToCanvas,
+  onSyncAllReels,
   onOpenExecutiveReport,
   onOpenFullAnalysis,
   posts = [],
@@ -511,7 +513,7 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
         )}
 
         {activeTab === 'instagram' && (
-          <MetaConnectionPanel businessId={business.id} onAddReelToCanvas={onAddReelToCanvas} onOpenFullAnalysis={onOpenFullAnalysis} />
+          <MetaConnectionPanel businessId={business.id} onAddReelToCanvas={onAddReelToCanvas} onSyncAllReels={onSyncAllReels} onOpenFullAnalysis={onOpenFullAnalysis} />
         )}
       </div>
     </aside>
