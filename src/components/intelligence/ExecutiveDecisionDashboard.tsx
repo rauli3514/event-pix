@@ -29,6 +29,7 @@ interface ExecutiveDecisionDashboardProps {
   onAddVariantToCanvas: (post: IntelligencePost) => void;
   onOpenTvPreview?: () => void;
   onOpenConnections?: () => void;
+  onSyncAllReels?: () => void;
 }
 
 export const ExecutiveDecisionDashboard: React.FC<ExecutiveDecisionDashboardProps> = ({
@@ -41,7 +42,8 @@ export const ExecutiveDecisionDashboard: React.FC<ExecutiveDecisionDashboardProp
   onApplyRecommendationToCanvas,
   onAddVariantToCanvas,
   onOpenTvPreview,
-  onOpenConnections
+  onOpenConnections,
+  onSyncAllReels
 }) => {
   // Carga asíncrona de datos reales del CRM
   const [conversations, setConversations] = useState<CRMConversation[]>([]);
@@ -640,15 +642,26 @@ export const ExecutiveDecisionDashboard: React.FC<ExecutiveDecisionDashboardProp
               ) : (
                 <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-5 text-center space-y-3">
                   <p className="text-xs text-slate-400">
-                    Todavía no hay publicaciones registradas. Agregá tu primer Reel en el Lienzo para que el sistema identifique tu contenido con mayor impacto.
+                    Todavía no hay publicaciones registradas. {onSyncAllReels ? 'Sincronizá tus Reels reales de Instagram o' : 'Agregá tu primer Reel en el Lienzo'} para que el sistema identifique tu contenido con mayor impacto.
                   </p>
-                  <button
-                    onClick={onSwitchToCanvas}
-                    className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors"
-                  >
-                    <Plus className="w-3.5 h-3.5 text-violet-400" />
-                    <span>Agregar Reel en Lienzo</span>
-                  </button>
+                  <div className="flex items-center justify-center gap-2 flex-wrap">
+                    {onSyncAllReels && (
+                      <button
+                        onClick={onSyncAllReels}
+                        className="px-3.5 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold inline-flex items-center gap-1.5 transition-colors"
+                      >
+                        <Zap className="w-3.5 h-3.5" />
+                        <span>Sincronizar mis Reels reales</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={onSwitchToCanvas}
+                      className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5 text-violet-400" />
+                      <span>Agregar Reel en Lienzo</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

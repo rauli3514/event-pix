@@ -31,6 +31,70 @@ import { ChatMessage, ContentFormatMode } from '../../components/intelligence/ca
 import { Brain, Activity, Tv, Sparkles, Cloud, Loader2, MessageSquare, LayoutDashboard, Network, Radio, Trash2, Bot, User, Zap, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
+// Convierte un media de Meta (propio) en un IntelligencePost. Métricas
+// estrictamente reportadas por Meta: lo que no viene, no existe — no se
+// estima a partir de otros campos ni se rellena con 0.
+function metaMediaToIntelligencePost(
+  reel: MetaMediaItem & { insights?: MetaMediaInsights },
+  businessId: string
+): IntelligencePost {
+  const likes = fromApi(reel.like_count);
+  const comments = fromApi(reel.comments_count);
+  const views = fromApi(reel.insights?.plays ?? reel.insights?.impressions);
+  const reach = fromApi(reel.insights?.reach);
+  const shares = fromApi(reel.insights?.shares);
+  const saves = fromApi(reel.insights?.saved);
+  const avgWatchTime = fromApi(reel.insights?.ig_reels_avg_watch_time);
+  const totalWatchTime = fromApi(reel.insights?.ig_reels_video_view_total_time);
+
+  const cleanCaption = reel.caption || '';
+  const cleanTitle = cleanCaption
+    ? (cleanCaption.slice(0, 70) + (cleanCaption.length > 70 ? '...' : ''))
+    : `Reel ${reel.id.slice(-6)}`;
+
+  return {
+    id: reel.id,
+    business_id: businessId,
+    title: cleanTitle,
+    video_url: reel.permalink,
+    // Solo presente cuando media_type es un video real (REELS/VIDEO);
+    // para imágenes reel.media_url no es un archivo de video descargable.
+    meta_media_url: reel.media_type !== 'IMAGE' ? reel.media_url : undefined,
+    thumbnail_url: reel.thumbnail_url || (reel.media_type === 'IMAGE' ? reel.media_url : undefined),
+    // Meta no devuelve la duración en los campos consultados; 0 = desconocida.
+    duration_seconds: 0,
+    objective: 'sales',
+    published_at: reel.timestamp,
+    created_at: reel.timestamp,
+    raw_transcript: cleanCaption || cleanTitle,
+    metrics: {
+      post_id: reel.id,
+      views,
+      reach,
+      likes,
+      comments,
+      shares,
+      saves,
+      // Meta no expone seguidores ganados ni visitas al perfil a nivel de media individual.
+      followers_gained: NO_DATA,
+      profile_visits: NO_DATA,
+      average_watch_time_seconds: avgWatchTime,
+      total_watch_time_seconds: totalWatchTime,
+      // Las tasas se derivan solo si existen numerador y denominador reales.
+      like_rate: rate(likes, views),
+      comment_rate: rate(comments, views),
+      share_rate: rate(shares, views),
+      save_rate: rate(saves, views),
+      retention_percentage: NO_DATA,
+      source: 'meta_graph_api',
+      synced_at: new Date().toISOString()
+    }
+    // Sin `analysis`: importar un Reel no equivale a haberlo analizado.
+    // El análisis (gancho, estructura, segmentos, diagnóstico) se produce cuando
+    // el usuario lo transcribe y lo procesa con IA desde el desglose del Reel.
+  };
+}
+
 export const IntelligenceCanvasPage: React.FC = () => {
   const [business, setBusiness] = useState(INITIAL_BUSINESS);
   const [brandDna, setBrandDna] = useState<BrandDNA>(INITIAL_BRAND_DNA);
@@ -377,75 +441,14 @@ export const IntelligenceCanvasPage: React.FC = () => {
     reel: MetaMediaItem & { insights?: MetaMediaInsights },
     position?: { x: number; y: number }
   ) => {
-    const newId = `node_reel_${reel.id}`;
-
     if (nodes.some(n => n.post?.id === reel.id)) {
       toast.info('Este Reel ya está en tu Canvas.');
       return;
     }
 
-    // Métricas estrictamente reportadas por Meta. Lo que no viene, no existe:
-    // no se estima a partir de los likes ni se rellena con 0.
-    const likes = fromApi(reel.like_count);
-    const comments = fromApi(reel.comments_count);
-    const views = fromApi(reel.insights?.plays ?? reel.insights?.impressions);
-    const reach = fromApi(reel.insights?.reach);
-    const shares = fromApi(reel.insights?.shares);
-    const saves = fromApi(reel.insights?.saved);
-    const avgWatchTime = fromApi(reel.insights?.ig_reels_avg_watch_time);
-    const totalWatchTime = fromApi(reel.insights?.ig_reels_video_view_total_time);
-
-    const cleanCaption = reel.caption || '';
-    const cleanTitle = cleanCaption
-      ? (cleanCaption.slice(0, 70) + (cleanCaption.length > 70 ? '...' : ''))
-      : `Reel ${reel.id.slice(-6)}`;
-
-    const newPost: IntelligencePost = {
-      id: reel.id,
-      business_id: business.id,
-      title: cleanTitle,
-      video_url: reel.permalink,
-      // Solo presente cuando media_type es un video real (REELS/VIDEO);
-      // para imágenes reel.media_url no es un archivo de video descargable.
-      meta_media_url: reel.media_type !== 'IMAGE' ? reel.media_url : undefined,
-      thumbnail_url: reel.thumbnail_url || (reel.media_type === 'IMAGE' ? reel.media_url : undefined),
-      // Meta no devuelve la duración en los campos consultados; 0 = desconocida.
-      duration_seconds: 0,
-      objective: 'sales',
-      published_at: reel.timestamp,
-      created_at: reel.timestamp,
-      raw_transcript: cleanCaption || cleanTitle,
-      metrics: {
-        post_id: reel.id,
-        views,
-        reach,
-        likes,
-        comments,
-        shares,
-        saves,
-        // Meta no expone seguidores ganados ni visitas al perfil a nivel de media individual.
-        followers_gained: NO_DATA,
-        profile_visits: NO_DATA,
-        average_watch_time_seconds: avgWatchTime,
-        total_watch_time_seconds: totalWatchTime,
-        // Las tasas se derivan solo si existen numerador y denominador reales.
-        like_rate: rate(likes, views),
-        comment_rate: rate(comments, views),
-        share_rate: rate(shares, views),
-        save_rate: rate(saves, views),
-        retention_percentage: NO_DATA,
-        source: 'meta_graph_api',
-        synced_at: new Date().toISOString()
-      },
-      // Sin `analysis`: importar un Reel no equivale a haberlo analizado.
-      // El análisis (gancho, estructura, segmentos, diagnóstico) se produce cuando
-      // el usuario lo transcribe y lo procesa con IA desde el desglose del Reel.
-      // Rellenarlo acá con scores fijos y segmentos de cartelería digital era
-      // exactamente lo que hacía que el sistema "supiera" cosas que nunca miró.
-    };
-
+    const newPost = metaMediaToIntelligencePost(reel, business.id);
     const newCanvasNode: CanvasNode = {
-      id: newId,
+      id: `node_reel_${reel.id}`,
       x: position?.x ?? 40,
       y: position?.y ?? (220 + nodes.filter(n => n.type === 'reel').length * 280),
       type: 'reel',
@@ -462,6 +465,62 @@ export const IntelligenceCanvasPage: React.FC = () => {
     const updatedAudit = ReelAnalyzerService.calculateAuditReport(updatedPosts, brandDna, accountHandle);
     setAuditReport(updatedAudit);
     toast.success(`🎬 Reel "${newPost.title}" agregado al Canvas!`);
+  };
+
+  // Traer de una todos los Reels reales ya cargados (con sus métricas de
+  // Meta) en vez de arrastrarlos uno por uno — Informe de Inteligencia y
+  // Métricas dependen de `posts`, así que sin esto quedaban vacíos aunque
+  // la cuenta tuviera cientos de publicaciones reales.
+  const handleSyncAllReelsFromMeta = (reelsList: Array<MetaMediaItem & { insights?: MetaMediaInsights }>) => {
+    const existingIds = new Set(nodes.filter(n => n.post).map(n => n.post!.id));
+    const newReels = reelsList.filter(r => !existingIds.has(r.id));
+    if (newReels.length === 0) {
+      toast.info('Ya tenés todos estos Reels sincronizados.');
+      return;
+    }
+
+    const baseY = 220 + nodes.filter(n => n.type === 'reel').length * 280;
+    const newPosts = newReels.map(r => metaMediaToIntelligencePost(r, business.id));
+    const newCanvasNodes: CanvasNode[] = newReels.map((reel, i) => ({
+      id: `node_reel_${reel.id}`,
+      x: 40,
+      y: baseY + i * 280,
+      type: 'reel',
+      post: newPosts[i]
+    }));
+
+    const updatedPosts = [...posts, ...newPosts];
+    setNodes(prev => [...prev, ...newCanvasNodes]);
+    setPosts(updatedPosts);
+    setSyncStatus('saving');
+    IntelligenceStorageService.savePosts(business.id, updatedPosts).finally(() => {
+      setSyncStatus('synced');
+    });
+    const updatedAudit = ReelAnalyzerService.calculateAuditReport(updatedPosts, brandDna, accountHandle);
+    setAuditReport(updatedAudit);
+    toast.success(`⚡ ${newPosts.length} Reels reales sincronizados al Informe y Métricas.`);
+  };
+
+  // Versión sin lista previa: la usan los estados vacíos del Informe de
+  // Inteligencia y Métricas, que no tienen los Reels ya cargados como sí
+  // los tiene el panel de Auditoría → Instagram.
+  const handleSyncAllReelsDirect = async () => {
+    if (!MetaGraphService.isConfigured(business.id)) {
+      toast.error('Conectá tu cuenta de Instagram primero, en Lienzo → Auditoría → Instagram.');
+      return;
+    }
+    const toastId = toast.loading('Sincronizando tus Reels reales...');
+    try {
+      const reelsList = await MetaGraphService.getReelsWithInsights(25, business.id);
+      if (reelsList.length === 0) {
+        toast.error('No encontramos Reels en tu cuenta todavía.', { id: toastId });
+        return;
+      }
+      toast.dismiss(toastId);
+      handleSyncAllReelsFromMeta(reelsList);
+    } catch (err: any) {
+      toast.error(err?.message || 'No se pudo sincronizar tus Reels.', { id: toastId });
+    }
   };
 
   const handleApplyNextPostToCanvas = () => {
@@ -1093,6 +1152,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
           onApplyRecommendationToCanvas={handleApplyRecommendationToCanvas}
           onAddVariantToCanvas={handleAddVariantToCanvas}
           onOpenConnections={() => setIsConnectionsOpen(true)}
+          onSyncAllReels={handleSyncAllReelsDirect}
           onOpenTvPreview={() => {
             setViewMode('canvas');
             toast.info('Mostrando el lienzo: hace clic en el nodo Display TV para gestionar pantallas.');
@@ -1141,6 +1201,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
             isOpen={isAuditOpen}
             onToggle={() => setIsAuditOpen(!isAuditOpen)}
             onAddReelToCanvas={handleAddReelFromMeta}
+            onSyncAllReels={handleSyncAllReelsFromMeta}
             onOpenExecutiveReport={() => setIsExecutiveReportOpen(true)}
             onOpenFullAnalysis={() => setViewMode('analysis')}
             posts={posts}
@@ -1172,6 +1233,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
         onClose={() => setIsExecutiveReportOpen(false)}
         report={executiveReport}
         onApplyNextPostToCanvas={handleApplyNextPostToCanvas}
+        onSyncAllReels={handleSyncAllReelsDirect}
       />
 
       <UnifiedConnectionsModal

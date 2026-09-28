@@ -19,6 +19,7 @@ interface ExecutiveIntelligenceReportModalProps {
   onClose: () => void;
   report: ExecutiveIntelligenceReport;
   onApplyNextPostToCanvas?: () => void;
+  onSyncAllReels?: () => void;
 }
 
 export const ExecutiveIntelligenceReportModal: React.FC<ExecutiveIntelligenceReportModalProps> = ({
@@ -26,6 +27,7 @@ export const ExecutiveIntelligenceReportModal: React.FC<ExecutiveIntelligenceRep
   onClose,
   report,
   onApplyNextPostToCanvas,
+  onSyncAllReels,
 }) => {
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'resumen' | 'ganadores' | 'patrones' | 'plan_accion'>('resumen');
@@ -186,6 +188,15 @@ CTA: "${report.next_recommended_post.cta}"
                 <p className="text-slate-200 text-sm leading-relaxed font-normal">
                   {report.account_status_summary}
                 </p>
+                {report.analyzed_posts_count === 0 && onSyncAllReels && (
+                  <button
+                    onClick={onSyncAllReels}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold transition-all"
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    Sincronizar mis Reels reales ahora
+                  </button>
+                )}
               </div>
 
               {/* Separación de las 3 capas: ALCANCE vs INTERÉS vs INTENCIÓN */}
