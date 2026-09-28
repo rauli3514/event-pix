@@ -589,6 +589,7 @@ Devolvé un JSON estricto con esta estructura:
     lead: CRMLead;
     chatHistory: CRMMessage[];
     brandDna?: BrandDNA;
+    businessName?: string;
     catalogProducts?: ShopProduct[];
     connections: UnifiedConnectionsState;
     clientInquiry?: string;
@@ -600,7 +601,7 @@ Devolvé un JSON estricto con esta estructura:
     updatedScore?: number;
     providerUsed: string;
   }> {
-    const { lead, chatHistory, catalogProducts = [], connections, clientInquiry, overrideProvider } = params;
+    const { lead, chatHistory, brandDna, businessName, catalogProducts = [], connections, clientInquiry, overrideProvider } = params;
 
     const provider = overrideProvider || connections.preferredAIProvider || 'claude';
     const hasClaude = connections.claude.isActive && connections.claude.apiKey;
@@ -611,23 +612,35 @@ Devolvé un JSON estricto con esta estructura:
       .map(m => `${m.sender_type === 'operator' ? 'Asesor' : lead.name}: "${m.content}"`)
       .join('\n');
 
-    const latestInquiry = clientInquiry || 
-      chatHistory.slice().reverse().find(m => m.sender_type === 'lead')?.content || 
-      lead.primary_interest || 
-      'Consultó precio de pantalla comercial';
+    const latestInquiry = clientInquiry ||
+      chatHistory.slice().reverse().find(m => m.sender_type === 'lead')?.content ||
+      lead.primary_interest ||
+      'Consultó por nuestros productos o servicios';
+
+    // El negocio real: sin esto, el prompt caía siempre a "EventPix" y
+    // "Pantallas Verticales" — el vendedor de IA de cualquier rubro terminaba
+    // ofreciendo cartelería digital.
+    const bizName = businessName?.trim() || 'este negocio';
+    const mainProducts = brandDna?.offers?.main_products?.filter(Boolean) || [];
+    const ctas = brandDna?.offers?.call_to_actions?.filter(Boolean) || [];
+    const tone = brandDna?.voice_and_tone?.primary_tone || 'directo';
 
     const catalogContext = catalogProducts.length > 0
-      ? catalogProducts.map(p => `- ${p.name}: $${p.price.toLocaleString('es-AR')} ARS (Stock: ${p.stock} un., Categoría: ${p.category || 'Display'})`).join('\n')
-      : `- Pantalla Vertical 55" con Kit Tanix y App: $580.000 ARS\n- Pantalla Vertical 43" con Soporte: $420.000 ARS\n- Plumas Banderas Publicitarias 3mts: $85.000 ARS`;
+      ? catalogProducts.map(p => `- ${p.name}: $${p.price.toLocaleString('es-AR')} ARS (Stock: ${p.stock} un., Categoría: ${p.category || 'General'})`).join('\n')
+      : mainProducts.length > 0
+      ? mainProducts.map(p => `- ${p} (sin precio cargado — no inventes un número, pedile al cliente que aclare o derivá a un asesor humano si pide precio exacto)`).join('\n')
+      : '(Sin catálogo ni productos cargados todavía — no inventes productos ni precios; enfocate en entender qué necesita el cliente y ofrecé derivarlo a un asesor humano si pide números concretos.)';
 
-    const prompt = `Sos el Asesor Comercial de Ventas de EventPix en Argentina.
+    const prompt = `Sos el Asesor Comercial de Ventas de ${bizName} en Argentina.
 Tu misión es redactar una respuesta de WhatsApp persuasiva, concisa y efectiva para avanzar la venta o cerrar la operación con este cliente.
+${brandDna?.identity?.unique_value_proposition ? `\nPROPUESTA DE VALOR DEL NEGOCIO: ${brandDna.identity.unique_value_proposition}` : ''}
+${ctas.length > 0 ? `\nLLAMADOS A LA ACCIÓN QUE USA ESTE NEGOCIO (preferí uno de estos para cerrar): ${ctas.join(' | ')}` : ''}
 
 PERFIL DEL LEAD:
 - Nombre: ${lead.name}
 - Etapa en el Pipeline: ${lead.stage.toUpperCase()}
 - Scoring de Intención: ${lead.intent_score}/100
-- Interés Principal: ${lead.primary_interest || 'Pantallas Verticales'}
+- Interés Principal: ${lead.primary_interest || 'Sin especificar'}
 - Origen del Lead: ${lead.source.post_title || 'Instagram Reel'}
 
 HISTORIAL DE LA CHARLA:
@@ -636,14 +649,14 @@ ${historyText || '(Inicio de conversación)'}
 CONSULTA / OBJECIÓN ACTUAL DEL CLIENTE:
 "${latestInquiry}"
 
-CATÁLOGO OFICIAL Y PRECIOS DISPONIBLES:
+CATÁLOGO / PRODUCTOS DISPONIBLES:
 ${catalogContext}
 
 PAUTAS DE RESPUESTA COMERCIAL:
-1. Hablá en español argentino natural (vos/te paso/fijate/mirá), educado y profesional, sin parecer un bot acartonado.
-2. Si el cliente pregunta por precio o compara con teles baratas/MercadoLibre, aplicá ANCLAJE DE VALOR: explicale que es equipamiento profesional comercial (diseñado para vidrieras con alto brillo, 16 a 24hs continuas sin recalentar, con app remota para cambiar promos desde el celular en 30 segundos).
-3. Si pide cotización, dale números claros del catálogo y aclarale qué incluye (pantalla, reproductor, soporte, app).
-4. Terminá SIEMPRE con una pregunta de cierre o avance suave (ej: "¿Te gustaría que coordinemos una visita técnica sin costo a tu local?", "¿Preferís que te detalle la de 43" o 55"?", etc.).
+1. Hablá en español argentino natural (vos/te paso/fijate/mirá), educado y profesional, con tono ${tone}, sin parecer un bot acartonado.
+2. Si el cliente pregunta por precio y no hay uno cargado en el catálogo, NUNCA inventes un número — pedile que aclare qué necesita o proponé derivarlo a un asesor humano para la cotización exacta.
+3. Si pide cotización y hay catálogo real, dale números claros del catálogo.
+4. Terminá SIEMPRE con una pregunta de cierre o avance suave acorde al negocio.
 5. Mantené el mensaje conciso (ideal para WhatsApp, entre 3 y 5 oraciones).
 
 Respondé ÚNICAMENTE con un objeto JSON válido con esta estructura:
@@ -710,7 +723,7 @@ Respondé ÚNICAMENTE con un objeto JSON válido con esta estructura:
             model: connections.openai.model || 'gpt-4o-mini',
             response_format: { type: 'json_object' },
             messages: [
-              { role: 'system', content: 'Sos un cerrador de ventas experto en WhatsApp para comercio y pantallas digitales en Argentina.' },
+              { role: 'system', content: 'Sos un cerrador de ventas experto en WhatsApp para comercios en Argentina.' },
               { role: 'user', content: prompt }
             ],
             temperature: 0.7
@@ -733,30 +746,40 @@ Respondé ÚNICAMENTE con un objeto JSON válido con esta estructura:
       }
     }
 
-    // 3. Fallback Determinístico Inteligente (Offline o sin saldo)
+    // 3. Fallback Determinístico Inteligente (Offline o sin saldo). Sin IA
+    // real disponible no hay forma de redactar algo genuinamente a medida,
+    // así que esto se mantiene genérico a propósito — nunca inventa
+    // productos, precios ni características que no vinieron del BrandDNA
+    // real de este negocio.
     const isPrice = /precio|cu[aá]nto|costo|barat|car[oa]|mercadolibre/i.test(latestInquiry);
-    const isTech = /instal|c[oó]mo|app|celular|dif[ií]cil|soporte/i.test(latestInquiry);
+    const isTech = /instal|c[oó]mo|funciona|dif[ií]cil|soporte/i.test(latestInquiry);
     const isInvoice = /factura|cuota|tarjeta|pago|transferencia/i.test(latestInquiry);
+    const firstName = lead.name.split(' ')[0];
+    const closingCta = ctas[0] ? ` ${ctas[0]}` : ' ¿Te gustaría que un asesor te contacte para avanzar?';
 
     let reply = '';
     let reason = '';
     let intent = 'Consulta Comercial';
 
     if (isPrice) {
-      reply = `¡Hola ${lead.name.split(' ')[0]}! Te explico la diferencia: una tele común no está preparada para estar 16hs encendida en vidriera ni tiene el brillo para competir con la luz del día. Nuestras pantallas verticales son equipos comerciales de alto impacto que incluyen el reproductor y la app para cambiar promos desde tu celular en 30 segundos. La de 55" completa está en $580.000 con soporte incluido. ¿Te gustaría coordinar una visita técnica sin cargo para medir tu vidriera?`;
-      reason = 'Anclaje de valor diferenciando pantalla comercial de TV hogareña con llamado a visita técnica.';
+      reply = mainProducts.length > 0
+        ? `¡Hola ${firstName}! Sobre ${mainProducts[0]}: para darte un precio exacto necesito confirmar algunos detalles con vos.${closingCta}`
+        : `¡Hola ${firstName}! Para pasarte un precio exacto te consulto un par de detalles primero, así te armamos algo justo a lo que necesitás.${closingCta}`;
+      reason = 'No inventa precios sin catálogo real — pide detalles y avanza hacia el cierre con el CTA propio del negocio.';
       intent = 'Manejo de Objeción de Precio';
     } else if (isTech) {
-      reply = `¡Buenas ${lead.name.split(' ')[0]}! Es súper simple: te dejamos instalada una app en tu celular (Android o iPhone). Creás una promo en Canva o sacás una foto, la subís en la app y en 5 segundos ya está reproduciéndose en la pantalla de tu vidriera. No necesitás cables ni saber de computación. ¿Querés que te pase un video de 30 segundos mostrando cómo funciona?`;
-      reason = 'Elimina la fricción tecnológica y ofrece micro-compromiso con video demostrativo.';
+      reply = `¡Buenas ${firstName}! Contame puntualmente qué te genera dudas y te lo explico paso a paso, así no perdés tiempo con info que no te sirve.${closingCta}`;
+      reason = 'Pide precisión antes de explicar para no asumir el producto ni el proceso.';
       intent = 'Consulta Técnica / Usabilidad';
     } else if (isInvoice) {
-      reply = `¡Hola ${lead.name.split(' ')[0]}! Sí, hacemos Factura A o B para empresas y comercios. Además trabajamos con transferencia directa y planes de financiación en cuotas fijas. ¿Precisás que te armemos el presupuesto formal con los datos de tu razón social para presentarlo?`;
+      reply = `¡Hola ${firstName}! Sí, podemos facturar formalmente y coordinar la forma de pago que te quede más cómoda. ¿Me pasás los datos de tu razón social para armar el presupuesto?`;
       reason = 'Facilidad administrativa y avance hacia la emisión formal de la orden.';
       intent = 'Consulta Comercial y Facturación';
     } else {
-      reply = `¡Hola ${lead.name.split(' ')[0]}! Qué bueno saludarte. Tenemos opciones de 43" y 55" ideales para tu rubro, listas para instalar con soporte y reproductor incluido. ¿En qué zona tenés el local para calcular los plazos de entrega?`;
-      reason = 'Apertura comercial con pregunta de ubicación para acelerar el cierre.';
+      reply = mainProducts.length > 0
+        ? `¡Hola ${firstName}! Qué bueno saludarte. Tenemos ${mainProducts[0]} disponible — contame qué estás buscando así te armo una propuesta a medida.${closingCta}`
+        : `¡Hola ${firstName}! Qué bueno saludarte. Contame un poco más sobre qué estás buscando así te puedo ayudar mejor.${closingCta}`;
+      reason = 'Apertura comercial genérica hasta entender qué necesita el lead.';
       intent = 'Solicitud de Presupuesto';
     }
 

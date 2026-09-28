@@ -123,14 +123,17 @@ export class CRMIntelligenceEngine {
       (brandDna?.voice_and_tone as any)?.catchphrases?.[0] ||
       '¡Hola!';
 
-    let primaryProduct = 'Pantallas Verticales de Display Digital';
+    let primaryProduct = 'nuestros productos o servicios';
     if (brandDna?.offers) {
       if (Array.isArray(brandDna.offers)) {
         primaryProduct = (brandDna.offers as any)[0]?.name || primaryProduct;
-      } else if (Array.isArray((brandDna.offers as any).main_products)) {
+      } else if (Array.isArray((brandDna.offers as any).main_products) && (brandDna.offers as any).main_products.length > 0) {
         primaryProduct = (brandDna.offers as any).main_products[0] || primaryProduct;
       }
     }
+    const closingCta = brandDna?.offers && !Array.isArray(brandDna.offers) && (brandDna.offers as any).call_to_actions?.[0]
+      ? (brandDna.offers as any).call_to_actions[0]
+      : null;
 
     const leadFirstName = lead?.name ? lead.name.split(' ')[0] : 'Hola';
 
@@ -146,20 +149,20 @@ export class CRMIntelligenceEngine {
       }
 
       if (matchedProduct) {
-        suggestedReply = `${greeting} ¿Cómo estás ${leadFirstName}? Te confirmo: el valor oficial de ${matchedProduct.name} es de $${matchedProduct.price.toLocaleString('es-AR')} ${matchedProduct.currency} (Stock disponible en local: ${matchedProduct.stock} un.). ¿Te gustaría que te reservemos o precisás factura?`;
-        reasoning = `Precio y stock cotizados en tiempo real desde el catálogo sincronizado de Shop de Plumas (${matchedProduct.name}).`;
+        suggestedReply = `${greeting} ¿Cómo estás ${leadFirstName}? Te confirmo: el valor oficial de ${matchedProduct.name} es de $${matchedProduct.price.toLocaleString('es-AR')} ${matchedProduct.currency} (Stock disponible: ${matchedProduct.stock} un.). ¿Te gustaría que te reservemos o precisás factura?`;
+        reasoning = `Precio y stock cotizados en tiempo real desde el catálogo sincronizado (${matchedProduct.name}).`;
       } else {
-        suggestedReply = `${greeting} ¿Cómo estás ${leadFirstName}? Para ${primaryProduct} tenemos opciones según las dimensiones y requerimientos de tu local. ¿Qué rubro tenés y qué medidas aprox buscás cubrir?`;
-        reasoning = 'Responde al precio calificando primero el rubro y medidas sin inventar tarifas sin contexto.';
+        suggestedReply = `${greeting} ¿Cómo estás ${leadFirstName}? Para ${primaryProduct} necesito un par de detalles tuyos para pasarte el precio justo. ¿Me contás qué estás buscando puntualmente?`;
+        reasoning = 'Responde al precio calificando primero la necesidad, sin inventar tarifas sin contexto ni catálogo real.';
       }
     } else if (intent === 'Solicitud de Presupuesto') {
-      suggestedReply = `¡Excelente ${leadFirstName}! Te podemos armar la propuesta completa con pantalla, soporte e instalación. ¿Preferís que te detallemos la opción de 43" o 55" vertical?`;
-      reasoning = 'Orienta el presupuesto a las dos configuraciones comerciales más vendidas del negocio.';
+      suggestedReply = `¡Excelente ${leadFirstName}! Te armamos la propuesta completa para ${primaryProduct}.${closingCta ? ` ${closingCta}` : ' ¿Me contás un poco más sobre lo que necesitás?'}`;
+      reasoning = 'Orienta el presupuesto hacia la oferta principal del negocio.';
     } else if (intent === 'Cierre de Compra Inminente') {
-      suggestedReply = `¡Genial ${leadFirstName}! Te paso los datos de facturación y coordinamos la entrega e instalación en tu local. ¿A nombre de qué razón social o persona confeccionamos la nota de pedido?`;
+      suggestedReply = `¡Genial ${leadFirstName}! Te paso los datos de facturación y coordinamos la entrega. ¿A nombre de qué razón social o persona confeccionamos la nota de pedido?`;
       reasoning = 'Facilita el cierre administrativo inmediato.';
     } else {
-      suggestedReply = `${greeting} Gracias por escribirnos. Contame un poco más sobre tu proyecto y te asesoramos al instante para equipar tu local con tecnología EventPix.`;
+      suggestedReply = `${greeting} Gracias por escribirnos. Contame un poco más sobre lo que estás buscando y te asesoramos al instante.`;
       reasoning = 'Saludo cercano con apertura para identificar el dolor comercial del cliente.';
     }
 
@@ -414,12 +417,12 @@ export class CRMIntelligenceEngine {
         projected_impact: 'Ahorro estimado de 3.5 horas semanales en respuestas iniciales',
         suggested_rule: {
           name: 'Respuesta Inteligente a Consultas de Precio',
-          description: 'Responde amablemente consultando el rubro y dimensiones del local antes de pasar el tarifario.',
+          description: 'Responde amablemente pidiendo un par de detalles antes de pasar el precio exacto.',
           trigger_event: 'price_inquiry',
           trigger_keyword: 'precio',
           action_type: 'suggest_ai_response',
           action_payload: {
-            message_template: '¡Hola! Para pasarte el valor exacto del equipamiento, ¿qué rubro tiene tu comercio y qué medidas aprox te gustaría cubrir en tu vidriera?',
+            message_template: '¡Hola! Para pasarte el valor exacto, ¿me contás un poco más sobre lo que estás buscando?',
             target_stage: 'interesado'
           },
           requires_human_approval: true
@@ -433,13 +436,13 @@ export class CRMIntelligenceEngine {
         detected_frequency: 'Disparador de alta conversión',
         projected_impact: 'Multiplica x3 la tasa de conversación comentario-a-lead',
         suggested_rule: {
-          name: 'Comentario a DM: Envío de Catálogo de Pantallas',
-          description: 'Envía por mensaje privado el catálogo interactivo y video demo cuando comentan "APP".',
+          name: 'Comentario a DM: Envío de Catálogo',
+          description: 'Envía por mensaje privado el catálogo o info del negocio cuando comentan "APP".',
           trigger_event: 'keyword_match',
           trigger_keyword: 'APP',
           action_type: 'send_auto_reply',
           action_payload: {
-            message_template: '¡Hola! Acá te comparto la demo en video de cómo se administran las pantallas desde el celular y el catálogo para comercios.',
+            message_template: '¡Hola! Acá te comparto más información y el catálogo. Contame qué estás buscando y te asesoramos.',
             target_stage: 'contactado'
           },
           requires_human_approval: false
