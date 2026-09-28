@@ -17,7 +17,7 @@ import { ReelAnalyzerService } from '../../services/intelligence/reelAnalyzerSer
 import { ContentIntelligenceEngine } from '../../services/intelligence/ContentIntelligenceEngine';
 import { IntelligenceStorageService } from '../../services/intelligence/IntelligenceStorageService';
 import { CRMStorageService } from '../../services/intelligence/CRMStorageService';
-import { MetaGraphService, MetaMediaItem, MetaMediaInsights } from '../../services/meta/MetaGraphService';
+import { MetaGraphService, MetaMediaItem, MetaMediaInsights, BusinessDiscoveryMedia } from '../../services/meta/MetaGraphService';
 import { supabase } from '../../lib/supabase';
 import { UnifiedConnectionsModal } from '../../components/intelligence/UnifiedConnectionsModal';
 import { ConnectionStorageService } from '../../services/intelligence/ConnectionStorageService';
@@ -92,6 +92,53 @@ function metaMediaToIntelligencePost(
     // Sin `analysis`: importar un Reel no equivale a haberlo analizado.
     // El análisis (gancho, estructura, segmentos, diagnóstico) se produce cuando
     // el usuario lo transcribe y lo procesa con IA desde el desglose del Reel.
+  };
+}
+
+// Igual que metaMediaToIntelligencePost, pero para media obtenida vía
+// business_discovery (cuenta compartida de la plataforma, cuando el negocio
+// no conectó su propia cuenta de Meta). No incluye reach/guardados/plays:
+// business_discovery nunca los expone, ni de la cuenta propia consultada así.
+function businessDiscoveryMediaToIntelligencePost(m: BusinessDiscoveryMedia, businessId: string): IntelligencePost {
+  const likes = fromApi(m.like_count);
+  const comments = fromApi(m.comments_count);
+  const cleanCaption = m.caption || '';
+  const cleanTitle = cleanCaption
+    ? (cleanCaption.slice(0, 70) + (cleanCaption.length > 70 ? '...' : ''))
+    : `Reel ${m.id.slice(-6)}`;
+
+  return {
+    id: m.id,
+    business_id: businessId,
+    title: cleanTitle,
+    video_url: m.permalink,
+    meta_media_url: m.media_type !== 'IMAGE' ? m.media_url : undefined,
+    thumbnail_url: m.thumbnail_url || (m.media_type === 'IMAGE' ? m.media_url : undefined),
+    duration_seconds: 0,
+    objective: 'sales',
+    published_at: m.timestamp,
+    created_at: m.timestamp,
+    raw_transcript: cleanCaption || cleanTitle,
+    metrics: {
+      post_id: m.id,
+      views: NO_DATA,
+      reach: NO_DATA,
+      likes,
+      comments,
+      shares: NO_DATA,
+      saves: NO_DATA,
+      followers_gained: NO_DATA,
+      profile_visits: NO_DATA,
+      average_watch_time_seconds: NO_DATA,
+      total_watch_time_seconds: NO_DATA,
+      like_rate: NO_DATA,
+      comment_rate: NO_DATA,
+      share_rate: NO_DATA,
+      save_rate: NO_DATA,
+      retention_percentage: NO_DATA,
+      source: 'meta_graph_api',
+      synced_at: new Date().toISOString()
+    }
   };
 }
 
@@ -471,22 +518,26 @@ export const IntelligenceCanvasPage: React.FC = () => {
   // Meta) en vez de arrastrarlos uno por uno — Informe de Inteligencia y
   // Métricas dependen de `posts`, así que sin esto quedaban vacíos aunque
   // la cuenta tuviera cientos de publicaciones reales.
-  const handleSyncAllReelsFromMeta = (reelsList: Array<MetaMediaItem & { insights?: MetaMediaInsights }>) => {
+  // Núcleo compartido: agrega posts nuevos al canvas + `posts`, evitando
+  // duplicados. Lo usan tanto el camino de Meta propia (con insights reales
+  // de reach/plays/guardados) como el de la cuenta compartida de la
+  // plataforma (solo likes/comentarios públicos, para negocios que no
+  // conectaron su propia cuenta de Meta).
+  const applyNewPostsToCanvas = (candidatePosts: IntelligencePost[]) => {
     const existingIds = new Set(nodes.filter(n => n.post).map(n => n.post!.id));
-    const newReels = reelsList.filter(r => !existingIds.has(r.id));
-    if (newReels.length === 0) {
+    const newPosts = candidatePosts.filter(p => !existingIds.has(p.id));
+    if (newPosts.length === 0) {
       toast.info('Ya tenés todos estos Reels sincronizados.');
       return;
     }
 
     const baseY = 220 + nodes.filter(n => n.type === 'reel').length * 280;
-    const newPosts = newReels.map(r => metaMediaToIntelligencePost(r, business.id));
-    const newCanvasNodes: CanvasNode[] = newReels.map((reel, i) => ({
-      id: `node_reel_${reel.id}`,
+    const newCanvasNodes: CanvasNode[] = newPosts.map((post, i) => ({
+      id: `node_reel_${post.id}`,
       x: 40,
       y: baseY + i * 280,
       type: 'reel',
-      post: newPosts[i]
+      post
     }));
 
     const updatedPosts = [...posts, ...newPosts];
@@ -501,23 +552,47 @@ export const IntelligenceCanvasPage: React.FC = () => {
     toast.success(`⚡ ${newPosts.length} Reels reales sincronizados al Informe y Métricas.`);
   };
 
+  const handleSyncAllReelsFromMeta = (reelsList: Array<MetaMediaItem & { insights?: MetaMediaInsights }>) => {
+    applyNewPostsToCanvas(reelsList.map(r => metaMediaToIntelligencePost(r, business.id)));
+  };
+
   // Versión sin lista previa: la usan los estados vacíos del Informe de
   // Inteligencia y Métricas, que no tienen los Reels ya cargados como sí
-  // los tiene el panel de Auditoría → Instagram.
+  // los tiene el panel de Auditoría → Instagram. Si el negocio conectó su
+  // propia cuenta de Meta usa esos datos (con reach/plays/guardados reales);
+  // si no, cae a la cuenta compartida de la plataforma vía business_discovery
+  // (solo likes/comentarios públicos, igual que en Análisis de Comercio).
   const handleSyncAllReelsDirect = async () => {
-    if (!MetaGraphService.isConfigured(business.id)) {
-      toast.error('Conectá tu cuenta de Instagram primero, en Lienzo → Auditoría → Instagram.');
-      return;
-    }
     const toastId = toast.loading('Sincronizando tus Reels reales...');
     try {
-      const reelsList = await MetaGraphService.getReelsWithInsights(25, business.id);
-      if (reelsList.length === 0) {
-        toast.error('No encontramos Reels en tu cuenta todavía.', { id: toastId });
+      if (MetaGraphService.isConfigured(business.id)) {
+        const reelsList = await MetaGraphService.getReelsWithInsights(25, business.id);
+        if (reelsList.length === 0) {
+          toast.error('No encontramos Reels en tu cuenta todavía.', { id: toastId });
+          return;
+        }
+        toast.dismiss(toastId);
+        applyNewPostsToCanvas(reelsList.map(r => metaMediaToIntelligencePost(r, business.id)));
+        return;
+      }
+
+      const ctx = await IntelligenceStorageService.loadProfileContext(business.id);
+      const ownHandle = ctx.profile.instagram_handle?.trim();
+      if (!ownHandle) {
+        toast.error('Completá tu @usuario de Instagram en Perfil & Contexto IA primero.', { id: toastId });
+        return;
+      }
+      const discovery = await MetaGraphService.getBusinessDiscovery(ownHandle, business.id);
+      if (!discovery.success) {
+        toast.error(discovery.error, { id: toastId });
+        return;
+      }
+      if (discovery.data.media.length === 0) {
+        toast.error('No encontramos publicaciones públicas en tu cuenta todavía.', { id: toastId });
         return;
       }
       toast.dismiss(toastId);
-      handleSyncAllReelsFromMeta(reelsList);
+      applyNewPostsToCanvas(discovery.data.media.map(m => businessDiscoveryMediaToIntelligencePost(m, business.id)));
     } catch (err: any) {
       toast.error(err?.message || 'No se pudo sincronizar tus Reels.', { id: toastId });
     }
