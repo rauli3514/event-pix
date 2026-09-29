@@ -4,7 +4,7 @@
 // EventPix Intelligence — SaaS Platform
 // ================================================================
 
-import { IntelligencePost, BrandDNA } from '../../types/intelligence';
+import { IntelligencePost, BrandDNA, MetricValue, NO_DATA } from '../../types/intelligence';
 import { toOptional, averageAvailable, hasValue } from './metricUtils';
 
 export interface ContentScoreBreakdown {
@@ -49,9 +49,12 @@ export interface ExecutiveIntelligenceReport {
 
   // Las 3 capas fundamentales
   layer_averages: {
-    avg_reach: number;
-    avg_interest_rate: number; // % guardados + compartidos sobre alcance
-    avg_commercial_intent_rate: number; // % visitas perfil + interacciones cualificadas
+    // MetricValue, no number: cuando Meta nunca reportó vistas para estos
+    // posts (ej. cuentas consultadas por business_discovery), estas 3 tasas
+    // son NO_DATA, nunca un número calculado contra un denominador fabricado.
+    avg_reach: MetricValue;
+    avg_interest_rate: MetricValue; // % guardados + compartidos sobre alcance
+    avg_commercial_intent_rate: MetricValue; // % visitas perfil + interacciones cualificadas
     reach_vs_intent_verdict: string;
   };
 
@@ -329,20 +332,29 @@ export class ContentIntelligenceEngine {
     const anomalies = analyzedPosts.filter(p => p.is_anomaly).slice(0, 3);
 
     // 3. Detección de patrones sistemáticos
-    const patterns = this.detectPatterns(posts, accountAverages);
+    const patterns = this.detectPatterns(analyzedPosts);
 
     // 4. Promedios de capas (Alcance vs Interés vs Intención)
-    const avgInterestRate = Number(
-      ((sumSaves + sumShares) / Math.max(sumViews, 1) * 100).toFixed(2)
-    );
-    const avgCommercialRate = Number(
-      ((sumVisits + sumComments) / Math.max(sumViews, 1) * 100).toFixed(2)
-    );
+    // Estas 3 tasas dividen por vistas: si NINGÚN post reportó vistas (ej.
+    // cuentas consultadas por business_discovery, que nunca las expone),
+    // dividir por el "1" de seguridad de accountAverages producía tasas
+    // absurdas (cientos de miles por ciento) a partir de datos reales de
+    // otras métricas. Sin vistas reales, las 3 son NO_DATA.
+    const viewsAvailable = hasValue(avgViewsAvail);
+    const avg_reach: MetricValue = viewsAvailable ? Math.round(avgViewsAvail) : NO_DATA;
+    const avgInterestRate: MetricValue = viewsAvailable
+      ? Number(((sumSaves + sumShares) / Math.max(sumViews, 1) * 100).toFixed(2))
+      : NO_DATA;
+    const avgCommercialRate: MetricValue = viewsAvailable
+      ? Number(((sumVisits + sumComments) / Math.max(sumViews, 1) * 100).toFixed(2))
+      : NO_DATA;
 
     let reachVsIntentVerdict = 'Equilibrio moderado entre difusión e interés.';
-    if (avgInterestRate > 4.0) {
+    if (!viewsAvailable) {
+      reachVsIntentVerdict = 'Meta no reportó vistas ni alcance para estas publicaciones (posible cuenta consultada por business_discovery, que no expone esas métricas): no se puede calcular el índice de alcance vs. intención. Conectá tu propia cuenta de Meta para obtenerlas.';
+    } else if (hasValue(avgInterestRate) && avgInterestRate > 4.0) {
       reachVsIntentVerdict = 'Audiencia altamente interesada: los contenidos se guardan y comparten por encima del benchmark promedio (4%).';
-    } else if (avgCommercialRate < 1.0) {
+    } else if (hasValue(avgCommercialRate) && avgCommercialRate < 1.0) {
       reachVsIntentVerdict = 'Fuga de intención comercial: los videos se reproducen pero pocos espectadores visitan el perfil o consultan.';
     }
 
@@ -392,38 +404,50 @@ export class ContentIntelligenceEngine {
     }
 
     what_to_repeat.push({
-      action: 'Incluir demostración de producto en pantallas o hardware en los primeros 5 segundos.',
-      evidence: 'Los contenidos con demostración tangible muestran 1.8x más retención que los videos con texto estático.',
-      expected_gain: '+40% de tiempo de visualización promedio.',
+      action: 'Incluir una demostración concreta del producto o servicio en los primeros 5 segundos.',
+      evidence: 'Los contenidos con demostración tangible suelen mostrar mayor retención que los videos con solo texto estático.',
+      expected_gain: 'Mayor tiempo de visualización promedio.',
     });
 
-    // 6. Próximos experimentos concretos
+    // 6. Próximos experimentos concretos — genéricos y basados en el Brand DNA
+    // real del negocio, nunca en el rubro con el que se armó la plataforma
+    // (cartelería/pantallas digitales).
+    const primaryOffer = brandDna.offers.main_products[0]?.trim();
+    const primaryCta = brandDna.offers.call_to_actions[0]?.trim();
     const next_experiments: ExecutiveIntelligenceReport['next_experiments'] = [
       {
-        hypothesis: 'Si colocamos el resultado del comercio en el primer segundo en pantalla completa, el interés comercial aumentará 2.5x.',
-        suggested_hook: '¿Cuánto factura un comercio cuando instala pantallas inteligentes? Mirá el caso real:',
-        suggested_structure: '0-3s: Gancho con cifra real -> 3-15s: Cámara en local mostrando pantalla -> 15-30s: Beneficio -> 30-45s: CTA directo.',
-        suggested_cta: 'Comentá "PANTALLA" y te paso la propuesta personalizada para tu local.',
+        hypothesis: 'Si mostrás un resultado real y concreto para el cliente en el primer segundo, el interés comercial debería aumentar.',
+        suggested_hook: primaryOffer
+          ? `¿Qué pasa cuando alguien prueba ${primaryOffer}? Mirá el resultado real:`
+          : '¿Qué pasa cuando un cliente prueba lo que ofrecés? Mirá el resultado real:',
+        suggested_structure: '0-3s: Gancho con resultado real -> 3-15s: Contexto del cliente -> 15-30s: Beneficio -> 30-45s: CTA directo.',
+        suggested_cta: primaryCta || 'Comentá o escribinos para conocer más.',
         target_metric: 'Comentarios por palabra clave y visitas al perfil.',
       },
       {
-        hypothesis: 'Un Reel comparativo (Error tradicional de carteles estáticos vs. Display Dinámico) generará alta tasa de guardados.',
-        suggested_hook: 'El error que comete el 90% de los locales al intentar captar clientes desde la vereda:',
-        suggested_structure: 'Problema visual -> Contraste estático vs digital -> Solución llave en mano -> Oferta.',
-        suggested_cta: 'Guardá este video si estás por renovar la imagen de tu negocio.',
+        hypothesis: 'Un Reel comparativo (antes/después, o el error más común vs. tu solución) suele generar una alta tasa de guardados.',
+        suggested_hook: 'El error que comete la mayoría antes de encontrar una solución como la tuya:',
+        suggested_structure: 'Problema -> Contraste con tu solución -> Resultado -> Oferta.',
+        suggested_cta: 'Guardá este video si te pasó lo mismo.',
         target_metric: 'Tasa de guardado > 5%.',
       }
     ];
 
-    // 7. Próximo post recomendado basado en el Brand DNA y ganadores
-    const primaryOffer = brandDna.offers.main_products[0] || 'Cartelería Digital & Pantallas para Comercios';
+    // 7. Próximo post recomendado, basado en el Brand DNA real del negocio y
+    // en el gancho del post ganador (si hay uno con análisis de IA hecho).
+    const bestHook = top_performers[0]?.post.analysis?.hook_data?.text;
+    const hookIntro = bestHook
+      ? `Repetí el estilo del gancho que ya te funcionó: "${bestHook.slice(0, 80)}"`
+      : (brandDna.identity?.unique_value_proposition?.trim()
+        ? `Mostrá en los primeros 3 segundos por qué ${brandDna.identity.unique_value_proposition.trim()}`
+        : 'Mostrá en los primeros 3 segundos el problema real que resolvés');
     const next_recommended_post = {
-      hook: `Escuchá esto antes de gastar en folletos o carteles: la forma en que los locales están duplicando visitas con ${primaryOffer}.`,
-      structure: 'Gancho Chocante (0-3s) -> Problema de Visibilidad Local (3-12s) -> Demostración en vivo de Pantalla (12-28s) -> CTA de WhatsApp (28-40s)',
+      hook: primaryOffer ? `${hookIntro}, conectándolo con ${primaryOffer}.` : `${hookIntro}.`,
+      structure: 'Gancho (0-3s) -> Problema del cliente (3-12s) -> Cómo lo resolvés (12-28s) -> Llamado a la acción (28-40s)',
       duration_seconds: 35,
-      cta: 'Escribí "LOCAL" en los comentarios y te envío una demo sin cargo para tu negocio.',
-      commercial_goal: 'Generar conversaciones directas por DM o WhatsApp para cotización de pantallas.',
-      justification: `Diseñado a partir del análisis de tus ${posts.length} Reels: combina el gancho con mayor retención detectado con la oferta principal del negocio.`,
+      cta: primaryCta || 'Escribinos por WhatsApp o comentá para recibir más información.',
+      commercial_goal: 'Generar conversaciones directas por DM o WhatsApp con clientes interesados.',
+      justification: `Diseñado a partir del análisis de tus ${posts.length} publicaciones reales: combina el patrón de gancho con mejor retención detectado con la oferta principal de tu negocio.`,
     };
 
     return {
@@ -433,7 +457,7 @@ export class ContentIntelligenceEngine {
       global_health_score: avgScoreTotal,
       account_status_summary: `Se auditaron ${posts.length} publicaciones de @${accountHandle.replace('@', '')}. La cuenta tiene una salud general de ${avgScoreTotal}/100. Se detectaron ${top_performers.length} contenidos ganadores que traccionan la mayor parte del interés, junto con oportunidades claras para eliminar formatos que consumen tiempo sin generar consultas comerciales.`,
       layer_averages: {
-        avg_reach: accountAverages.avgViews,
+        avg_reach,
         avg_interest_rate: avgInterestRate,
         avg_commercial_intent_rate: avgCommercialRate,
         reach_vs_intent_verdict: reachVsIntentVerdict,
@@ -449,64 +473,75 @@ export class ContentIntelligenceEngine {
     };
   }
 
-  private static detectPatterns(
-    posts: IntelligencePost[],
-    accountAverages: { avgViews: number; avgSaves: number; avgComments: number }
-  ): DetectedPattern[] {
+  /**
+   * Solo reporta un patrón cuando hay publicaciones reales que lo respalden,
+   * con estadísticas calculadas sobre esos posts (nunca números de ejemplo
+   * fijos). Un patrón sin muestra real simplemente no aparece: es preferible
+   * una pestaña "Patrones Demostrados" vacía a una con hipótesis inventadas
+   * disfrazadas de evidencia.
+   */
+  private static detectPatterns(analyzedPosts: PostPerformanceAnalysis[]): DetectedPattern[] {
     const patterns: DetectedPattern[] = [];
+    if (analyzedPosts.length === 0) return patterns;
 
-    // Patrón 1: Duración
-    const shortPosts = posts.filter(p => p.duration_seconds <= 30);
+    const overallAvgScore = analyzedPosts.reduce((s, a) => s + a.score.total_score, 0) / analyzedPosts.length;
 
+    const summarize = (subset: PostPerformanceAnalysis[]) => {
+      const avg_score = Math.round(subset.reduce((s, a) => s + a.score.total_score, 0) / subset.length);
+      const avg_interest_score = Math.round(subset.reduce((s, a) => s + a.score.interest_score, 0) / subset.length);
+      const avg_commercial_score = Math.round(subset.reduce((s, a) => s + a.score.commercial_intent_score, 0) / subset.length);
+      const performance_vs_average_pct = Math.round(((avg_score - overallAvgScore) / Math.max(overallAvgScore, 1)) * 100);
+      return { avg_score, avg_interest_score, avg_commercial_score, performance_vs_average_pct };
+    };
+
+    // Patrón 1: Formato corto (< 30s). `duration_seconds` es 0 cuando Meta no
+    // la reportó (posts importados por Graph API), así que se excluye ese caso.
+    const shortPosts = analyzedPosts.filter(a => a.post.duration_seconds > 0 && a.post.duration_seconds <= 30);
     if (shortPosts.length > 0) {
-      const shortViewsAvail = averageAvailable(shortPosts.map(p => toOptional(p.metrics?.views)));
-      const avgViewsShort = hasValue(shortViewsAvail) ? shortViewsAvail : 0;
-      const pct = Math.round(((avgViewsShort - accountAverages.avgViews) / Math.max(accountAverages.avgViews, 1)) * 100);
+      const stats = summarize(shortPosts);
       patterns.push({
-        name: 'Formato Corto (< 30s) de Alta Dinámica',
+        name: 'Formato Corto (< 30s)',
         category: 'duracion',
         sample_size: shortPosts.length,
-        avg_score: 74,
-        avg_interest_score: 72,
-        avg_commercial_score: 68,
-        performance_vs_average_pct: pct,
-        recommendation: pct >= 0 ? 'repetir' : 'optimizar',
-        reasoning: `Los Reels de menos de 30s presentan un ${Math.abs(pct)}% ${pct >= 0 ? 'mayor' : 'menor'} alcance promedio al favorecer la reproducción completa.`,
+        ...stats,
+        recommendation: stats.performance_vs_average_pct >= 0 ? 'repetir' : 'optimizar',
+        reasoning: `Tus ${shortPosts.length} publicaciones de menos de 30s tienen un score promedio ${Math.abs(stats.performance_vs_average_pct)}% ${stats.performance_vs_average_pct >= 0 ? 'mayor' : 'menor'} que el resto de la cuenta.`,
       });
     }
 
-    // Patrón 2: Detección de CTA por Comentario / Palabra Clave
-    const keywordCtaPosts = posts.filter(p => 
-      p.analysis?.cta_data?.type === 'comment_keyword' || 
-      (p.title && p.title.toLowerCase().includes('coment'))
+    // Patrón 2: CTA por palabra clave en comentarios
+    const keywordCtaPosts = analyzedPosts.filter(a =>
+      a.post.analysis?.cta_data?.type === 'comment_keyword' ||
+      (a.post.title && a.post.title.toLowerCase().includes('coment'))
     );
-
     if (keywordCtaPosts.length > 0) {
+      const stats = summarize(keywordCtaPosts);
       patterns.push({
         name: 'Llamado a la Acción por Palabra Clave ("Comentá X")',
         category: 'cta',
         sample_size: keywordCtaPosts.length,
-        avg_score: 82,
-        avg_interest_score: 85,
-        avg_commercial_score: 88,
-        performance_vs_average_pct: 45,
-        recommendation: 'repetir',
-        reasoning: 'Multiplica por 2.4x el volumen de comentarios cualificados y habilita la automatización de DM para prospección.',
+        ...stats,
+        recommendation: stats.performance_vs_average_pct >= 0 ? 'repetir' : 'optimizar',
+        reasoning: `Tus ${keywordCtaPosts.length} publicaciones con este tipo de CTA tienen un score promedio ${Math.abs(stats.performance_vs_average_pct)}% ${stats.performance_vs_average_pct >= 0 ? 'mayor' : 'menor'} que el resto de la cuenta.`,
       });
     }
 
-    // Patrón 3: Gancho de Pregunta o Problema Negativo
-    patterns.push({
-      name: 'Gancho de Advertencia / Error Común del Cliente',
-      category: 'hook',
-      sample_size: Math.max(1, Math.round(posts.length * 0.4)),
-      avg_score: 79,
-      avg_interest_score: 81,
-      avg_commercial_score: 76,
-      performance_vs_average_pct: 32,
-      recommendation: 'repetir',
-      reasoning: 'Genera un freno de scroll inmediato al activar la aversión a la pérdida en los dueños de negocios.',
-    });
+    // Patrón 3: Gancho de advertencia / error común (requiere que el post
+    // tenga análisis de IA hecho: `hook_data.type` no viene de Meta).
+    const warningHookPosts = analyzedPosts.filter(a =>
+      a.post.analysis?.hook_data?.type === 'preguntas_negativas' || a.post.analysis?.hook_data?.type === 'error_comun'
+    );
+    if (warningHookPosts.length > 0) {
+      const stats = summarize(warningHookPosts);
+      patterns.push({
+        name: 'Gancho de Advertencia / Error Común',
+        category: 'hook',
+        sample_size: warningHookPosts.length,
+        ...stats,
+        recommendation: stats.performance_vs_average_pct >= 0 ? 'repetir' : 'optimizar',
+        reasoning: `Tus ${warningHookPosts.length} publicaciones con este tipo de gancho tienen un score promedio ${Math.abs(stats.performance_vs_average_pct)}% ${stats.performance_vs_average_pct >= 0 ? 'mayor' : 'menor'} que el resto de la cuenta.`,
+      });
+    }
 
     return patterns;
   }
@@ -522,9 +557,9 @@ export class ContentIntelligenceEngine {
       global_health_score: 0,
       account_status_summary: 'Esperando importación de publicaciones. Sincronizá tus Reels reales de Instagram o agregalos al Lienzo para activar el motor de inteligencia basado en evidencia real.',
       layer_averages: {
-        avg_reach: 0,
-        avg_interest_rate: 0,
-        avg_commercial_intent_rate: 0,
+        avg_reach: NO_DATA,
+        avg_interest_rate: NO_DATA,
+        avg_commercial_intent_rate: NO_DATA,
         reach_vs_intent_verdict: 'Esperando datos de publicaciones para calcular el índice de alcance vs intención.',
       },
       top_performers: [],
