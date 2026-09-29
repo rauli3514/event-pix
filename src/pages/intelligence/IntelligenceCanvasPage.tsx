@@ -817,7 +817,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
       x: position?.x ?? 540,
       y: position?.y ?? 80,
       type: 'ai_chat',
-      activeMode: 'b_roll',
+      activeMode: 'reel_hablado',
       chatMessages: [
         {
           id: `msg-welcome-${Date.now()}`,
@@ -1093,6 +1093,13 @@ export const IntelligenceCanvasPage: React.FC = () => {
               const cleanHandle = `@${updated.profile.instagram_handle}`;
               setAccountHandle(cleanHandle);
               setBusiness((prev) => ({ ...prev, instagram_handle: cleanHandle }));
+            }
+            if (updated.profile.business_name?.trim() || updated.profile.niche?.trim()) {
+              setBusiness((prev) => ({
+                ...prev,
+                name: updated.profile.business_name?.trim() || prev.name,
+                niche: updated.profile.niche?.trim() || prev.niche,
+              }));
             }
             const wasFirstCompletion = !profileCompleted && !!updated.profile.instagram_handle?.trim();
             setProfileCompleted(!!updated.profile.instagram_handle?.trim());

@@ -482,6 +482,17 @@ export class IntelligenceStorageService {
     if (context.profile.instagram_handle) {
       await this.updateBusinessInstagramHandle(businessId, context.profile.instagram_handle);
     }
+    // El nombre y el nicho también vivían duplicados: acá y en el registro
+    // del negocio (lo que muestra el switcher del lienzo). Guardar solo acá
+    // dejaba el switcher mostrando para siempre el nombre/nicho con el que
+    // se creó el negocio (a veces el demo inicial), aunque se corrigieran
+    // en Perfil & Contexto IA.
+    if (context.profile.business_name?.trim() || context.profile.niche?.trim()) {
+      await this.updateBusinessProfile(businessId, {
+        name: context.profile.business_name?.trim() || undefined,
+        niche: context.profile.niche?.trim() || undefined,
+      });
+    }
     return true;
   }
 
@@ -505,6 +516,34 @@ export class IntelligenceStorageService {
       localStorage.setItem(LOCAL_STORAGE_KEYS.BUSINESSES_LIST, JSON.stringify(updated));
     } catch (e) {
       console.warn('Error actualizando el @handle del negocio en localStorage:', e);
+    }
+
+    return true;
+  }
+
+  /** Mantiene sincronizado el nombre y el nicho del negocio (Supabase + caché local) con los que se confirman en Perfil & Contexto IA. */
+  static async updateBusinessProfile(businessId: string, updates: { name?: string; niche?: string }): Promise<boolean> {
+    const payload: { name?: string; niche?: string } = {};
+    if (updates.name) payload.name = updates.name;
+    if (updates.niche) payload.niche = updates.niche;
+    if (Object.keys(payload).length === 0) return true;
+
+    const isSupa = await this.testSupabase();
+    if (isSupa) {
+      try {
+        await supabase.from('intelligence_businesses').update(payload).eq('id', businessId);
+      } catch (err) {
+        console.warn('Error actualizando nombre/nicho del negocio en Supabase:', err);
+      }
+    }
+
+    try {
+      const stored = localStorage.getItem(LOCAL_STORAGE_KEYS.BUSINESSES_LIST);
+      const list: IntelligenceBusiness[] = stored ? JSON.parse(stored) : [];
+      const updated = list.map((b) => (b.id === businessId ? { ...b, ...payload } : b));
+      localStorage.setItem(LOCAL_STORAGE_KEYS.BUSINESSES_LIST, JSON.stringify(updated));
+    } catch (e) {
+      console.warn('Error actualizando nombre/nicho del negocio en localStorage:', e);
     }
 
     return true;
@@ -535,6 +574,7 @@ export class IntelligenceStorageService {
       business_id: businessId,
       profile: {
         avatar_url: '',
+        business_name: currentBiz?.name || '',
         instagram_handle: currentBiz?.instagram_handle?.replace('@', '') || '',
         niche: currentBiz?.niche || '',
         language: 'Español (Latinoamérica)',

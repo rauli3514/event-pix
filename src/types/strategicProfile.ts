@@ -6,6 +6,7 @@
 
 export interface ProfileIdentity {
   avatar_url?: string;
+  business_name: string;
   instagram_handle: string;
   niche: string;
   language: string;
