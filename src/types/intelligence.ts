@@ -62,6 +62,13 @@ export interface IntelligencePost {
   id: string;
   business_id: string;
   title: string;
+  /**
+   * Formato real del posteo en Instagram, tal como lo reporta Meta Graph API.
+   * Ausente en posts creados manualmente (sin importar desde Meta) o en
+   * fuentes que no lo exponen. Necesario para el desglose de formatos
+   * (Reels vs Carruseles vs Imágenes) del Panel de Métricas.
+   */
+  media_type?: 'IMAGE' | 'VIDEO' | 'CAROUSEL_ALBUM' | 'REELS';
   video_url?: string;
   /**
    * Link directo y descargable al archivo de video (CDN de Meta), disponible
@@ -111,6 +118,12 @@ export interface IntelligenceMetrics {
   /** Origen de los datos, para que la UI y los prompts puedan declararlo. */
   source?: 'meta_graph_api' | 'instagram_scrape' | 'manual';
   synced_at?: string;
+  /**
+   * Copia de `IntelligencePost.media_type` guardada acá (JSONB, sin migración
+   * de esquema) para que sobreviva el viaje de ida y vuelta a Supabase:
+   * `intelligence_posts` todavía no tiene una columna propia para el formato.
+   */
+  media_type?: 'IMAGE' | 'VIDEO' | 'CAROUSEL_ALBUM' | 'REELS';
 }
 
 export interface HookData {
