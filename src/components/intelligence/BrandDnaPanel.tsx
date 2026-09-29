@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { BrandDNA, IntelligenceBusiness } from '../../types/intelligence';
-import { Brain, Sparkles, Sliders, Plus, Trash2, ChevronLeft, ChevronRight, Copy } from 'lucide-react';
+import { Brain, Sparkles, Sliders, Plus, Trash2, ChevronLeft, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface BrandDnaPanelProps {
@@ -84,18 +84,11 @@ export const BrandDnaPanel: React.FC<BrandDnaPanelProps> = ({
     navigator.clipboard.writeText(text).then(() => toast.success('Copiado al portapapeles.'));
   };
 
+  // Cerrado: no hay botón flotante propio — el botón "ADN Marca" de la
+  // barra de herramientas del lienzo ya abre/cierra este panel, y tener
+  // los dos duplicaba el control y tapaba otros elementos del lienzo.
   if (!isOpen) {
-    return (
-      <button
-        onClick={onToggle}
-        className="fixed left-0 top-24 md:left-64 z-40 bg-slate-900/90 border border-slate-800 border-l-0 text-violet-400 p-2.5 rounded-r-xl shadow-xl backdrop-blur-md hover:bg-slate-800 transition-all flex items-center gap-2 group"
-        title="Abrir Accesos Rápidos de Marca"
-      >
-        <Brain className="w-5 h-5 text-violet-400 group-hover:scale-110 transition-transform" />
-        <span className="text-xs font-semibold tracking-wide text-slate-200 hidden md:inline">Marca</span>
-        <ChevronRight className="w-4 h-4 text-slate-400" />
-      </button>
-    );
+    return null;
   }
 
   return (

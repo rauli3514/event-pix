@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { BusinessAuditReport, IntelligenceBusiness, IntelligencePost, BrandDNA, UnifiedBusinessAudit, AuditSnapshot, AuditSnapshotMetrics } from '../../types/intelligence';
-import { Activity, AlertTriangle, CheckCircle, Lightbulb, ChevronRight, ChevronLeft, ArrowUpRight, Sparkles, Users, Instagram, Flag, TrendingUp, TrendingDown, Minus, Loader2 } from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle, Lightbulb, ChevronRight, ArrowUpRight, Sparkles, Users, Instagram, Flag, TrendingUp, TrendingDown, Minus, Loader2 } from 'lucide-react';
 import { CompetitorAnalysisPanel } from './CompetitorAnalysisPanel';
 import { MetaConnectionPanel } from './MetaConnectionPanel';
 import { MetaAdsIntelligenceEngine } from '../../services/intelligence/MetaAdsIntelligenceEngine';
@@ -182,18 +182,11 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
     }
   };
 
+  // Cerrado: no hay botón flotante propio — el botón "Auditoría & Ads" de
+  // la barra de herramientas del lienzo ya abre/cierra este panel, y tener
+  // los dos duplicaba el control y tapaba otros elementos del lienzo.
   if (!isOpen) {
-    return (
-      <button
-        onClick={onToggle}
-        className="fixed right-0 top-24 z-40 bg-slate-900/90 border border-slate-800 border-r-0 text-emerald-400 p-2.5 rounded-l-xl shadow-xl backdrop-blur-md hover:bg-slate-800 transition-all flex items-center gap-2 group"
-        title="Abrir Auditoría de Comercio & Acciones"
-      >
-        <ChevronLeft className="w-4 h-4 text-slate-400" />
-        <span className="text-xs font-semibold tracking-wide text-slate-200 hidden md:inline">Auditoría & Conectores</span>
-        <Activity className="w-5 h-5 text-emerald-400 group-hover:scale-110 transition-transform" />
-      </button>
-    );
+    return null;
   }
 
   const displayScore = unifiedAudit?.overall_score ?? auditReport.health_score;

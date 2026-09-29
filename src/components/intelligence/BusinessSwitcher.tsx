@@ -108,16 +108,26 @@ export const BusinessSwitcher: React.FC<BusinessSwitcherProps> = ({
 
         <div className="flex flex-col min-w-0 pr-1">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-bold text-slate-100 truncate max-w-[140px] sm:max-w-[190px]">
-              {currentBusiness?.name || 'Comercio'}
-            </span>
+            {/* El nombre y el nicho del negocio son datos editables en
+                Perfil & Contexto IA — acá, para una cuenta de un solo
+                comercio (no super-admin), solo hace falta el @handle: el
+                nombre/nicho no aportan nada y quedaban mostrando el valor
+                viejo o el del negocio demo inicial. Para un super-admin
+                manejando varios comercios sí hacen falta para distinguirlos. */}
+            {!readOnly && (
+              <span className="text-xs font-bold text-slate-100 truncate max-w-[140px] sm:max-w-[190px]">
+                {currentBusiness?.name || 'Comercio'}
+              </span>
+            )}
             <span className="text-[10px] font-mono text-violet-400 font-bold bg-violet-500/15 border border-violet-500/30 px-1.5 py-0.2 rounded-md">
               {currentBusiness?.instagram_handle || '@comercio'}
             </span>
           </div>
-          <span className="text-[10px] text-slate-400 truncate max-w-[180px]">
-            {currentBusiness?.niche || 'Cartelería & IA'}
-          </span>
+          {!readOnly && (
+            <span className="text-[10px] text-slate-400 truncate max-w-[180px]">
+              {currentBusiness?.niche || 'Cartelería & IA'}
+            </span>
+          )}
         </div>
 
         {!readOnly && (
