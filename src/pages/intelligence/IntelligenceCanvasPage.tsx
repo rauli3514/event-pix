@@ -261,10 +261,13 @@ export const IntelligenceCanvasPage: React.FC = () => {
           setAccountHandle(activeBiz.instagram_handle);
         }
 
-        // Cargar Brand DNA guardado
+        // Cargar Brand DNA guardado. Sin `savedDna` (negocio nuevo sin Brand
+        // DNA guardado todavía) NO hay que dejar el estado en el valor
+        // inicial de la demo (EventPix Display Hub): se normaliza un DNA
+        // genérico y vacío propio de este negocio.
         const savedDna = await IntelligenceStorageService.loadBrandDna(activeBiz.id);
-        if (savedDna && isMounted) {
-          setBrandDna(savedDna);
+        if (isMounted) {
+          setBrandDna(savedDna || IntelligenceStorageService.normalizeBrandDna(null, activeBiz.id));
         }
 
         // Cargar Posts guardados
@@ -315,11 +318,11 @@ export const IntelligenceCanvasPage: React.FC = () => {
     }
     IntelligenceStorageService.setActiveBusinessId(newBiz.id);
 
-    // 1. Cargar Brand DNA del nuevo negocio
+    // 1. Cargar Brand DNA del nuevo negocio. Sin dato guardado, normalizar uno
+    // genérico y vacío en vez de dejar el estado con el Brand DNA del negocio
+    // anterior (o el de la demo) — cada negocio empieza limpio.
     const savedDna = await IntelligenceStorageService.loadBrandDna(newBiz.id);
-    if (savedDna) {
-      setBrandDna(savedDna);
-    }
+    setBrandDna(savedDna || IntelligenceStorageService.normalizeBrandDna(null, newBiz.id));
 
     // 2. Cargar conexiones del nuevo negocio
     const conns = ConnectionStorageService.loadConnections(newBiz.id);
