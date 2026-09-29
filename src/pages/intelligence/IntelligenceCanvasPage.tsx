@@ -241,6 +241,14 @@ export const IntelligenceCanvasPage: React.FC = () => {
   const [nodes, setNodes] = useState<CanvasNode[]>([]);
   const [edges, setEdges] = useState<CanvasEdge[]>([]);
 
+  // "Nueva Idea": entrada simple y rápida de generación de contenido, separada
+  // de la tarjeta de Estrategia del lienzo. Usa SIEMPRE todos los Reels ya
+  // sincronizados del negocio como contexto automático (sin conectar a mano).
+  const [isQuickIdeaOpen, setIsQuickIdeaOpen] = useState(false);
+  const [quickIdeaMessages, setQuickIdeaMessages] = useState<ChatMessage[]>([]);
+  const [quickIdeaMode, setQuickIdeaMode] = useState<ContentFormatMode>('reel_hablado');
+  const [isQuickIdeaGenerating, setIsQuickIdeaGenerating] = useState(false);
+
   const [isBrandDnaOpen, setIsBrandDnaOpen] = useState(false);
   const [isAuditOpen, setIsAuditOpen] = useState(false);
   const [inspectedPost, setInspectedPost] = useState<IntelligencePost | null>(null);
@@ -906,6 +914,58 @@ export const IntelligenceCanvasPage: React.FC = () => {
     }
   };
 
+  // "Nueva Idea": mismo orquestador que el Chat con IA del lienzo
+  // (adaptScriptWithChat), pero usando TODOS los Reels ya sincronizados del
+  // negocio (`posts`) como fuente automática en vez de depender de que el
+  // usuario los conecte a mano con el cable del lienzo.
+  const handleSendQuickIdea = async (text: string) => {
+    const userMsg: ChatMessage = {
+      id: `qi-${Date.now()}-user`,
+      sender: 'user',
+      text,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    setQuickIdeaMessages(prev => [...prev, userMsg]);
+    setIsQuickIdeaGenerating(true);
+
+    try {
+      const profileContext = await IntelligenceStorageService.loadProfileContext(business.id);
+      const currentConns = ConnectionStorageService.loadConnections(business.id);
+
+      const result = await AIProviderService.adaptScriptWithChat({
+        userInstruction: text,
+        mode: quickIdeaMode,
+        sourcePosts: posts,
+        profileContext: profileContext || undefined,
+        connections: currentConns,
+        chatHistory: quickIdeaMessages
+      });
+
+      const aiMsg: ChatMessage = {
+        id: `qi-${Date.now()}-ai`,
+        sender: 'ai',
+        text: result.replyText,
+        scriptData: result.scriptData,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setQuickIdeaMessages(prev => [...prev, aiMsg]);
+    } catch (err: any) {
+      console.error('Error generando Nueva Idea:', err);
+      toast.error('Error al generar respuesta de IA');
+      const errorMsg: ChatMessage = {
+        id: `qi-${Date.now()}-err`,
+        sender: 'ai',
+        text: 'Ocurrió un error al procesar tu solicitud con el motor de IA. Por favor, intentá nuevamente.',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setQuickIdeaMessages(prev => [...prev, errorMsg]);
+    } finally {
+      setIsQuickIdeaGenerating(false);
+    }
+  };
+
+  const handleResetQuickIdea = () => setQuickIdeaMessages([]);
+
   // Acciones provenientes del Dashboard Ejecutivo
   const handleApplyRecommendationToCanvas = () => {
     setViewMode('canvas');
@@ -1275,6 +1335,15 @@ export const IntelligenceCanvasPage: React.FC = () => {
             onCreateAiChatNode={handleCreateAiChatNode}
             preferredAIProvider={connections.preferredAIProvider}
             onSelectAIProvider={handleSelectAIProvider}
+            isQuickIdeaOpen={isQuickIdeaOpen}
+            onToggleQuickIdea={() => setIsQuickIdeaOpen(!isQuickIdeaOpen)}
+            quickIdeaMessages={quickIdeaMessages}
+            quickIdeaMode={quickIdeaMode}
+            onQuickIdeaModeChange={setQuickIdeaMode}
+            onSendQuickIdea={handleSendQuickIdea}
+            onResetQuickIdea={handleResetQuickIdea}
+            isQuickIdeaGenerating={isQuickIdeaGenerating}
+            quickIdeaPostsCount={posts.length}
           />
 
           <BusinessAuditPanel
