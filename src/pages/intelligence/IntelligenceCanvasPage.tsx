@@ -56,6 +56,7 @@ function metaMediaToIntelligencePost(
     id: reel.id,
     business_id: businessId,
     title: cleanTitle,
+    media_type: reel.media_type,
     video_url: reel.permalink,
     // Solo presente cuando media_type es un video real (REELS/VIDEO);
     // para imágenes reel.media_url no es un archivo de video descargable.
@@ -87,7 +88,8 @@ function metaMediaToIntelligencePost(
       save_rate: rate(saves, views),
       retention_percentage: NO_DATA,
       source: 'meta_graph_api',
-      synced_at: new Date().toISOString()
+      synced_at: new Date().toISOString(),
+      media_type: reel.media_type
     }
     // Sin `analysis`: importar un Reel no equivale a haberlo analizado.
     // El análisis (gancho, estructura, segmentos, diagnóstico) se produce cuando
@@ -111,6 +113,7 @@ function businessDiscoveryMediaToIntelligencePost(m: BusinessDiscoveryMedia, bus
     id: m.id,
     business_id: businessId,
     title: cleanTitle,
+    media_type: m.media_type,
     video_url: m.permalink,
     meta_media_url: m.media_type !== 'IMAGE' ? m.media_url : undefined,
     thumbnail_url: m.thumbnail_url || (m.media_type === 'IMAGE' ? m.media_url : undefined),
@@ -137,7 +140,8 @@ function businessDiscoveryMediaToIntelligencePost(m: BusinessDiscoveryMedia, bus
       save_rate: NO_DATA,
       retention_percentage: NO_DATA,
       source: 'meta_graph_api',
-      synced_at: new Date().toISOString()
+      synced_at: new Date().toISOString(),
+      media_type: m.media_type
     }
   };
 }

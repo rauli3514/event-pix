@@ -636,6 +636,9 @@ export class IntelligenceStorageService {
             id: row.id,
             business_id: row.business_id,
             title: row.title,
+            // `intelligence_posts` no tiene columna propia para el formato:
+            // viaja dentro del JSONB de `metrics` (ver comentario en el tipo).
+            media_type: row.metrics?.media_type,
             video_url: row.video_url,
             thumbnail_url: row.thumbnail_url,
             duration_seconds: row.duration_seconds,

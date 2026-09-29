@@ -16,6 +16,10 @@ import { CRMConversation, CRMTask } from '../../types/crm';
 import { CRMStorageService } from '../../services/intelligence/CRMStorageService';
 import { CRMIntelligenceEngine } from '../../services/intelligence/CRMIntelligenceEngine';
 import { toOptional, formatMetric, hasValue } from '../../services/intelligence/metricUtils';
+import { AccountMetricsEngine } from '../../services/intelligence/AccountMetricsEngine';
+import { AccountMetricsPanel } from './AccountMetricsPanel';
+import { MetaGraphService } from '../../services/meta/MetaGraphService';
+import { ProfileSnapshotService } from '../../services/intelligence/ProfileSnapshotService';
 
 interface ExecutiveDecisionDashboardProps {
   businessId: string;
@@ -69,6 +73,45 @@ export const ExecutiveDecisionDashboard: React.FC<ExecutiveDecisionDashboardProp
     return () => { isMounted = false; };
   }, [businessId]);
 
+  // Seguidores reales + crecimiento (para la Capa 1 del panel de métricas
+  // estilo Socialinsider). Nunca bloquea el resto del dashboard si falla.
+  const [followersCount, setFollowersCount] = useState<number | null>(null);
+  const [followerGrowthPct, setFollowerGrowthPct] = useState<number | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const cleanHandle = accountHandle?.replace('@', '').trim();
+    if (!cleanHandle) return;
+
+    async function fetchFollowers() {
+      try {
+        let count: number | null = null;
+        if (MetaGraphService.isConfigured(businessId)) {
+          const profile = await MetaGraphService.getProfile(businessId);
+          count = typeof profile.followers_count === 'number' ? profile.followers_count : null;
+        } else {
+          const discovery = await MetaGraphService.getBusinessDiscovery(cleanHandle, businessId);
+          if (discovery.success) count = discovery.data.followers_count ?? null;
+        }
+        if (!isMounted || count === null) return;
+        setFollowersCount(count);
+        ProfileSnapshotService.recordSnapshotIfNeeded({
+          businessId,
+          kind: 'own',
+          platform: 'instagram',
+          handle: cleanHandle,
+          followerCount: count,
+        });
+        const growth = await ProfileSnapshotService.getGrowth(businessId, 'instagram', cleanHandle, 30);
+        if (isMounted) setFollowerGrowthPct(growth.growthPct);
+      } catch {
+        // Sin seguidores no rompe el resto del panel: se muestra "Sin dato".
+      }
+    }
+    fetchFollowers();
+    return () => { isMounted = false; };
+  }, [businessId, accountHandle]);
+
   // Cálculos dinámicos de CRM
   const funnelMetrics = useMemo(() => {
     return CRMIntelligenceEngine.calculateFunnelMetrics(conversations);
@@ -92,6 +135,12 @@ export const ExecutiveDecisionDashboard: React.FC<ExecutiveDecisionDashboardProp
 
   // Top Reel con mayor impacto
   const topReel = safePosts.length > 0 ? safePosts[0] : null;
+
+  // Motor de métricas de cuenta estilo Socialinsider (5 capas de datos reales)
+  const accountMetrics = useMemo(
+    () => AccountMetricsEngine.compute(safePosts, followersCount),
+    [safePosts, followersCount]
+  );
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#080C14] text-slate-100 p-4 sm:p-6 lg:p-8 custom-scrollbar">
@@ -242,6 +291,16 @@ export const ExecutiveDecisionDashboard: React.FC<ExecutiveDecisionDashboardProp
             </div>
           </div>
         </div>
+
+        {/* ========================================================================= */}
+        {/* MÉTRICAS DE CUENTA ESTILO SOCIALINSIDER (5 CAPAS DE DATOS REALES) */}
+        {/* ========================================================================= */}
+        <AccountMetricsPanel
+          snapshot={accountMetrics}
+          accountHandle={accountHandle}
+          followersCount={followersCount}
+          followerGrowthPct={followerGrowthPct}
+        />
 
         {/* ========================================================================= */}
         {/* CUERPO PRINCIPAL EN DOS COLUMNAS DE JERARQUÍA */}
