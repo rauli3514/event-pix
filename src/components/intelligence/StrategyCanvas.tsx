@@ -14,6 +14,7 @@ import { DisplayTvPreviewModal } from './DisplayTvPreviewModal';
 import { TeleprompterModal } from './TeleprompterModal';
 import { AutoDmStudioModal } from './AutoDmStudioModal';
 import { AiChatCardNode, ChatMessage, ContentFormatMode } from './canvas/AiChatCardNode';
+import { QuickIdeaComposerModal } from './canvas/QuickIdeaComposerModal';
 import { HooksResourceDrawer } from './canvas/HooksResourceDrawer';
 import { IntelligenceStorageService } from '../../services/intelligence/IntelligenceStorageService';
 import { formatMetric } from '../../services/intelligence/metricUtils';
@@ -61,6 +62,15 @@ interface StrategyCanvasProps {
   onCreateAiChatNode?: (position?: { x: number; y: number }, sourceReelId?: string) => void;
   preferredAIProvider?: 'claude' | 'gemini' | 'openai' | 'local_engine' | 'auto';
   onSelectAIProvider?: (provider: 'claude' | 'gemini' | 'openai' | 'auto') => void;
+  isQuickIdeaOpen?: boolean;
+  onToggleQuickIdea?: () => void;
+  quickIdeaMessages?: ChatMessage[];
+  quickIdeaMode?: ContentFormatMode;
+  onQuickIdeaModeChange?: (mode: ContentFormatMode) => void;
+  onSendQuickIdea?: (text: string) => Promise<void>;
+  onResetQuickIdea?: () => void;
+  isQuickIdeaGenerating?: boolean;
+  quickIdeaPostsCount?: number;
 }
 
 export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
@@ -85,7 +95,16 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
   onUpdateNodeChatMode,
   onCreateAiChatNode,
   preferredAIProvider,
-  onSelectAIProvider
+  onSelectAIProvider,
+  isQuickIdeaOpen,
+  onToggleQuickIdea,
+  quickIdeaMessages,
+  quickIdeaMode,
+  onQuickIdeaModeChange,
+  onSendQuickIdea,
+  onResetQuickIdea,
+  isQuickIdeaGenerating,
+  quickIdeaPostsCount
 }) => {
   const [inputUrl, setInputUrl] = useState('');
   const [canvasInputUrl, setCanvasInputUrl] = useState('');
@@ -454,6 +473,16 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
             >
               <Bot className="w-3.5 h-3.5 text-pink-400" />
               <span>+ Chat con IA (Card)</span>
+            </button>
+          )}
+          {onToggleQuickIdea && (
+            <button
+              onClick={onToggleQuickIdea}
+              className="bg-gradient-to-r from-fuchsia-600/20 to-pink-600/20 hover:from-fuchsia-600/30 hover:to-pink-600/30 text-fuchsia-300 border border-fuchsia-500/40 px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-bold transition-all shadow-sm"
+              title="Generar una idea de contenido rápido, usando tus Reels reales como contexto"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-fuchsia-300" />
+              <span>Nueva Idea</span>
             </button>
           )}
           <button
@@ -1433,6 +1462,29 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
         hook={teleprompterModal.hook}
         cta={teleprompterModal.cta}
       />
+
+      {onSendQuickIdea && (
+        <QuickIdeaComposerModal
+          isOpen={!!isQuickIdeaOpen}
+          onClose={() => onToggleQuickIdea && onToggleQuickIdea()}
+          messages={quickIdeaMessages || []}
+          activeMode={quickIdeaMode || 'reel_hablado'}
+          onModeChange={(mode) => onQuickIdeaModeChange && onQuickIdeaModeChange(mode)}
+          onSend={onSendQuickIdea}
+          onReset={() => onResetQuickIdea && onResetQuickIdea()}
+          onOpenTeleprompter={(scriptText, title) => {
+            setTeleprompterModal({
+              isOpen: true,
+              title: title || 'Guión de Nueva Idea',
+              scriptText,
+              hook: '',
+              cta: ''
+            });
+          }}
+          isGenerating={!!isQuickIdeaGenerating}
+          postsCount={quickIdeaPostsCount || 0}
+        />
+      )}
 
       <AutoDmStudioModal
         isOpen={isAutoDmModalOpen}
