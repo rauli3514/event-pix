@@ -238,7 +238,7 @@ export class ContentIntelligenceEngine {
   static generateExecutiveReport(
     posts: IntelligencePost[],
     brandDna: BrandDNA,
-    accountHandle = '@display_digital'
+    accountHandle = '@tu_negocio'
   ): ExecutiveIntelligenceReport {
     if (posts.length === 0) {
       return this.generateEmptyReport(accountHandle, brandDna);
@@ -519,8 +519,8 @@ export class ContentIntelligenceEngine {
       generated_at: new Date().toISOString(),
       account_handle: accountHandle,
       analyzed_posts_count: 0,
-      global_health_score: 60,
-      account_status_summary: `Conectá tus publicaciones de @${accountHandle.replace('@', '')} o agregá Reels al Canvas para activar el motor de inteligencia.`,
+      global_health_score: 0,
+      account_status_summary: 'Esperando importación de publicaciones. Sincronizá tus Reels reales de Instagram o agregalos al Lienzo para activar el motor de inteligencia basado en evidencia real.',
       layer_averages: {
         avg_reach: 0,
         avg_interest_rate: 0,
@@ -535,12 +535,12 @@ export class ContentIntelligenceEngine {
       what_to_repeat: [],
       next_experiments: [],
       next_recommended_post: {
-        hook: `Conocé la solución de ${brandDna.offers.main_products[0] || 'Display Digital'}.`,
+        hook: `Conocé ${brandDna.offers.main_products[0] || 'tu producto o servicio principal'}.`,
         structure: 'Gancho -> Problema -> Solución -> CTA',
         duration_seconds: 30,
         cta: 'Escribinos para más info.',
         commercial_goal: 'Presentación de marca.',
-        justification: 'Plantilla base inicial.',
+        justification: 'Sin publicaciones aún: esto es una plantilla genérica, no una recomendación basada en evidencia. Importá tus Reels reales para un guión basado en datos.',
       },
     };
   }

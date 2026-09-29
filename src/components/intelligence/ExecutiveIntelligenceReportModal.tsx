@@ -108,11 +108,17 @@ CTA: "${report.next_recommended_post.cta}"
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-slate-950/90 border-b border-slate-800 shrink-0 text-xs">
           <div className="p-3 bg-slate-900/90 border border-slate-800 rounded-2xl flex items-center gap-3">
             <div className="text-2xl font-black font-mono text-emerald-400">
-              {report.global_health_score}<span className="text-xs text-slate-500">/100</span>
+              {report.analyzed_posts_count === 0 ? (
+                <span className="text-slate-500">N/D</span>
+              ) : (
+                <>{report.global_health_score}<span className="text-xs text-slate-500">/100</span></>
+              )}
             </div>
             <div>
               <div className="font-bold text-slate-200 text-[11px]">Score General</div>
-              <div className="text-[10px] text-slate-400">Salud del contenido</div>
+              <div className="text-[10px] text-slate-400">
+                {report.analyzed_posts_count === 0 ? 'Sin publicaciones para calcular' : 'Salud del contenido'}
+              </div>
             </div>
           </div>
 
@@ -438,62 +444,82 @@ CTA: "${report.next_recommended_post.cta}"
               </div>
 
               {/* PRÓXIMO REEL PARA PUBLICAR */}
-              <div className="p-5 bg-gradient-to-br from-violet-950/50 to-indigo-950/50 border-2 border-violet-500/40 rounded-3xl space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Zap className="w-4 h-4 text-amber-400 animate-pulse" />
-                    <h4 className="font-bold text-violet-200 text-sm">
-                      Próximo Reel Recomendado para Grabar
-                    </h4>
-                  </div>
-                  <span className="text-[10px] bg-violet-500/30 text-violet-300 px-2.5 py-1 rounded-full font-mono font-bold">
-                    Duración: {report.next_recommended_post.duration_seconds}s
-                  </span>
+              {report.analyzed_posts_count === 0 ? (
+                <div className="p-5 bg-slate-950/60 border border-slate-800 rounded-3xl space-y-3 text-center">
+                  <p className="text-sm font-semibold text-slate-200">
+                    Esperando importación de publicaciones
+                  </p>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Todavía no hay Reels reales cargados para este negocio, así que no podemos proponer un guión basado en evidencia. Sincronizá tus Reels de Instagram para que la IA analice tus datos reales.
+                  </p>
+                  {onSyncAllReels && (
+                    <button
+                      onClick={onSyncAllReels}
+                      className="mx-auto flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold transition-all"
+                    >
+                      <Zap className="w-3.5 h-3.5" />
+                      Sincronizar mis Reels reales ahora
+                    </button>
+                  )}
                 </div>
-
-                <div className="space-y-2">
-                  <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
-                    <span className="text-[10px] uppercase font-bold text-pink-400 block mb-1">
-                      Gancho de Apertura (0 - 3s):
+              ) : (
+                <div className="p-5 bg-gradient-to-br from-violet-950/50 to-indigo-950/50 border-2 border-violet-500/40 rounded-3xl space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-amber-400 animate-pulse" />
+                      <h4 className="font-bold text-violet-200 text-sm">
+                        Próximo Reel Recomendado para Grabar
+                      </h4>
+                    </div>
+                    <span className="text-[10px] bg-violet-500/30 text-violet-300 px-2.5 py-1 rounded-full font-mono font-bold">
+                      Duración: {report.next_recommended_post.duration_seconds}s
                     </span>
-                    <p className="text-slate-100 font-medium text-xs">
-                      "{report.next_recommended_post.hook}"
-                    </p>
                   </div>
 
-                  <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
-                    <span className="text-[10px] uppercase font-bold text-cyan-400 block mb-1">
-                      Estructura Narrativa:
-                    </span>
-                    <p className="text-slate-300 text-xs">
-                      {report.next_recommended_post.structure}
-                    </p>
+                  <div className="space-y-2">
+                    <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
+                      <span className="text-[10px] uppercase font-bold text-pink-400 block mb-1">
+                        Gancho de Apertura (0 - 3s):
+                      </span>
+                      <p className="text-slate-100 font-medium text-xs">
+                        "{report.next_recommended_post.hook}"
+                      </p>
+                    </div>
+
+                    <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
+                      <span className="text-[10px] uppercase font-bold text-cyan-400 block mb-1">
+                        Estructura Narrativa:
+                      </span>
+                      <p className="text-slate-300 text-xs">
+                        {report.next_recommended_post.structure}
+                      </p>
+                    </div>
+
+                    <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
+                      <span className="text-[10px] uppercase font-bold text-amber-400 block mb-1">
+                        Llamado a la Acción (CTA de Conversión):
+                      </span>
+                      <p className="text-slate-200 text-xs font-semibold">
+                        "{report.next_recommended_post.cta}"
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
-                    <span className="text-[10px] uppercase font-bold text-amber-400 block mb-1">
-                      Llamado a la Acción (CTA de Conversión):
-                    </span>
-                    <p className="text-slate-200 text-xs font-semibold">
-                      "{report.next_recommended_post.cta}"
-                    </p>
-                  </div>
+                  <p className="text-[11px] text-slate-400 italic">
+                    💡 {report.next_recommended_post.justification}
+                  </p>
+
+                  {onApplyNextPostToCanvas && (
+                    <button
+                      onClick={onApplyNextPostToCanvas}
+                      className="w-full py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-violet-600/30 transition-all hover:scale-102"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      Cargar este Guión Recomendado al Canvas
+                    </button>
+                  )}
                 </div>
-
-                <p className="text-[11px] text-slate-400 italic">
-                  💡 {report.next_recommended_post.justification}
-                </p>
-
-                {onApplyNextPostToCanvas && (
-                  <button
-                    onClick={onApplyNextPostToCanvas}
-                    className="w-full py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-violet-600/30 transition-all hover:scale-102"
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    Cargar este Guión Recomendado al Canvas
-                  </button>
-                )}
-              </div>
+              )}
             </div>
           )}
 

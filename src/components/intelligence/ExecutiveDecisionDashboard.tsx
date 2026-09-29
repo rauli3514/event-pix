@@ -18,6 +18,7 @@ import { CRMIntelligenceEngine } from '../../services/intelligence/CRMIntelligen
 import { toOptional, formatMetric, hasValue } from '../../services/intelligence/metricUtils';
 
 interface ExecutiveDecisionDashboardProps {
+  businessId: string;
   posts: IntelligencePost[];
   brandDna: BrandDNA;
   accountHandle: string;
@@ -33,6 +34,7 @@ interface ExecutiveDecisionDashboardProps {
 }
 
 export const ExecutiveDecisionDashboard: React.FC<ExecutiveDecisionDashboardProps> = ({
+  businessId,
   posts,
   accountHandle,
   onSwitchToCanvas,
@@ -53,8 +55,8 @@ export const ExecutiveDecisionDashboard: React.FC<ExecutiveDecisionDashboardProp
     let isMounted = true;
     async function fetchCrmData() {
       try {
-        const convs = await CRMStorageService.loadConversations();
-        const t = await CRMStorageService.loadTasks();
+        const convs = await CRMStorageService.loadConversations(businessId);
+        const t = await CRMStorageService.loadTasks(businessId);
         if (isMounted) {
           setConversations(convs);
           setTasks(t);
@@ -65,7 +67,7 @@ export const ExecutiveDecisionDashboard: React.FC<ExecutiveDecisionDashboardProp
     }
     fetchCrmData();
     return () => { isMounted = false; };
-  }, []);
+  }, [businessId]);
 
   // Cálculos dinámicos de CRM
   const funnelMetrics = useMemo(() => {
@@ -416,7 +418,7 @@ export const ExecutiveDecisionDashboard: React.FC<ExecutiveDecisionDashboardProp
 
                   <div className="pt-2 border-t border-slate-800/80">
                     <p className="text-slate-300 leading-relaxed">
-                      El motor extraerá ganchos de alta retención, preguntas de clientes y ofertas de pantallas para redactar el guión óptimo.
+                      El motor extraerá ganchos de alta retención, preguntas de clientes y ofertas de tu negocio para redactar el guión óptimo.
                     </p>
                   </div>
 
@@ -491,7 +493,7 @@ export const ExecutiveDecisionDashboard: React.FC<ExecutiveDecisionDashboardProp
                     </span>
                     <div>
                       <h5 className="font-bold text-slate-200">
-                        {postsCount === 0 ? 'Auditar primer Reel de @display_digital' : 'Optimizar llamada a la acción (CTA)'}
+                        {postsCount === 0 ? `Auditar primer Reel de ${accountHandle}` : 'Optimizar llamada a la acción (CTA)'}
                       </h5>
                       <p className="text-[11px] text-slate-400">
                         {postsCount === 0
