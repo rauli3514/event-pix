@@ -183,6 +183,11 @@ export const AccountMetricsPanel: React.FC<AccountMetricsPanelProps> = ({
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+          {pillarChartData.every(p => p.topic === 'Sin clasificar') && (
+            <p className="text-[11px] text-slate-500">
+              Todavía no analizaste tus Reels con la IA, así que no hay tema real detectado. Abrí cada Reel en el lienzo y usá "Analizar" para que aparezca el desglose por pilar de contenido.
+            </p>
+          )}
         </div>
       )}
 

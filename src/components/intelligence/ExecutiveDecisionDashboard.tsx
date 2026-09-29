@@ -15,11 +15,18 @@ import { IntelligencePost, BrandDNA } from '../../types/intelligence';
 import { CRMConversation, CRMTask } from '../../types/crm';
 import { CRMStorageService } from '../../services/intelligence/CRMStorageService';
 import { CRMIntelligenceEngine } from '../../services/intelligence/CRMIntelligenceEngine';
-import { toOptional, formatMetric, hasValue } from '../../services/intelligence/metricUtils';
+import { toOptional, formatMetric, hasValue, sumAvailable } from '../../services/intelligence/metricUtils';
 import { AccountMetricsEngine } from '../../services/intelligence/AccountMetricsEngine';
 import { AccountMetricsPanel } from './AccountMetricsPanel';
 import { MetaGraphService } from '../../services/meta/MetaGraphService';
 import { ProfileSnapshotService, ProfileSnapshot } from '../../services/intelligence/ProfileSnapshotService';
+
+const OBJECTIVE_LABELS: Record<IntelligencePost['objective'], string> = {
+  engagement: 'Generar interacción',
+  sales: 'Atraer ventas',
+  brand_awareness: 'Dar a conocer la marca',
+  community: 'Construir comunidad',
+};
 
 interface ExecutiveDecisionDashboardProps {
   businessId: string;
@@ -137,8 +144,19 @@ export const ExecutiveDecisionDashboard: React.FC<ExecutiveDecisionDashboardProp
   const totalInteractions = totalLikes + totalComments + totalSaves;
   const avgEngagement = totalViews > 0 ? ((totalInteractions / totalViews) * 100).toFixed(1) : '0.0';
 
-  // Top Reel con mayor impacto
-  const topReel = safePosts.length > 0 ? safePosts[0] : null;
+  // Top Reel con mayor impacto: antes era literalmente `safePosts[0]` (el
+  // primero del arreglo, sin relación con el rendimiento real) — acá se
+  // elige el que sumó más interacción real (likes+comentarios+guardados+
+  // compartidos) entre los que tienen al menos una métrica disponible.
+  // Si ninguno tiene datos todavía, no hay "top reel" que mostrar.
+  const topReel = useMemo(() => {
+    const scored = safePosts
+      .map(p => ({ post: p, total: sumAvailable([p.metrics?.likes, p.metrics?.comments, p.metrics?.saves, p.metrics?.shares]).total }))
+      .filter((s): s is { post: IntelligencePost; total: number } => hasValue(s.total));
+    if (scored.length === 0) return null;
+    scored.sort((a, b) => b.total - a.total);
+    return scored[0].post;
+  }, [safePosts]);
 
   // Motor de métricas de cuenta estilo Socialinsider (5 capas de datos reales)
   const accountMetrics = useMemo(
@@ -675,15 +693,15 @@ export const ExecutiveDecisionDashboard: React.FC<ExecutiveDecisionDashboardProp
                     <ul className="space-y-1 text-slate-300">
                       <li className="flex items-center gap-1.5">
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                        <span><strong>Gancho:</strong> {topReel.analysis?.hook_data?.text ? `"${topReel.analysis.hook_data.text.slice(0, 50)}..."` : 'Gancho visual dinámico.'}</span>
+                        <span><strong>Gancho:</strong> {topReel.analysis?.hook_data?.text ? `"${topReel.analysis.hook_data.text.slice(0, 50)}..."` : 'Sin analizar todavía — analizá este Reel para detectarlo.'}</span>
                       </li>
                       <li className="flex items-center gap-1.5">
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                        <span><strong>Retención:</strong> {hasValue(topReel.metrics?.retention_percentage) ? `${formatMetric(topReel.metrics?.retention_percentage)}%` : 'Calculada por duración de video.'}</span>
+                        <span><strong>Retención:</strong> {hasValue(topReel.metrics?.retention_percentage) ? `${formatMetric(topReel.metrics?.retention_percentage)}%` : 'Sin dato (Meta no reportó esta métrica).'}</span>
                       </li>
                       <li className="flex items-center gap-1.5">
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                        <span><strong>Objetivo:</strong> {topReel.objective || 'Atracción de clientes para local comercial.'}</span>
+                        <span><strong>Objetivo:</strong> {OBJECTIVE_LABELS[topReel.objective] || topReel.objective}</span>
                       </li>
                     </ul>
                   </div>
