@@ -18,7 +18,6 @@ import { CanvasNode, CanvasEdge } from '../../components/intelligence/StrategyCa
 import { ExecutiveIntelligenceReport } from './ContentIntelligenceEngine';
 
 import { UserProfileContext } from '../../types/strategicProfile';
-import { INITIAL_BRAND_DNA } from './mockData';
 
 const LOCAL_STORAGE_KEYS = {
   BUSINESS: 'eventpix_saas_business',
@@ -372,10 +371,15 @@ export class IntelligenceStorageService {
   }
 
   /**
-   * Normaliza cualquier BrandDNA (antiguo o nuevo) para garantizar que los arrays existan siempre
+   * Normaliza cualquier BrandDNA (antiguo o nuevo) para garantizar que los arrays existan siempre.
+   * Sin `dna` (negocio nuevo, sin Brand DNA guardado todavía), NUNCA cae al
+   * `INITIAL_BRAND_DNA` de la demo (EventPix Display Hub, WhatsApp de
+   * ejemplo): eso hacía que cualquier negocio nuevo mostrara el rubro de
+   * pantallas digitales del negocio con el que se armó la plataforma. Usa
+   * los mismos placeholders genéricos de acá abajo.
    */
   static normalizeBrandDna(dna: any, businessId: string): BrandDNA {
-    if (!dna) return { ...INITIAL_BRAND_DNA, business_id: businessId };
+    dna = dna || {};
 
     const favorite_catchphrases =
       dna.voice_and_tone?.favorite_catchphrases ||
