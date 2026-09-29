@@ -19,7 +19,7 @@ import { toOptional, formatMetric, hasValue } from '../../services/intelligence/
 import { AccountMetricsEngine } from '../../services/intelligence/AccountMetricsEngine';
 import { AccountMetricsPanel } from './AccountMetricsPanel';
 import { MetaGraphService } from '../../services/meta/MetaGraphService';
-import { ProfileSnapshotService } from '../../services/intelligence/ProfileSnapshotService';
+import { ProfileSnapshotService, ProfileSnapshot } from '../../services/intelligence/ProfileSnapshotService';
 
 interface ExecutiveDecisionDashboardProps {
   businessId: string;
@@ -77,6 +77,7 @@ export const ExecutiveDecisionDashboard: React.FC<ExecutiveDecisionDashboardProp
   // estilo Socialinsider). Nunca bloquea el resto del dashboard si falla.
   const [followersCount, setFollowersCount] = useState<number | null>(null);
   const [followerGrowthPct, setFollowerGrowthPct] = useState<number | null>(null);
+  const [followerHistory, setFollowerHistory] = useState<ProfileSnapshot[]>([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -103,7 +104,10 @@ export const ExecutiveDecisionDashboard: React.FC<ExecutiveDecisionDashboardProp
           followerCount: count,
         });
         const growth = await ProfileSnapshotService.getGrowth(businessId, 'instagram', cleanHandle, 30);
-        if (isMounted) setFollowerGrowthPct(growth.growthPct);
+        if (isMounted) {
+          setFollowerGrowthPct(growth.growthPct);
+          setFollowerHistory(growth.history);
+        }
       } catch {
         // Sin seguidores no rompe el resto del panel: se muestra "Sin dato".
       }
@@ -138,8 +142,8 @@ export const ExecutiveDecisionDashboard: React.FC<ExecutiveDecisionDashboardProp
 
   // Motor de métricas de cuenta estilo Socialinsider (5 capas de datos reales)
   const accountMetrics = useMemo(
-    () => AccountMetricsEngine.compute(safePosts, followersCount),
-    [safePosts, followersCount]
+    () => AccountMetricsEngine.compute(safePosts, followersCount, accountHandle, followerGrowthPct),
+    [safePosts, followersCount, accountHandle, followerGrowthPct]
   );
 
   return (
@@ -300,6 +304,7 @@ export const ExecutiveDecisionDashboard: React.FC<ExecutiveDecisionDashboardProp
           accountHandle={accountHandle}
           followersCount={followersCount}
           followerGrowthPct={followerGrowthPct}
+          followerHistory={followerHistory}
         />
 
         {/* ========================================================================= */}
