@@ -194,7 +194,7 @@ export class AutomationEngineService {
         is_completed: false,
         assigned_to: conversation.lead.assigned_to || 'Asesor Comercial',
         priority: rule.action_type === 'notify_seller' ? 'high' : 'medium'
-      });
+      }, businessId);
       taskCreated = newTask;
     }
 

@@ -377,9 +377,10 @@ export class CRMStorageService {
   // 3. TAREAS & SEGUIMIENTO (FOLLOW-UP)
   // =========================================================================
 
-  static async loadTasks(_businessId?: string): Promise<CRMTask[]> {
+  static async loadTasks(businessId?: string): Promise<CRMTask[]> {
     try {
-      const stored = localStorage.getItem(LOCAL_STORAGE_KEYS.TASKS);
+      const key = businessId ? `${LOCAL_STORAGE_KEYS.TASKS}_${businessId}` : LOCAL_STORAGE_KEYS.TASKS;
+      const stored = localStorage.getItem(key);
       if (stored) {
         return JSON.parse(stored) as CRMTask[];
       }
@@ -391,33 +392,34 @@ export class CRMStorageService {
     return [];
   }
 
-  static toggleTaskCompleted(taskId: string): Promise<CRMTask[]> {
-    return this.loadTasks().then(current => {
+  static toggleTaskCompleted(taskId: string, businessId?: string): Promise<CRMTask[]> {
+    return this.loadTasks(businessId).then(current => {
       const updated = current.map(t => t.id === taskId ? { ...t, is_completed: !t.is_completed } : t);
-      this.saveTasksLocally(updated);
+      this.saveTasksLocally(updated, businessId);
       return updated;
     });
   }
 
-  static async createTask(task: Omit<CRMTask, 'id' | 'created_at'>): Promise<CRMTask[]> {
-    const current = await this.loadTasks();
+  static async createTask(task: Omit<CRMTask, 'id' | 'created_at'>, businessId?: string): Promise<CRMTask[]> {
+    const current = await this.loadTasks(businessId);
     const newTask: CRMTask = {
       ...task,
       id: `task_${Date.now()}`,
       created_at: new Date().toISOString()
     };
     const updated = [newTask, ...current];
-    this.saveTasksLocally(updated);
+    this.saveTasksLocally(updated, businessId);
     return updated;
   }
 
-  static async saveTasks(tasks: CRMTask[]): Promise<void> {
-    this.saveTasksLocally(tasks);
+  static async saveTasks(tasks: CRMTask[], businessId?: string): Promise<void> {
+    this.saveTasksLocally(tasks, businessId);
   }
 
-  private static saveTasksLocally(tasks: CRMTask[]): void {
+  private static saveTasksLocally(tasks: CRMTask[], businessId?: string): void {
     try {
-      localStorage.setItem(LOCAL_STORAGE_KEYS.TASKS, JSON.stringify(tasks));
+      const key = businessId ? `${LOCAL_STORAGE_KEYS.TASKS}_${businessId}` : LOCAL_STORAGE_KEYS.TASKS;
+      localStorage.setItem(key, JSON.stringify(tasks));
     } catch (e) {
       console.error('Error saving tasks to localStorage', e);
     }
@@ -432,6 +434,7 @@ export class CRMStorageService {
       // leads ni mensajes reales de Supabase acá: son comunicaciones reales de
       // clientes, no datos demo, y no deben poder perderse con un botón de reset.
       localStorage.removeItem(`${LOCAL_STORAGE_KEYS.CONVERSATIONS}_${businessId}`);
+      localStorage.removeItem(`${LOCAL_STORAGE_KEYS.TASKS}_${businessId}`);
     } catch (e) {
       console.error('Error clearing CRM data', e);
     }

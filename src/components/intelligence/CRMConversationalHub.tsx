@@ -151,7 +151,7 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
     async function loadData() {
       const convs = await CRMStorageService.loadConversations(businessId);
       const r = await CRMStorageService.loadRules(businessId);
-      const t = await CRMStorageService.loadTasks();
+      const t = await CRMStorageService.loadTasks(businessId);
       const logs = AutomationEngineService.loadLogs();
       const conns = ConnectionStorageService.loadConnections(businessId);
       if (!isMounted) return;
@@ -440,7 +440,7 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
 
       // Refrescar conversaciones, tareas y logs actualizados
       const freshConvs = await CRMStorageService.loadConversations(businessId);
-      const freshTasks = await CRMStorageService.loadTasks();
+      const freshTasks = await CRMStorageService.loadTasks(businessId);
       setConversations(freshConvs);
       setTasks(freshTasks);
       setAutomationLogs(AutomationEngineService.loadLogs());
@@ -521,7 +521,7 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
 
   // Toggle de tarea de seguimiento
   const handleToggleTask = async (taskId: string) => {
-    const updated = await CRMStorageService.toggleTaskCompleted(taskId);
+    const updated = await CRMStorageService.toggleTaskCompleted(taskId, businessId);
     setTasks(updated);
     toast.info('Estado de tarea actualizado.');
   };
@@ -563,7 +563,7 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
 
       // Refrescar estado global
       const freshConvs = await CRMStorageService.loadConversations(businessId);
-      const freshTasks = await CRMStorageService.loadTasks();
+      const freshTasks = await CRMStorageService.loadTasks(businessId);
       setConversations(freshConvs);
       setTasks(freshTasks);
       setAutomationLogs(AutomationEngineService.loadLogs());
@@ -621,7 +621,7 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
   const handleActionOpportunity = async (opp: CommercialOpportunity) => {
     if (opp.suggested_action_type === 'create_task' && opp.lead_id && opp.lead_name) {
       const updatedTasks = await CRMStorageService.createTask({
-        business_id: 'biz_default',
+        business_id: businessId,
         lead_id: opp.lead_id,
         lead_name: opp.lead_name,
         title: `Seguimiento prioritario: ${opp.lead_name}`,
@@ -629,7 +629,7 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
         is_completed: false,
         assigned_to: 'Ventas EventPix',
         priority: opp.severity === 'high' ? 'high' : 'medium'
-      });
+      }, businessId);
       setTasks(updatedTasks);
       toast.success(`Tarea de seguimiento creada para ${opp.lead_name}`);
     } else if (opp.suggested_action_type === 'open_chat' && opp.lead_id) {

@@ -1217,6 +1217,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
         />
       ) : viewMode === 'dashboard' ? (
         <ExecutiveDecisionDashboard
+          businessId={business.id}
           posts={posts}
           brandDna={brandDna}
           accountHandle={accountHandle}
