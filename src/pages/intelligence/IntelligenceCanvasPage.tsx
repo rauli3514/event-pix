@@ -146,6 +146,20 @@ function businessDiscoveryMediaToIntelligencePost(m: BusinessDiscoveryMedia, bus
   };
 }
 
+// Cuadrícula de tarjetas Reel en el Lienzo: antes se apilaban en una sola
+// columna vertical (misma x, y creciente), así que con muchas publicaciones
+// sincronizadas los cables hacia la tarjeta de IA se volvían una maraña de
+// líneas casi paralelas viajando una distancia enorme. En filas de 4 quedan
+// agrupadas y los cables se ven ordenados en vez de "cortados".
+const REEL_GRID_COLUMNS = 4;
+const REEL_GRID_COL_SPACING = 300;
+const REEL_GRID_ROW_SPACING = 280;
+function reelGridPosition(index: number): { x: number; y: number } {
+  const col = index % REEL_GRID_COLUMNS;
+  const row = Math.floor(index / REEL_GRID_COLUMNS);
+  return { x: 40 + col * REEL_GRID_COL_SPACING, y: 220 + row * REEL_GRID_ROW_SPACING };
+}
+
 export const IntelligenceCanvasPage: React.FC = () => {
   const [business, setBusiness] = useState(INITIAL_BUSINESS);
   const [brandDna, setBrandDna] = useState<BrandDNA>(INITIAL_BRAND_DNA);
@@ -473,8 +487,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
       const newId = `node_${Date.now()}`;
       const newCanvasNode: CanvasNode = {
         id: newId,
-        x: 40,
-        y: 220 + nodes.filter(n => n.type === 'reel').length * 280,
+        ...reelGridPosition(nodes.filter(n => n.type === 'reel').length),
         type: 'reel',
         post: newPost
       };
@@ -512,8 +525,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
     const newPost = metaMediaToIntelligencePost(reel, business.id);
     const newCanvasNode: CanvasNode = {
       id: `node_reel_${reel.id}`,
-      x: position?.x ?? 40,
-      y: position?.y ?? (220 + nodes.filter(n => n.type === 'reel').length * 280),
+      ...(position ?? reelGridPosition(nodes.filter(n => n.type === 'reel').length)),
       type: 'reel',
       post: newPost
     };
@@ -547,11 +559,10 @@ export const IntelligenceCanvasPage: React.FC = () => {
       return;
     }
 
-    const baseY = 220 + nodes.filter(n => n.type === 'reel').length * 280;
+    const baseIndex = nodes.filter(n => n.type === 'reel').length;
     const newCanvasNodes: CanvasNode[] = newPosts.map((post, i) => ({
       id: `node_reel_${post.id}`,
-      x: 40,
-      y: baseY + i * 280,
+      ...reelGridPosition(baseIndex + i),
       type: 'reel',
       post
     }));
