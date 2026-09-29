@@ -88,7 +88,7 @@ export const BrandDnaPanel: React.FC<BrandDnaPanelProps> = ({
     return (
       <button
         onClick={onToggle}
-        className="fixed left-0 top-24 z-40 bg-slate-900/90 border border-slate-800 border-l-0 text-violet-400 p-2.5 rounded-r-xl shadow-xl backdrop-blur-md hover:bg-slate-800 transition-all flex items-center gap-2 group"
+        className="fixed left-0 top-24 md:left-64 z-40 bg-slate-900/90 border border-slate-800 border-l-0 text-violet-400 p-2.5 rounded-r-xl shadow-xl backdrop-blur-md hover:bg-slate-800 transition-all flex items-center gap-2 group"
         title="Abrir Accesos Rápidos de Marca"
       >
         <Brain className="w-5 h-5 text-violet-400 group-hover:scale-110 transition-transform" />

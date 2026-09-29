@@ -1362,7 +1362,7 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
                   cardId={node.id.startsWith('node-ai-chat-') ? node.id.replace('node-ai-chat-', 'Card #') : 'Card #8'}
                   connectedPosts={connectedPosts}
                   messages={node.chatMessages || []}
-                  activeMode={node.activeMode || 'b_roll'}
+                  activeMode={node.activeMode || 'reel_hablado'}
                   onModeChange={(mode) => onUpdateNodeChatMode && onUpdateNodeChatMode(node.id, mode)}
                   onSendMessage={(text, mode) => onSendChatMessage ? onSendChatMessage(node.id, text, mode) : Promise.resolve()}
                   onDisconnectAll={() => onDisconnectAllFromTarget && onDisconnectAllFromTarget(node.id)}
@@ -1402,7 +1402,7 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
           mueven y se pierden al arrastrar el lienzo. El portal lo saca
           de ese árbol para que quede anclado a la ventana de verdad. */}
       {createPortal(
-        <div className="canvas-hud fixed bottom-4 left-6 z-20 flex items-center gap-1.5 bg-slate-950/90 border border-slate-800/90 px-3 py-1.5 rounded-2xl shadow-2xl backdrop-blur-xl text-xs">
+        <div className="canvas-hud fixed bottom-4 left-6 md:left-[280px] z-20 flex items-center gap-1.5 bg-slate-950/90 border border-slate-800/90 px-3 py-1.5 rounded-2xl shadow-2xl backdrop-blur-xl text-xs">
           <div className="flex items-center gap-1.5 pr-2 border-r border-slate-800 text-slate-400 text-[11px]">
             <Move className="w-3.5 h-3.5 text-slate-500" />
             <span className="hidden sm:inline">Arrastrá lienzo</span>
@@ -1500,13 +1500,13 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
         onApplyHookToChat={(hookText) => {
           const chatNode = nodes.find(n => n.type === 'ai_chat');
           if (chatNode && onSendChatMessage) {
-            onSendChatMessage(chatNode.id, hookText, chatNode.activeMode || 'b_roll');
+            onSendChatMessage(chatNode.id, hookText, chatNode.activeMode || 'reel_hablado');
           } else if (onCreateAiChatNode) {
             onCreateAiChatNode({ x: 520, y: 100 });
             setTimeout(() => {
               const freshChat = nodes.find(n => n.type === 'ai_chat');
               if (freshChat && onSendChatMessage) {
-                onSendChatMessage(freshChat.id, hookText, 'b_roll');
+                onSendChatMessage(freshChat.id, hookText, 'reel_hablado');
               }
             }, 300);
           }

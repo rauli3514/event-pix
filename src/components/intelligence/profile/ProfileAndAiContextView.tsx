@@ -322,7 +322,25 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
 
               {/* Formulario de Campos */}
               <div className="md:col-span-8 space-y-4">
-                
+
+                {/* Nombre del negocio — esto es lo que se muestra en el selector
+                    de comercios del lienzo, así que tiene que ser editable acá. */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                    Nombre del negocio
+                  </label>
+                  <input
+                    type="text"
+                    value={context.profile.business_name || ''}
+                    onChange={(e) => setContext({
+                      ...context,
+                      profile: { ...context.profile, business_name: e.target.value }
+                    })}
+                    placeholder="Nombre de tu comercio o marca"
+                    className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-xs text-slate-100 outline-none focus:border-pink-500/60"
+                  />
+                </div>
+
                 {/* Usuario de Instagram — condición: tiene que existir de verdad */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
