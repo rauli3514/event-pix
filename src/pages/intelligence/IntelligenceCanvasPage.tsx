@@ -24,11 +24,11 @@ import { ConnectionStorageService } from '../../services/intelligence/Connection
 import { AIProviderService } from '../../services/intelligence/AIProviderService';
 import { UnifiedConnectionsState } from '../../types/connections';
 import { MetaAdCampaign } from '../../types/ads';
-import { BusinessSwitcher } from '../../components/intelligence/BusinessSwitcher';
 import { NewClientRegistrationModal } from '../../components/intelligence/NewClientRegistrationModal';
 import { ProfileAndAiContextView } from '../../components/intelligence/profile/ProfileAndAiContextView';
 import { ChatMessage, ContentFormatMode } from '../../components/intelligence/canvas/AiChatCardNode';
-import { Brain, Activity, Tv, Sparkles, Cloud, Loader2, MessageSquare, LayoutDashboard, Network, Radio, Trash2, Bot, User, Zap, Search } from 'lucide-react';
+import { AppSidebar } from '../../components/intelligence/layout/AppSidebar';
+import { Menu } from 'lucide-react';
 import { toast } from 'sonner';
 
 // Convierte un media de Meta (propio) en un IntelligencePost. Métricas
@@ -251,6 +251,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
 
   const [isBrandDnaOpen, setIsBrandDnaOpen] = useState(false);
   const [isAuditOpen, setIsAuditOpen] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [inspectedPost, setInspectedPost] = useState<IntelligencePost | null>(null);
   const [isSynthesizing, setIsSynthesizing] = useState(false);
 
@@ -1012,241 +1013,76 @@ export const IntelligenceCanvasPage: React.FC = () => {
   }, [brandDna, business.instagram_handle, accountHandle]);
 
   return (
-    <div className="h-screen w-screen bg-[#080C14] text-slate-100 flex flex-col overflow-hidden font-sans select-none">
-      {/* Header Superior Reorganizado y Orientado a Decisiones */}
-      <header className="min-h-14 border-b border-slate-800/80 bg-slate-950/80 px-4 py-2 flex flex-wrap items-center justify-between gap-y-2 z-30 shrink-0 backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-violet-600/30">
-            <Brain className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-sm font-black tracking-tight text-slate-100 uppercase">
-                EVENTPIX INTELLIGENCE
-              </h1>
-              <span className="text-[10px] bg-violet-500/20 text-violet-300 border border-violet-500/30 px-2 py-0.5 rounded-full font-mono font-semibold">
-                Centro de Decisión & Acción
-              </span>
-            </div>
-            <p className="text-xs text-slate-400">
-              Analista + Estratega para <strong className="text-slate-200">{accountHandle}</strong>
-            </p>
-          </div>
+    <div className="h-screen w-screen bg-[#080C14] text-slate-100 flex overflow-hidden font-sans select-none">
+      {/* BARRA LATERAL DE NAVEGACIÓN (Desktop) — reemplaza al header horizontal
+          para liberar todo el ancho de pantalla para el Lienzo. */}
+      <div className="hidden md:flex h-full">
+        <AppSidebar
+          business={business}
+          accountHandle={accountHandle}
+          viewMode={viewMode}
+          onChangeViewMode={setViewMode}
+          profileCompleted={profileCompleted}
+          isSuperAdmin={isSuperAdmin}
+          onSelectBusiness={handleSelectBusiness}
+          onOpenNewClientModal={() => setIsNewClientModalOpen(true)}
+          activeConnectionsCount={activeConnectionsCount}
+          onOpenConnections={() => setIsConnectionsOpen(true)}
+          onOpenExecutiveReport={() => setIsExecutiveReportOpen(true)}
+          connections={connections}
+          onToggleAIProvider={handleToggleAIProvider}
+          syncStatus={syncStatus}
+          healthScore={executiveReport.global_health_score}
+          onResetToZero={handleResetToZero}
+        />
+      </div>
 
-          {/* Switcher Multi-Tenant de Clientes / Comercios */}
-          <div className="hidden md:block ml-2 border-l border-slate-800/80 pl-3">
-            <BusinessSwitcher
-              currentBusiness={business}
+      {/* BARRA LATERAL EN MÓVIL (overlay a pantalla completa) */}
+      {isMobileSidebarOpen && (
+        <div className="fixed inset-0 z-50 md:hidden flex">
+          <div
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            onClick={() => setIsMobileSidebarOpen(false)}
+          />
+          <div className="relative h-full">
+            <AppSidebar
+              business={business}
+              accountHandle={accountHandle}
+              viewMode={viewMode}
+              onChangeViewMode={setViewMode}
+              profileCompleted={profileCompleted}
+              isSuperAdmin={isSuperAdmin}
               onSelectBusiness={handleSelectBusiness}
               onOpenNewClientModal={() => setIsNewClientModalOpen(true)}
-              readOnly={!isSuperAdmin}
+              activeConnectionsCount={activeConnectionsCount}
+              onOpenConnections={() => setIsConnectionsOpen(true)}
+              onOpenExecutiveReport={() => setIsExecutiveReportOpen(true)}
+              connections={connections}
+              onToggleAIProvider={handleToggleAIProvider}
+              syncStatus={syncStatus}
+              healthScore={executiveReport.global_health_score}
+              onResetToZero={handleResetToZero}
+              onNavigate={() => setIsMobileSidebarOpen(false)}
+              onCloseMobile={() => setIsMobileSidebarOpen(false)}
             />
           </div>
-
-          {/* Buscar un perfil de Instagram/TikTok (propio o de competencia):
-              a propósito NO es lo mismo que "Registrar Nuevo Cliente" de
-              arriba — esto solo consulta datos públicos, no crea un negocio.
-              Abre la pantalla completa de Análisis (Resumen/Contenido/
-              Engagement/Comparar), no el panel angosto del lienzo. */}
-          <button
-            type="button"
-            onClick={() => setViewMode('analysis')}
-            disabled={profileCompleted === false}
-            title={profileCompleted === false ? 'Completá tu Perfil & Contexto IA primero' : 'Buscar cualquier perfil de Instagram o TikTok (el tuyo o de la competencia) y ver su análisis completo'}
-            className="hidden md:flex items-center gap-1.5 ml-2 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-violet-500/50 text-slate-200 text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-slate-900"
-          >
-            <Search className="w-3.5 h-3.5 text-violet-400" />
-            <span>Buscar Perfil</span>
-          </button>
         </div>
+      )}
 
-        {/* Selector Central de Vistas: Lienzo (Board) vs Perfil & Contexto IA vs Métricas.
-            Mientras no se completó el perfil (primera vez), solo se puede estar acá:
-            las demás pestañas quedan deshabilitadas hasta guardar. */}
-        <div className="hidden sm:flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-800 text-xs font-semibold shadow-sm">
+      <main className="flex-1 flex flex-col overflow-hidden min-w-0">
+        {/* BARRA SUPERIOR COMPACTA (solo móvil): la navegación principal ahora
+            vive en la barra lateral, que en pantallas chicas queda oculta. */}
+        <div className="md:hidden flex items-center gap-2.5 px-3 py-2 border-b border-slate-800/80 bg-slate-950/90 shrink-0">
           <button
             type="button"
-            onClick={() => setViewMode('canvas')}
-            disabled={profileCompleted === false}
-            title={profileCompleted === false ? 'Completá tu Perfil & Contexto IA primero' : undefined}
-            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
-              viewMode === 'canvas'
-                ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-            }`}
+            onClick={() => setIsMobileSidebarOpen(true)}
+            className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300"
           >
-            <Network className="w-3.5 h-3.5" />
-            <span>Lienzo (Board)</span>
+            <Menu className="w-4 h-4" />
           </button>
-
-          <button
-            type="button"
-            onClick={() => setViewMode('messages')}
-            disabled={profileCompleted === false}
-            title={profileCompleted === false ? 'Completá tu Perfil & Contexto IA primero' : undefined}
-            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
-              viewMode === 'messages'
-                ? 'bg-gradient-to-r from-emerald-600 to-teal-500 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-            }`}
-          >
-            <MessageSquare className="w-3.5 h-3.5" />
-            <span>Mensajes</span>
-          </button>
-
-          {profileCompleted !== true && (
-            <button
-              type="button"
-              onClick={() => setViewMode('profile')}
-              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
-                viewMode === 'profile'
-                  ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-md shadow-pink-600/20'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-              }`}
-            >
-              <User className="w-3.5 h-3.5 text-pink-300" />
-              <span>Perfil & Contexto IA</span>
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={() => setViewMode('dashboard')}
-            disabled={profileCompleted === false}
-            title={profileCompleted === false ? 'Completá tu Perfil & Contexto IA primero' : undefined}
-            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
-              viewMode === 'dashboard'
-                ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-            }`}
-          >
-            <LayoutDashboard className="w-3.5 h-3.5" />
-            <span>Métricas</span>
-          </button>
+          <span className="text-xs font-bold text-slate-200 truncate">{business.name}</span>
+          <span className="text-[10px] font-mono text-violet-400 ml-auto shrink-0">{accountHandle}</span>
         </div>
-
-        <div className="flex items-center gap-2 sm:gap-3 text-xs">
-          <div className="hidden xl:flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl">
-            <Tv className="w-4 h-4 text-amber-400" />
-            <span className="text-slate-300">Display TV:</span>
-            <span className="text-slate-400 font-medium">0 Pantallas</span>
-          </div>
-
-          <div className="hidden md:flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl">
-            <Activity className="w-4 h-4 text-cyan-400" />
-            <span className="text-slate-300">Salud Negocio:</span>
-            <span className="text-cyan-400 font-bold font-mono">{executiveReport.global_health_score}/100</span>
-          </div>
-
-          {/* Indicador de Nube SaaS */}
-          <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-[11px]">
-            {syncStatus === 'saving' ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 text-violet-400 animate-spin" />
-                <span className="text-violet-300 font-medium">Guardando...</span>
-              </>
-            ) : (
-              <>
-                <Cloud className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-emerald-400 font-medium">SaaS Cloud</span>
-              </>
-            )}
-          </div>
-
-          {/* Acceso rápido a Perfil & Contexto IA una vez que ya no es pestaña fija */}
-          {profileCompleted === true && (
-            <button
-              onClick={() => setViewMode('profile')}
-              className="hidden sm:flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-pink-500/50 text-slate-300 hover:text-pink-300 p-1.5 rounded-xl transition-all"
-              title="Editar Perfil & Contexto IA"
-            >
-              <User className="w-4 h-4" />
-            </button>
-          )}
-
-          {/* Botón Central de Conexiones & APIs */}
-          <button
-            onClick={() => setIsConnectionsOpen(true)}
-            className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-violet-500/50 text-slate-200 px-3 py-1.5 rounded-xl font-bold text-xs transition-all hover:scale-105 shadow-sm"
-            title="Conectar y sincronizar Shop de Plumas, Meta/WhatsApp, OpenAI y Claude"
-          >
-            <Radio className="w-3.5 h-3.5 text-violet-400" />
-            <span className="hidden sm:inline">Conectar APIs</span>
-            <span className="sm:hidden">APIs</span>
-            <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono font-bold ${
-              activeConnectionsCount > 0
-                ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/40'
-                : 'bg-slate-800 text-slate-400'
-            }`}>
-              {activeConnectionsCount > 0 ? `🟢 ${activeConnectionsCount}` : '⚪ 0'}
-            </span>
-          </button>
-
-          {/* Selector Rápido de IA Activa (Multi-IA Auto vs Claude vs Gemini vs OpenAI) */}
-          {(Boolean(connections.gemini?.apiKey && connections.gemini.apiKey.length > 5) ||
-            Boolean(connections.claude?.apiKey && connections.claude.apiKey.length > 5) ||
-            Boolean(connections.openai?.apiKey && connections.openai.apiKey.length > 5) ||
-            connections.openai.status === 'connected' ||
-            connections.claude.status === 'connected' ||
-            connections.gemini?.status === 'connected') && (
-            <button
-              onClick={handleToggleAIProvider}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs transition-all hover:scale-105 border shadow-sm ${
-                connections.preferredAIProvider === 'gemini'
-                  ? 'bg-sky-500/10 border-sky-500/30 text-sky-300 hover:bg-sky-500/20 shadow-sky-500/10'
-                  : connections.preferredAIProvider === 'claude'
-                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20 shadow-amber-500/10'
-                  : connections.preferredAIProvider === 'openai'
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20 shadow-emerald-500/10'
-                  : 'bg-fuchsia-500/15 border-fuchsia-500/40 text-fuchsia-300 hover:bg-fuchsia-500/25 shadow-fuchsia-500/15'
-              }`}
-              title="Click para alternar entre Multi-IA Automático, Claude Sonnet, Google Gemini y ChatGPT GPT-4o"
-            >
-              {connections.preferredAIProvider === 'gemini' ? (
-                <>
-                  <Zap className="w-3.5 h-3.5 text-sky-400 animate-pulse" />
-                  <span>IA: Gemini 1.5</span>
-                </>
-              ) : connections.preferredAIProvider === 'claude' ? (
-                <>
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-                  <span>IA: Claude Sonnet</span>
-                </>
-              ) : connections.preferredAIProvider === 'openai' ? (
-                <>
-                  <Bot className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>IA: GPT-4o</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-3.5 h-3.5 text-fuchsia-400 animate-pulse" />
-                  <span>⚡ Multi-IA: Auto</span>
-                </>
-              )}
-            </button>
-          )}
-
-          {/* Botón Destacado: INFORME DE INTELIGENCIA */}
-          <button
-            onClick={() => setIsExecutiveReportOpen(true)}
-            className="flex items-center gap-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white px-3 py-1.5 rounded-xl font-bold text-xs shadow-lg shadow-violet-600/30 transition-all hover:scale-105"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
-            <span className="hidden sm:inline">Informe de Inteligencia</span>
-            <span className="sm:hidden">Informe</span>
-          </button>
-
-          {/* Botón Reiniciar Datos a 0 */}
-          <button
-            onClick={handleResetToZero}
-            className="flex items-center gap-1.5 bg-rose-950/30 hover:bg-rose-900/60 border border-rose-500/30 hover:border-rose-500/60 text-rose-300 px-2.5 py-1.5 rounded-xl font-semibold text-xs transition-all"
-            title="Limpiar datos demo y comenzar desde 0"
-          >
-            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-            <span className="hidden lg:inline">Reiniciar a 0</span>
-          </button>
-        </div>
-      </header>
 
       {/* VISTA DINÁMICA: PERFIL & CONTEXTO IA, DASHBOARD EJECUTIVO O LIENZO DE ESTRATEGIA */}
       {viewMode === 'profile' ? (
@@ -1361,6 +1197,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
           />
         </div>
       )}
+      </main>
 
       <ReelBreakdownModal
         post={inspectedPost}
