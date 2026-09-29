@@ -143,7 +143,7 @@ export const BusinessAuditPanel: React.FC<BusinessAuditPanelProps> = ({
         if (!cancelled) {
           setUnifiedAudit(built);
           setSupportingMetrics({
-            avg_reach: organicReport.layer_averages.avg_reach || undefined,
+            avg_reach: toOptional(organicReport.layer_averages.avg_reach),
             total_spend: usedAdsReport?.total_spend,
             budget_efficiency_score: usedAdsReport?.budget_efficiency_score,
             total_leads: funnelMetrics.total_leads,

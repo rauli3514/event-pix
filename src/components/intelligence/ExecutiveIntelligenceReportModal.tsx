@@ -12,6 +12,7 @@ import {
   BarChart3
 } from 'lucide-react';
 import { ExecutiveIntelligenceReport } from '../../services/intelligence/ContentIntelligenceEngine';
+import { formatMetric } from '../../services/intelligence/metricUtils';
 import { toast } from 'sonner';
 
 interface ExecutiveIntelligenceReportModalProps {
@@ -124,7 +125,7 @@ CTA: "${report.next_recommended_post.cta}"
 
           <div className="p-3 bg-slate-900/90 border border-slate-800 rounded-2xl flex items-center gap-3">
             <div className="text-2xl font-black font-mono text-cyan-400">
-              {report.layer_averages.avg_reach.toLocaleString()}
+              {formatMetric(report.layer_averages.avg_reach, { compact: true })}
             </div>
             <div>
               <div className="font-bold text-slate-200 text-[11px]">Alcance Promedio</div>
@@ -134,7 +135,7 @@ CTA: "${report.next_recommended_post.cta}"
 
           <div className="p-3 bg-slate-900/90 border border-slate-800 rounded-2xl flex items-center gap-3">
             <div className="text-2xl font-black font-mono text-violet-400">
-              {report.layer_averages.avg_interest_rate}%
+              {formatMetric(report.layer_averages.avg_interest_rate, { suffix: '%' })}
             </div>
             <div>
               <div className="font-bold text-slate-200 text-[11px]">Tasa de Interés</div>
@@ -144,7 +145,7 @@ CTA: "${report.next_recommended_post.cta}"
 
           <div className="p-3 bg-slate-900/90 border border-slate-800 rounded-2xl flex items-center gap-3">
             <div className="text-2xl font-black font-mono text-amber-400">
-              {report.layer_averages.avg_commercial_intent_rate}%
+              {formatMetric(report.layer_averages.avg_commercial_intent_rate, { suffix: '%' })}
             </div>
             <div>
               <div className="font-bold text-slate-200 text-[11px]">Intención Comercial</div>
@@ -224,7 +225,7 @@ CTA: "${report.next_recommended_post.cta}"
                     </p>
                     <div className="pt-2 border-t border-slate-800 flex justify-between items-center text-[11px]">
                       <span className="text-slate-500">Promedio:</span>
-                      <span className="font-mono font-bold text-slate-200">{report.layer_averages.avg_reach} views</span>
+                      <span className="font-mono font-bold text-slate-200">{formatMetric(report.layer_averages.avg_reach, { suffix: ' views' })}</span>
                     </div>
                   </div>
 
@@ -239,7 +240,7 @@ CTA: "${report.next_recommended_post.cta}"
                     </p>
                     <div className="pt-2 border-t border-slate-800 flex justify-between items-center text-[11px]">
                       <span className="text-slate-500">Tasa de Interés:</span>
-                      <span className="font-mono font-bold text-slate-200">{report.layer_averages.avg_interest_rate}%</span>
+                      <span className="font-mono font-bold text-slate-200">{formatMetric(report.layer_averages.avg_interest_rate, { suffix: '%' })}</span>
                     </div>
                   </div>
 
@@ -254,7 +255,7 @@ CTA: "${report.next_recommended_post.cta}"
                     </p>
                     <div className="pt-2 border-t border-slate-800 flex justify-between items-center text-[11px]">
                       <span className="text-slate-500">Tasa Comercial:</span>
-                      <span className="font-mono font-bold text-slate-200">{report.layer_averages.avg_commercial_intent_rate}%</span>
+                      <span className="font-mono font-bold text-slate-200">{formatMetric(report.layer_averages.avg_commercial_intent_rate, { suffix: '%' })}</span>
                     </div>
                   </div>
                 </div>
@@ -367,33 +368,45 @@ CTA: "${report.next_recommended_post.cta}"
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {report.patterns.map((pat, idx) => (
-                  <div key={idx} className="p-4 bg-slate-950 border border-slate-800 rounded-2xl space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-200 text-xs">{pat.name}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono uppercase ${
-                        pat.recommendation === 'repetir'
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                          : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                      }`}>
-                        {pat.recommendation}
-                      </span>
-                    </div>
+              {report.patterns.length === 0 ? (
+                <div className="p-5 bg-slate-950/60 border border-slate-800 rounded-2xl text-center space-y-1.5">
+                  <p className="text-sm font-semibold text-slate-200">
+                    Todavía no se detectaron patrones con evidencia suficiente
+                  </p>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Los patrones de esta pestaña requieren publicaciones con análisis de IA hecho (gancho, CTA) o con duración reportada por Meta.
+                    Transcribí y analizá algunos de tus Reels desde el Lienzo para que el motor pueda identificarlos.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {report.patterns.map((pat, idx) => (
+                    <div key={idx} className="p-4 bg-slate-950 border border-slate-800 rounded-2xl space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-200 text-xs">{pat.name}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono uppercase ${
+                          pat.recommendation === 'repetir'
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                        }`}>
+                          {pat.recommendation}
+                        </span>
+                      </div>
 
-                    <p className="text-[11px] text-slate-400 leading-relaxed">
-                      {pat.reasoning}
-                    </p>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        {pat.reasoning}
+                      </p>
 
-                    <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[10px]">
-                      <span className="text-slate-500">Métricas clave:</span>
-                      <span className="text-violet-300 font-mono font-bold">
-                        Interés {pat.avg_interest_score}/100 · Comercial {pat.avg_commercial_score}/100
-                      </span>
+                      <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[10px]">
+                        <span className="text-slate-500">Métricas clave:</span>
+                        <span className="text-violet-300 font-mono font-bold">
+                          Interés {pat.avg_interest_score}/100 · Comercial {pat.avg_commercial_score}/100
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
