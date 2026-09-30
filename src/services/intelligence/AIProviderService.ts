@@ -23,6 +23,7 @@ import { UserProfileContext } from '../../types/strategicProfile';
 import { AccountBenchmarkService } from './AccountBenchmarkService';
 import { ContentDnaEngine } from './ContentDnaEngine';
 import { IntelligenceStorageService } from './IntelligenceStorageService';
+import { supabase } from '../../lib/supabase';
 import {
   hasValue,
   fromApi,
@@ -1601,6 +1602,36 @@ Devuelve un JSON con este formato exacto:
       ContentDnaEngine.deconstructReelDna(postToMetaItem(p), niche)
     );
 
+    // 2.b Traer catálogo real y base de conocimiento del negocio: sin esto la IA
+    // solo tiene la categoría genérica del nicho y termina escribiendo consejos
+    // de guion en abstracto en vez de un guion concreto sobre lo que se vende.
+    const [{ data: catalogRows }, { data: knowledgeBase }] = await Promise.all([
+      supabase
+        .from('intelligence_business_products')
+        .select('name, description, price')
+        .eq('business_id', businessId)
+        .eq('is_active', true)
+        .limit(20),
+      supabase
+        .from('intelligence_business_knowledge_base')
+        .select('*')
+        .eq('business_id', businessId)
+        .maybeSingle()
+    ]);
+
+    const catalogText = catalogRows && catalogRows.length > 0
+      ? catalogRows.map((p: any) => `- ${p.name}${p.price ? ` ($${p.price})` : ''}${p.description ? `: ${p.description}` : ''}`).join('\n')
+      : '(sin catálogo cargado: usá lo que diga "De qué habla la cuenta" abajo, sin inventar productos)';
+
+    const kb = knowledgeBase || {};
+    const knowledgeText = [
+      kb.business_description ? `Descripción del negocio: ${kb.business_description}` : null,
+      kb.pricing_policy ? `Política de precios: ${kb.pricing_policy}` : null,
+      kb.faqs && Array.isArray(kb.faqs) && kb.faqs.length > 0 ? `Preguntas frecuentes reales: ${JSON.stringify(kb.faqs)}` : null
+    ].filter(Boolean).join('\n') || '(sin base de conocimiento cargada todavía)';
+
+    const aboutContent = profileContext?.profile?.about_content?.trim() || null;
+
     // 3. Evaluar rendimiento contra la mediana
     const classifications = sourcePosts.map(p => {
       return AccountBenchmarkService.evaluateReelPerformance(postToMetaItem(p), benchmark!);
@@ -1656,7 +1687,11 @@ REGLAS INQUEBRANTABLES:
    - VARIANTE A (Patrón Probado): Aplica directamente el patrón que mejor superó la mediana de la cuenta.
    - VARIANTE B (Ángulo Alternativo): Misma hipótesis pero atacando una objeción o ángulo complementario.
    - VARIANTE C (Apuesta Creativa): Hipótesis exploratoria con mayor contraste visual y narrativo.
-4. Responde ÚNICAMENTE con un JSON con la estructura:
+4. PROHIBIDO EXPLICAR TEORÍA DE GUION EN VEZ DE ESCRIBIRLO:
+   - ❌ Nunca escribas consejos en abstracto tipo "hacé un gancho fuerte en los primeros segundos" o "mostrá el producto de forma atractiva".
+   - ✅ Cada campo (hook_0_3s, script_body, on_screen_text, cta_trigger) tiene que ser el TEXTO REAL Y FINAL que se dice o se lee en el video, nombrando el producto/servicio concreto del catálogo o de "De qué habla la cuenta" que te paso abajo — nunca una descripción de cómo debería ser.
+   - Si el catálogo o la descripción del negocio no traen nada específico, elegí el producto o servicio más mencionado y construí el guion sobre eso, nunca en genérico ("tu producto", "tu servicio").
+5. Responde ÚNICAMENTE con un JSON con la estructura:
 {
   "variantA": {
     "label": "Variante A: Patrón Ganador Probado",
@@ -1715,12 +1750,19 @@ ${pastLearningsText}
 
 CONTEXTO DEL NEGOCIO:
 - Nicho: ${niche}
+- De qué habla la cuenta y a quién ayuda: ${aboutContent || '(no cargado: inferí del catálogo y del nicho, sin inventar datos de terceros)'}
 - Tono: ${profileTone}
 - Reglas OBLIGATORIAS: ${mustDos}
 - Reglas PROHIBIDAS: ${forbiddens}
 - CTA preferido: "${favoriteCta}"
 - Formato solicitado: ${mode.toUpperCase()}
-- Objetivo / Tema: ${userGoal || 'Superar la mediana histórica de guardados y consultas comerciales'}`;
+- Objetivo / Tema: ${userGoal || 'Superar la mediana histórica de guardados y consultas comerciales'}
+
+CATÁLOGO REAL DE PRODUCTOS/SERVICIOS (nombrá estos productos textualmente en el guion, no generalices):
+${catalogText}
+
+BASE DE CONOCIMIENTO DEL NEGOCIO:
+${knowledgeText}`;
 
     // Orquestación Multi-IA (Auto vs Manual): Cascada inteligente sin caídas
     const hasClaude = Boolean(connections.claude?.isActive && connections.claude?.apiKey?.trim());
