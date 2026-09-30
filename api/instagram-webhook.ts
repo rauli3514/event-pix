@@ -1,16 +1,26 @@
 // ================================================================
 // api/instagram-webhook.ts
 // Función serverless de Vercel — recibe DMs reales de Instagram
-// (Instagram API con Instagram Login), los guarda en el mismo CRM
-// que usa WhatsApp, y responde con IA grounded en el conocimiento
-// del negocio o con automatizaciones por palabra clave.
+// (Instagram API con Instagram Login) Y mensajes de Messenger de
+// Facebook (misma "Messenger Platform", mismo payload `messaging`),
+// los guarda en el mismo CRM, y responde con IA grounded en el
+// conocimiento del negocio o con automatizaciones por palabra clave.
+//
+// Instagram y Facebook comparten esta única función (en vez de tener
+// una función aparte para cada una) porque el plan Hobby de Vercel
+// tiene un tope de 12 Funciones Serverless por deployment — ya
+// estábamos en el límite antes de sumar Facebook. Meta permite
+// registrar los dos productos de webhook ("instagram" y "page")
+// apuntando a la MISMA callback URL: acá se distinguen por
+// `req.body.object`.
 //
 // Variables de entorno que necesita (Vercel → Environment Variables):
 //   - VITE_SUPABASE_URL               (ya existe, se reutiliza)
 //   - SUPABASE_SERVICE_ROLE_KEY       (ya existe, se reutiliza)
 //   - INSTAGRAM_WEBHOOK_VERIFY_TOKEN  (nueva — la inventamos nosotros,
 //                                      se pega también en el panel de
-//                                      Meta al configurar el webhook)
+//                                      Meta al configurar el webhook,
+//                                      para ambos productos)
 //   - ANTHROPIC_API_KEY               (ya existe, se reutiliza)
 // ================================================================
 
@@ -72,6 +82,32 @@ async function sendInstagramCommentPrivateReply(accessToken: string, commentId: 
   return res.ok;
 }
 
+// Envío de Messenger (Facebook Page) — misma API que Instagram, pero por
+// graph.facebook.com y con el token de la Página, no de la cuenta de IG.
+async function sendFacebookText(accessToken: string, psid: string, text: string) {
+  const res = await fetch(`https://graph.facebook.com/v19.0/me/messages?access_token=${encodeURIComponent(accessToken)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      recipient: { id: psid },
+      message: { text }
+    })
+  });
+  return res.ok;
+}
+
+async function sendFacebookImage(accessToken: string, psid: string, imageUrl: string) {
+  const res = await fetch(`https://graph.facebook.com/v19.0/me/messages?access_token=${encodeURIComponent(accessToken)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      recipient: { id: psid },
+      message: { attachment: { type: 'image', payload: { url: imageUrl, is_reusable: true } } }
+    })
+  });
+  return res.ok;
+}
+
 interface CatalogProduct {
   id: string;
   name: string;
@@ -89,6 +125,7 @@ interface AiReplyResult {
 // el conocimiento real del negocio y su catálogo, nunca inventando.
 async function generateAiReply(params: {
   businessName: string;
+  channelLabel: string;
   knowledgeBase: any;
   products: CatalogProduct[];
   customerMessage: string;
@@ -103,7 +140,7 @@ async function generateAiReply(params: {
     : '(sin productos cargados todavía)';
 
   const kb = params.knowledgeBase || {};
-  const systemPrompt = `Sos el asistente de Instagram Direct de "${params.businessName}". Respondé como si fueras un vendedor real de ese negocio: corto, cordial, en español rioplatense.
+  const systemPrompt = `Sos el asistente de ${params.channelLabel} de "${params.businessName}". Respondé como si fueras un vendedor real de ese negocio: corto, cordial, en español rioplatense.
 
 Descripción del negocio: ${kb.business_description || 'sin descripción cargada'}
 Política de precios: ${kb.pricing_policy || 'no especificada'}
@@ -147,7 +184,8 @@ Respondé SIEMPRE en JSON válido, sin texto extra, con esta forma exacta:
 }
 
 export default async function handler(req: any, res: any) {
-  // 1. Verificación del webhook (handshake de Meta al configurar la URL)
+  // 1. Verificación del webhook (handshake de Meta al configurar la URL,
+  //    compartido por los productos "Instagram" y "Messenger/Page")
   if (req.method === 'GET') {
     const mode = req.query?.['hub.mode'];
     const token = req.query?.['hub.verify_token'];
@@ -174,8 +212,210 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
+    // Meta manda `object: "page"` para Messenger de Facebook y
+    // `object: "instagram"` para Instagram — mismo payload `entry[].messaging`,
+    // pero el ID de la entrada y a qué negocio pertenece cambian.
+    const isPageEvent = req.body?.object === 'page';
+
     const entries = req.body?.entry || [];
     for (const entry of entries) {
+      if (isPageEvent) {
+        // ---- Rama Facebook Messenger ----
+        const pageId = entry.id as string | undefined;
+        const messagingEvents = entry.messaging || [];
+        if (!pageId || messagingEvents.length === 0) continue;
+
+        const { data: business } = await supabase
+          .from('intelligence_businesses')
+          .select('id, facebook_page_access_token, name')
+          .eq('facebook_page_id', pageId)
+          .maybeSingle();
+
+        if (!business) {
+          console.warn('instagram-webhook: sin negocio para facebook_page_id', pageId);
+          continue;
+        }
+
+        for (const event of messagingEvents) {
+          if (event.message?.is_echo) continue;
+          const text = event.message?.text;
+          const psid = event.sender?.id as string | undefined;
+          if (!text || !psid) continue;
+          const leadName = `Facebook ${psid.slice(-6)}`;
+
+          let { data: lead } = await supabase
+            .from('intelligence_crm_leads')
+            .select('id')
+            .eq('business_id', business.id)
+            .eq('facebook_scoped_id', psid)
+            .maybeSingle();
+
+          if (!lead) {
+            const { data: newLead } = await supabase
+              .from('intelligence_crm_leads')
+              .insert({
+                business_id: business.id,
+                name: leadName,
+                facebook_scoped_id: psid,
+                channel: 'facebook_dm',
+                source: { type: 'facebook_webhook' }
+              })
+              .select('id')
+              .single();
+            lead = newLead;
+          }
+          if (!lead) continue;
+
+          let { data: conversation } = await supabase
+            .from('intelligence_crm_conversations')
+            .select('id, ai_mode, unread_count')
+            .eq('business_id', business.id)
+            .eq('lead_id', lead.id)
+            .maybeSingle();
+
+          if (!conversation) {
+            const { data: newConv } = await supabase
+              .from('intelligence_crm_conversations')
+              .insert({ business_id: business.id, lead_id: lead.id, channel: 'facebook_dm' })
+              .select('id, ai_mode, unread_count')
+              .single();
+            conversation = newConv;
+          }
+          if (!conversation) continue;
+
+          await supabase.from('intelligence_crm_messages').insert({
+            conversation_id: conversation.id,
+            sender_type: 'lead',
+            sender_name: leadName,
+            content: text,
+            status: 'received',
+            message_type: 'incoming'
+          });
+
+          await supabase
+            .from('intelligence_crm_conversations')
+            .update({
+              unread_count: (conversation.unread_count || 0) + 1,
+              last_interaction_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', conversation.id);
+
+          await supabase
+            .from('intelligence_crm_leads')
+            .update({ last_interaction_at: new Date().toISOString() })
+            .eq('id', lead.id);
+
+          if (conversation.ai_mode === 'disabled') continue;
+
+          const { data: automations } = await supabase
+            .from('intelligence_crm_automations')
+            .select('*')
+            .eq('business_id', business.id)
+            .eq('trigger_event', 'keyword_match')
+            .eq('is_active', true);
+
+          const lowerText = text.toLowerCase();
+          const matched = (automations || []).find((a: any) =>
+            a.trigger_keyword &&
+            a.action_payload?.trigger_channel !== 'comment' &&
+            lowerText.includes(String(a.trigger_keyword).toLowerCase())
+          );
+
+          if (matched) {
+            const replyText = matched.action_payload?.message_template;
+            if (replyText && !matched.requires_human_approval && business.facebook_page_access_token) {
+              const sent = await sendFacebookText(business.facebook_page_access_token, psid, replyText);
+              await supabase.from('intelligence_crm_messages').insert({
+                conversation_id: conversation.id,
+                sender_type: 'ai_auto',
+                sender_name: business.name,
+                content: replyText,
+                status: sent ? 'sent' : 'rejected',
+                message_type: 'auto_reply',
+                ai_metadata: { automation_id: matched.id, reasoning: `Disparado por palabra clave: "${matched.trigger_keyword}"` }
+              });
+            } else if (replyText) {
+              await supabase.from('intelligence_crm_messages').insert({
+                conversation_id: conversation.id,
+                sender_type: 'ai_suggested',
+                sender_name: business.name,
+                content: replyText,
+                status: 'suggested',
+                message_type: 'auto_reply',
+                ai_metadata: { automation_id: matched.id, reasoning: `Sugerido por palabra clave: "${matched.trigger_keyword}"` }
+              });
+            }
+            continue;
+          }
+
+          const [{ data: knowledgeBase }, { data: catalog }] = await Promise.all([
+            supabase
+              .from('intelligence_business_knowledge_base')
+              .select('*')
+              .eq('business_id', business.id)
+              .maybeSingle(),
+            supabase
+              .from('intelligence_business_products')
+              .select('id, name, description, price, image_url')
+              .eq('business_id', business.id)
+              .eq('is_active', true)
+          ]);
+
+          const aiResult = await generateAiReply({
+            businessName: business.name,
+            channelLabel: 'Messenger',
+            knowledgeBase,
+            products: (catalog || []) as CatalogProduct[],
+            customerMessage: text
+          });
+
+          if (!aiResult) continue;
+
+          const matchedProduct = aiResult.product_id
+            ? (catalog || []).find((p: CatalogProduct) => p.id === aiResult.product_id)
+            : null;
+
+          if (conversation.ai_mode === 'automatic' && business.facebook_page_access_token) {
+            const sent = await sendFacebookText(business.facebook_page_access_token, psid, aiResult.reply);
+            let imageSent = false;
+            if (matchedProduct?.image_url) {
+              imageSent = await sendFacebookImage(business.facebook_page_access_token, psid, matchedProduct.image_url);
+            }
+            await supabase.from('intelligence_crm_messages').insert({
+              conversation_id: conversation.id,
+              sender_type: 'ai_auto',
+              sender_name: business.name,
+              content: aiResult.reply,
+              status: sent ? 'sent' : 'rejected',
+              message_type: 'auto_reply',
+              ai_metadata: {
+                reasoning: 'Respuesta generada por IA (sin regla de palabra clave)',
+                product_id: matchedProduct?.id,
+                product_image_sent: imageSent
+              }
+            });
+          } else {
+            await supabase.from('intelligence_crm_messages').insert({
+              conversation_id: conversation.id,
+              sender_type: 'ai_suggested',
+              sender_name: business.name,
+              content: aiResult.reply,
+              status: 'suggested',
+              message_type: 'auto_reply',
+              ai_metadata: {
+                reasoning: 'Sugerencia generada por IA (sin regla de palabra clave)',
+                product_id: matchedProduct?.id,
+                product_image_url: matchedProduct?.image_url
+              }
+            });
+          }
+        }
+
+        continue;
+      }
+
+      // ---- Rama Instagram DM / comentarios ----
       const igAccountId = entry.id as string | undefined;
       const messagingEvents = entry.messaging || [];
       const commentChanges = (entry.changes || []).filter((c: any) => c.field === 'comments');
@@ -330,6 +570,7 @@ export default async function handler(req: any, res: any) {
 
         const aiResult = await generateAiReply({
           businessName: business.name,
+          channelLabel: 'Instagram Direct',
           knowledgeBase,
           products: (catalog || []) as CatalogProduct[],
           customerMessage: text
