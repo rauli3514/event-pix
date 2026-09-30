@@ -40,8 +40,11 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  const limitParam = parseInt((req.query?.limit as string) || '25', 10);
-  const mediaLimit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 50) : 25;
+  // 100 es el máximo real que permite `business_discovery.media` por
+  // consulta — Meta no pagina este campo, así que no tiene sentido pedir
+  // (ni permitir) más.
+  const limitParam = parseInt((req.query?.limit as string) || '100', 10);
+  const mediaLimit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 100) : 100;
 
   const fields = `business_discovery.username(${username}){username,name,profile_picture_url,followers_count,media_count,media.limit(${mediaLimit}){id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count}}`;
 

@@ -33,6 +33,10 @@ export interface CompetitorProfile {
   display_name: string;
   avatar_url?: string;
   followers_count?: number;
+  /** Total real de publicaciones que reporta Meta para esta cuenta — nunca
+   * el largo de `reels`, que solo trae como máximo los últimos ~100 posts
+   * que permite consultar `business_discovery` por request. */
+  media_count?: number;
   niche?: string;
   reels: AuditedCompetitorReel[];
   avg_likes: MetricValue;
@@ -369,6 +373,7 @@ export const CompetitorAnalysisPanel: React.FC<CompetitorAnalysisPanelProps> = (
             display_name: bd.name || bd.username,
             avatar_url: bd.profile_picture_url,
             followers_count: bd.followers_count,
+            media_count: bd.media_count,
             reels,
             avg_likes: averageAvailable(reels.map((r) => r.likes)),
             avg_comments: averageAvailable(reels.map((r) => r.comments_count)),
