@@ -450,7 +450,12 @@ export class MetaGraphService {
   static async getBusinessDiscovery(
     targetUsername: string,
     businessId?: string,
-    mediaLimit = 25
+    // 100 es el máximo real que permite `business_discovery.media` por
+    // consulta — Meta no expone paginación para este campo, así que en
+    // cuentas con cientos de publicaciones el análisis siempre va a ser
+    // sobre las últimas ~100 (igual que hacen otras herramientas de
+    // analítica de perfiles públicos ajenos).
+    mediaLimit = 100
   ): Promise<{ success: true; data: BusinessDiscoveryResult } | { success: false; error: string }> {
     const creds = MetaGraphService.loadCredentials(businessId);
     if (!creds?.accessToken || !creds.instagramAccountId) {

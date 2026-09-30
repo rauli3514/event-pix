@@ -230,7 +230,10 @@ export const ProfileAnalysisView: React.FC<ProfileAnalysisViewProps> = ({ busine
           displayName: c.display_name,
           avatarUrl: c.avatar_url,
           followerCount: c.followers_count ?? null,
-          mediaCount: c.reels.length,
+          // `c.media_count` es el total real que reportó Meta; los perfiles
+          // guardados antes de que se empezara a guardar ese dato caen al
+          // largo de `reels` (todo lo que se llegó a traer en su momento).
+          mediaCount: c.media_count ?? c.reels.length,
           posts: c.reels.map(competitorReelToPost),
         });
       }
@@ -337,6 +340,7 @@ export const ProfileAnalysisView: React.FC<ProfileAnalysisViewProps> = ({ busine
           display_name: bd.name || bd.username,
           avatar_url: bd.profile_picture_url,
           followers_count: bd.followers_count,
+          media_count: bd.media_count,
           reels: bd.media.map((m) => ({
             id: `reel_${m.id}`,
             url: m.permalink,
