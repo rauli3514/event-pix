@@ -4,7 +4,7 @@
 // EventPix Intelligence — SaaS Platform
 // ================================================================
 
-export type CRMChannel = 'whatsapp' | 'instagram_dm' | 'meta_ads' | 'qr_display' | 'direct';
+export type CRMChannel = 'whatsapp' | 'instagram_dm' | 'facebook_dm' | 'meta_ads' | 'qr_display' | 'direct';
 
 export type LeadStage = 
   | 'nuevo'          // Acaba de iniciar conversación

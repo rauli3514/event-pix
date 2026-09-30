@@ -47,6 +47,16 @@ export interface InstagramConnection {
   lastTestedAt?: string;
 }
 
+export interface FacebookConnection {
+  accessToken: string;
+  pageId: string;
+  pageName?: string;
+  isActive: boolean;
+  status: ConnectionStatus;
+  errorMessage?: string;
+  lastTestedAt?: string;
+}
+
 export interface ShopProduct {
   id: string;
   code?: string;
@@ -92,5 +102,6 @@ export interface UnifiedConnectionsState {
   gemini: GeminiConnection;
   whatsapp: WhatsAppConnection;
   instagram: InstagramConnection;
+  facebook: FacebookConnection;
   shopDePlumas: ShopDePlumasConnection;
 }

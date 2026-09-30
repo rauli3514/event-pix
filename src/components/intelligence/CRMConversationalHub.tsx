@@ -9,7 +9,7 @@ import {
   MessageSquare, Users, Sparkles, Send,
   Clock, ShieldAlert, Check,
   Search, ArrowRight, AlertTriangle,
-  X, Instagram, PhoneCall, Zap, Plus, Edit2,
+  X, Instagram, Facebook, PhoneCall, Zap, Plus, Edit2,
   Trash2, Play, DollarSign, Flame, Activity, ShieldCheck, RotateCcw
 } from 'lucide-react';
 import {
@@ -806,6 +806,14 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
                     >
                       <Instagram className="w-3 h-3 text-pink-400" /> Instagram
                     </button>
+                    <button
+                      onClick={() => setChannelFilter('facebook_dm')}
+                      className={`px-2.5 py-1 rounded-lg flex items-center gap-1 font-medium transition-all ${
+                        channelFilter === 'facebook_dm' ? 'bg-blue-600/30 text-blue-300 border border-blue-500/40' : 'text-slate-400 hover:text-blue-300'
+                      }`}
+                    >
+                      <Facebook className="w-3 h-3 text-blue-400" /> Facebook
+                    </button>
                   </div>
 
                   {/* Filtro por Etapa */}
@@ -865,6 +873,10 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
                             {conv.channel === 'whatsapp' ? (
                               <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
                                 <PhoneCall className="w-3.5 h-3.5" />
+                              </div>
+                            ) : conv.channel === 'facebook_dm' ? (
+                              <div className="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+                                <Facebook className="w-3.5 h-3.5" />
                               </div>
                             ) : (
                               <div className="w-6 h-6 rounded-lg bg-pink-500/20 text-pink-400 flex items-center justify-center shrink-0">
@@ -1714,7 +1726,7 @@ export const CRMConversationalHub: React.FC<CRMConversationalHubProps> = ({
                           </p>
 
                           <div className="flex items-center justify-between pt-1 text-[10px] text-slate-500 border-t border-slate-800/60">
-                            <span>{conv.channel === 'whatsapp' ? 'WhatsApp' : 'Instagram'}</span>
+                            <span>{conv.channel === 'whatsapp' ? 'WhatsApp' : conv.channel === 'facebook_dm' ? 'Facebook' : 'Instagram'}</span>
                             <span className="text-slate-300 font-mono">
                               ${conv.lead.estimated_value?.toLocaleString() || '0'}
                             </span>
