@@ -557,6 +557,9 @@ CONTEXTO Y OFERTA DEL NEGOCIO:
 - Productos y precios oficiales del catálogo:
 ${productContext}
 
+CTAs guardados del negocio (reusá textualmente el que más tenga que ver con el tema de ESTE guion; si ninguno encaja, generá uno nuevo — PROHIBIDO usar siempre el mismo CTA sin importar el tema):
+${(profileContext?.cta_list?.length ?? 0) > 0 ? profileContext!.cta_list.map(c => `- "${c.keyword}": ${c.full_phrase}`).join('\n') : '(sin CTAs guardados todavía)'}
+
 REGLA INQUEBRANTABLE: el diálogo tiene que hablar del negocio real de arriba (nicho/catálogo) o de los Reels fuente analizados. PROHIBIDO ROTUNDAMENTE inventar o asumir un producto o rubro que no figure ahí (nunca metas pantallas digitales, cartelería, zapatillas ni ningún otro ejemplo genérico si el negocio no lo vende). Tampoco escribas frases de coach de redes vacías ("¡hoy es tu día!", "tu reel es una joya"): el guion tiene que vender o hablar de algo concreto.
 
 OBJETIVOS DE LA SÍNTESIS Y NUEVO DIÁLOGO:
@@ -1410,8 +1413,15 @@ Devolvé un JSON estricto con:
       : 'Sin fuentes conectadas (creación libre basada en el tema pedido).';
 
     const profileTone = profileContext?.ai_context?.tone || 'directo y conversacional';
-    const explicitFavoriteCta = profileContext?.cta_list?.find(c => c.is_favorite)?.full_phrase?.trim() || null;
-    const favoriteCta = explicitFavoriteCta || `Comentá "${deriveCtaKeyword(effectiveTargetTopic)}" y te paso la info 👇`;
+    // Los CTAs guardados son un banco para reusar el que tenga sentido con el
+    // tema de ESTE guion puntual — nunca un único CTA forzado en todos los
+    // guiones sin importar el tema (eso es lo que generaba "Comentá APP"
+    // repetido siempre, venga de donde venga el guion).
+    const existingCtas = profileContext?.cta_list || [];
+    const existingCtasText = existingCtas.length > 0
+      ? existingCtas.map(c => `- "${c.keyword}": ${c.full_phrase}`).join('\n')
+      : '(sin CTAs guardados todavía)';
+    const favoriteCta = `Comentá "${deriveCtaKeyword(effectiveTargetTopic)}" y te paso la info 👇`;
     const mustDos = profileContext?.ai_context?.must_do_rules?.join('\n- ') || 'Mantener ganchos de alto impacto en los primeros 2 segundos.';
     const forbiddens = profileContext?.ai_context?.forbidden_rules?.join('\n- ') || 'No sonar aburrido, no usar frases hechas de autoayuda, no hacer introducciones lentas.';
     const niche = profileContext?.profile?.niche || 'Comercios y Negocios';
@@ -1483,7 +1493,9 @@ CONTEXTO DEL PERFIL:
 - ${mustDos}
 - Reglas PROHIBIDAS:
 - ${forbiddens}
-- CTA: ${explicitFavoriteCta ? `el negocio ya tiene un CTA fijo, usalo tal cual: "${explicitFavoriteCta}"` : `no hay un CTA fijo configurado. PROHIBIDO usar palabras de relleno genéricas como "APP" o "INFO" que no tengan nada que ver con el tema. Generá un "cta" con una palabra clave específica del producto o tema de ESTE guion en particular (ej. de inspiración, pero más específico si podés: "${favoriteCta}")`}
+- CTAs guardados del negocio (reusá textualmente el que más tenga que ver con el tema de ESTE guion puntual; si ninguno encaja, generá un "cta" nuevo con una palabra clave específica de este tema — PROHIBIDO usar siempre el mismo CTA sin importar el tema, y PROHIBIDO relleno genérico como "APP" o "INFO" sin relación):
+${existingCtasText}
+(si tenés que generar uno nuevo porque ninguno encaja, un ejemplo de formato válido sería: "${favoriteCta}")
 
 Devuelve un JSON con este formato exacto:
 {
@@ -1866,9 +1878,12 @@ Devuelve un JSON con este formato exacto:
       ? learnedInsights.map(l => `- [APRENDIZAJE PREVIO]: ${l.insight_text}`).join('\n')
       : 'Sin aprendizajes previos registrados (primer ciclo de experimentación).';
 
-    const explicitFavoriteCta = profileContext?.cta_list?.find(c => c.is_favorite)?.full_phrase?.trim() || null;
+    const existingCtas = profileContext?.cta_list || [];
+    const existingCtasText = existingCtas.length > 0
+      ? existingCtas.map(c => `- "${c.keyword}": ${c.full_phrase}`).join('\n')
+      : '(sin CTAs guardados todavía)';
     const ctaTopicSeed = (catalogRows && catalogRows[0]?.name) || niche;
-    const favoriteCta = explicitFavoriteCta || `Comentá "${deriveCtaKeyword(ctaTopicSeed)}" y te paso la info 👇`;
+    const favoriteCta = `Comentá "${deriveCtaKeyword(ctaTopicSeed)}" y te paso la info 👇`;
     const profileTone = profileContext?.ai_context?.tone || 'directo y conversacional';
     const mustDos = profileContext?.ai_context?.must_do_rules?.join('\n- ') || 'Gancho inmediato de menos de 3 segundos sin rodeos.';
     const forbiddens = profileContext?.ai_context?.forbidden_rules?.join('\n- ') || 'Cero introducciones lentas, cero frases cliché.';
@@ -1954,7 +1969,9 @@ CONTEXTO DEL NEGOCIO:
 - Tono: ${profileTone}
 - Reglas OBLIGATORIAS: ${mustDos}
 - Reglas PROHIBIDAS: ${forbiddens}
-- CTA: ${explicitFavoriteCta ? `el negocio ya tiene un CTA fijo, usalo tal cual en cta_trigger: "${explicitFavoriteCta}"` : `no hay un CTA fijo configurado. PROHIBIDO usar palabras de relleno genéricas como "APP" o "INFO" sin relación con el producto. Cada variante tiene que tener su propio cta_trigger con una palabra clave específica del producto/tema de ESA variante (ej. de inspiración: "${favoriteCta}")`}
+- CTAs guardados del negocio (reusá textualmente el que más tenga que ver con el tema de CADA variante; si ninguno encaja, generá uno nuevo — PROHIBIDO repetir siempre el mismo CTA en las 3 variantes si tratan temas distintos, y PROHIBIDO relleno genérico como "APP" o "INFO"):
+${existingCtasText}
+(si tenés que generar uno nuevo, un ejemplo de formato válido sería: "${favoriteCta}")
 - Formato solicitado: ${mode.toUpperCase()}
 - Objetivo / Tema: ${userGoal || 'Superar la mediana histórica de guardados y consultas comerciales'}
 

@@ -76,7 +76,6 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
   const [verifiedHandle, setVerifiedHandle] = useState<string | null>(null);
   const [isVerifyingHandle, setIsVerifyingHandle] = useState(false);
   const [isAutoDetecting, setIsAutoDetecting] = useState(false);
-  const [autoDetectTips, setAutoDetectTips] = useState<string[]>([]);
   const [handleVerifyError, setHandleVerifyError] = useState<string | null>(null);
   // true solo cuando NINGÚN método pudo determinar si la cuenta existe
   // (bloqueo/red, no "confirmamos que no existe") — ahí sí dejamos
@@ -152,6 +151,9 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
         }
       });
       toast.success(`✓ @${username} confirmado en Instagram.`);
+      // Verificado de verdad que la cuenta existe: aprovechamos para ajustar
+      // nicho/descripción/CTAs solos, sin pedirle un segundo clic aparte.
+      await runAutoDetect(username, context.profile.business_name || username);
     } catch {
       setHandleVerifyError('No pudimos conectar para verificar el perfil. Probá de nuevo.');
       setVerifyInconclusive(true);
@@ -169,13 +171,7 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
     toast.warning(`Guardando @${username} sin poder confirmarlo — revisá que esté bien escrito.`);
   };
 
-  const handleAutoDetect = async () => {
-    if (!context) return;
-    const username = context.profile.instagram_handle.trim().replace(/^@/, '');
-    if (!username) {
-      toast.error('Ingresá tu @usuario de Instagram primero.');
-      return;
-    }
+  const runAutoDetect = async (username: string, businessName: string) => {
     const connections = ConnectionStorageService.loadConnections(businessId);
     const hasAnyAi = Boolean(
       (connections.claude?.isActive && connections.claude?.apiKey?.trim()) ||
@@ -183,11 +179,12 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
       (connections.openai?.isActive && connections.openai?.apiKey?.trim())
     );
     if (!hasAnyAi) {
-      toast.error('Conectá OpenAI, Claude o Gemini en "Conectar APIs" para poder analizar tu cuenta automáticamente.');
+      // No bloqueamos la verificación del handle por esto — solo avisamos
+      // que falta conectar una IA para poder ajustar nicho/CTAs solos.
+      toast.info('Conectá OpenAI, Claude o Gemini en "Conectar APIs" para que ajustemos tu nicho y CTAs automáticamente.');
       return;
     }
     setIsAutoDetecting(true);
-    setAutoDetectTips([]);
     try {
       const discovery = await MetaGraphService.getBusinessDiscovery(username, businessId, 15);
       if (!discovery.success) {
@@ -195,14 +192,14 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
         return;
       }
       const result = await AIProviderService.autoDetectProfile({
-        businessName: context.profile.business_name || username,
+        businessName,
         handle: username,
         biography: discovery.data.biography,
         posts: discovery.data.media,
         connections
       });
       if (!result) {
-        toast.error('No encontramos suficiente texto real (bio/posts) para determinar el rubro automáticamente. Completalo a mano abajo.');
+        toast.error('No encontramos suficiente texto real (bio/posts) para ajustar el nicho solos. Completalo a mano abajo.');
         return;
       }
       setContext(prev => prev ? {
@@ -210,7 +207,8 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
         profile: {
           ...prev.profile,
           niche: result.niche || prev.profile.niche,
-          about_content: result.about_content || prev.profile.about_content
+          about_content: result.about_content || prev.profile.about_content,
+          profile_tips: result.profile_tips
         },
         cta_list: [
           ...result.suggested_ctas.map(c => ({
@@ -223,9 +221,8 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
           ...prev.cta_list
         ]
       } : prev);
-      setAutoDetectTips(result.profile_tips);
       const ctaCount = result.suggested_ctas.length;
-      toast.success(`Detectamos "${result.niche}"${ctaCount > 0 ? ` y sugerimos ${ctaCount} CTA${ctaCount > 1 ? 's' : ''}` : ''} — revisá los cambios y guardá.`);
+      toast.success(`Ajustamos tu nicho a "${result.niche}"${ctaCount > 0 ? ` y sugerimos ${ctaCount} CTA${ctaCount > 1 ? 's' : ''}` : ''} — revisá los cambios y guardá.`);
     } catch (err: any) {
       toast.error(err?.message || 'No pudimos analizar la cuenta ahora mismo.');
     } finally {
@@ -355,6 +352,24 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
               </p>
             </div>
 
+            {context.profile.profile_tips && context.profile.profile_tips.length > 0 && (
+              <div className="rounded-2xl border border-amber-500/40 bg-amber-500/5 p-4 space-y-2">
+                <p className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                  ⚠️ Correcciones urgentes de tu perfil
+                </p>
+                <div className="space-y-2">
+                  {context.profile.profile_tips.map((tip, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <span className="shrink-0 w-4 h-4 rounded-full bg-amber-500/20 text-amber-300 text-[9px] font-bold flex items-center justify-center mt-0.5">
+                        {i + 1}
+                      </span>
+                      <p className="text-[11px] text-slate-200 leading-relaxed">{tip}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-12 gap-6 sm:gap-8 items-start pt-2">
               {/* Avatar con Aro de Instagram */}
               <div className="md:col-span-4 flex flex-col items-center justify-center p-4 rounded-2xl bg-slate-950/50 border border-slate-800/80 text-center">
@@ -466,45 +481,19 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
                         </button>
                       )}
                     </div>
+                  ) : isAutoDetecting ? (
+                    <p className="text-[10px] text-pink-400 flex items-center gap-1.5">
+                      <Sparkles className="w-3 h-3 animate-pulse" />
+                      Ajustando tu nicho, descripción y CTAs con IA...
+                    </p>
                   ) : (
                     <p className="text-[10px] text-slate-500">
                       {isHandleVerified
-                        ? 'Confirmamos que esta cuenta existe en Instagram.'
+                        ? 'Confirmamos que esta cuenta existe en Instagram. Al verificar, ajustamos solos el nicho, la descripción y los CTAs de abajo.'
                         : canSaveHandle
                         ? 'Guardando sin poder confirmarlo — revisá que esté bien escrito.'
-                        : 'Tenés que confirmar que este @usuario existe de verdad antes de guardar.'}
+                        : 'Tenés que confirmar que este @usuario existe de verdad antes de guardar. Al verificarlo, ajustamos solos el nicho, la descripción y los CTAs de abajo.'}
                     </p>
-                  )}
-                </div>
-
-                {/* Detección automática con IA */}
-                <div className="rounded-xl border border-pink-500/30 bg-pink-500/5 p-3 space-y-2">
-                  <button
-                    type="button"
-                    onClick={handleAutoDetect}
-                    disabled={isAutoDetecting || !context.profile.instagram_handle.trim()}
-                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold transition-all"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    {isAutoDetecting ? 'Analizando tu bio y posts reales...' : 'Detectar nicho, descripción y CTAs con IA'}
-                  </button>
-                  <p className="text-[10px] text-slate-500 text-center">
-                    Lee tu bio real y tus últimos posts públicos de Instagram para completar los campos de abajo. No inventa datos: si no hay suficiente texto, no completa nada.
-                  </p>
-                  {autoDetectTips.length > 0 && (
-                    <div className="pt-1 space-y-1.5 border-t border-pink-500/20">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-pink-400 pt-1.5">
-                        3 cosas que deberías revisar en tu bio
-                      </p>
-                      {autoDetectTips.map((tip, i) => (
-                        <div key={i} className="flex items-start gap-2">
-                          <span className="shrink-0 w-4 h-4 rounded-full bg-pink-500/20 text-pink-300 text-[9px] font-bold flex items-center justify-center mt-0.5">
-                            {i + 1}
-                          </span>
-                          <p className="text-[11px] text-slate-300 leading-relaxed">{tip}</p>
-                        </div>
-                      ))}
-                    </div>
                   )}
                 </div>
 
