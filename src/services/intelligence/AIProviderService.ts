@@ -322,7 +322,7 @@ export class AIProviderService {
     biography?: string;
     posts: Array<{ caption?: string }>;
     connections: UnifiedConnectionsState;
-  }): Promise<{ niche: string; about_content: string; suggested_ctas: Array<{ keyword: string; full_phrase: string }> } | null> {
+  }): Promise<{ niche: string; about_content: string; suggested_ctas: Array<{ keyword: string; full_phrase: string }>; profile_tips: string[] } | null> {
     const { businessName, handle, biography, posts, connections } = params;
     const captionsText = posts
       .map(p => p.caption?.trim())
@@ -346,6 +346,9 @@ Devolvé un JSON con esta estructura exacta:
   "about_content": "2-3 oraciones describiendo de qué habla la cuenta y a quién ayuda, basado solo en el texto real de arriba. String vacío si no hay suficiente información.",
   "suggested_ctas": [
     { "keyword": "PALABRA", "full_phrase": "Comentá \\"PALABRA\\" y te paso la info 👇" }
+  ],
+  "profile_tips": [
+    "Hasta 3 observaciones concretas y accionables sobre la BIO REAL de arriba (no sobre la foto, no tenés acceso a la imagen): por ejemplo si no queda claro qué vende, si falta un dato de contacto, o si hay texto que no aporta (como una frase motivacional) ocupando espacio que podría usarse para decir qué vende. Citá literalmente el texto de la bio al que te referís entre comillas. Si la bio ya es clara y específica, devolvé un array vacío — no inventes problemas que no existen."
   ]
 }
 "suggested_ctas" tiene que tener entre 1 y 3 keywords específicas de productos/temas reales mencionados arriba (nunca "APP" ni "INFO" genéricos). Si no hay nada específico, devolvé un array vacío.`;
@@ -368,6 +371,9 @@ Devolvé un JSON con esta estructura exacta:
               .filter((c: any) => c?.keyword && c?.full_phrase)
               .slice(0, 3)
               .map((c: any) => ({ keyword: String(c.keyword).toUpperCase().slice(0, 20), full_phrase: String(c.full_phrase) }))
+          : [],
+        profile_tips: Array.isArray(parsed.profile_tips)
+          ? parsed.profile_tips.filter((t: any) => typeof t === 'string' && t.trim()).slice(0, 3)
           : []
       };
     };

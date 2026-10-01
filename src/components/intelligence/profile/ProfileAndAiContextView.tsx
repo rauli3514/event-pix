@@ -76,6 +76,7 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
   const [verifiedHandle, setVerifiedHandle] = useState<string | null>(null);
   const [isVerifyingHandle, setIsVerifyingHandle] = useState(false);
   const [isAutoDetecting, setIsAutoDetecting] = useState(false);
+  const [autoDetectTips, setAutoDetectTips] = useState<string[]>([]);
   const [handleVerifyError, setHandleVerifyError] = useState<string | null>(null);
   // true solo cuando NINGÚN método pudo determinar si la cuenta existe
   // (bloqueo/red, no "confirmamos que no existe") — ahí sí dejamos
@@ -186,6 +187,7 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
       return;
     }
     setIsAutoDetecting(true);
+    setAutoDetectTips([]);
     try {
       const discovery = await MetaGraphService.getBusinessDiscovery(username, businessId, 15);
       if (!discovery.success) {
@@ -221,6 +223,7 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
           ...prev.cta_list
         ]
       } : prev);
+      setAutoDetectTips(result.profile_tips);
       const ctaCount = result.suggested_ctas.length;
       toast.success(`Detectamos "${result.niche}"${ctaCount > 0 ? ` y sugerimos ${ctaCount} CTA${ctaCount > 1 ? 's' : ''}` : ''} — revisá los cambios y guardá.`);
     } catch (err: any) {
@@ -488,6 +491,21 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
                   <p className="text-[10px] text-slate-500 text-center">
                     Lee tu bio real y tus últimos posts públicos de Instagram para completar los campos de abajo. No inventa datos: si no hay suficiente texto, no completa nada.
                   </p>
+                  {autoDetectTips.length > 0 && (
+                    <div className="pt-1 space-y-1.5 border-t border-pink-500/20">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-pink-400 pt-1.5">
+                        3 cosas que deberías revisar en tu bio
+                      </p>
+                      {autoDetectTips.map((tip, i) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <span className="shrink-0 w-4 h-4 rounded-full bg-pink-500/20 text-pink-300 text-[9px] font-bold flex items-center justify-center mt-0.5">
+                            {i + 1}
+                          </span>
+                          <p className="text-[11px] text-slate-300 leading-relaxed">{tip}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Nicho que abordas */}
