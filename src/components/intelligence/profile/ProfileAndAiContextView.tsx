@@ -21,6 +21,9 @@ import {
 } from 'lucide-react';
 import { UserProfileContext, CtaItem } from '../../../types/strategicProfile';
 import { IntelligenceStorageService } from '../../../services/intelligence/IntelligenceStorageService';
+import { ConnectionStorageService } from '../../../services/intelligence/ConnectionStorageService';
+import { AIProviderService } from '../../../services/intelligence/AIProviderService';
+import { MetaGraphService } from '../../../services/meta/MetaGraphService';
 import { ProductCatalogManager } from './ProductCatalogManager';
 import { toast } from 'sonner';
 
@@ -72,6 +75,7 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
   // deja de matchear y hay que verificar de nuevo.
   const [verifiedHandle, setVerifiedHandle] = useState<string | null>(null);
   const [isVerifyingHandle, setIsVerifyingHandle] = useState(false);
+  const [isAutoDetecting, setIsAutoDetecting] = useState(false);
   const [handleVerifyError, setHandleVerifyError] = useState<string | null>(null);
   // true solo cuando NINGÚN método pudo determinar si la cuenta existe
   // (bloqueo/red, no "confirmamos que no existe") — ahí sí dejamos
@@ -162,6 +166,68 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
     setHandleOverridden(username.toLowerCase());
     setHandleVerifyError(null);
     toast.warning(`Guardando @${username} sin poder confirmarlo — revisá que esté bien escrito.`);
+  };
+
+  const handleAutoDetect = async () => {
+    if (!context) return;
+    const username = context.profile.instagram_handle.trim().replace(/^@/, '');
+    if (!username) {
+      toast.error('Ingresá tu @usuario de Instagram primero.');
+      return;
+    }
+    const connections = ConnectionStorageService.loadConnections(businessId);
+    const hasAnyAi = Boolean(
+      (connections.claude?.isActive && connections.claude?.apiKey?.trim()) ||
+      (connections.gemini?.isActive && connections.gemini?.apiKey?.trim()) ||
+      (connections.openai?.isActive && connections.openai?.apiKey?.trim())
+    );
+    if (!hasAnyAi) {
+      toast.error('Conectá OpenAI, Claude o Gemini en "Conectar APIs" para poder analizar tu cuenta automáticamente.');
+      return;
+    }
+    setIsAutoDetecting(true);
+    try {
+      const discovery = await MetaGraphService.getBusinessDiscovery(username, businessId, 15);
+      if (!discovery.success) {
+        toast.error(discovery.error);
+        return;
+      }
+      const result = await AIProviderService.autoDetectProfile({
+        businessName: context.profile.business_name || username,
+        handle: username,
+        biography: discovery.data.biography,
+        posts: discovery.data.media,
+        connections
+      });
+      if (!result) {
+        toast.error('No encontramos suficiente texto real (bio/posts) para determinar el rubro automáticamente. Completalo a mano abajo.');
+        return;
+      }
+      setContext(prev => prev ? {
+        ...prev,
+        profile: {
+          ...prev.profile,
+          niche: result.niche || prev.profile.niche,
+          about_content: result.about_content || prev.profile.about_content
+        },
+        cta_list: [
+          ...result.suggested_ctas.map(c => ({
+            id: `cta_auto_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            keyword: c.keyword,
+            full_phrase: c.full_phrase,
+            action_type: 'comment_keyword' as const,
+            is_favorite: false
+          })),
+          ...prev.cta_list
+        ]
+      } : prev);
+      const ctaCount = result.suggested_ctas.length;
+      toast.success(`Detectamos "${result.niche}"${ctaCount > 0 ? ` y sugerimos ${ctaCount} CTA${ctaCount > 1 ? 's' : ''}` : ''} — revisá los cambios y guardá.`);
+    } catch (err: any) {
+      toast.error(err?.message || 'No pudimos analizar la cuenta ahora mismo.');
+    } finally {
+      setIsAutoDetecting(false);
+    }
   };
 
   const handleSave = async () => {
@@ -408,23 +474,46 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
                   )}
                 </div>
 
+                {/* Detección automática con IA */}
+                <div className="rounded-xl border border-pink-500/30 bg-pink-500/5 p-3 space-y-2">
+                  <button
+                    type="button"
+                    onClick={handleAutoDetect}
+                    disabled={isAutoDetecting || !context.profile.instagram_handle.trim()}
+                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold transition-all"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    {isAutoDetecting ? 'Analizando tu bio y posts reales...' : 'Detectar nicho, descripción y CTAs con IA'}
+                  </button>
+                  <p className="text-[10px] text-slate-500 text-center">
+                    Lee tu bio real y tus últimos posts públicos de Instagram para completar los campos de abajo. No inventa datos: si no hay suficiente texto, no completa nada.
+                  </p>
+                </div>
+
                 {/* Nicho que abordas */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-300">
                     Nicho que abordás
                   </label>
-                  <select
+                  <input
+                    type="text"
+                    list="niche-suggestions"
                     value={context.profile.niche}
                     onChange={(e) => setContext({
                       ...context,
                       profile: { ...context.profile, niche: e.target.value }
                     })}
+                    placeholder="Ej: Insumos para carnaval"
                     className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-xs text-slate-100 outline-none focus:border-pink-500/60"
-                  >
+                  />
+                  <datalist id="niche-suggestions">
                     {NICHES.map((n) => (
-                      <option key={n} value={n}>{n}</option>
+                      <option key={n} value={n} />
                     ))}
-                  </select>
+                  </datalist>
+                  <p className="text-[10px] text-slate-500">
+                    Escribí el rubro específico (no hace falta elegir una categoría genérica) — cuanto más preciso, mejor salen los guiones.
+                  </p>
                 </div>
 
                 {/* Idioma */}

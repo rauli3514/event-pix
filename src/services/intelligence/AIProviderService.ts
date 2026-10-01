@@ -309,6 +309,162 @@ export class AIProviderService {
   }
 
   /**
+   * Analiza la bio real y los últimos posts públicos de una cuenta (traídos
+   * vía business_discovery, sin necesitar que el negocio conecte su propia
+   * cuenta de Meta) para sugerir el nicho específico, el "about_content" y
+   * CTAs con palabra clave — en vez de obligar a completarlo todo a mano.
+   * Nunca inventa: si no hay suficiente texto real para inferir el rubro,
+   * devuelve null en vez de forzar una categoría genérica.
+   */
+  static async autoDetectProfile(params: {
+    businessName: string;
+    handle: string;
+    biography?: string;
+    posts: Array<{ caption?: string }>;
+    connections: UnifiedConnectionsState;
+  }): Promise<{ niche: string; about_content: string; suggested_ctas: Array<{ keyword: string; full_phrase: string }> } | null> {
+    const { businessName, handle, biography, posts, connections } = params;
+    const captionsText = posts
+      .map(p => p.caption?.trim())
+      .filter((c): c is string => Boolean(c))
+      .slice(0, 15)
+      .map((c, i) => `${i + 1}. "${c.slice(0, 280)}"`)
+      .join('\n');
+
+    const systemPrompt = `Sos un analista que identifica el rubro real de un negocio a partir de su bio y publicaciones reales de Instagram. Trabajás ÚNICAMENTE con el texto real que te pasan, nunca inventás datos ni asumís un rubro de ejemplo. Respondé ÚNICAMENTE con JSON válido.`;
+
+    const userPrompt = `CUENTA: @${handle} (${businessName || handle})
+
+BIO REAL: "${biography?.trim() || '(sin bio disponible)'}"
+
+ÚLTIMOS POSTS REALES (texto de las publicaciones):
+${captionsText || '(sin texto de captions disponible en los posts públicos)'}
+
+Devolvé un JSON con esta estructura exacta:
+{
+  "niche": "rubro específico en 2-6 palabras, texto libre basado en lo que realmente vende/hace (ej: 'Insumos para carnaval', NUNCA una categoría genérica tipo 'Comercios'). Si la bio y los posts no alcanzan para determinarlo con confianza, dejalo como string vacío.",
+  "about_content": "2-3 oraciones describiendo de qué habla la cuenta y a quién ayuda, basado solo en el texto real de arriba. String vacío si no hay suficiente información.",
+  "suggested_ctas": [
+    { "keyword": "PALABRA", "full_phrase": "Comentá \\"PALABRA\\" y te paso la info 👇" }
+  ]
+}
+"suggested_ctas" tiene que tener entre 1 y 3 keywords específicas de productos/temas reales mencionados arriba (nunca "APP" ni "INFO" genéricos). Si no hay nada específico, devolvé un array vacío.`;
+
+    const hasClaude = Boolean(connections.claude?.isActive && connections.claude?.apiKey?.trim());
+    const hasGemini = Boolean(connections.gemini?.isActive && connections.gemini?.apiKey?.trim());
+    const hasOpenAI = Boolean(connections.openai?.isActive && connections.openai?.apiKey?.trim());
+
+    const parseResult = (raw: string) => {
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return null;
+      const parsed = JSON.parse(jsonMatch[0]);
+      const niche = typeof parsed.niche === 'string' ? parsed.niche.trim() : '';
+      if (!niche) return null;
+      return {
+        niche,
+        about_content: typeof parsed.about_content === 'string' ? parsed.about_content.trim() : '',
+        suggested_ctas: Array.isArray(parsed.suggested_ctas)
+          ? parsed.suggested_ctas
+              .filter((c: any) => c?.keyword && c?.full_phrase)
+              .slice(0, 3)
+              .map((c: any) => ({ keyword: String(c.keyword).toUpperCase().slice(0, 20), full_phrase: String(c.full_phrase) }))
+          : []
+      };
+    };
+
+    if (hasClaude) {
+      try {
+        let res: Response;
+        try {
+          res = await fetch('/api/claude-messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              apiKey: connections.claude!.apiKey,
+              model: connections.claude!.model || 'claude-3-5-sonnet-20241022',
+              max_tokens: 800,
+              workspaceId: connections.claude!.workspaceId,
+              system: systemPrompt,
+              messages: [{ role: 'user', content: userPrompt }]
+            })
+          });
+        } catch {
+          res = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'x-api-key': connections.claude!.apiKey,
+              'anthropic-version': '2023-06-01',
+              'anthropic-dangerous-direct-browser-access': 'true',
+              'content-type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: connections.claude!.model || 'claude-3-5-sonnet-20241022',
+              max_tokens: 800,
+              system: systemPrompt,
+              messages: [{ role: 'user', content: userPrompt }]
+            })
+          });
+        }
+        const data = await res.json();
+        const text = data?.content?.[0]?.text;
+        if (text) {
+          const parsed = parseResult(text);
+          if (parsed) return parsed;
+        }
+      } catch (err) {
+        console.warn('autoDetectProfile: fallo en Claude', err);
+      }
+    }
+
+    if (hasGemini) {
+      try {
+        const raw = await AIProviderService.callGemini({
+          apiKey: connections.gemini!.apiKey,
+          model: connections.gemini!.model || 'gemini-1.5-flash',
+          systemPrompt,
+          prompt: userPrompt,
+          responseMimeType: 'application/json'
+        });
+        const parsed = parseResult(raw);
+        if (parsed) return parsed;
+      } catch (err) {
+        console.warn('autoDetectProfile: fallo en Gemini', err);
+      }
+    }
+
+    if (hasOpenAI) {
+      try {
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${connections.openai!.apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: connections.openai!.model || 'gpt-4o-mini',
+            response_format: { type: 'json_object' },
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt }
+            ],
+            temperature: 0.4
+          })
+        });
+        const data = await res.json();
+        const text = data?.choices?.[0]?.message?.content;
+        if (text) {
+          const parsed = parseResult(text);
+          if (parsed) return parsed;
+        }
+      } catch (err) {
+        console.warn('autoDetectProfile: fallo en OpenAI', err);
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Genera un Super Guión y Síntesis usando la IA activa (OpenAI o Claude)
    */
   static async generateSynthesis(
