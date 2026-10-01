@@ -36,6 +36,19 @@ import {
 } from './metricUtils';
 import { toast } from 'sonner';
 
+// Saca una palabra clave real del tema/producto para armar un CTA tipo
+// "Comentá 'X' y te paso la info" cuando el negocio no fijó un CTA propio.
+// Nunca usamos un relleno fijo tipo "APP" o "INFO": cada guion necesita una
+// palabra que tenga que ver con lo que se está mostrando en ESE guion.
+const CTA_KEYWORD_STOPWORDS = new Set(['el', 'la', 'los', 'las', 'de', 'del', 'para', 'por', 'con', 'en', 'un', 'una', 'y', 'o', 'tu', 'tus', 'que', 'como', 'mas', 'más', 'sin', 'esta', 'este']);
+
+function deriveCtaKeyword(topic: string | null | undefined): string {
+  const clean = (topic || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9\s]/g, '');
+  const words = clean.split(/\s+/).filter(w => w.length > 2 && !CTA_KEYWORD_STOPWORDS.has(w.toLowerCase()));
+  const chosen = [...words].sort((a, b) => b.length - a.length)[0];
+  return (chosen || 'CATALOGO').toUpperCase().slice(0, 14);
+}
+
 export class AIProviderService {
   /**
    * Valida una clave de API de OpenAI contra el endpoint de modelos y prueba de completado para verificar saldo
@@ -296,6 +309,168 @@ export class AIProviderService {
   }
 
   /**
+   * Analiza la bio real y los últimos posts públicos de una cuenta (traídos
+   * vía business_discovery, sin necesitar que el negocio conecte su propia
+   * cuenta de Meta) para sugerir el nicho específico, el "about_content" y
+   * CTAs con palabra clave — en vez de obligar a completarlo todo a mano.
+   * Nunca inventa: si no hay suficiente texto real para inferir el rubro,
+   * devuelve null en vez de forzar una categoría genérica.
+   */
+  static async autoDetectProfile(params: {
+    businessName: string;
+    handle: string;
+    biography?: string;
+    posts: Array<{ caption?: string }>;
+    connections: UnifiedConnectionsState;
+  }): Promise<{ niche: string; about_content: string; suggested_ctas: Array<{ keyword: string; full_phrase: string }>; profile_tips: string[] } | null> {
+    const { businessName, handle, biography, posts, connections } = params;
+    const captionsText = posts
+      .map(p => p.caption?.trim())
+      .filter((c): c is string => Boolean(c))
+      .slice(0, 15)
+      .map((c, i) => `${i + 1}. "${c.slice(0, 280)}"`)
+      .join('\n');
+
+    const systemPrompt = `Sos un analista que identifica el rubro real de un negocio a partir de su bio y publicaciones reales de Instagram. Trabajás ÚNICAMENTE con el texto real que te pasan, nunca inventás datos ni asumís un rubro de ejemplo. Respondé ÚNICAMENTE con JSON válido.`;
+
+    const userPrompt = `CUENTA: @${handle} (${businessName || handle})
+
+BIO REAL: "${biography?.trim() || '(sin bio disponible)'}"
+
+ÚLTIMOS POSTS REALES (texto de las publicaciones):
+${captionsText || '(sin texto de captions disponible en los posts públicos)'}
+
+Devolvé un JSON con esta estructura exacta:
+{
+  "niche": "rubro específico en 2-6 palabras, texto libre basado en lo que realmente vende/hace (ej: 'Insumos para carnaval', NUNCA una categoría genérica tipo 'Comercios'). Si la bio y los posts no alcanzan para determinarlo con confianza, dejalo como string vacío.",
+  "about_content": "2-3 oraciones describiendo de qué habla la cuenta y a quién ayuda, basado solo en el texto real de arriba. String vacío si no hay suficiente información.",
+  "suggested_ctas": [
+    { "keyword": "PALABRA", "full_phrase": "Comentá \\"PALABRA\\" y te paso la info 👇" }
+  ],
+  "profile_tips": [
+    "Hasta 3 observaciones concretas y accionables sobre la BIO REAL de arriba (no sobre la foto, no tenés acceso a la imagen): por ejemplo si no queda claro qué vende, si falta un dato de contacto, o si hay texto que no aporta (como una frase motivacional) ocupando espacio que podría usarse para decir qué vende. Citá literalmente el texto de la bio al que te referís entre comillas. Si la bio ya es clara y específica, devolvé un array vacío — no inventes problemas que no existen."
+  ]
+}
+"suggested_ctas" tiene que tener entre 1 y 3 keywords específicas de productos/temas reales mencionados arriba (nunca "APP" ni "INFO" genéricos). Si no hay nada específico, devolvé un array vacío.`;
+
+    const hasClaude = Boolean(connections.claude?.isActive && connections.claude?.apiKey?.trim());
+    const hasGemini = Boolean(connections.gemini?.isActive && connections.gemini?.apiKey?.trim());
+    const hasOpenAI = Boolean(connections.openai?.isActive && connections.openai?.apiKey?.trim());
+
+    const parseResult = (raw: string) => {
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return null;
+      const parsed = JSON.parse(jsonMatch[0]);
+      const niche = typeof parsed.niche === 'string' ? parsed.niche.trim() : '';
+      if (!niche) return null;
+      return {
+        niche,
+        about_content: typeof parsed.about_content === 'string' ? parsed.about_content.trim() : '',
+        suggested_ctas: Array.isArray(parsed.suggested_ctas)
+          ? parsed.suggested_ctas
+              .filter((c: any) => c?.keyword && c?.full_phrase)
+              .slice(0, 3)
+              .map((c: any) => ({ keyword: String(c.keyword).toUpperCase().slice(0, 20), full_phrase: String(c.full_phrase) }))
+          : [],
+        profile_tips: Array.isArray(parsed.profile_tips)
+          ? parsed.profile_tips.filter((t: any) => typeof t === 'string' && t.trim()).slice(0, 3)
+          : []
+      };
+    };
+
+    if (hasClaude) {
+      try {
+        let res: Response;
+        try {
+          res = await fetch('/api/claude-messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              apiKey: connections.claude!.apiKey,
+              model: connections.claude!.model || 'claude-3-5-sonnet-20241022',
+              max_tokens: 800,
+              workspaceId: connections.claude!.workspaceId,
+              system: systemPrompt,
+              messages: [{ role: 'user', content: userPrompt }]
+            })
+          });
+        } catch {
+          res = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'x-api-key': connections.claude!.apiKey,
+              'anthropic-version': '2023-06-01',
+              'anthropic-dangerous-direct-browser-access': 'true',
+              'content-type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: connections.claude!.model || 'claude-3-5-sonnet-20241022',
+              max_tokens: 800,
+              system: systemPrompt,
+              messages: [{ role: 'user', content: userPrompt }]
+            })
+          });
+        }
+        const data = await res.json();
+        const text = data?.content?.[0]?.text;
+        if (text) {
+          const parsed = parseResult(text);
+          if (parsed) return parsed;
+        }
+      } catch (err) {
+        console.warn('autoDetectProfile: fallo en Claude', err);
+      }
+    }
+
+    if (hasGemini) {
+      try {
+        const raw = await AIProviderService.callGemini({
+          apiKey: connections.gemini!.apiKey,
+          model: connections.gemini!.model || 'gemini-1.5-flash',
+          systemPrompt,
+          prompt: userPrompt,
+          responseMimeType: 'application/json'
+        });
+        const parsed = parseResult(raw);
+        if (parsed) return parsed;
+      } catch (err) {
+        console.warn('autoDetectProfile: fallo en Gemini', err);
+      }
+    }
+
+    if (hasOpenAI) {
+      try {
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${connections.openai!.apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: connections.openai!.model || 'gpt-4o-mini',
+            response_format: { type: 'json_object' },
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt }
+            ],
+            temperature: 0.4
+          })
+        });
+        const data = await res.json();
+        const text = data?.choices?.[0]?.message?.content;
+        if (text) {
+          const parsed = parseResult(text);
+          if (parsed) return parsed;
+        }
+      } catch (err) {
+        console.warn('autoDetectProfile: fallo en OpenAI', err);
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Genera un Super Guión y Síntesis usando la IA activa (OpenAI o Claude)
    */
   static async generateSynthesis(
@@ -338,17 +513,36 @@ ${segments}`;
       brandDna?.voice_and_tone?.favorite_catchphrases?.[0] ||
       (brandDna?.voice_and_tone as any)?.catchphrases?.[0] ||
       'Escuchá esto:';
-    
+
+    // Traer nicho real y catálogo genérico del negocio: sin esto, cuando no
+    // hay productos sincronizados por la integración "Shop de Plumas" ni
+    // brandDna.offers cargado, no hay que inventar un rubro de relleno
+    // (nunca más "pantallas digitales" fijo acá).
+    const [profileContext, { data: genericCatalogRows }] = await Promise.all([
+      IntelligenceStorageService.loadProfileContext(brandDna.business_id).catch(() => null),
+      supabase
+        .from('intelligence_business_products')
+        .select('name, description, price')
+        .eq('business_id', brandDna.business_id)
+        .eq('is_active', true)
+        .limit(20)
+    ]);
+
+    const niche = profileContext?.profile?.niche?.trim();
+    const aboutContent = profileContext?.profile?.about_content?.trim();
+
     // Anclaje a productos reales si existen
     const mainProductsList = Array.isArray(brandDna?.offers)
       ? (brandDna.offers as any).map((o: any) => o.name || '').filter(Boolean).join(', ')
       : Array.isArray((brandDna?.offers as any)?.main_products)
         ? (brandDna.offers as any).main_products.join(', ')
-        : 'pantallas digitales';
+        : '';
 
-    const productContext = (catalogProducts && catalogProducts.length > 0)
+    const productContext = catalogProducts && catalogProducts.length > 0
       ? catalogProducts.slice(0, 5).map(p => `- ${p.name} ($${p.price.toLocaleString('es-AR')} ARS, Stock: ${p.stock} un.)`).join('\n')
-      : mainProductsList;
+      : genericCatalogRows && genericCatalogRows.length > 0
+        ? genericCatalogRows.map((p: any) => `- ${p.name}${p.price ? ` ($${p.price})` : ''}${p.description ? `: ${p.description}` : ''}`).join('\n')
+        : mainProductsList || aboutContent || (niche ? `(sin catálogo cargado: el negocio es de "${niche}", escribí sobre eso en general sin inventar un producto específico)` : '(sin catálogo ni nicho cargado: sacá el tema únicamente de los Reels fuente analizados abajo, nunca inventes un producto de otro rubro)');
 
     const prompt = `Actuá como el Director Creativo y Estratega de Contenidos de EventPix Intelligence.
 Tu tarea es COMPARAR Y FUSIONAR los Reels analizados para redactar el SUPER GUIÓN RECOMENDADO con el diálogo completo palabra por palabra para el próximo video del negocio.
@@ -357,10 +551,13 @@ ANÁLISIS COMPARATIVO DE LOS REELS FUENTE:
 ${sourceBreakdowns}
 
 CONTEXTO Y OFERTA DEL NEGOCIO:
+- Nicho real: ${niche || '(no cargado, usá los Reels fuente para inferir el rubro)'}
 - Tono de voz: ${primaryTone} (Argentino natural, profesional, dinámico y directo).
 - Frase de cabecera: "${catchphrase}"
 - Productos y precios oficiales del catálogo:
 ${productContext}
+
+REGLA INQUEBRANTABLE: el diálogo tiene que hablar del negocio real de arriba (nicho/catálogo) o de los Reels fuente analizados. PROHIBIDO ROTUNDAMENTE inventar o asumir un producto o rubro que no figure ahí (nunca metas pantallas digitales, cartelería, zapatillas ni ningún otro ejemplo genérico si el negocio no lo vende). Tampoco escribas frases de coach de redes vacías ("¡hoy es tu día!", "tu reel es una joya"): el guion tiene que vender o hablar de algo concreto.
 
 OBJETIVOS DE LA SÍNTESIS Y NUEVO DIÁLOGO:
 1. Extraer los elementos del diálogo que tuvieron mayor retención en los Reels analizados y descartar las partes aburridas o lentas.
@@ -369,7 +566,7 @@ OBJETIVOS DE LA SÍNTESIS Y NUEVO DIÁLOGO:
    - [HOOK (0-3s)]: Gancho de alta curiosidad con texto en pantalla.
    - [CONFLICTO (3-12s)]: El dolor o problema que frena las ventas de los clientes.
    - [DEMOSTRACIÓN (12-30s)]: Solución tangible mencionando el equipamiento o producto real con precios.
-   - [CTA (30-45s)]: Llamado a la acción claro (ej: 'Comentá "APP" para enviarte la cotización por WhatsApp').
+   - [CTA (30-45s)]: Llamado a la acción con una palabra clave ESPECÍFICA del producto/tema de este guion (ej: si es sobre boas de plumas, 'Comentá "BOAS" y te paso los colores disponibles'). PROHIBIDO usar una palabra de relleno genérica como "APP" o "INFO" que no tenga relación con lo que se está vendiendo.
 
 Devolvé un JSON estricto con esta estructura:
 {
@@ -403,6 +600,31 @@ Devolvé un JSON estricto con esta estructura:
 }
 `;
 
+    // Fallbacks neutrales por si la IA devuelve un campo vacío: genéricos del
+    // mecanismo de guion (nunca un producto o rubro inventado como "pantallas
+    // digitales" o "cartelería", que no tiene por qué tener nada que ver con
+    // el negocio real que se está analizando).
+    const neutralStructureFallback = [
+      '0-3s: Hook de alta retención',
+      '3-12s: Exposición del problema o deseo del cliente',
+      '12-30s: Demostración de la solución real del negocio',
+      '30-45s: CTA directo por palabra clave'
+    ];
+    const neutralAlternativeHooksFallback = [
+      { type: 'Curiosidad', text: `${catchphrase} Lo que la mayoría no sabe sobre esto.` },
+      { type: 'Dolor / Pérdida', text: 'Lo que te estás perdiendo si todavía no probaste esto.' },
+      { type: 'Resultado Directo', text: `Basado en ${sourceTitles || 'tu mejor contenido'}, el ángulo que más convierte.` }
+    ];
+    const neutralNewReelIdeasFallback = [
+      {
+        title: 'Idea basada en tu Reel de mejor desempeño',
+        hook: sourcePosts[0]?.analysis?.hook_data?.text || sourcePosts[0]?.title || 'Gancho a definir a partir de tu contenido real',
+        angle: 'Replicar el patrón ganador detectado',
+        spoken_dialogue: 'La IA no devolvió un diálogo completo esta vez: volvé a pedir la síntesis para generar el guion real.',
+        cta: 'Comentá la palabra clave de tu negocio para recibir más info.'
+      }
+    ];
+
     // 0. Ejecución con Google Gemini si está configurado
     const hasGemini = Boolean(connections.gemini?.isActive && connections.gemini?.apiKey?.trim());
     if (provider === 'gemini' && hasGemini) {
@@ -419,29 +641,12 @@ Devolvé un JSON estricto con esta estructura:
         return {
           title: parsed.title || `Super Guion: ${sourceTitles}`,
           hook: parsed.hook || `${catchphrase} La clave que pocos negocios conocen.`,
-          structure_breakdown: parsed.structure_breakdown || [
-            '0-3s: Hook de alta retención',
-            '3-12s: Exposición del problema comercial',
-            '12-30s: Solución con equipamiento',
-            '30-45s: CTA de comentario clave ("APP")'
-          ],
-          cta: parsed.cta || 'Comenta "APP" para recibir el catálogo',
+          structure_breakdown: parsed.structure_breakdown || neutralStructureFallback,
+          cta: parsed.cta || `Comentá "${deriveCtaKeyword(niche || mainProductsList)}" y te paso la info`,
           full_script: parsed.full_script,
           teleprompter_clean_script: cleanScript,
-          alternative_hooks: parsed.alternative_hooks || [
-            { type: 'Curiosidad', text: `${catchphrase} ¿Sabías por qué los locales que más venden ya no usan carteles fijos?` },
-            { type: 'Dolor / Pérdida', text: 'El 80% de los clientes que pasan por tu vereda no entran porque tu vidriera está apagada.' },
-            { type: 'Resultado Directo', text: 'Cómo duplicar las ventas de tu local instalando una pantalla vertical en 48 horas.' }
-          ],
-          new_reel_ideas: parsed.new_reel_ideas || [
-            {
-              title: 'El Error de la Cartelería Tradicional',
-              hook: 'El error más caro que siguen cometiendo los locales comerciales en 2024...',
-              angle: 'Aversión a la Pérdida',
-              spoken_dialogue: 'El error que cometen casi todos los comercios es gastar fortunas en lonas y ploteos que al mes quedan desactualizados. Con una pantalla vertical cambiás la carta, la promo del día y los combos desde tu celular en 30 segundos. Comentá PANTALLA y te paso la info con cuotas.',
-              cta: 'Comentá "PANTALLA" y te pasamos el catálogo.'
-            }
-          ],
+          alternative_hooks: parsed.alternative_hooks || neutralAlternativeHooksFallback,
+          new_reel_ideas: parsed.new_reel_ideas || neutralNewReelIdeasFallback,
           why_it_works: parsed.why_it_works || 'Generado con Google Gemini 1.5 Flash anclado a productos reales.',
           expected_impact: parsed.expected_impact || 'Aumento en comentarios y calificación de leads.'
         };
@@ -482,29 +687,12 @@ Devolvé un JSON estricto con esta estructura:
           return {
             title: parsed.title || `Super Guion: ${sourceTitles}`,
             hook: parsed.hook || `${catchphrase} La clave que pocos negocios conocen.`,
-            structure_breakdown: parsed.structure_breakdown || [
-              '0-3s: Hook de alta retención',
-              '3-12s: Exposición del problema comercial',
-              '12-30s: Solución con equipamiento',
-              '30-45s: CTA de comentario clave ("APP")'
-            ],
-            cta: parsed.cta || 'Comenta "APP" para recibir el catálogo',
+            structure_breakdown: parsed.structure_breakdown || neutralStructureFallback,
+            cta: parsed.cta || `Comentá "${deriveCtaKeyword(niche || mainProductsList)}" y te paso la info`,
             full_script: parsed.full_script,
             teleprompter_clean_script: cleanScript,
-            alternative_hooks: parsed.alternative_hooks || [
-              { type: 'Curiosidad', text: `${catchphrase} ¿Sabías por qué los locales que más venden ya no usan carteles fijos?` },
-              { type: 'Dolor / Pérdida', text: 'El 80% de los clientes que pasan por tu vereda no entran porque tu vidriera está apagada.' },
-              { type: 'Resultado Directo', text: 'Cómo duplicar las ventas de tu local instalando una pantalla vertical en 48 horas.' }
-            ],
-            new_reel_ideas: parsed.new_reel_ideas || [
-              {
-                title: 'El Error de la Cartelería Tradicional',
-                hook: 'El error más caro que siguen cometiendo los locales comerciales en 2024...',
-                angle: 'Aversión a la Pérdida',
-                spoken_dialogue: 'El error que cometen casi todos los comercios es gastar fortunas en lonas y ploteos que al mes quedan desactualizados. Con una pantalla vertical cambiás la carta, la promo del día y los combos desde tu celular en 30 segundos. Comentá PANTALLA y te paso la info con cuotas.',
-                cta: 'Comentá "PANTALLA" y te pasamos el catálogo.'
-              }
-            ],
+            alternative_hooks: parsed.alternative_hooks || neutralAlternativeHooksFallback,
+            new_reel_ideas: parsed.new_reel_ideas || neutralNewReelIdeasFallback,
             why_it_works: parsed.why_it_works || 'Generado con GPT-4o mini anclado a productos reales.',
             expected_impact: parsed.expected_impact || 'Aumento en comentarios y calificación de leads.'
           };
@@ -1222,7 +1410,8 @@ Devolvé un JSON estricto con:
       : 'Sin fuentes conectadas (creación libre basada en el tema pedido).';
 
     const profileTone = profileContext?.ai_context?.tone || 'directo y conversacional';
-    const favoriteCta = profileContext?.cta_list?.find(c => c.is_favorite)?.full_phrase || 'Comentá "APP" y te paso la información detallada 👇';
+    const explicitFavoriteCta = profileContext?.cta_list?.find(c => c.is_favorite)?.full_phrase?.trim() || null;
+    const favoriteCta = explicitFavoriteCta || `Comentá "${deriveCtaKeyword(effectiveTargetTopic)}" y te paso la info 👇`;
     const mustDos = profileContext?.ai_context?.must_do_rules?.join('\n- ') || 'Mantener ganchos de alto impacto en los primeros 2 segundos.';
     const forbiddens = profileContext?.ai_context?.forbidden_rules?.join('\n- ') || 'No sonar aburrido, no usar frases hechas de autoayuda, no hacer introducciones lentas.';
     const niche = profileContext?.profile?.niche || 'Comercios y Negocios';
@@ -1294,7 +1483,7 @@ CONTEXTO DEL PERFIL:
 - ${mustDos}
 - Reglas PROHIBIDAS:
 - ${forbiddens}
-- CTA preferido: "${favoriteCta}"
+- CTA: ${explicitFavoriteCta ? `el negocio ya tiene un CTA fijo, usalo tal cual: "${explicitFavoriteCta}"` : `no hay un CTA fijo configurado. PROHIBIDO usar palabras de relleno genéricas como "APP" o "INFO" que no tengan nada que ver con el tema. Generá un "cta" con una palabra clave específica del producto o tema de ESTE guion en particular (ej. de inspiración, pero más específico si podés: "${favoriteCta}")`}
 
 Devuelve un JSON con este formato exacto:
 {
@@ -1632,6 +1821,14 @@ Devuelve un JSON con este formato exacto:
 
     const aboutContent = profileContext?.profile?.about_content?.trim() || null;
 
+    const realPostTopics = dnaItems
+      .map(d => d.caption_summary?.trim())
+      .filter((c): c is string => Boolean(c))
+      .slice(0, 8);
+    const realPostsText = realPostTopics.length > 0
+      ? realPostTopics.map((c, i) => `${i + 1}. "${c}"`).join('\n')
+      : '(no hay texto de captions disponible en los posts sincronizados)';
+
     // 3. Evaluar rendimiento contra la mediana
     const classifications = sourcePosts.map(p => {
       return AccountBenchmarkService.evaluateReelPerformance(postToMetaItem(p), benchmark!);
@@ -1669,7 +1866,9 @@ Devuelve un JSON con este formato exacto:
       ? learnedInsights.map(l => `- [APRENDIZAJE PREVIO]: ${l.insight_text}`).join('\n')
       : 'Sin aprendizajes previos registrados (primer ciclo de experimentación).';
 
-    const favoriteCta = profileContext?.cta_list?.find(c => c.is_favorite)?.full_phrase || 'Comentá "INFO" y te lo enviamos por privado 👇';
+    const explicitFavoriteCta = profileContext?.cta_list?.find(c => c.is_favorite)?.full_phrase?.trim() || null;
+    const ctaTopicSeed = (catalogRows && catalogRows[0]?.name) || niche;
+    const favoriteCta = explicitFavoriteCta || `Comentá "${deriveCtaKeyword(ctaTopicSeed)}" y te paso la info 👇`;
     const profileTone = profileContext?.ai_context?.tone || 'directo y conversacional';
     const mustDos = profileContext?.ai_context?.must_do_rules?.join('\n- ') || 'Gancho inmediato de menos de 3 segundos sin rodeos.';
     const forbiddens = profileContext?.ai_context?.forbidden_rules?.join('\n- ') || 'Cero introducciones lentas, cero frases cliché.';
@@ -1687,10 +1886,11 @@ REGLAS INQUEBRANTABLES:
    - VARIANTE A (Patrón Probado): Aplica directamente el patrón que mejor superó la mediana de la cuenta.
    - VARIANTE B (Ángulo Alternativo): Misma hipótesis pero atacando una objeción o ángulo complementario.
    - VARIANTE C (Apuesta Creativa): Hipótesis exploratoria con mayor contraste visual y narrativo.
-4. PROHIBIDO EXPLICAR TEORÍA DE GUION EN VEZ DE ESCRIBIRLO:
-   - ❌ Nunca escribas consejos en abstracto tipo "hacé un gancho fuerte en los primeros segundos" o "mostrá el producto de forma atractiva".
-   - ✅ Cada campo (hook_0_3s, script_body, on_screen_text, cta_trigger) tiene que ser el TEXTO REAL Y FINAL que se dice o se lee en el video, nombrando el producto/servicio concreto del catálogo o de "De qué habla la cuenta" que te paso abajo — nunca una descripción de cómo debería ser.
-   - Si el catálogo o la descripción del negocio no traen nada específico, elegí el producto o servicio más mencionado y construí el guion sobre eso, nunca en genérico ("tu producto", "tu servicio").
+4. PROHIBIDO EXPLICAR TEORÍA DE GUION EN VEZ DE ESCRIBIRLO, Y PROHIBIDO INVENTAR UN RUBRO DISTINTO AL REAL:
+   - ❌ Nunca escribas consejos en abstracto tipo "hacé un gancho fuerte en los primeros segundos" o "mostrá el producto de forma atractiva", ni frases de coach de redes genéricas tipo "¡hoy es tu día!" o "tu reel es una joya".
+   - ❌ PROHIBIDO ROTUNDAMENTE inventar un producto o rubro que no esté en el catálogo, en "De qué habla la cuenta", en el nicho declarado o en los posts reales de abajo (ej.: nunca metas zapatillas, pantallas digitales, ni ningún producto de ejemplo si el negocio no lo vende).
+   - ✅ Cada campo (hook_0_3s, script_body, on_screen_text, cta_trigger) tiene que ser el TEXTO REAL Y FINAL que se dice o se lee en el video, nombrando el producto/servicio concreto del catálogo, de "De qué habla la cuenta" o de los posts reales que te paso abajo — nunca una descripción de cómo debería ser.
+   - Orden de prioridad para decidir sobre qué producto/tema escribir el guion: 1º catálogo real, 2º "De qué habla la cuenta", 3º temas que se repiten en los posts reales de abajo, 4º el nicho declarado en texto llano (ej. si el nicho es "Insumos para carnaval" y no hay más datos, escribí sobre insumos de carnaval en general, nunca sobre un producto inventado de otro rubro).
 5. Responde ÚNICAMENTE con un JSON con la estructura:
 {
   "variantA": {
@@ -1754,7 +1954,7 @@ CONTEXTO DEL NEGOCIO:
 - Tono: ${profileTone}
 - Reglas OBLIGATORIAS: ${mustDos}
 - Reglas PROHIBIDAS: ${forbiddens}
-- CTA preferido: "${favoriteCta}"
+- CTA: ${explicitFavoriteCta ? `el negocio ya tiene un CTA fijo, usalo tal cual en cta_trigger: "${explicitFavoriteCta}"` : `no hay un CTA fijo configurado. PROHIBIDO usar palabras de relleno genéricas como "APP" o "INFO" sin relación con el producto. Cada variante tiene que tener su propio cta_trigger con una palabra clave específica del producto/tema de ESA variante (ej. de inspiración: "${favoriteCta}")`}
 - Formato solicitado: ${mode.toUpperCase()}
 - Objetivo / Tema: ${userGoal || 'Superar la mediana histórica de guardados y consultas comerciales'}
 
@@ -1762,7 +1962,10 @@ CATÁLOGO REAL DE PRODUCTOS/SERVICIOS (nombrá estos productos textualmente en e
 ${catalogText}
 
 BASE DE CONOCIMIENTO DEL NEGOCIO:
-${knowledgeText}`;
+${knowledgeText}
+
+TEMAS REALES DE LOS ÚLTIMOS POSTS DE LA CUENTA (de acá sacás de qué habla el negocio si no hay catálogo cargado):
+${realPostsText}`;
 
     // Orquestación Multi-IA (Auto vs Manual): Cascada inteligente sin caídas
     const hasClaude = Boolean(connections.claude?.isActive && connections.claude?.apiKey?.trim());

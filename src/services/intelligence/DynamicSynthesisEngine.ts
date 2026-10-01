@@ -42,10 +42,14 @@ export class DynamicSynthesisEngine {
     const allText = posts.map(p => `${p.title} ${p.analysis?.hook_data?.text || ''} ${p.analysis?.cta_data?.text || ''}`).join(' ').toLowerCase();
 
     const isSorteoOrContest = allText.includes('sorteo') || allText.includes('premio') || allText.includes('particip') || allText.includes('ganad');
-    const isCarteleriaOrDisplay = allText.includes('cartel') || allText.includes('pantalla') || allText.includes('digital') || allText.includes('local') || allText.includes('comercio') || allText.includes('vidriera');
 
     const brandCatchphrase = brandDna.voice_and_tone?.favorite_catchphrases?.[0] || 'Escuchá esto:';
-    const mainProduct = catalogProducts[0]?.name || brandDna.offers?.main_products?.[0] || 'pantallas digitales de alto brillo';
+    const mainProduct = catalogProducts[0]?.name || brandDna.offers?.main_products?.[0] || null;
+    // La narrativa de "cartelería/pantallas digitales" es específica de un
+    // rubro (señalética para comercios) y solo tiene sentido si el negocio
+    // realmente vende eso — nunca por una coincidencia de palabras sueltas
+    // como "local" o "comercio" en el texto de otro rubro distinto.
+    const isCarteleriaOrDisplay = Boolean(mainProduct) && (allText.includes('cartel') || allText.includes('pantalla') || allText.includes('vidriera'));
 
     // 4. Construir la Síntesis Cruzada Dinámica
     let synthesizedTitle = `Fusión Estratégica: ${topTitle.slice(0, 30)}... + ${secTitle ? secTitle.slice(0, 25) + '...' : 'Display Digital'}`;
@@ -218,37 +222,34 @@ export class DynamicSynthesisEngine {
 
   private static generateDefaultSynthesis(brandDna: BrandDNA): ReelSynthesisResult {
     const catchphrase = brandDna.voice_and_tone?.favorite_catchphrases?.[0] || 'Escuchá esto:';
-    const hook = `${catchphrase} La razón por la que los comercios más exitosos están usando pantallas dinámicas en su punto de venta.`;
-    const cleanScript = `${hook}\n\nSi estás esperando que la gente entre a tu local con carteles impresos que nadie lee, estás perdiendo el ochenta por ciento de los clientes que pasan por tu vereda.\n\nCon nuestras pantallas dinámicas tus promociones cambian en tiempo real desde el celular. Mirá el impacto que genera una pantalla vertical en la entrada.\n\nComentá la palabra "APP" acá abajo y te mandamos una propuesta con el equipamiento exacto y financiación para tu local.`;
+    const mainProduct = brandDna.offers?.main_products?.[0] || null;
+    const hook = mainProduct
+      ? `${catchphrase} Lo que nadie te cuenta sobre ${mainProduct}.`
+      : `${catchphrase} Todavía no hay Reels ni catálogo cargados para generar un guion con datos reales de tu negocio.`;
+    const cleanScript = mainProduct
+      ? `${hook}\n\nCargá tu catálogo y conectá tus Reels para que la IA use datos reales de ${mainProduct} en el guion.\n\nComentá "INFO" acá abajo y te contamos más.`
+      : `${hook}\n\nPara generar un guion con contenido real, cargá al menos un producto en tu catálogo o conectá Reels de tu cuenta. Sin esos datos no podemos escribir un guion específico sin inventar un negocio que no es el tuyo.`;
 
     return {
-      title: 'Super Guion Fusionado: Modernización Comercial',
+      title: mainProduct ? `Super Guion: ${mainProduct}` : 'Sin datos suficientes para un guion real',
       hook,
       structure_breakdown: [
-        '0-3s: Hook de Alta Curiosidad + Demostración Visual',
-        '3-12s: Exposición del Problema de Captación en Local',
-        '12-30s: Demostración Tangible de Pantalla Vertical',
-        '30-45s: CTA Directo por Palabra Clave ("APP")'
+        '0-3s: Hook de Alta Curiosidad',
+        '3-12s: Exposición del Problema o Deseo del Cliente',
+        '12-30s: Demostración de la Solución Real del Negocio',
+        '30-45s: CTA Directo por Palabra Clave'
       ],
-      cta: 'Comentá "APP" y te enviamos la propuesta personalizada.',
-      full_script: `[HOOK (0-3s)]\n"${hook}"\n\n[PROBLEMA]\nCartelería estática ignorada en vereda.\n\n[VALOR]\nPantallas dinámicas con actualización móvil.\n\n[CTA]\nComentá "APP".`,
+      cta: 'Comentá la palabra clave de tu negocio para recibir más info.',
+      full_script: `[HOOK (0-3s)]\n"${hook}"\n\n[SIGUIENTE PASO]\nCargá catálogo o Reels para un guion anclado a datos reales.\n\n[CTA]\nComentá "INFO".`,
       teleprompter_clean_script: cleanScript,
       alternative_hooks: [
-        { type: 'Curiosidad', text: '¿Sabías por qué los locales que más venden ya no usan carteles de lona?' },
-        { type: 'Pérdida', text: 'El 80% de las personas que pasan frente a tu negocio no entran por esto...' },
-        { type: 'Resultado Directo', text: 'Cómo captar la atención de tu cuadra completa con una sola pantalla vertical.' }
+        { type: 'Curiosidad', text: `${catchphrase} Lo que casi nadie en tu rubro está haciendo todavía.` },
+        { type: 'Pérdida', text: 'Esto es lo que te estás perdiendo si no cargaste tu catálogo todavía.' },
+        { type: 'Resultado Directo', text: mainProduct ? `Cómo vender más ${mainProduct} con un solo Reel bien armado.` : 'Cargá tu catálogo para ver un gancho anclado a tu producto real.' }
       ],
-      new_reel_ideas: [
-        {
-          title: 'El Error del Cartel Estático',
-          hook: 'El error de plata que cometen el 90% de los comercios con su cartelería...',
-          angle: 'Aversión a la Pérdida',
-          spoken_dialogue: 'El error que cometen casi todos los comercios es gastar fortunas en lonas y ploteos que al mes quedan desactualizados. Con una pantalla vertical cambiás la carta, la promo del día y los combos desde tu celular en 30 segundos. Comentá PANTALLA y te paso la info con cuotas.',
-          cta: 'Comentá "PANTALLA" y te pasamos el catálogo.'
-        }
-      ],
-      why_it_works: 'Combina retención probada con la oferta comercial del negocio.',
-      expected_impact: '2.8x más comentarios por palabra clave y derivación a WhatsApp.'
+      new_reel_ideas: [],
+      why_it_works: 'Guion de respaldo generado sin IA activa y sin Reels ni catálogo suficientes como evidencia real.',
+      expected_impact: 'Sin datos suficientes para proyectar impacto; cargá catálogo o conectá Reels para una estimación real.'
     };
   }
 }
