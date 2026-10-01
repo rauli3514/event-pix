@@ -36,6 +36,19 @@ import {
 } from './metricUtils';
 import { toast } from 'sonner';
 
+// Saca una palabra clave real del tema/producto para armar un CTA tipo
+// "Comentá 'X' y te paso la info" cuando el negocio no fijó un CTA propio.
+// Nunca usamos un relleno fijo tipo "APP" o "INFO": cada guion necesita una
+// palabra que tenga que ver con lo que se está mostrando en ESE guion.
+const CTA_KEYWORD_STOPWORDS = new Set(['el', 'la', 'los', 'las', 'de', 'del', 'para', 'por', 'con', 'en', 'un', 'una', 'y', 'o', 'tu', 'tus', 'que', 'como', 'mas', 'más', 'sin', 'esta', 'este']);
+
+function deriveCtaKeyword(topic: string | null | undefined): string {
+  const clean = (topic || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9\s]/g, '');
+  const words = clean.split(/\s+/).filter(w => w.length > 2 && !CTA_KEYWORD_STOPWORDS.has(w.toLowerCase()));
+  const chosen = [...words].sort((a, b) => b.length - a.length)[0];
+  return (chosen || 'CATALOGO').toUpperCase().slice(0, 14);
+}
+
 export class AIProviderService {
   /**
    * Valida una clave de API de OpenAI contra el endpoint de modelos y prueba de completado para verificar saldo
@@ -391,7 +404,7 @@ OBJETIVOS DE LA SÍNTESIS Y NUEVO DIÁLOGO:
    - [HOOK (0-3s)]: Gancho de alta curiosidad con texto en pantalla.
    - [CONFLICTO (3-12s)]: El dolor o problema que frena las ventas de los clientes.
    - [DEMOSTRACIÓN (12-30s)]: Solución tangible mencionando el equipamiento o producto real con precios.
-   - [CTA (30-45s)]: Llamado a la acción claro (ej: 'Comentá "APP" para enviarte la cotización por WhatsApp').
+   - [CTA (30-45s)]: Llamado a la acción con una palabra clave ESPECÍFICA del producto/tema de este guion (ej: si es sobre boas de plumas, 'Comentá "BOAS" y te paso los colores disponibles'). PROHIBIDO usar una palabra de relleno genérica como "APP" o "INFO" que no tenga relación con lo que se está vendiendo.
 
 Devolvé un JSON estricto con esta estructura:
 {
@@ -467,7 +480,7 @@ Devolvé un JSON estricto con esta estructura:
           title: parsed.title || `Super Guion: ${sourceTitles}`,
           hook: parsed.hook || `${catchphrase} La clave que pocos negocios conocen.`,
           structure_breakdown: parsed.structure_breakdown || neutralStructureFallback,
-          cta: parsed.cta || 'Comentá la palabra clave de tu negocio para recibir más info.',
+          cta: parsed.cta || `Comentá "${deriveCtaKeyword(niche || mainProductsList)}" y te paso la info`,
           full_script: parsed.full_script,
           teleprompter_clean_script: cleanScript,
           alternative_hooks: parsed.alternative_hooks || neutralAlternativeHooksFallback,
@@ -513,7 +526,7 @@ Devolvé un JSON estricto con esta estructura:
             title: parsed.title || `Super Guion: ${sourceTitles}`,
             hook: parsed.hook || `${catchphrase} La clave que pocos negocios conocen.`,
             structure_breakdown: parsed.structure_breakdown || neutralStructureFallback,
-            cta: parsed.cta || 'Comentá la palabra clave de tu negocio para recibir más info.',
+            cta: parsed.cta || `Comentá "${deriveCtaKeyword(niche || mainProductsList)}" y te paso la info`,
             full_script: parsed.full_script,
             teleprompter_clean_script: cleanScript,
             alternative_hooks: parsed.alternative_hooks || neutralAlternativeHooksFallback,
@@ -1235,7 +1248,8 @@ Devolvé un JSON estricto con:
       : 'Sin fuentes conectadas (creación libre basada en el tema pedido).';
 
     const profileTone = profileContext?.ai_context?.tone || 'directo y conversacional';
-    const favoriteCta = profileContext?.cta_list?.find(c => c.is_favorite)?.full_phrase || 'Comentá "APP" y te paso la información detallada 👇';
+    const explicitFavoriteCta = profileContext?.cta_list?.find(c => c.is_favorite)?.full_phrase?.trim() || null;
+    const favoriteCta = explicitFavoriteCta || `Comentá "${deriveCtaKeyword(effectiveTargetTopic)}" y te paso la info 👇`;
     const mustDos = profileContext?.ai_context?.must_do_rules?.join('\n- ') || 'Mantener ganchos de alto impacto en los primeros 2 segundos.';
     const forbiddens = profileContext?.ai_context?.forbidden_rules?.join('\n- ') || 'No sonar aburrido, no usar frases hechas de autoayuda, no hacer introducciones lentas.';
     const niche = profileContext?.profile?.niche || 'Comercios y Negocios';
@@ -1307,7 +1321,7 @@ CONTEXTO DEL PERFIL:
 - ${mustDos}
 - Reglas PROHIBIDAS:
 - ${forbiddens}
-- CTA preferido: "${favoriteCta}"
+- CTA: ${explicitFavoriteCta ? `el negocio ya tiene un CTA fijo, usalo tal cual: "${explicitFavoriteCta}"` : `no hay un CTA fijo configurado. PROHIBIDO usar palabras de relleno genéricas como "APP" o "INFO" que no tengan nada que ver con el tema. Generá un "cta" con una palabra clave específica del producto o tema de ESTE guion en particular (ej. de inspiración, pero más específico si podés: "${favoriteCta}")`}
 
 Devuelve un JSON con este formato exacto:
 {
@@ -1690,7 +1704,9 @@ Devuelve un JSON con este formato exacto:
       ? learnedInsights.map(l => `- [APRENDIZAJE PREVIO]: ${l.insight_text}`).join('\n')
       : 'Sin aprendizajes previos registrados (primer ciclo de experimentación).';
 
-    const favoriteCta = profileContext?.cta_list?.find(c => c.is_favorite)?.full_phrase || 'Comentá "INFO" y te lo enviamos por privado 👇';
+    const explicitFavoriteCta = profileContext?.cta_list?.find(c => c.is_favorite)?.full_phrase?.trim() || null;
+    const ctaTopicSeed = (catalogRows && catalogRows[0]?.name) || niche;
+    const favoriteCta = explicitFavoriteCta || `Comentá "${deriveCtaKeyword(ctaTopicSeed)}" y te paso la info 👇`;
     const profileTone = profileContext?.ai_context?.tone || 'directo y conversacional';
     const mustDos = profileContext?.ai_context?.must_do_rules?.join('\n- ') || 'Gancho inmediato de menos de 3 segundos sin rodeos.';
     const forbiddens = profileContext?.ai_context?.forbidden_rules?.join('\n- ') || 'Cero introducciones lentas, cero frases cliché.';
@@ -1776,7 +1792,7 @@ CONTEXTO DEL NEGOCIO:
 - Tono: ${profileTone}
 - Reglas OBLIGATORIAS: ${mustDos}
 - Reglas PROHIBIDAS: ${forbiddens}
-- CTA preferido: "${favoriteCta}"
+- CTA: ${explicitFavoriteCta ? `el negocio ya tiene un CTA fijo, usalo tal cual en cta_trigger: "${explicitFavoriteCta}"` : `no hay un CTA fijo configurado. PROHIBIDO usar palabras de relleno genéricas como "APP" o "INFO" sin relación con el producto. Cada variante tiene que tener su propio cta_trigger con una palabra clave específica del producto/tema de ESA variante (ej. de inspiración: "${favoriteCta}")`}
 - Formato solicitado: ${mode.toUpperCase()}
 - Objetivo / Tema: ${userGoal || 'Superar la mediana histórica de guardados y consultas comerciales'}
 
