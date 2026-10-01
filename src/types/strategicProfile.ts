@@ -11,6 +11,10 @@ export interface ProfileIdentity {
   niche: string;
   language: string;
   about_content: string; // "De qué hablas en tu contenido y a quién ayudas"
+  // Correcciones urgentes detectadas por la IA sobre la bio real de la
+  // cuenta (autoDetectProfile). Persistidas para que no desaparezcan al
+  // cambiar de pestaña — quedan visibles hasta que el usuario las resuelva.
+  profile_tips?: string[];
 }
 
 export interface AiPermanentContext {

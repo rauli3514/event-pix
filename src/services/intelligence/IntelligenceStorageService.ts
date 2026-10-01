@@ -600,7 +600,7 @@ export class IntelligenceStorageService {
           keyword: 'APP',
           full_phrase: 'Comenta "APP" y te la envío ya mismo!! 🤩👇',
           action_type: 'comment_keyword',
-          is_favorite: true
+          is_favorite: false
         },
         {
           id: 'cta_3',
