@@ -304,7 +304,7 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
   const getNodeDimensions = (node: CanvasNode) => {
     if (node.type === 'synthesis') return { width: 380, height: 420 };
     if (node.type === 'ai_chat') return { width: 380, height: 500 };
-    if (node.type === 'reel') return { width: 280, height: 260 };
+    if (node.type === 'reel') return { width: 280, height: 410 };
     return { width: 270, height: 170 };
   };
 
@@ -687,7 +687,7 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
             const tDim = getNodeDimensions(targetNode);
 
             const x1 = sPos.x + sDim.width;
-            const y1 = sPos.y + (sourceNode.type === 'reel' ? 68 : Math.min(sDim.height / 2, 80));
+            const y1 = sPos.y + (sourceNode.type === 'reel' ? 160 : Math.min(sDim.height / 2, 80));
 
             const x2 = tPos.x;
             const y2 = tPos.y + (targetNode.type === 'ai_chat' ? 44 : Math.min(tDim.height / 2, 80));
@@ -863,22 +863,27 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
                 </div>
 
                 <div className="p-3 space-y-2.5">
-                  <div className="flex gap-3">
+                  <div className="relative rounded-xl overflow-hidden border border-slate-800 bg-slate-950">
                     <img
                       src={post.thumbnail_url}
                       alt={post.title}
-                      className="w-16 h-24 object-cover rounded-xl border border-slate-800 shrink-0"
+                      className="w-full h-64 object-cover"
                     />
-                    <div className="space-y-1.5 flex-1 min-w-0">
-                      <h4 className="text-xs font-bold text-slate-100 line-clamp-2 leading-snug">
-                        {post.title}
-                      </h4>
-                      {post.analysis && (
-                        <div className="bg-violet-950/40 border border-violet-500/30 px-2 py-1 rounded-lg text-[10px] text-violet-300 font-semibold truncate">
-                          Hook: "{post.analysis.hook_data.text}"
+                    {post.analysis?.hook_data?.text ? (
+                      <div className="absolute top-2 left-2 right-2">
+                        <div className="relative bg-white text-slate-900 text-[11px] font-semibold leading-snug px-2.5 py-1.5 rounded-xl shadow-lg line-clamp-3">
+                          {post.analysis.hook_data.text}
+                          <div className="absolute -bottom-1.5 left-4 w-3 h-3 bg-white rotate-45" />
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    ) : (
+                      <div className="absolute top-2 left-2 right-2">
+                        <div className="relative bg-white text-slate-900 text-[11px] font-semibold leading-snug px-2.5 py-1.5 rounded-xl shadow-lg line-clamp-2">
+                          {post.title}
+                          <div className="absolute -bottom-1.5 left-4 w-3 h-3 bg-white rotate-45" />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {post.metrics && (
