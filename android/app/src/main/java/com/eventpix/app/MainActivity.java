@@ -7,6 +7,7 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.webkit.JavascriptInterface;
 
+import com.eventpix.app.print.NativePrintPlugin;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
@@ -15,6 +16,7 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(NativePrintPlugin.class);
         super.onCreate(savedInstanceState);
         bluetoothServer = new BluetoothServer(this);
         // BluetoothClient se inicializa después del Bridge (webview disponible)

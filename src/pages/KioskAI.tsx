@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Printer, Users, Sparkles, Trophy, QrCode, Instagram, Palette, Sticker } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
+import { isNativePrintAvailable, printImageNative, printErrorMessage } from '@/lib/nativePrint';
 import { StickerEditor } from '@/components/stickers/StickerEditor';
 
 // ---- Types ----
@@ -623,6 +624,36 @@ The subject must perfectly match the facial features and gender of the reference
       try { return JSON.parse(localStorage.getItem('kiosk_print_settings') || '{}'); }
       catch { return {}; }
     })();
+
+    // 0. APP ANDROID: impresión nativa (directa por WiFi o diálogo del sistema)
+    if (isNativePrintAvailable()) {
+      const options = {
+        image: imageUrl,
+        paper: cfg.paper || '4x6',
+        orientation: cfg.orientation || 'portrait',
+        rotation: cfg.rotation || 0,
+        scaleMode: cfg.imageAdjust || 'cover',
+        copies: cfg.copies || 1,
+        borderless: !!cfg.borderless,
+        jobName: 'EventPix',
+      };
+      try {
+        const res = await printImageNative({ ...options, printer: cfg.nativePrinter || null });
+        if (res.mode === 'silent') toast.success("Impresión enviada correctamente");
+      } catch (err) {
+        if (!cfg.nativePrinter) {
+          toast.error(`No se pudo imprimir: ${printErrorMessage(err)}`);
+          return;
+        }
+        toast.error(`No se pudo imprimir directo (${printErrorMessage(err)}). Abriendo el diálogo de impresión.`);
+        try {
+          await printImageNative(options);
+        } catch (dialogErr) {
+          toast.error(`No se pudo imprimir: ${printErrorMessage(dialogErr)}`);
+        }
+      }
+      return;
+    }
 
     // 1. INTENTAR IMPRESIÓN SILENCIOSA (Local Server)
     if (cfg.selectedPrinter && cfg.selectedPrinter !== 'Impresora del Sistema (diálogo del navegador)') {

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from 'sonner';
+import { isNativePrintAvailable, discoverNativePrinters, printImageNative, PAPER_SIZES, printErrorMessage, type NativePrinter } from '@/lib/nativePrint';
 import {
     Sparkles, ArrowLeft, Trash2, Save,
     Monitor, Download, Printer, Settings, ExternalLink, Camera, Instagram, Users,
@@ -85,6 +86,11 @@ const KioskManager = () => {
     });
     const [availablePrinters, setAvailablePrinters] = useState<string[]>([]);
     const [isLoadingPrinters, setIsLoadingPrinters] = useState(false);
+    const isNativePrint = isNativePrintAvailable();
+    const [nativePrinters, setNativePrinters] = useState<NativePrinter[]>(() =>
+        printerSettings.nativePrinter ? [printerSettings.nativePrinter] : []
+    );
+    const [isTestPrinting, setIsTestPrinting] = useState(false);
 
 
     // Persist printer settings
@@ -94,6 +100,24 @@ const KioskManager = () => {
 
     const enumeratePrinters = async () => {
         setIsLoadingPrinters(true);
+        if (isNativePrint) {
+            try {
+                const found = await discoverNativePrinters();
+                const current = printerSettings.nativePrinter as NativePrinter | undefined;
+                // Mantiene la elegida aunque no haya respondido en esta búsqueda
+                const merged = current && !found.some(p => p.serviceName === current.serviceName)
+                    ? [current, ...found] : found;
+                setNativePrinters(merged);
+                toast.success(found.length
+                    ? `${found.length} impresora${found.length === 1 ? '' : 's'} en la red`
+                    : 'No se encontraron impresoras. Revisá que estén en la misma WiFi.');
+            } catch (err) {
+                toast.error(printErrorMessage(err));
+            } finally {
+                setIsLoadingPrinters(false);
+            }
+            return;
+        }
         try {
             // Browsers don't expose printers directly. We try the print server API first.
             const res = await fetch('http://localhost:3001/printers').catch(() => null);
@@ -975,6 +999,21 @@ const KioskManager = () => {
                                             <div className="space-y-3">
                                                 <Label className="text-slate-300 text-[10px] uppercase font-bold tracking-wider">Impresora Activa</Label>
                                                 <div className="flex gap-3">
+                                                    {isNativePrint ? (
+                                                        <select
+                                                            className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white appearance-none focus:ring-2 focus:ring-violet-500/20 outline-none"
+                                                            value={printerSettings.nativePrinter?.serviceName || ''}
+                                                            onChange={(e) => {
+                                                                const printer = nativePrinters.find(p => p.serviceName === e.target.value) || null;
+                                                                setPrinterSettings({...printerSettings, nativePrinter: printer, selectedPrinter: printer?.name || ''});
+                                                            }}
+                                                        >
+                                                            <option value="">Diálogo de Android (elegir al imprimir)</option>
+                                                            {nativePrinters.map(p => (
+                                                                <option key={p.serviceName} value={p.serviceName}>{p.name} — {p.host}</option>
+                                                            ))}
+                                                        </select>
+                                                    ) : (
                                                     <select 
                                                         className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white appearance-none focus:ring-2 focus:ring-violet-500/20 outline-none"
                                                         value={printerSettings.selectedPrinter}
@@ -983,11 +1022,68 @@ const KioskManager = () => {
                                                         <option value="">Seleccionar impresora...</option>
                                                         {availablePrinters.map(p => <option key={p} value={p}>{p}</option>)}
                                                     </select>
+                                                    )}
                                                     <Button onClick={enumeratePrinters} disabled={isLoadingPrinters} className="bg-slate-800 hover:bg-slate-700 text-white uppercase text-xs font-bold px-6 py-6 rounded-xl">
                                                         {isLoadingPrinters ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Actualizar'}
                                                     </Button>
                                                 </div>
                                             </div>
+
+                                            {isNativePrint && (
+                                                <p className="text-slate-500 text-xs -mt-5">
+                                                    {printerSettings.nativePrinter
+                                                        ? 'Las fotos se imprimen directo por WiFi, sin diálogo. Si falla, se abre el diálogo de Android.'
+                                                        : 'Tocá "Actualizar" para buscar impresoras en la WiFi e imprimir sin diálogo.'}
+                                                </p>
+                                            )}
+
+                                            {isNativePrint && (
+                                                <div className="space-y-3">
+                                                    <Label className="text-slate-300 text-[10px] uppercase font-bold tracking-wider">Papel</Label>
+                                                    <div className="flex gap-3">
+                                                        <select
+                                                            className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white appearance-none outline-none"
+                                                            value={printerSettings.paper || '4x6'}
+                                                            onChange={(e) => setPrinterSettings({...printerSettings, paper: e.target.value})}
+                                                        >
+                                                            {PAPER_SIZES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                                                        </select>
+                                                        <Button
+                                                            onClick={() => setPrinterSettings({...printerSettings, borderless: !printerSettings.borderless})}
+                                                            className={`px-6 py-6 rounded-xl text-xs font-bold uppercase ${printerSettings.borderless ? 'bg-violet-600 hover:bg-violet-700 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-400'}`}
+                                                        >
+                                                            Sin bordes: {printerSettings.borderless ? 'Sí' : 'No'}
+                                                        </Button>
+                                                    </div>
+                                                    <Button
+                                                        disabled={isTestPrinting}
+                                                        onClick={async () => {
+                                                            setIsTestPrinting(true);
+                                                            try {
+                                                                const res = await printImageNative({
+                                                                    image: '/ai-themes/jugador-seleccion.jpg',
+                                                                    printer: printerSettings.nativePrinter || null,
+                                                                    paper: printerSettings.paper || '4x6',
+                                                                    orientation: printerSettings.orientation,
+                                                                    rotation: printerSettings.rotation,
+                                                                    scaleMode: printerSettings.imageAdjust,
+                                                                    copies: 1,
+                                                                    borderless: !!printerSettings.borderless,
+                                                                    jobName: 'EventPix - prueba',
+                                                                });
+                                                                if (res.mode === 'silent') toast.success('Prueba enviada a la impresora');
+                                                            } catch (err) {
+                                                                toast.error(printErrorMessage(err));
+                                                            } finally {
+                                                                setIsTestPrinting(false);
+                                                            }
+                                                        }}
+                                                        className="w-full bg-slate-800 hover:bg-slate-700 text-white py-6 rounded-xl flex items-center justify-center gap-2"
+                                                    >
+                                                        {isTestPrinting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />} Imprimir prueba
+                                                    </Button>
+                                                </div>
+                                            )}
 
                                             {/* PREFERENCES */}
                                             <div className="space-y-3">
