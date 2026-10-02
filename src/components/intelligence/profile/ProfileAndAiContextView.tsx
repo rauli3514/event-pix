@@ -88,6 +88,8 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
   const [newMustDo, setNewMustDo] = useState('');
   const [newForbidden, setNewForbidden] = useState('');
   const [newCatchphrase, setNewCatchphrase] = useState('');
+  const [newIdentifyingWord, setNewIdentifyingWord] = useState('');
+  const [newNeverWord, setNewNeverWord] = useState('');
   
   // Modal / form nuevo CTA
   const [isAddingCta, setIsAddingCta] = useState(false);
@@ -814,6 +816,149 @@ export const ProfileAndAiContextView: React.FC<ProfileAndAiContextViewProps> = (
                       setNewCatchphrase('');
                     }}
                     className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-violet-400 text-xs font-bold flex items-center gap-1 shrink-0"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Agregar
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Palabras que te identifican — opcional, refuerza el tono sin
+                agregar un paso obligatorio al onboarding. */}
+            <div className="space-y-2 pt-2 border-t border-slate-800/80">
+              <label className="text-xs font-bold uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5" />
+                Palabras que normalmente usás y te identifican (opcional)
+              </label>
+              <p className="text-[10px] text-slate-500 -mt-1">
+                Regionalismos o expresiones tuyas. Ej: "che", "boludo", "parce", "wey".
+              </p>
+              <div className="space-y-2">
+                {(context.ai_context.identifying_words || []).map((word, idx) => (
+                  <div key={idx} className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-950 border border-slate-800/80 text-xs text-slate-200">
+                    <span className="leading-snug">{word}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = (context.ai_context.identifying_words || []).filter((_, i) => i !== idx);
+                        setContext({
+                          ...context,
+                          ai_context: { ...context.ai_context, identifying_words: next }
+                        });
+                      }}
+                      className="text-slate-500 hover:text-rose-400 p-1 transition-colors shrink-0"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newIdentifyingWord}
+                    onChange={(e) => setNewIdentifyingWord(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && newIdentifyingWord.trim()) {
+                        e.preventDefault();
+                        setContext({
+                          ...context,
+                          ai_context: {
+                            ...context.ai_context,
+                            identifying_words: [...(context.ai_context.identifying_words || []), newIdentifyingWord.trim()]
+                          }
+                        });
+                        setNewIdentifyingWord('');
+                      }
+                    }}
+                    placeholder="Ej: che, boludo, parce..."
+                    className="flex-1 rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-xs text-slate-100 outline-none focus:border-sky-500/60"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!newIdentifyingWord.trim()) return;
+                      setContext({
+                        ...context,
+                        ai_context: {
+                          ...context.ai_context,
+                          identifying_words: [...(context.ai_context.identifying_words || []), newIdentifyingWord.trim()]
+                        }
+                      });
+                      setNewIdentifyingWord('');
+                    }}
+                    className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-400 text-xs font-bold flex items-center gap-1 shrink-0"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Agregar
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Palabras con las que JAMÁS te identificarías — opcional */}
+            <div className="space-y-2 pt-2 border-t border-slate-800/80">
+              <label className="text-xs font-bold uppercase tracking-wider text-orange-400 flex items-center gap-1.5">
+                <Trash2 className="w-3.5 h-3.5" />
+                Palabras con las que JAMÁS te identificarías (opcional)
+              </label>
+              <p className="text-[10px] text-slate-500 -mt-1">
+                Distinto de las reglas prohibidas de arriba: esto es vocabulario o estilo que no es "vos". Ej: "exceso de egocentrismo", "corazón", "jaja".
+              </p>
+              <div className="space-y-2">
+                {(context.ai_context.never_words || []).map((word, idx) => (
+                  <div key={idx} className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-950 border border-slate-800/80 text-xs text-slate-200">
+                    <span className="leading-snug">{word}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = (context.ai_context.never_words || []).filter((_, i) => i !== idx);
+                        setContext({
+                          ...context,
+                          ai_context: { ...context.ai_context, never_words: next }
+                        });
+                      }}
+                      className="text-slate-500 hover:text-rose-400 p-1 transition-colors shrink-0"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newNeverWord}
+                    onChange={(e) => setNewNeverWord(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && newNeverWord.trim()) {
+                        e.preventDefault();
+                        setContext({
+                          ...context,
+                          ai_context: {
+                            ...context.ai_context,
+                            never_words: [...(context.ai_context.never_words || []), newNeverWord.trim()]
+                          }
+                        });
+                        setNewNeverWord('');
+                      }
+                    }}
+                    placeholder="Ej: corazón, jaja, exceso de egocentrismo..."
+                    className="flex-1 rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-xs text-slate-100 outline-none focus:border-orange-500/60"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!newNeverWord.trim()) return;
+                      setContext({
+                        ...context,
+                        ai_context: {
+                          ...context.ai_context,
+                          never_words: [...(context.ai_context.never_words || []), newNeverWord.trim()]
+                        }
+                      });
+                      setNewNeverWord('');
+                    }}
+                    className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-orange-400 text-xs font-bold flex items-center gap-1 shrink-0"
                   >
                     <Plus className="w-3.5 h-3.5" /> Agregar
                   </button>

@@ -18,6 +18,8 @@ import {
   FileText,
   MessageCircle,
   Mic,
+  Link2,
+  Trash2,
   RefreshCw,
   FlaskConical,
   TrendingUp,
@@ -66,7 +68,7 @@ interface AiChatCardNodeProps {
   messages: ChatMessage[];
   activeMode: ContentFormatMode;
   onModeChange: (mode: ContentFormatMode) => void;
-  onSendMessage: (text: string, mode: ContentFormatMode) => Promise<void>;
+  onSendMessage: (text: string, mode: ContentFormatMode, referenceReelText?: string) => Promise<void>;
   onDisconnectAll: () => void;
   onDisconnectSource: (postId: string) => void;
   onOpenTeleprompter: (scriptText: string, title: string) => void;
@@ -134,6 +136,17 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
   const [isAiMenuOpen, setIsAiMenuOpen] = useState(false);
   const [copiedScriptId, setCopiedScriptId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Clonar Reel de referencia (opcional): pegar el link de un Reel ajeno
+  // (propio o de un competidor/viral) para usar su estructura/caption como
+  // inspiración del próximo guion — nunca se copia su texto literal, se usa
+  // solo como referencia opcional sobre lo ya existente (Content DNA, CTAs,
+  // Business Snapshot).
+  const [showCloneReel, setShowCloneReel] = useState(false);
+  const [cloneReelUrl, setCloneReelUrl] = useState('');
+  const [isCloningReel, setIsCloningReel] = useState(false);
+  const [cloneReelResult, setCloneReelResult] = useState<{ username: string; caption: string; imageUrl: string } | null>(null);
+  const [useCloneReelAsReference, setUseCloneReelAsReference] = useState(false);
 
   const businessId = IntelligenceStorageService.getActiveBusinessId() || 'tecno_eventos_arg';
 
@@ -305,7 +318,48 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
     if (!inputText.trim() || isGenerating) return;
     const textToSend = inputText.trim();
     setInputText('');
-    await onSendMessage(textToSend, activeMode);
+    const referenceReelText = (useCloneReelAsReference && cloneReelResult?.caption)
+      ? cloneReelResult.caption
+      : undefined;
+    await onSendMessage(textToSend, activeMode, referenceReelText);
+  };
+
+  // Clonar Reel de referencia: trae el caption público de un Reel (propio o
+  // ajeno) vía el scraper existente (/api/instagram-scrape, ya usado para
+  // métricas) — reutilizado acá para no sumar una función serverless nueva
+  // (Vercel Hobby está en el límite de 12). No hay transcripción de audio
+  // para Reels ajenos: Whisper en producción solo funciona con el archivo
+  // de video de una cuenta conectada por Meta Graph API.
+  const handleCloneReel = async () => {
+    const url = cloneReelUrl.trim();
+    if (!url) {
+      toast.error('Pegá el link de un Reel de Instagram primero.');
+      return;
+    }
+    setIsCloningReel(true);
+    try {
+      const res = await fetch(`/api/instagram-scrape?url=${encodeURIComponent(url)}`);
+      const data = await res.json();
+      if (!data.success || data.isProfile) {
+        toast.error(data.error || 'Ese link no parece ser un Reel específico. Pegá el link directo del Reel.');
+        return;
+      }
+      if (!data.caption) {
+        toast.error('No pudimos leer el texto de ese Reel. Puede ser privado o Instagram bloqueó la lectura pública.');
+        return;
+      }
+      setCloneReelResult({
+        username: data.username || '',
+        caption: data.caption,
+        imageUrl: data.imageUrl || ''
+      });
+      setUseCloneReelAsReference(true);
+      toast.success('Reel leído. Lo vamos a usar como referencia de estructura en el próximo guion (nunca copiamos su texto literal).');
+    } catch {
+      toast.error('No pudimos leer ese Reel ahora mismo. Probá de nuevo.');
+    } finally {
+      setIsCloningReel(false);
+    }
   };
 
   // Dictado por voz de la instrucción, como el micrófono de Scripty: usa la
@@ -575,6 +629,85 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
             </span>
             <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
           </button>
+        )}
+
+        {/* Clonar Reel de referencia (opcional): pegar el link de un Reel
+            propio o ajeno para usar su estructura como inspiración, sin
+            copiar su texto literal. No reemplaza el Content DNA ya
+            existente — lo refuerza. */}
+        {activeTab === 'chat' && (
+          <button
+            type="button"
+            onClick={() => setShowCloneReel(v => !v)}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-900/70 border border-slate-800 text-[11px] font-bold text-slate-300 hover:text-slate-100 transition-colors"
+          >
+            <span className="flex items-center gap-1.5">
+              <Link2 className="w-3.5 h-3.5 text-sky-400" />
+              Clonar estructura de un Reel de referencia (opcional)
+              {cloneReelResult && useCloneReelAsReference && (
+                <span className="px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 text-[8px] font-bold uppercase">Activo</span>
+              )}
+            </span>
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showCloneReel ? 'rotate-180' : ''}`} />
+          </button>
+        )}
+
+        {activeTab === 'chat' && showCloneReel && (
+          <div className="p-3 rounded-xl bg-slate-900/70 border border-slate-800 space-y-2.5">
+            <p className="text-[10px] text-slate-400 leading-relaxed">
+              Pegá el link de un Reel (tuyo o de referencia) y leemos su texto completo. Lo usamos solo como inspiración de estructura para el próximo guion — nunca copiamos su contenido literal.
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={cloneReelUrl}
+                onChange={(e) => setCloneReelUrl(e.target.value)}
+                placeholder="https://www.instagram.com/reel/..."
+                className="flex-1 rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-xs text-slate-100 outline-none focus:border-sky-500/60"
+              />
+              <button
+                type="button"
+                onClick={handleCloneReel}
+                disabled={isCloningReel || !cloneReelUrl.trim()}
+                className="px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-white text-xs font-bold shrink-0"
+              >
+                {isCloningReel ? 'Leyendo...' : 'Analizar'}
+              </button>
+            </div>
+
+            {cloneReelResult && (
+              <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-sky-400">
+                    {cloneReelResult.username ? `@${cloneReelResult.username}` : 'Texto completo del Reel'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCloneReelResult(null);
+                      setUseCloneReelAsReference(false);
+                      setCloneReelUrl('');
+                    }}
+                    className="text-slate-500 hover:text-rose-400"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-300 whitespace-pre-wrap leading-relaxed max-h-32 overflow-y-auto custom-scrollbar">
+                  {cloneReelResult.caption}
+                </p>
+                <label className="flex items-center gap-2 text-[10px] text-slate-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={useCloneReelAsReference}
+                    onChange={(e) => setUseCloneReelAsReference(e.target.checked)}
+                    className="accent-sky-500"
+                  />
+                  Usar como referencia en el próximo guion que genere
+                </label>
+              </div>
+            )}
+          </div>
         )}
 
         {/* ============================================================ */}

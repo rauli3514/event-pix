@@ -1319,6 +1319,10 @@ Devolvé un JSON estricto con:
     profileContext?: UserProfileContext;
     connections: UnifiedConnectionsState;
     chatHistory?: Array<{ sender: 'user' | 'ai'; text: string; scriptData?: any }>;
+    // Texto completo (caption) de un Reel de referencia, propio o ajeno,
+    // leído con /api/instagram-scrape. Solo inspiración de estructura —
+    // nunca se copia literal.
+    referenceReelText?: string;
   }): Promise<{
     replyText: string;
     scriptData: {
@@ -1329,7 +1333,7 @@ Devolvé un JSON estricto con:
       fullScript: string;
     };
   }> {
-    const { businessId, userInstruction, mode, sourcePosts, profileContext, connections, chatHistory } = params;
+    const { businessId, userInstruction, mode, sourcePosts, profileContext, connections, chatHistory, referenceReelText } = params;
 
     const hasOpenAI = Boolean(connections.openai?.isActive && connections.openai?.apiKey?.trim());
     const hasClaude = Boolean(connections.claude?.isActive && connections.claude?.apiKey?.trim());
@@ -1459,6 +1463,14 @@ Devolvé un JSON estricto con:
     const mustDos = profileContext?.ai_context?.must_do_rules?.join('\n- ') || 'Mantener ganchos de alto impacto en los primeros 2 segundos.';
     const forbiddens = profileContext?.ai_context?.forbidden_rules?.join('\n- ') || 'No sonar aburrido, no usar frases hechas de autoayuda, no hacer introducciones lentas.';
     const niche = profileContext?.profile?.niche || 'Comercios y Negocios';
+    // Vocabulario de identidad opcional: refuerza el tono sin ser un paso
+    // obligatorio. Si el usuario no cargó nada acá, no se menciona.
+    const identifyingWords = profileContext?.ai_context?.identifying_words || [];
+    const neverWords = profileContext?.ai_context?.never_words || [];
+    const voiceIdentityText = [
+      identifyingWords.length > 0 ? `- Palabras/regionalismos que SÍ usa este negocio y lo identifican (metelas cuando encajen naturalmente): ${identifyingWords.join(', ')}` : null,
+      neverWords.length > 0 ? `- Palabras o estilos con los que este negocio JAMÁS se identificaría (prohibido usarlos): ${neverWords.join(', ')}` : null
+    ].filter(Boolean).join('\n');
 
     const modeDescriptions: Record<string, string> = {
       reel_hablado: 'Reel hablado a cámara: diálogo fluido y natural para teleprompter, oraciones cortas, ritmo dinámico y sin presentaciones lentas.',
@@ -1530,7 +1542,7 @@ CONTEXTO DEL PERFIL:
 - Reglas OBLIGATORIAS:
 - ${mustDos}
 - Reglas PROHIBIDAS:
-- ${forbiddens}
+- ${forbiddens}${voiceIdentityText ? `\n${voiceIdentityText}` : ''}
 - CTAs guardados del negocio (reusá textualmente el que más tenga que ver con el tema de ESTE guion puntual; si ninguno encaja, generá un "cta" nuevo con una palabra clave específica de este tema — PROHIBIDO usar siempre el mismo CTA sin importar el tema, y PROHIBIDO relleno genérico como "APP" o "INFO" sin relación):
 ${existingCtasText}
 (si tenés que generar uno nuevo porque ninguno encaja, un ejemplo de formato válido sería: "${favoriteCta}")
@@ -1540,7 +1552,7 @@ ${catalogText}
 
 BASE DE CONOCIMIENTO DEL NEGOCIO (usala para dar sustancia real: cuidados, materiales, política de precios, FAQs):
 ${knowledgeText}
-
+${referenceReelText ? `\nREEL DE REFERENCIA (texto completo de un Reel ajeno o propio que el usuario marcó como inspiración — usá SOLO su estructura/ritmo/forma de enganchar, PROHIBIDO copiar sus frases, su producto o su contenido literal; el guion tiene que seguir siendo 100% sobre el negocio/tema de arriba):\n"${referenceReelText}"\n` : ''}
 Devuelve un JSON con este formato exacto:
 {
   "reply_text": "Explicación breve del copiloto detallando qué fórmula de gancho y qué sustancia fusionó de los Reels conectados",
@@ -1938,6 +1950,14 @@ Devuelve un JSON con este formato exacto:
     const profileTone = profileContext?.ai_context?.tone || 'directo y conversacional';
     const mustDos = profileContext?.ai_context?.must_do_rules?.join('\n- ') || 'Gancho inmediato de menos de 3 segundos sin rodeos.';
     const forbiddens = profileContext?.ai_context?.forbidden_rules?.join('\n- ') || 'Cero introducciones lentas, cero frases cliché.';
+    // Vocabulario de identidad opcional: refuerza el tono sin ser un paso
+    // obligatorio. Si el usuario no cargó nada acá, no se menciona.
+    const identifyingWords = profileContext?.ai_context?.identifying_words || [];
+    const neverWords = profileContext?.ai_context?.never_words || [];
+    const voiceIdentityText = [
+      identifyingWords.length > 0 ? `- Palabras/regionalismos que SÍ usa este negocio y lo identifican (metelas cuando encajen naturalmente): ${identifyingWords.join(', ')}` : null,
+      neverWords.length > 0 ? `- Palabras o estilos con los que este negocio JAMÁS se identificaría (prohibido usarlos): ${neverWords.join(', ')}` : null
+    ].filter(Boolean).join('\n');
 
     const systemPrompt = `Sos el Analista y Estratega Senior de Contenido de EventPix Intelligence.
 Trabajás EXCLUSIVAMENTE en guiones de REEL YAPPING (reel hablado, cámara al pecho/cara contando algo). No es un video promocional de agencia: es una pieza de VENTA real, con la misma exigencia de un copywriter senior, no un generador de "ideas de contenido".
@@ -2026,7 +2046,7 @@ CONTEXTO DEL NEGOCIO:
 - De qué habla la cuenta y a quién ayuda: ${aboutContent || '(no cargado: inferí del catálogo y del nicho, sin inventar datos de terceros)'}
 - Tono: ${profileTone}
 - Reglas OBLIGATORIAS: ${mustDos}
-- Reglas PROHIBIDAS: ${forbiddens}
+- Reglas PROHIBIDAS: ${forbiddens}${voiceIdentityText ? `\n${voiceIdentityText}` : ''}
 - CTAs guardados del negocio (reusá textualmente el que más tenga que ver con el tema de CADA variante; si ninguno encaja, generá uno nuevo — PROHIBIDO repetir siempre el mismo CTA en las 3 variantes si tratan temas distintos, y PROHIBIDO relleno genérico como "APP" o "INFO"):
 ${existingCtasText}
 (si tenés que generar uno nuevo, un ejemplo de formato válido sería: "${favoriteCta}")

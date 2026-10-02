@@ -846,7 +846,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
     toast.success('¡Tarjeta de Chat con IA agregada al lienzo!');
   };
 
-  const handleSendChatMessage = async (nodeId: string, text: string, mode: ContentFormatMode) => {
+  const handleSendChatMessage = async (nodeId: string, text: string, mode: ContentFormatMode, referenceReelText?: string) => {
     const userMsg: ChatMessage = {
       id: `msg-${Date.now()}-user`,
       sender: 'user',
@@ -890,7 +890,8 @@ export const IntelligenceCanvasPage: React.FC = () => {
         sourcePosts,
         profileContext: profileContext || undefined,
         connections: currentConns,
-        chatHistory: previousMessages
+        chatHistory: previousMessages,
+        referenceReelText
       });
 
       const aiMsg: ChatMessage = {
