@@ -304,7 +304,7 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
   const getNodeDimensions = (node: CanvasNode) => {
     if (node.type === 'synthesis') return { width: 380, height: 420 };
     if (node.type === 'ai_chat') return { width: 380, height: 500 };
-    if (node.type === 'reel') return { width: 280, height: 410 };
+    if (node.type === 'reel') return { width: 180, height: 215 };
     return { width: 270, height: 170 };
   };
 
@@ -687,7 +687,7 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
             const tDim = getNodeDimensions(targetNode);
 
             const x1 = sPos.x + sDim.width;
-            const y1 = sPos.y + (sourceNode.type === 'reel' ? 160 : Math.min(sDim.height / 2, 80));
+            const y1 = sPos.y + (sourceNode.type === 'reel' ? 75 : Math.min(sDim.height / 2, 80));
 
             const x2 = tPos.x;
             const y2 = tPos.y + (targetNode.type === 'ai_chat' ? 44 : Math.min(tDim.height / 2, 80));
@@ -821,7 +821,7 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
                 key={node.id}
                 onMouseDown={(e) => handleMouseDownNode(node.id, e)}
                 style={{ left: `${pos.x}px`, top: `${pos.y}px` }}
-                className={`canvas-node absolute w-72 bg-slate-900/90 border rounded-2xl shadow-2xl backdrop-blur-xl transition-shadow group ${
+                className={`canvas-node absolute w-44 bg-slate-900/90 border rounded-2xl shadow-2xl backdrop-blur-xl transition-shadow group ${
                   isSelected
                     ? 'border-violet-500 ring-2 ring-violet-500/40 shadow-violet-950/50'
                     : 'border-slate-800 hover:border-slate-700'
@@ -833,7 +833,7 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
                     handleConnectReelToChat(node.id);
                   }}
                   title={isReelConnectedToChat(node.id) ? "Desconectar del Chat IA" : "Conectar con Chat IA"}
-                  className={`absolute -right-3 top-14 w-6 h-6 rounded-full border-2 border-slate-950 shadow-md flex items-center justify-center text-white z-30 transition-transform hover:scale-125 cursor-pointer group/anchor ${
+                  className={`absolute -right-2.5 top-9 w-5 h-5 rounded-full border-2 border-slate-950 shadow-md flex items-center justify-center text-white z-30 transition-transform hover:scale-125 cursor-pointer group/anchor ${
                     isReelConnectedToChat(node.id)
                       ? 'bg-gradient-to-r from-pink-500 to-rose-600 ring-2 ring-pink-400/50'
                       : 'bg-violet-600 hover:bg-pink-500'
@@ -842,88 +842,88 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
                   <div className={`w-2 h-2 rounded-full bg-white ${isReelConnectedToChat(node.id) ? 'animate-pulse' : 'group-hover/anchor:animate-ping'}`} />
                 </button>
 
-                <div className="p-3 border-b border-slate-800/80 flex items-center justify-between bg-slate-950/50 rounded-t-2xl">
-                  <div className="flex items-center gap-2">
+                <div className="p-1.5 border-b border-slate-800/80 flex items-center justify-between bg-slate-950/50 rounded-t-2xl">
+                  <div className="flex items-center gap-1">
                     <button
                       onClick={(e) => handleToggleSelectNode(node.id, e)}
-                      className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${
+                      className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors ${
                         isSelected ? 'bg-violet-600 border-violet-500 text-white' : 'border-slate-700 bg-slate-950 text-transparent'
                       }`}
                     >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <CheckCircle2 className="w-2.5 h-2.5" />
                     </button>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
-                      <Link className="w-3 h-3 text-cyan-400" /> Reel {post.objective}
+                    <span className="text-[8px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-0.5">
+                      <Link className="w-2.5 h-2.5 text-cyan-400" /> Reel
                     </span>
                   </div>
 
-                  <button onClick={() => onDeleteNode(node.id)} className="text-slate-600 hover:text-rose-400 p-1">
-                    <Trash2 className="w-3.5 h-3.5" />
+                  <button onClick={() => onDeleteNode(node.id)} className="text-slate-600 hover:text-rose-400 p-0.5">
+                    <Trash2 className="w-3 h-3" />
                   </button>
                 </div>
 
-                <div className="p-3 space-y-2.5">
-                  <div className="relative rounded-xl overflow-hidden border border-slate-800 bg-slate-950">
+                <div className="p-1.5 space-y-1.5">
+                  <div className="relative rounded-lg overflow-hidden border border-slate-800 bg-slate-950">
                     <img
                       src={post.thumbnail_url}
                       alt={post.title}
-                      className="w-full h-64 object-cover"
+                      className="w-full h-28 object-cover"
                     />
                     {post.analysis?.hook_data?.text ? (
-                      <div className="absolute top-2 left-2 right-2">
-                        <div className="relative bg-white text-slate-900 text-[11px] font-semibold leading-snug px-2.5 py-1.5 rounded-xl shadow-lg line-clamp-3">
+                      <div className="absolute top-1 left-1 right-1">
+                        <div className="relative bg-white text-slate-900 text-[8px] font-semibold leading-snug px-1.5 py-1 rounded-lg shadow-lg line-clamp-2">
                           {post.analysis.hook_data.text}
-                          <div className="absolute -bottom-1.5 left-4 w-3 h-3 bg-white rotate-45" />
+                          <div className="absolute -bottom-1 left-3 w-2 h-2 bg-white rotate-45" />
                         </div>
                       </div>
                     ) : (
-                      <div className="absolute top-2 left-2 right-2">
-                        <div className="relative bg-white text-slate-900 text-[11px] font-semibold leading-snug px-2.5 py-1.5 rounded-xl shadow-lg line-clamp-2">
+                      <div className="absolute top-1 left-1 right-1">
+                        <div className="relative bg-white text-slate-900 text-[8px] font-semibold leading-snug px-1.5 py-1 rounded-lg shadow-lg line-clamp-2">
                           {post.title}
-                          <div className="absolute -bottom-1.5 left-4 w-3 h-3 bg-white rotate-45" />
+                          <div className="absolute -bottom-1 left-3 w-2 h-2 bg-white rotate-45" />
                         </div>
                       </div>
                     )}
                   </div>
 
                   {post.metrics && (
-                    <div className="grid grid-cols-3 gap-1.5 text-[10px] pt-1 border-t border-slate-800/60 font-mono">
-                      <div className="bg-slate-950 px-2 py-1 rounded-lg text-slate-300 text-center" title="Vistas estimadas">
-                        <Eye className="w-3 h-3 text-cyan-400 inline mr-1" />
+                    <div className="grid grid-cols-3 gap-1 text-[8px] pt-1 border-t border-slate-800/60 font-mono">
+                      <div className="bg-slate-950 px-1 py-0.5 rounded text-slate-300 text-center" title="Vistas estimadas">
+                        <Eye className="w-2.5 h-2.5 text-cyan-400 inline mr-0.5" />
                         {formatMetric(post.metrics.views, { compact: true })}
                       </div>
-                      <div className="bg-slate-950 px-2 py-1 rounded-lg text-slate-300 text-center" title="Likes reales de Instagram">
-                        <Heart className="w-3 h-3 text-rose-400 inline mr-1" />
+                      <div className="bg-slate-950 px-1 py-0.5 rounded text-slate-300 text-center" title="Likes reales de Instagram">
+                        <Heart className="w-2.5 h-2.5 text-rose-400 inline mr-0.5" />
                         {formatMetric(post.metrics.likes)}
                       </div>
-                      <div className="bg-slate-950 px-2 py-1 rounded-lg text-slate-300 text-center" title="Comentarios reales de Instagram">
-                        <MessageSquare className="w-3 h-3 text-emerald-400 inline mr-1" />
+                      <div className="bg-slate-950 px-1 py-0.5 rounded text-slate-300 text-center" title="Comentarios reales de Instagram">
+                        <MessageSquare className="w-2.5 h-2.5 text-emerald-400 inline mr-0.5" />
                         {formatMetric(post.metrics.comments)}
                       </div>
                     </div>
                   )}
 
-                  <div className="grid grid-cols-2 gap-1.5 pt-1">
+                  <div className="grid grid-cols-2 gap-1">
                     <button
                       onClick={() => onInspectNode(post)}
-                      className="bg-slate-800/80 hover:bg-slate-800 text-slate-200 text-[10px] font-semibold py-1.5 rounded-xl border border-slate-700/80 flex items-center justify-center gap-1 transition-all"
+                      title="Ver Detalle"
+                      className="bg-slate-800/80 hover:bg-slate-800 text-slate-200 py-1 rounded-lg border border-slate-700/80 flex items-center justify-center transition-all"
                     >
                       <Layers className="w-3 h-3 text-violet-400" />
-                      Ver Detalle
                     </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         handleConnectReelToChat(node.id);
                       }}
-                      className={`text-[10px] font-semibold py-1.5 rounded-xl border flex items-center justify-center gap-1 transition-all ${
+                      title={isReelConnectedToChat(node.id) ? 'Conectado al Chat IA' : 'Conectar al Chat IA'}
+                      className={`py-1 rounded-lg border flex items-center justify-center transition-all ${
                         isReelConnectedToChat(node.id)
                           ? 'bg-pink-950/40 border-pink-500/50 text-pink-300 hover:bg-pink-950/70'
                           : 'bg-slate-800/50 hover:bg-pink-600/20 text-slate-300 hover:text-pink-200 border-slate-700/60 hover:border-pink-500/40'
                       }`}
                     >
                       <Link2 className="w-3 h-3 text-pink-400" />
-                      {isReelConnectedToChat(node.id) ? 'Conectado' : 'Al Chat IA'}
                     </button>
                   </div>
                 </div>
