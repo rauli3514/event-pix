@@ -1312,6 +1312,7 @@ Devolvé un JSON estricto con:
    * (Inspirada en Scripty / Instaceos)
    */
   static async adaptScriptWithChat(params: {
+    businessId: string;
     userInstruction: string;
     mode: 'reel_hablado' | 'b_roll' | 'carrusel' | 'tweet' | 'stories';
     sourcePosts: IntelligencePost[];
@@ -1328,11 +1329,43 @@ Devolvé un JSON estricto con:
       fullScript: string;
     };
   }> {
-    const { userInstruction, mode, sourcePosts, profileContext, connections, chatHistory } = params;
+    const { businessId, userInstruction, mode, sourcePosts, profileContext, connections, chatHistory } = params;
 
     const hasOpenAI = Boolean(connections.openai?.isActive && connections.openai?.apiKey?.trim());
     const hasClaude = Boolean(connections.claude?.isActive && connections.claude?.apiKey?.trim());
     const hasGemini = Boolean(connections.gemini?.isActive && connections.gemini?.apiKey?.trim());
+
+    // Catálogo real y base de conocimiento del negocio: sin esto el Copiloto
+    // solo tenía el nicho genérico y los captions de los Reels conectados, y
+    // terminaba escribiendo guiones vagos sin nombrar productos, precios ni
+    // cuidados/consejos reales del negocio (lo mismo que ya se había
+    // resuelto para generateEvidenceBasedStrategy pero faltaba acá).
+    const [{ data: catalogRows }, { data: knowledgeBase }] = await Promise.all([
+      supabase
+        .from('intelligence_business_products')
+        .select('name, description, price')
+        .eq('business_id', businessId)
+        .eq('is_active', true)
+        .limit(20),
+      supabase
+        .from('intelligence_business_knowledge_base')
+        .select('*')
+        .eq('business_id', businessId)
+        .maybeSingle()
+    ]);
+
+    const catalogText = catalogRows && catalogRows.length > 0
+      ? catalogRows.map((p: any) => `- ${p.name}${p.price ? ` ($${p.price})` : ''}${p.description ? `: ${p.description}` : ''}`).join('\n')
+      : '(sin catálogo cargado: usá lo que diga "De qué habla la cuenta" o los Reels conectados, sin inventar productos)';
+
+    const kb = knowledgeBase || {};
+    const knowledgeText = [
+      kb.business_description ? `Descripción del negocio: ${kb.business_description}` : null,
+      kb.pricing_policy ? `Política de precios: ${kb.pricing_policy}` : null,
+      kb.faqs && Array.isArray(kb.faqs) && kb.faqs.length > 0 ? `Preguntas frecuentes reales: ${JSON.stringify(kb.faqs)}` : null
+    ].filter(Boolean).join('\n') || '(sin base de conocimiento cargada todavía)';
+
+    const aboutContent = profileContext?.profile?.about_content?.trim() || null;
 
     // 1. Detectar si el usuario especificó una temática o nicho concreto en su mensaje
     let userSpecifiedTopic: string | null = null;
@@ -1446,22 +1479,25 @@ Devolvé un JSON estricto con:
         ).join('\n')
       : 'Inicio de conversación.';
 
-    const systemPrompt = `Sos el copiloto creativo y estratega de contenido de Instagram Reels de EventPix Intelligence.
-Tu trabajo es redactar guiones VIRALES, AUTÉNTICOS y DE ALTA RETENCIÓN combinando lo mejor de los Reels conectados por el usuario.
+    const systemPrompt = `Sos el copiloto creativo y estratega senior de VENTA por contenido de EventPix Intelligence. Tu foco es el REEL YAPPING (reel hablado a cámara, estilo conversación directa) — tratalo como una pieza de venta real escrita por un copywriter senior, no como una "idea de contenido" ni un video institucional de agencia.
 
-🚨 PROTOCOLO DE FUSIÓN INTELIGENTE (PROHIBIDO EL CONTENIDO GENÉRICO):
-1. ANÁLISIS DE PIEZAS GANADORAS:
-   - Identificá cuál de los Reels conectados tiene el GANCHO MÁS POTENTE (mayor curiosidad, más vistas o mejor llamada a la acción).
-   - Identificá cuál tiene la SUSTANCIA o TEMA REAL a resolver.
-   - FUSIONÁ: Usá la fórmula de enganche del Reel viral aplicada 100% al contenido y producto del negocio.
-2. LISTA NEGRA DE FRASES BANDEADAS (CERO CLICHÉS PUBLICITARIOS):
-   - ❌ PROHIBIDO EMPEZAR CON: "¿Quieres saber cómo...?", "¿Sabías que...?", "¿Buscas mejorar...?", "¿Te gustaría transformar...?"
-   - ❌ PROHIBIDO FRASES LENTAS: "Hoy te voy a contar cómo...", "En este video te enseño...", "Hola a todos...", "Si todavía usas X es hora de actualizarte..."
-   - ✅ REGLA DEL SEGUNDO 0: Comienza con una afirmación chocante, un error costoso, una pérdida evitable o una demostración visual inmediata.
-3. PRIORIDAD AL TEMA REAL DEL USUARIO:
-   - Todo el contenido debe tener ejemplos tangibles, fricciones cotidianas y soluciones claras.
-4. RESPUESTA ESTRATÉGICA TRANSPARENTE:
-   - En "reply_text", explícale brevemente al usuario qué elemento ganador tomaste de cada Reel conectado (ej: gancho de curiosidad masiva del Reel #1 + solución concreta del Reel #2).
+PASO 0 — ENTENDER EL NEGOCIO ANTES DE ESCRIBIR (puertas adentro, no lo muestres en el JSON salvo que el "reply_text" lo resuma en una frase):
+Usando SOLO el catálogo real, la base de conocimiento, "de qué habla la cuenta" y los Reels conectados de abajo —nunca información inventada— respondé para vos mismo: ¿qué vende?, ¿a quién?, ¿qué problema resuelve?, ¿qué desea el cliente?, ¿qué objeciones puede tener?, ¿por qué compraría?, ¿qué diferencia al negocio? Si algo no se puede inferir con evidencia real, no lo inventes: trabajá con lo que SÍ hay (catálogo/KB/posts/nicho) antes que con relleno genérico.
+
+PASO 1 — ELEGIR UN ÁNGULO CONCRETO:
+Elegí UNO de estos ángulos, el mejor justificado para este negocio y este pedido puntual: problema, deseo, error, mito, objeción, comparación, demostración, transformación, curiosidad, ahorro, calidad, resultado, detrás de escena, producto, caso real, pregunta frecuente. Si el usuario pidió explícitamente "otro" o "diferente" en su instrucción o en el historial, el ángulo tiene que cambiar respecto del guion anterior. Mencioná en "reply_text" qué ángulo elegiste y por qué (en una frase, sin tecnicismos).
+
+PASO 2 — ESTRUCTURA DE VENTA (no un flyer leído en voz alta):
+Para reel_hablado especialmente, el guion no puede ser el patrón plano "gancho → información → CTA". Usá, cuando el ángulo lo amerite, una progresión del tipo: HOOK → PROBLEMA/DESEO CONCRETO → TENSIÓN O CREENCIA ERRÓNEA → EXPLICACIÓN/MECANISMO (ej: consejos prácticos reales, no genéricos) → PRODUCTO/SOLUCIÓN → BENEFICIO → PRUEBA O RAZÓN PARA CREER → CTA. No todas las etapas son obligatorias; elegí las que le den tensión y resolución real a ESTE guion, nunca una lista de datos leída en voz alta.
+
+REGLAS INQUEBRANTABLES:
+1. CERO CLICHÉS, CERO FRASES DE "COACH DE REDES": PROHIBIDO usar o parafrasear: "¿Querés llevar tu negocio al siguiente nivel?", "Hoy te contamos...", "Si tenés un emprendimiento esto es para vos.", "Te voy a mostrar...", "3 consejos que nadie te cuenta...", "¿Sabías que...?", "¿Buscas mejorar...?", "¿Te gustaría transformar...?", "Hoy te voy a contar cómo...", "En este video te enseño...", "Hola a todos...", y cualquier frase de urgencia vacía y genérica tipo "no te quedes sin stock" o "se te va a acabar" sin un motivo concreto detrás (plazo real, cantidad real, temporada real).
+   - El hook tiene que nacer del producto, problema, deseo, objeción, contexto de mercado o curiosidad ESPECÍFICA de este negocio — nunca una frase motivacional que serviría para cualquier rubro. Si al leerlo podría pertenecer a cualquier otro negocio, está mal.
+2. GROUNDING OBLIGATORIO Y PROHIBIDO INVENTAR RUBRO:
+   - Nombrá productos/servicios concretos del catálogo o de "de qué habla la cuenta" de abajo. Si hay instrucciones de uso, cuidado, materiales o política de precios en la base de conocimiento, USALAS para dar sustancia real (ej: tips de cuidado concretos), no inventes datos técnicos que no estén ahí.
+   - PROHIBIDO ROTUNDAMENTE inventar un producto o rubro que no esté en el catálogo, en "de qué habla la cuenta", en los Reels conectados o en el nicho declarado.
+3. CTA CON SENTIDO: nunca siempre el mismo, nunca "Escribinos por WhatsApp" por defecto, nunca una palabra clave vacía tipo "URGENCIA" sin relación con el producto. Usá palabras clave ligadas al producto/tema real (ej: "Comentá CATÁLOGO", "Mandanos BOAS", "Pedinos los colores disponibles").
+4. RESPUESTA ESTRATÉGICA TRANSPARENTE: en "reply_text" contale brevemente al usuario qué ángulo elegiste y en qué te basaste (catálogo, KB, Reel conectado, etc.), en 1-2 frases, tono natural.
 5. Respondé ÚNICAMENTE con un objeto JSON válido con las claves: reply_text, script_title, hook, script_body, cta, full_script.`;
 
     const userPrompt = `INSTRUCCIÓN ACTUAL DEL USUARIO:
@@ -1489,6 +1525,7 @@ ${sourcesSummary}
 
 CONTEXTO DEL PERFIL:
 - Nicho: ${niche}
+- De qué habla la cuenta y a quién ayuda: ${aboutContent || '(no cargado: inferí del catálogo y del nicho, sin inventar datos de terceros)'}
 - Tono de voz: ${profileTone}
 - Reglas OBLIGATORIAS:
 - ${mustDos}
@@ -1497,6 +1534,12 @@ CONTEXTO DEL PERFIL:
 - CTAs guardados del negocio (reusá textualmente el que más tenga que ver con el tema de ESTE guion puntual; si ninguno encaja, generá un "cta" nuevo con una palabra clave específica de este tema — PROHIBIDO usar siempre el mismo CTA sin importar el tema, y PROHIBIDO relleno genérico como "APP" o "INFO" sin relación):
 ${existingCtasText}
 (si tenés que generar uno nuevo porque ninguno encaja, un ejemplo de formato válido sería: "${favoriteCta}")
+
+CATÁLOGO REAL DE PRODUCTOS/SERVICIOS (nombrá estos productos textualmente en el guion cuando el tema lo permita, no generalices):
+${catalogText}
+
+BASE DE CONOCIMIENTO DEL NEGOCIO (usala para dar sustancia real: cuidados, materiales, política de precios, FAQs):
+${knowledgeText}
 
 Devuelve un JSON con este formato exacto:
 {
@@ -1587,7 +1630,7 @@ Devuelve un JSON con este formato exacto:
               body: JSON.stringify({
                 apiKey: connections.claude.apiKey,
                 model: connections.claude.model || 'claude-3-5-sonnet-20241022',
-                max_tokens: 2500,
+                max_tokens: 3500,
                 workspaceId: connections.claude.workspaceId,
                 system: systemPrompt,
                 messages: claudeMessages
@@ -1608,7 +1651,7 @@ Devuelve un JSON con este formato exacto:
               headers: directHeaders,
               body: JSON.stringify({
                 model: connections.claude.model || 'claude-3-5-sonnet-20241022',
-                max_tokens: 2500,
+                max_tokens: 3500,
                 system: systemPrompt,
                 messages: claudeMessages
               })

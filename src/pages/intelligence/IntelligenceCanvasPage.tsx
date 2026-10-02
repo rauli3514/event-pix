@@ -884,6 +884,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
 
       // 4. Llamar al orquestador adaptScriptWithChat
       const result = await AIProviderService.adaptScriptWithChat({
+        businessId: business.id,
         userInstruction: text,
         mode,
         sourcePosts,
@@ -945,6 +946,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
       const currentConns = ConnectionStorageService.loadConnections(business.id);
 
       const result = await AIProviderService.adaptScriptWithChat({
+        businessId: business.id,
         userInstruction: text,
         mode: quickIdeaMode,
         sourcePosts: posts,

@@ -17,7 +17,6 @@ import {
   ChevronDown,
   FileText,
   MessageCircle,
-  Smartphone,
   RefreshCw,
   FlaskConical,
   TrendingUp,
@@ -76,12 +75,12 @@ interface AiChatCardNodeProps {
   onSelectAIProvider?: (provider: 'claude' | 'gemini' | 'openai' | 'auto') => void;
 }
 
+// Único formato de contenido que EventPix Intelligence genera: reel yapping
+// (reel hablado a cámara). B-roll, Carrusel, Frase/tweet y Stories se sacaron
+// de la interfaz porque no se usan — todo el esfuerzo de calidad se concentra
+// en este único formato.
 const FORMAT_PILLS: Array<{ id: ContentFormatMode; label: string; icon: any }> = [
-  { id: 'reel_hablado', label: 'Reel hablado', icon: Play },
-  { id: 'b_roll', label: 'B-roll', icon: Video },
-  { id: 'carrusel', label: 'Carrusel', icon: FileText },
-  { id: 'tweet', label: 'Frase/tweet', icon: MessageCircle },
-  { id: 'stories', label: 'Stories', icon: Smartphone }
+  { id: 'reel_hablado', label: 'Reel hablado', icon: Play }
 ];
 
 export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
@@ -1094,28 +1093,30 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
       {/* 5. SELECTOR DE FORMATO & BARRA DE ENTRADA (Siempre visible para interacción fluida) */}
       <div className="p-3 bg-slate-950 border-t border-slate-800 space-y-2.5">
         
-        {/* Pastillas de Formato */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scrollbar">
-          {FORMAT_PILLS.map((pill) => {
-            const isSelected = activeMode === pill.id;
-            const Icon = pill.icon;
-            return (
-              <button
-                key={pill.id}
-                type="button"
-                onClick={() => onModeChange(pill.id)}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold transition-all shrink-0 ${
-                  isSelected
-                    ? 'bg-pink-600 text-white shadow-md shadow-pink-600/30'
-                    : 'bg-slate-900 hover:bg-slate-850 text-slate-400 hover:text-slate-200 border border-slate-800'
-                }`}
-              >
-                <Icon className="w-3 h-3" />
-                <span>{pill.label}</span>
-              </button>
-            );
-          })}
-        </div>
+        {/* Pastillas de Formato: ocultas cuando hay un solo formato disponible (reel yapping) */}
+        {FORMAT_PILLS.length > 1 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scrollbar">
+            {FORMAT_PILLS.map((pill) => {
+              const isSelected = activeMode === pill.id;
+              const Icon = pill.icon;
+              return (
+                <button
+                  key={pill.id}
+                  type="button"
+                  onClick={() => onModeChange(pill.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold transition-all shrink-0 ${
+                    isSelected
+                      ? 'bg-pink-600 text-white shadow-md shadow-pink-600/30'
+                      : 'bg-slate-900 hover:bg-slate-850 text-slate-400 hover:text-slate-200 border border-slate-800'
+                  }`}
+                >
+                  <Icon className="w-3 h-3" />
+                  <span>{pill.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Input conversacional */}
         <form onSubmit={handleSend} className="flex items-center gap-2">
