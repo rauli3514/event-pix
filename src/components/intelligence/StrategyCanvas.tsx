@@ -687,7 +687,7 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
             const tDim = getNodeDimensions(targetNode);
 
             const x1 = sPos.x + sDim.width;
-            const y1 = sPos.y + (sourceNode.type === 'reel' ? 75 : Math.min(sDim.height / 2, 80));
+            const y1 = sPos.y + (sourceNode.type === 'reel' ? 80 : Math.min(sDim.height / 2, 80));
 
             const x2 = tPos.x;
             const y2 = tPos.y + (targetNode.type === 'ai_chat' ? 44 : Math.min(tDim.height / 2, 80));
@@ -828,12 +828,13 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
                 }`}
               >
                 <button
+                  onMouseDown={(e) => e.stopPropagation()}
                   onClick={(e) => {
                     e.stopPropagation();
                     handleConnectReelToChat(node.id);
                   }}
                   title={isReelConnectedToChat(node.id) ? "Desconectar del Chat IA" : "Conectar con Chat IA"}
-                  className={`absolute -right-2.5 top-9 w-5 h-5 rounded-full border-2 border-slate-950 shadow-md flex items-center justify-center text-white z-30 transition-transform hover:scale-125 cursor-pointer group/anchor ${
+                  className={`absolute -right-3 top-[68px] w-6 h-6 rounded-full border-2 border-slate-950 shadow-md flex items-center justify-center text-white z-30 transition-transform hover:scale-125 cursor-pointer group/anchor ${
                     isReelConnectedToChat(node.id)
                       ? 'bg-gradient-to-r from-pink-500 to-rose-600 ring-2 ring-pink-400/50'
                       : 'bg-violet-600 hover:bg-pink-500'
@@ -845,6 +846,7 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
                 <div className="p-1.5 border-b border-slate-800/80 flex items-center justify-between bg-slate-950/50 rounded-t-2xl">
                   <div className="flex items-center gap-1">
                     <button
+                      onMouseDown={(e) => e.stopPropagation()}
                       onClick={(e) => handleToggleSelectNode(node.id, e)}
                       className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors ${
                         isSelected ? 'bg-violet-600 border-violet-500 text-white' : 'border-slate-700 bg-slate-950 text-transparent'
@@ -857,7 +859,11 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
                     </span>
                   </div>
 
-                  <button onClick={() => onDeleteNode(node.id)} className="text-slate-600 hover:text-rose-400 p-0.5">
+                  <button
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={() => onDeleteNode(node.id)}
+                    className="text-slate-600 hover:text-rose-400 p-0.5"
+                  >
                     <Trash2 className="w-3 h-3" />
                   </button>
                 </div>
@@ -905,6 +911,7 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
 
                   <div className="grid grid-cols-2 gap-1">
                     <button
+                      onMouseDown={(e) => e.stopPropagation()}
                       onClick={() => onInspectNode(post)}
                       title="Ver Detalle"
                       className="bg-slate-800/80 hover:bg-slate-800 text-slate-200 py-1 rounded-lg border border-slate-700/80 flex items-center justify-center transition-all"
@@ -912,6 +919,7 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
                       <Layers className="w-3 h-3 text-violet-400" />
                     </button>
                     <button
+                      onMouseDown={(e) => e.stopPropagation()}
                       onClick={(e) => {
                         e.stopPropagation();
                         handleConnectReelToChat(node.id);
