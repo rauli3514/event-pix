@@ -17,6 +17,7 @@ import {
   ChevronDown,
   FileText,
   MessageCircle,
+  Mic,
   RefreshCw,
   FlaskConical,
   TrendingUp,
@@ -98,8 +99,13 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
   preferredAIProvider = 'claude',
   onSelectAIProvider
 }) => {
-  // Pestañas principales de la tarjeta
-  const [activeTab, setActiveTab] = useState<'strategy' | 'experiments' | 'chat'>('strategy');
+  // Pestañas principales de la tarjeta: Guion (Copiloto, con el modo avanzado
+  // de 3 variantes plegado adentro) y Experimentos — se fusionaron "Estrategia
+  // & Variantes" y "Copiloto" en una sola pestaña para que el panel quede
+  // simple como Scripty (un solo generador), sin perder la posibilidad de
+  // crear un experimento y mantener vivo el Learning Loop.
+  const [activeTab, setActiveTab] = useState<'experiments' | 'chat'>('chat');
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Estado de estrategia e hipótesis
   const [isGeneratingStrategy, setIsGeneratingStrategy] = useState(false);
@@ -302,6 +308,53 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
     await onSendMessage(textToSend, activeMode);
   };
 
+  // Dictado por voz de la instrucción, como el micrófono de Scripty: usa la
+  // Web Speech API del navegador (sin costo de IA, no pasa por ningún
+  // proveedor). Si el navegador no la soporta (ej. Firefox de escritorio),
+  // avisamos en vez de fallar en silencio.
+  const recognitionRef = useRef<any>(null);
+  const [isListening, setIsListening] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      try { recognitionRef.current?.stop?.(); } catch { /* noop */ }
+    };
+  }, []);
+
+  const handleToggleDictation = () => {
+    const SpeechRecognitionImpl = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognitionImpl) {
+      toast.error('Tu navegador no soporta dictado por voz. Probá desde Chrome.');
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+
+    const recognition = new SpeechRecognitionImpl();
+    recognition.lang = 'es-AR';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results?.[0]?.[0]?.transcript?.trim();
+      if (transcript) {
+        setInputText(prev => (prev ? `${prev} ${transcript}` : transcript));
+      }
+    };
+    recognition.onerror = () => {
+      setIsListening(false);
+      toast.error('No se pudo escuchar el dictado. Intentá de nuevo.');
+    };
+    recognition.onend = () => setIsListening(false);
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
+  };
+
   const handleCopy = (fullScript: string, idKey: string) => {
     navigator.clipboard.writeText(fullScript);
     setCopiedScriptId(idKey);
@@ -475,19 +528,19 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
         )}
       </div>
 
-      {/* 3. NAVEGACIÓN POR PESTAÑAS (ESTRATEGIA | EXPERIMENTOS | COPILOTO) */}
+      {/* 3. NAVEGACIÓN POR PESTAÑAS (GUION | EXPERIMENTOS) */}
       <div className="flex border-b border-slate-800/80 bg-slate-950/40 text-[11px] font-semibold">
         <button
           type="button"
-          onClick={() => setActiveTab('strategy')}
+          onClick={() => setActiveTab('chat')}
           className={`flex-1 py-2 px-2 flex items-center justify-center gap-1.5 transition-colors border-b-2 ${
-            activeTab === 'strategy'
-              ? 'border-pink-500 text-pink-300 bg-pink-500/10 font-bold'
+            activeTab === 'chat'
+              ? 'border-sky-500 text-sky-300 bg-sky-500/10 font-bold'
               : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
-          <Sparkles className="w-3 h-3" />
-          <span>Estrategia & Variantes</span>
+          <MessageCircle className="w-3 h-3" />
+          <span>Guion</span>
         </button>
 
         <button
@@ -502,28 +555,32 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
           <FlaskConical className="w-3 h-3" />
           <span>Experimentos ({experiments.length})</span>
         </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('chat')}
-          className={`flex-1 py-2 px-2 flex items-center justify-center gap-1.5 transition-colors border-b-2 ${
-            activeTab === 'chat'
-              ? 'border-sky-500 text-sky-300 bg-sky-500/10 font-bold'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <MessageCircle className="w-3 h-3" />
-          <span>Copiloto</span>
-        </button>
       </div>
 
       {/* 4. CONTENIDO SEGÚN LA PESTAÑA ACTIVA */}
       <div className="flex-1 overflow-y-auto p-3.5 space-y-3.5 text-xs custom-scrollbar bg-[#080C14]">
 
+        {/* Toggle del modo avanzado (3 variantes + Crear Experimento), plegado
+            por defecto para que el panel por defecto sea un solo generador de
+            guion simple, como Scripty. */}
+        {activeTab === 'chat' && (
+          <button
+            type="button"
+            onClick={() => setShowAdvanced(v => !v)}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-900/70 border border-slate-800 text-[11px] font-bold text-slate-300 hover:text-slate-100 transition-colors"
+          >
+            <span className="flex items-center gap-1.5">
+              <FlaskConical className="w-3.5 h-3.5 text-emerald-400" />
+              Modo avanzado: 3 variantes + Crear Experimento
+            </span>
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+          </button>
+        )}
+
         {/* ============================================================ */}
-        {/* PESTAÑA 1: ESTRATEGIA Y 3 VARIANTES (PRE-PUBLICACIÓN) */}
+        {/* ESTRATEGIA Y 3 VARIANTES (PRE-PUBLICACIÓN) — modo avanzado, plegado */}
         {/* ============================================================ */}
-        {activeTab === 'strategy' && (
+        {activeTab === 'chat' && showAdvanced && (
           <div className="space-y-3">
             {/* Si no hay estrategia generada aún */}
             {!variants && !isGeneratingStrategy && (
@@ -812,7 +869,7 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
               </span>
               <button
                 type="button"
-                onClick={() => setActiveTab('strategy')}
+                onClick={() => { setActiveTab('chat'); setShowAdvanced(true); }}
                 className="text-[10px] text-pink-400 hover:underline"
               >
                 + Nuevo Experimento
@@ -823,14 +880,14 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
               <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-center space-y-2">
                 <p className="text-slate-400 text-xs">No hay experimentos registrados todavía.</p>
                 <p className="text-[11px] text-slate-500">
-                  Genera una estrategia en la primera pestaña y presiona "Crear Experimento" para comenzar el ciclo.
+                  Abrí el modo avanzado en la pestaña Guion y presioná "Crear Experimento" para comenzar el ciclo.
                 </p>
                 <button
                   type="button"
-                  onClick={() => setActiveTab('strategy')}
+                  onClick={() => { setActiveTab('chat'); setShowAdvanced(true); }}
                   className="mt-2 py-1.5 px-3 rounded-lg bg-pink-600 hover:bg-pink-500 text-white font-bold text-xs"
                 >
-                  Ir a Estrategia
+                  Ir al Guion
                 </button>
               </div>
             ) : (
@@ -1125,9 +1182,22 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             disabled={isGenerating || isGeneratingStrategy}
-            placeholder={activeTab === 'chat' ? 'Ajustar guion, cambiar gancho o pedir alternativa...' : 'Escribí un objetivo o instrucción para la IA...'}
+            placeholder={isListening ? 'Escuchando...' : activeTab === 'chat' ? 'Ajustar guion, cambiar gancho o pedir alternativa...' : 'Escribí un objetivo o instrucción para la IA...'}
             className="flex-1 rounded-xl bg-slate-900 border border-slate-800 px-3 py-2 text-xs text-slate-100 outline-none focus:border-pink-500/50 disabled:opacity-50"
           />
+          <button
+            type="button"
+            onClick={handleToggleDictation}
+            disabled={isGenerating || isGeneratingStrategy}
+            title={isListening ? 'Detener dictado' : 'Dictar instrucción por voz'}
+            className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-sm transition-all disabled:opacity-40 ${
+              isListening
+                ? 'bg-rose-600 text-white animate-pulse'
+                : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+            }`}
+          >
+            <Mic className="w-3.5 h-3.5" />
+          </button>
           <button
             type="submit"
             disabled={!inputText.trim() || isGenerating || isGeneratingStrategy}
