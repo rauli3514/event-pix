@@ -859,10 +859,6 @@ The subject must perfectly match the facial features and gender of the reference
         let finalImage = capturedImage!;
         if (frameUrl) {
           try {
-            const replicateToken = import.meta.env.VITE_REPLICATE_TOKEN_B64 ? atob(import.meta.env.VITE_REPLICATE_TOKEN_B64) : (import.meta.env.VITE_REPLICATE_API_TOKEN || '');
-            if (!replicateToken) {
-                throw new Error("Falta el token de Replicate (B64 o plano) en las variables de entorno.");
-            }
             finalImage = await mergeImages(capturedImage!, frameUrl);
           } catch (e) {
             console.error("Error applying frame to selfie:", e);
