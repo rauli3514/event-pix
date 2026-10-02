@@ -52,6 +52,12 @@ export const PAPER_SIZES: { value: PaperSize; label: string }[] = [
 export const isNativePrintAvailable = () =>
   Capacitor.getPlatform() === 'android' && Capacitor.isPluginAvailable('NativePrint');
 
+/** Igual que NativePrintPlugin: sin "pdl" se asume JPEG; si no, hace falta JPEG o PDF. */
+export const isPrintableDirect = (printer: NativePrinter) => {
+  const pdl = printer.pdl.toLowerCase();
+  return !pdl || pdl.includes('image/jpeg') || pdl.includes('application/pdf');
+};
+
 export const discoverNativePrinters = async (timeoutMs = 5000) =>
   (await NativePrint.discoverPrinters({ timeoutMs })).printers;
 

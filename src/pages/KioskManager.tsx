@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from 'sonner';
-import { isNativePrintAvailable, discoverNativePrinters, printImageNative, PAPER_SIZES, printErrorMessage, type NativePrinter } from '@/lib/nativePrint';
+import { isNativePrintAvailable, discoverNativePrinters, printImageNative, PAPER_SIZES, printErrorMessage, isPrintableDirect, type NativePrinter } from '@/lib/nativePrint';
 import {
     Sparkles, ArrowLeft, Trash2, Save,
     Monitor, Download, Printer, Settings, ExternalLink, Camera, Instagram, Users,
@@ -1010,7 +1010,9 @@ const KioskManager = () => {
                                                         >
                                                             <option value="">Diálogo de Android (elegir al imprimir)</option>
                                                             {nativePrinters.map(p => (
-                                                                <option key={p.serviceName} value={p.serviceName}>{p.name} — {p.host}</option>
+                                                                <option key={p.serviceName} value={p.serviceName}>
+                                                                    {p.name} — {p.host}{isPrintableDirect(p) ? '' : ' (no acepta JPEG/PDF)'}
+                                                                </option>
                                                             ))}
                                                         </select>
                                                     ) : (
