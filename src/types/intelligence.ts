@@ -402,6 +402,13 @@ export interface Hypothesis {
 export interface ScriptVariant {
   variant_key: 'A' | 'B' | 'C';
   label: string; // "Variante A: Patrón Ganador Probado", "Variante B: Ángulo Alternativo", "Variante C: Apuesta Creativa"
+  // Ángulo comercial elegido para ESTA variante (problema, deseo, objeción,
+  // comparación, etc.) y por qué se justifica para este negocio puntual —
+  // sin esto la IA saltaba directo a escribir sin decidir primero DESDE
+  // DÓNDE está vendiendo, y las 3 variantes terminaban siendo la misma
+  // idea con distinto nivel de atrevimiento, no 3 ángulos de venta reales.
+  content_angle?: string;
+  angle_justification?: string;
   hook_0_3s: string;
   on_screen_text: string;
   script_body: string;
@@ -410,6 +417,29 @@ export interface ScriptVariant {
   b_roll_suggestions: string[];
   confidence_score: 'alta' | 'media' | 'baja';
   why_this_variant: string;
+  // Qué se está poniendo a prueba con esta variante y qué métrica real
+  // determina si funcionó — cierra el loop guion -> resultado -> aprendizaje.
+  hypothesis_to_test?: string;
+  what_to_measure?: string;
+}
+
+// Una respuesta del Business Snapshot: nunca se presenta como dato
+// confirmado si en realidad es una inferencia o directamente no hay
+// evidencia suficiente — evita que la IA mezcle hecho con suposición.
+export interface BusinessSnapshotField {
+  value: string;
+  basis: 'hecho' | 'inferencia' | 'informacion_faltante';
+}
+
+export interface BusinessSnapshot {
+  que_vende: BusinessSnapshotField;
+  a_quien: BusinessSnapshotField;
+  problema_que_resuelve: BusinessSnapshotField;
+  deseo_del_cliente: BusinessSnapshotField;
+  objeciones: BusinessSnapshotField;
+  por_que_comprarian: BusinessSnapshotField;
+  diferenciador: BusinessSnapshotField;
+  productos_clave: BusinessSnapshotField;
 }
 
 export interface ContentExperiment {

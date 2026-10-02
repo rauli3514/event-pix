@@ -33,7 +33,8 @@ import {
   ScriptVariant,
   ContentExperiment,
   LearnedInsight,
-  EmpiricalPattern
+  EmpiricalPattern,
+  BusinessSnapshot
 } from '../../../types/intelligence';
 import { AIProviderService } from '../../../services/intelligence/AIProviderService';
 import { IntelligenceStorageService } from '../../../services/intelligence/IntelligenceStorageService';
@@ -113,6 +114,7 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
   const [benchmark, setBenchmark] = useState<AccountMedianBenchmark | null>(null);
   const [, setPatterns] = useState<EmpiricalPattern[]>([]);
   const [, setWinningRules] = useState<string[]>([]);
+  const [businessSnapshot, setBusinessSnapshot] = useState<BusinessSnapshot | null>(null);
 
   // Estado de experimentos y bucle de aprendizaje
   const [experiments, setExperiments] = useState<ContentExperiment[]>([]);
@@ -174,6 +176,7 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
       setBenchmark(result.benchmark);
       setPatterns(result.patterns);
       setWinningRules(result.winningRules);
+      setBusinessSnapshot(result.business_snapshot);
 
       toast.success('¡Estrategia y 3 variantes generadas basadas en datos reales!');
     } catch (err: any) {
@@ -576,6 +579,39 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
             {/* Estrategia generada con Hipótesis y 3 Variantes */}
             {variants && hypothesis && !isGeneratingStrategy && (
               <div className="space-y-3">
+                {/* Business Snapshot: qué entendió la IA del negocio antes de escribir */}
+                {businessSnapshot && (
+                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
+                      <BrainCircuit className="w-3.5 h-3.5" />
+                      Business Snapshot
+                    </span>
+                    {([
+                      ['Qué vende', businessSnapshot.que_vende],
+                      ['A quién', businessSnapshot.a_quien],
+                      ['Problema que resuelve', businessSnapshot.problema_que_resuelve],
+                      ['Deseo del cliente', businessSnapshot.deseo_del_cliente],
+                      ['Objeciones', businessSnapshot.objeciones],
+                      ['Por qué comprarían', businessSnapshot.por_que_comprarian],
+                      ['Diferenciador', businessSnapshot.diferenciador],
+                      ['Productos clave', businessSnapshot.productos_clave]
+                    ] as const).map(([label, field]) => (
+                      <div key={label} className="flex items-start gap-1.5 text-[10px]">
+                        <span className={`shrink-0 mt-0.5 px-1 py-px rounded text-[8px] font-bold uppercase ${
+                          field.basis === 'hecho'
+                            ? 'bg-emerald-500/20 text-emerald-300'
+                            : field.basis === 'inferencia'
+                            ? 'bg-amber-500/20 text-amber-300'
+                            : 'bg-slate-800 text-slate-500'
+                        }`}>
+                          {field.basis === 'hecho' ? 'HECHO' : field.basis === 'inferencia' ? 'INFERENCIA' : 'FALTA INFO'}
+                        </span>
+                        <span className="text-slate-300"><strong className="text-slate-400">{label}:</strong> {field.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {/* Caja de Hipótesis y Evidencia */}
                 <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
                   <div className="flex items-center justify-between">
@@ -645,7 +681,14 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
                 {currentVariant && (
                   <div className="p-3.5 rounded-xl bg-slate-950 border border-pink-500/30 space-y-2.5">
                     <div className="flex items-center justify-between pb-1.5 border-b border-slate-800 text-[10px]">
-                      <span className="font-bold text-pink-300">{currentVariant.label}</span>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="font-bold text-pink-300 truncate">{currentVariant.label}</span>
+                        {currentVariant.content_angle && (
+                          <span className="shrink-0 px-1.5 py-0.5 rounded bg-fuchsia-500/20 text-fuchsia-300 text-[8px] font-bold uppercase border border-fuchsia-500/30">
+                            Ángulo: {currentVariant.content_angle}
+                          </span>
+                        )}
+                      </div>
                       <button
                         type="button"
                         onClick={() => handleCopy(`${currentVariant.hook_0_3s}\n\n${currentVariant.script_body}\n\n${currentVariant.cta_trigger}`, selectedVariantKey)}
@@ -715,6 +758,18 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
                     <p className="text-[10px] italic text-slate-400 bg-slate-900/40 p-2 rounded border border-slate-800/60">
                       💡 {currentVariant.why_this_variant}
                     </p>
+
+                    {/* Hipótesis a comprobar y qué medir */}
+                    {(currentVariant.hypothesis_to_test || currentVariant.what_to_measure) && (
+                      <div className="p-2 rounded-lg bg-slate-900/40 border border-slate-800/60 text-[10px] space-y-1">
+                        {currentVariant.hypothesis_to_test && (
+                          <p className="text-slate-400"><strong className="text-sky-400">🧪 Hipótesis a comprobar:</strong> {currentVariant.hypothesis_to_test}</p>
+                        )}
+                        {currentVariant.what_to_measure && (
+                          <p className="text-slate-400"><strong className="text-sky-400">📏 Qué medir:</strong> {currentVariant.what_to_measure}</p>
+                        )}
+                      </div>
+                    )}
 
                     {/* Botones de Acción */}
                     <div className="pt-2 flex gap-2">

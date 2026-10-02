@@ -13,6 +13,7 @@ import {
   ScriptVariant,
   ContentDnaItem,
   EmpiricalPattern,
+  BusinessSnapshot,
   NO_DATA
 } from '../../types/intelligence';
 import { CRMLead, CRMMessage } from '../../types/crm';
@@ -1783,6 +1784,7 @@ Devuelve un JSON con este formato exacto:
     patterns: EmpiricalPattern[];
     winningRules: string[];
     losingRules: string[];
+    business_snapshot: BusinessSnapshot;
   }> {
     const { businessId, sourcePosts, profileContext, connections, userGoal, mode = 'reel_hablado' } = params;
 
@@ -1856,13 +1858,19 @@ Devuelve un JSON con este formato exacto:
     // Guardar hipótesis detectadas
     IntelligenceStorageService.saveHypotheses(businessId, hypotheses);
 
+    // Content DNA Aprendido (hay hipótesis minadas de resultados reales) vs
+    // Content DNA Inicial (negocio sin historial suficiente): en este segundo
+    // caso NUNCA se devuelve "sin info"; se construye una hipótesis de arranque
+    // basada en perfil/catálogo/posts, pero marcada honestamente como de día 1,
+    // no como si fuera evidencia medida.
+    const hasLearnedDna = hypotheses.length > 0;
     const activeHypothesis = hypotheses[0] || {
-      hypothesis_id: `hyp_default_${Date.now()}`,
+      hypothesis_id: `hyp_dna_inicial_${Date.now()}`,
       business_id: businessId,
-      statement: 'Probar un gancho directo con demostración práctica en los primeros 3 segundos incrementará los guardados sobre la mediana histórica.',
-      evidence_basis: 'Estructura orientada a maximizar retención y utilidad de consulta para la cuenta.',
+      statement: `Content DNA Inicial (sin historial de resultados todavía): arrancar con guiones que nombren el producto/servicio concreto y ataquen un ángulo de venta real (problema, deseo u objeción), en vez de un gancho genérico de retención.`,
+      evidence_basis: 'HIPÓTESIS DE DÍA 1 — basada en perfil, catálogo y posts reales, NO en resultados medidos. Todavía no hay suficientes reels con métricas de Meta para minar un patrón ganador propio de esta cuenta.',
       sample_reels_count: sourcePosts.length,
-      confidence: 'media' as const,
+      confidence: 'baja' as const,
       metric_to_impact: 'saves' as const,
       target_benchmark_comparison: hasValue(benchmark.median_saves)
         ? `Superar la mediana de guardados (${formatMetric(benchmark.median_saves)})`
@@ -1889,58 +1897,63 @@ Devuelve un JSON con este formato exacto:
     const forbiddens = profileContext?.ai_context?.forbidden_rules?.join('\n- ') || 'Cero introducciones lentas, cero frases cliché.';
 
     const systemPrompt = `Sos el Analista y Estratega Senior de Contenido de EventPix Intelligence.
-Tu tarea es generar una estrategia de experimentación con 3 VARIANTES RIGUROSAS de guion basadas en la evidencia empírica de la cuenta.
+Trabajás EXCLUSIVAMENTE en guiones de REEL YAPPING (reel hablado, cámara al pecho/cara contando algo). No es un video promocional de agencia: es una pieza de VENTA real, con la misma exigencia de un copywriter senior, no un generador de "ideas de contenido".
+
+PASO 0 — ENTENDER EL NEGOCIO ANTES DE ESCRIBIR (Business Snapshot):
+Antes de escribir una sola línea de guion, respondé puertas adentro estas 8 preguntas sobre el negocio, usando SOLO catálogo real / "de qué habla la cuenta" / posts reales / nicho declarado que te paso abajo:
+¿QUÉ VENDE? ¿A QUIÉN? ¿QUÉ PROBLEMA RESUELVE? ¿QUÉ DESEA EL CLIENTE? ¿QUÉ OBJECIONES PUEDE TENER? ¿POR QUÉ COMPRARÍA? ¿QUÉ DIFERENCIA AL NEGOCIO? ¿QUÉ PRODUCTOS/SERVICIOS SON IMPORTANTES?
+Para CADA pregunta marcá "basis": "hecho" (está escrito literalmente en los datos reales), "inferencia" (es una deducción razonable a partir de los datos, no un dato confirmado) o "informacion_faltante" (no hay base para responder). NUNCA INVENTES un dato y lo presentes como "hecho". Una inferencia se escribe como inferencia, nunca como si fuera un dato confirmado.
+
+PASO 1 — ELEGIR UN ÁNGULO DE VENTA DISTINTO POR VARIANTE:
+Ángulos posibles: problema, deseo, error, mito, objeción, comparación, demostración, transformación, curiosidad, ahorro, calidad, resultado, detrás de escena, producto, caso real, pregunta frecuente.
+Elegí el ángulo mejor justificado para cada variante según: el negocio, el producto/servicio concreto, la audiencia, el contenido histórico, el Content DNA (ganador/perdedor) y la hipótesis activa de abajo. Las 3 variantes NO pueden usar el mismo ángulo. Completá "content_angle" (una palabra de la lista) y "angle_justification" (1 frase, por qué ESE ángulo para ESTE negocio) en cada variante.
+
+PASO 2 — ESTRUCTURA DE VENTA DEL GUION (arco opcional, no mecánico):
+El guion completo NO puede ser el patrón plano "gancho → información → CTA". Usá, cuando el ángulo lo justifique, etapas del tipo: HOOK → PROBLEMA/DESEO → TENSIÓN O CREENCIA ERRÓNEA → NUEVO MECANISMO/EXPLICACIÓN → PRODUCTO/SOLUCIÓN → BENEFICIO → PRUEBA O RAZÓN PARA CREER → CTA. No todas las etapas son obligatorias en todos los guiones: elegí las que sirvan para ESE ángulo y ESE negocio, pero el guion tiene que sentirse como una pieza de venta con tensión y resolución, no una lista de datos leída en voz alta.
 
 REGLAS INQUEBRANTABLES:
-1. CERO CLICHÉS Y CERO ESTADÍSTICAS FALSAS:
-   - ❌ PROHIBIDO ROTUNDAMENTE: "¿Sabías que...?", "El 70% de tus clientes...", "Hoy te voy a contar 3 cosas...", "¿Buscas mejorar...?"
-   - ❌ PROHIBIDO INVENTAR PORCENTAJES DE MERCADO O DATOS DE TERCEROS SIN FUENTE.
-2. ENFOQUE DEL SEGUNDO 0-3:
-   - Toda variante debe arrancar inmediatamente con una afirmación contundente, un problema tangible del negocio o una demostración visual.
-3. ESTRUCTURA DE 3 VARIANTES:
-   - VARIANTE A (Patrón Probado): Aplica directamente el patrón que mejor superó la mediana de la cuenta.
-   - VARIANTE B (Ángulo Alternativo): Misma hipótesis pero atacando una objeción o ángulo complementario.
-   - VARIANTE C (Apuesta Creativa): Hipótesis exploratoria con mayor contraste visual y narrativo.
-4. PROHIBIDO EXPLICAR TEORÍA DE GUION EN VEZ DE ESCRIBIRLO, Y PROHIBIDO INVENTAR UN RUBRO DISTINTO AL REAL:
-   - ❌ Nunca escribas consejos en abstracto tipo "hacé un gancho fuerte en los primeros segundos" o "mostrá el producto de forma atractiva", ni frases de coach de redes genéricas tipo "¡hoy es tu día!" o "tu reel es una joya".
-   - ❌ PROHIBIDO ROTUNDAMENTE inventar un producto o rubro que no esté en el catálogo, en "De qué habla la cuenta", en el nicho declarado o en los posts reales de abajo (ej.: nunca metas zapatillas, pantallas digitales, ni ningún producto de ejemplo si el negocio no lo vende).
-   - ✅ Cada campo (hook_0_3s, script_body, on_screen_text, cta_trigger) tiene que ser el TEXTO REAL Y FINAL que se dice o se lee en el video, nombrando el producto/servicio concreto del catálogo, de "De qué habla la cuenta" o de los posts reales que te paso abajo — nunca una descripción de cómo debería ser.
-   - Orden de prioridad para decidir sobre qué producto/tema escribir el guion: 1º catálogo real, 2º "De qué habla la cuenta", 3º temas que se repiten en los posts reales de abajo, 4º el nicho declarado en texto llano (ej. si el nicho es "Insumos para carnaval" y no hay más datos, escribí sobre insumos de carnaval en general, nunca sobre un producto inventado de otro rubro).
-5. Responde ÚNICAMENTE con un JSON con la estructura:
+1. CERO CLICHÉS: PROHIBIDO usar o parafrasear estos ganchos genéricos salvo que el historial real de la cuenta muestre que ESE estilo funciona para ella:
+   - "¿Querés llevar tu negocio al siguiente nivel?", "Hoy te contamos...", "Si tenés un emprendimiento esto es para vos.", "Te voy a mostrar...", "3 consejos que nadie te cuenta...", "¿Sabías que...?", "El 70% de tus clientes...", "¿Buscas mejorar...?"
+   - PROHIBIDO INVENTAR PORCENTAJES DE MERCADO O DATOS DE TERCEROS SIN FUENTE.
+   - El hook tiene que nacer del producto, problema, deseo, objeción, contexto de mercado, oportunidad o curiosidad ESPECÍFICA de este negocio, nunca una frase motivacional genérica de "coach de redes".
+2. CTA CON SENTIDO, NUNCA SIEMPRE EL MISMO NI SIEMPRE "ESCRIBINOS POR WHATSAPP":
+   - El CTA tiene que generar una acción medible acorde al objetivo (ej: "Comentá CATÁLOGO y te lo mando", "Mandanos la palabra BOAS y te paso precios", "Guardá este Reel para no perderlo", "Mandáselo a alguien que le pueda servir", "Pedinos los colores disponibles").
+   - Reusá un CTA guardado del negocio si el tema calza, o generá uno nuevo con sentido — PROHIBIDO forzar siempre el mismo CTA en las 3 variantes.
+3. PROHIBIDO EXPLICAR TEORÍA DE GUION EN VEZ DE ESCRIBIRLO, Y PROHIBIDO INVENTAR UN RUBRO DISTINTO AL REAL:
+   - ❌ Nunca escribas consejos en abstracto tipo "hacé un gancho fuerte" o frases de coach genéricas tipo "¡hoy es tu día!".
+   - ❌ PROHIBIDO ROTUNDAMENTE inventar un producto o rubro que no esté en el catálogo, en "De qué habla la cuenta", en el nicho declarado o en los posts reales de abajo.
+   - ✅ Cada campo de texto tiene que ser el TEXTO REAL Y FINAL que se dice o se lee en el video, nombrando el producto/servicio concreto — nunca una descripción de cómo debería ser.
+   - Orden de prioridad para decidir sobre qué producto/tema escribir: 1º catálogo real, 2º "De qué habla la cuenta", 3º temas que se repiten en los posts reales de abajo, 4º el nicho declarado en texto llano.
+4. HECHO vs INFERENCIA vs HIPÓTESIS, siempre explícito en "why_this_variant": nunca mezclés una suposición con un dato medido como si fueran lo mismo.
+5. Responde ÚNICAMENTE con un JSON con esta estructura exacta:
 {
+  "business_snapshot": {
+    "que_vende": { "value": "...", "basis": "hecho" },
+    "a_quien": { "value": "...", "basis": "inferencia" },
+    "problema_que_resuelve": { "value": "...", "basis": "inferencia" },
+    "deseo_del_cliente": { "value": "...", "basis": "inferencia" },
+    "objeciones": { "value": "...", "basis": "inferencia" },
+    "por_que_comprarian": { "value": "...", "basis": "inferencia" },
+    "diferenciador": { "value": "...", "basis": "informacion_faltante" },
+    "productos_clave": { "value": "...", "basis": "hecho" }
+  },
   "variantA": {
     "label": "Variante A: Patrón Ganador Probado",
-    "hook_0_3s": "Gancho demoledor de 0 a 3 segundos",
+    "content_angle": "problema",
+    "angle_justification": "...",
+    "hook_0_3s": "Gancho de 0 a 3 segundos, específico del negocio",
     "on_screen_text": "Texto exacto que debe aparecer en pantalla",
-    "script_body": "Desarrollo del guion con ritmo y pausas",
-    "cta_trigger": "Llamado a la acción específico",
+    "script_body": "Guion hablado completo, con la progresión de venta que corresponda a este ángulo",
+    "cta_trigger": "Llamado a la acción específico y medible",
     "shooting_directions": "Cómo encuadrar la cámara, iluminación y tono físico",
-    "b_roll_suggestions": ["Plano 1...", "Plano 2..."],
+    "b_roll_suggestions": ["Qué mostrar en pantalla / plano 1...", "Plano 2..."],
     "confidence_score": "alta",
-    "why_this_variant": "Explicación basada en la evidencia de la cuenta"
+    "why_this_variant": "Explicación basada en evidencia real de la cuenta, distinguiendo hecho/inferencia/hipótesis",
+    "hypothesis_to_test": "Qué se intenta comprobar con esta variante",
+    "what_to_measure": "Qué resultado concreto determina si funcionó (ej: guardados, DMs con la palabra clave del CTA)"
   },
-  "variantB": {
-    "label": "Variante B: Ángulo Alternativo",
-    "hook_0_3s": "...",
-    "on_screen_text": "...",
-    "script_body": "...",
-    "cta_trigger": "...",
-    "shooting_directions": "...",
-    "b_roll_suggestions": ["..."],
-    "confidence_score": "media",
-    "why_this_variant": "..."
-  },
-  "variantC": {
-    "label": "Variante C: Apuesta Creativa",
-    "hook_0_3s": "...",
-    "on_screen_text": "...",
-    "script_body": "...",
-    "cta_trigger": "...",
-    "shooting_directions": "...",
-    "b_roll_suggestions": ["..."],
-    "confidence_score": "baja",
-    "why_this_variant": "..."
-  }
+  "variantB": { "label": "Variante B: Ángulo Alternativo", "content_angle": "...", "angle_justification": "...", "hook_0_3s": "...", "on_screen_text": "...", "script_body": "...", "cta_trigger": "...", "shooting_directions": "...", "b_roll_suggestions": ["..."], "confidence_score": "media", "why_this_variant": "...", "hypothesis_to_test": "...", "what_to_measure": "..." },
+  "variantC": { "label": "Variante C: Apuesta Creativa", "content_angle": "...", "angle_justification": "...", "hook_0_3s": "...", "on_screen_text": "...", "script_body": "...", "cta_trigger": "...", "shooting_directions": "...", "b_roll_suggestions": ["..."], "confidence_score": "baja", "why_this_variant": "...", "hypothesis_to_test": "...", "what_to_measure": "..." }
 }`;
 
     const userPrompt = `DATOS Y BENCHMARK REAL DE LA CUENTA:
@@ -1949,6 +1962,8 @@ REGLAS INQUEBRANTABLES:
 - ${formatForPrompt(benchmark.median_reach, 'Mediana de alcance')} (calculada sobre ${benchmark.metric_sample_sizes.reach} de ${benchmark.sample_size} reels)
 - Tamaño de muestra analizada: ${benchmark.sample_size} publicaciones
 - IMPORTANTE: toda métrica marcada como NO DISPONIBLE no debe usarse ni estimarse. Si no hay evidencia numérica suficiente, decilo explícitamente en "why_this_variant" y bajá "confidence_score" a "baja".
+
+CONTENT DNA DE ESTA CUENTA: ${hasLearnedDna ? 'APRENDIDO (basado en resultados reales medidos de sus propios reels)' : 'INICIAL (día 1, sin historial de resultados suficiente — basate en perfil/catálogo/posts, NUNCA te niegues a generar por falta de datos)'}
 
 HIPÓTESIS ACTIVA:
 "${activeHypothesis.statement}"
@@ -2043,7 +2058,7 @@ ${realPostsText}`;
               body: JSON.stringify({
                 apiKey: connections.claude!.apiKey,
                 model: connections.claude!.model || 'claude-3-5-sonnet-20241022',
-                max_tokens: 3000,
+                max_tokens: 4500,
                 workspaceId: connections.claude!.workspaceId,
                 system: systemPrompt,
                 messages: [{ role: 'user', content: userPrompt }]
@@ -2060,7 +2075,7 @@ ${realPostsText}`;
               },
               body: JSON.stringify({
                 model: connections.claude!.model || 'claude-3-5-sonnet-20241022',
-                max_tokens: 3000,
+                max_tokens: 4500,
                 system: systemPrompt,
                 messages: [{ role: 'user', content: userPrompt }]
               })
@@ -2113,6 +2128,8 @@ ${realPostsText}`;
       variantA: {
         variant_key: 'A' as const,
         label: 'Variante A: Patrón Ganador Probado',
+        content_angle: 'problema',
+        angle_justification: 'Fallback determinístico: ángulo de problema, el más seguro cuando no hay IA disponible para justificar uno más específico.',
         hook_0_3s: `Si tenés un negocio en ${niche.toLowerCase()}, esto te está haciendo perder clientes todos los días:`,
         on_screen_text: 'ERROR TÍPICO QUE TE CUESTA VENTAS 🛑',
         script_body: `Seguir dependiendo de métodos manuales o desorganizados hace que el 40% de las consultas se enfríen antes de cerrar.\n\nCuando implementás un sistema con respuesta automática y seguimiento visual, cada contacto sabe exactamente qué hacer y cuándo comprar.\n\nNo necesitás más tráfico; necesitás convertir el que ya tenés.`,
@@ -2126,11 +2143,15 @@ ${realPostsText}`;
           ? `Basada en patrones observados en la cuenta: ${winningRules[0]}`
           : hasValue(benchmark.median_saves)
             ? `Estructura de apertura por dolor, a contrastar contra la mediana de guardados de la cuenta (${formatMetric(benchmark.median_saves)}). Todavía sin evidencia propia que la respalde: es la hipótesis a testear.`
-            : 'Variante generada sin benchmark de la cuenta: no hay métricas de Meta sincronizadas para respaldarla. Tratar como hipótesis sin evidencia.'
+            : 'Variante generada sin benchmark de la cuenta: no hay métricas de Meta sincronizadas para respaldarla. Tratar como hipótesis sin evidencia.',
+        hypothesis_to_test: 'Si un hook de problema directo sostiene la atención mejor que una apertura neutra.',
+        what_to_measure: 'Guardados y mensajes/comentarios con la palabra clave del CTA, comparados contra la mediana de la cuenta.'
       },
       variantB: {
         variant_key: 'B' as const,
         label: 'Variante B: Ángulo Alternativo (Caso Real)',
+        content_angle: 'comparación',
+        angle_justification: 'Fallback determinístico: ángulo de comparación para ofrecer un contraste distinto a la Variante A.',
         hook_0_3s: `Mirá la diferencia exacta entre un negocio que improvisa y uno con proceso claro en ${niche.toLowerCase()}:`,
         on_screen_text: 'IMPROVISAR VS TENER SISTEMA 📊',
         script_body: `El que improvisa pierde horas respondiendo lo mismo y persiguiendo pagos.\n\nEl que tiene un flujo estructurado atiende en segundos, genera confianza inmediata y multiplica su tasa de cierre.\n\nEl cambio no te lleva semanas; se configura una sola vez.`,
@@ -2138,11 +2159,15 @@ ${realPostsText}`;
         shooting_directions: 'Plano dividido o alternancia rápida de tomas (caos vs orden). Tono empático pero directo al grano.',
         b_roll_suggestions: ['Capturas de pantalla de mensajes acumulados vs panel ordenado', 'Toma cenital de trabajo fluido'],
         confidence_score: 'media' as const,
-        why_this_variant: 'Misma hipótesis de dolor pero enfocada en la comparación visual de contraste, ideal para elevar el tiempo de retención.'
+        why_this_variant: 'Misma hipótesis de dolor pero enfocada en la comparación visual de contraste, ideal para elevar el tiempo de retención.',
+        hypothesis_to_test: 'Si el contraste visual antes/después retiene más que una afirmación directa.',
+        what_to_measure: 'Tiempo de retención y mensajes con la palabra clave "FLUJO".'
       },
       variantC: {
         variant_key: 'C' as const,
         label: 'Variante C: Apuesta Creativa (Desafío de Creencia)',
+        content_angle: 'mito',
+        angle_justification: 'Fallback determinístico: ángulo de mito/creencia errónea como apuesta exploratoria distinta a A y B.',
         hook_0_3s: `Te dijeron que necesitabas más seguidores para vender en ${niche.toLowerCase()}... y te mintieron:`,
         on_screen_text: 'EL MITO DE LOS SEGUIDORES ❌',
         script_body: `Tener 50.000 seguidores que no compran solo alimenta el ego.\n\nLo que necesitas son 200 personas cualificadas con un gancho que filtre a los curiosos y lleve a los compradores directo a tu WhatsApp.\n\nAsí es como se factura de verdad con contenido.`,
@@ -2150,7 +2175,26 @@ ${realPostsText}`;
         shooting_directions: 'Cámara en mano o estilo b-roll dinámico en movimiento. Tono provocador y desafiante.',
         b_roll_suggestions: ['Gráficos de métricas en celular', 'Corte rápido a cámara hablando mientras caminas'],
         confidence_score: 'baja' as const,
-        why_this_variant: 'Hipótesis exploratoria con ángulo de polarización para descubrir si la audiencia responde a disrupciones de creencias.'
+        why_this_variant: 'Hipótesis exploratoria con ángulo de polarización para descubrir si la audiencia responde a disrupciones de creencias.',
+        hypothesis_to_test: 'Si desafiar una creencia instalada genera más comentarios/guardados que un enfoque directo.',
+        what_to_measure: 'Comentarios y guardados comparados contra la mediana histórica de la cuenta.'
+      }
+    };
+
+    const fallbackBusinessSnapshot: BusinessSnapshot = {
+      que_vende: {
+        value: catalogRows && catalogRows.length > 0 ? catalogRows.map((p: any) => p.name).join(', ') : niche,
+        basis: catalogRows && catalogRows.length > 0 ? 'hecho' : 'informacion_faltante'
+      },
+      a_quien: { value: 'No hay datos suficientes para inferir el público objetivo con precisión.', basis: 'informacion_faltante' },
+      problema_que_resuelve: { value: 'Sin información cargada para inferirlo de forma confiable.', basis: 'informacion_faltante' },
+      deseo_del_cliente: { value: 'Sin información cargada para inferirlo de forma confiable.', basis: 'informacion_faltante' },
+      objeciones: { value: 'Sin información cargada para inferirlo de forma confiable.', basis: 'informacion_faltante' },
+      por_que_comprarian: { value: 'Sin información cargada para inferirlo de forma confiable.', basis: 'informacion_faltante' },
+      diferenciador: { value: 'Sin información cargada para inferirlo de forma confiable.', basis: 'informacion_faltante' },
+      productos_clave: {
+        value: catalogRows && catalogRows.length > 0 ? catalogRows.map((p: any) => p.name).join(', ') : '(sin catálogo cargado)',
+        basis: catalogRows && catalogRows.length > 0 ? 'hecho' : 'informacion_faltante'
       }
     };
 
@@ -2169,13 +2213,19 @@ ${realPostsText}`;
       }
     };
 
+    const businessSnapshot: BusinessSnapshot = {
+      ...fallbackBusinessSnapshot,
+      ...(aiResult?.business_snapshot || {})
+    };
+
     return {
       hypothesis: activeHypothesis,
       variants: finalVariants,
       benchmark,
       patterns,
       winningRules,
-      losingRules
+      losingRules,
+      business_snapshot: businessSnapshot
     };
   }
 }
