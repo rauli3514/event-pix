@@ -19,7 +19,7 @@ export default function ResultSection() {
       </Panel>
 
       <Panel title="Tiempos">
-        <Choice label="Volver solo al inicio después del resultado" value={general.resultTimeout ?? 0}
+        <Choice label="Volver solo al inicio después del resultado" value={general.resultTimeout ?? 30}
           options={[{ value: 0, label: 'No' }, { value: 15, label: '15 s' }, { value: 30, label: '30 s' }, { value: 60, label: '1 min' }]}
           onChange={resultTimeout => updateGeneral({ resultTimeout })} />
         <Choice label="Volver al inicio si nadie toca nada (pantallas de elección)" value={general.idleTimeout ?? 0}

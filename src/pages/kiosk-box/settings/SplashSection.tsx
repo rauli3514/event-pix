@@ -16,6 +16,9 @@ export default function SplashSection() {
           {video && <video key={video} src={video} autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover opacity-80" />}
           <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/50" />
           <div className="relative h-full flex flex-col items-center justify-center text-center px-6">
+            {settings.eventTitle && (
+              <p className="carlmarx-bold text-4xl mb-3 bg-gradient-to-r from-[#ff2e93] via-[#ffd23f] to-[#00d4ff] bg-clip-text text-transparent drop-shadow-2xl">{settings.eventTitle}</p>
+            )}
             <p className="carlmarx-bold text-white text-5xl drop-shadow-2xl">{settings.welcomeTitle || DEFAULT_WELCOME_TITLE}</p>
             {settings.welcomeSubtitle && <p className="text-white/85 text-2xl mt-3">{settings.welcomeSubtitle}</p>}
           </div>
@@ -23,7 +26,11 @@ export default function SplashSection() {
       </Panel>
 
       <Panel title="Textos">
-        <Field label="Título">
+        <Field label="Nombre del evento (va en la bienvenida y en los marcos de las fotos)">
+          <input className={inputClass} placeholder="Ej: 15 de Pía" value={settings.eventTitle || ''}
+            onChange={e => update({ eventTitle: e.target.value })} />
+        </Field>
+        <Field label="Texto para invitar a tocar">
           <input className={inputClass} placeholder={DEFAULT_WELCOME_TITLE} value={settings.welcomeTitle || ''}
             onChange={e => update({ welcomeTitle: e.target.value })} />
         </Field>

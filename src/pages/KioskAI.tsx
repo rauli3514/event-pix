@@ -1,15 +1,16 @@
 import { useState, useRef, useEffect } from 'react'; // Kiosk AI Optimized Flow
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Printer, Users, Sparkles, Trophy, QrCode, Instagram, Palette, Sticker, Home } from 'lucide-react';
+import { Printer, Users, Sparkles, Trophy, QrCode, Instagram, Palette, Sticker, Home, Lock, LockOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { isNativePrintAvailable, printImageNative, printErrorMessage } from '@/lib/nativePrint';
 import { StickerEditor } from '@/components/stickers/StickerEditor';
 import { useRemoteFocus } from '@/hooks/use-remote-focus';
 import { openCameraStream, stopStream } from '@/lib/kioskCamera';
-import { splashVideoSrc } from '@/lib/kioskSettings';
+import { getSectionLock, setSectionLock, splashVideoSrc } from '@/lib/kioskSettings';
+import PinDialog from '@/components/kiosk/PinDialog';
+import { backupPhoto } from '@/lib/kioskStorage';
 import { glassStyleOf, isGlassFrame, renderGlassFrame } from '@/lib/glassFrame';
-import { getCachedDeviceState } from '@/lib/kioskDevice';
 import { motion } from 'framer-motion';
 import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
 import { AIProcessing, CameraFlash, CountdownRing } from '@/components/kiosk/KioskAnimations';
@@ -148,8 +149,10 @@ export default function KioskAI() {
   // muestra el botón para volver al inicio de la app
   const modesParam = searchParams.get('modes');
   const showHomeButton = searchParams.get('home') === '1';
-  const isModeAllowed = (m: Exclude<Mode, null>) =>
-    modesParam === 'selfie' ? m === 'selfie' : modesParam === 'ai' ? m !== 'selfie' : true;
+  const isModeAllowed = (m: Exclude<Mode, null>) => {
+    if (offlineMode && m !== 'selfie') return false; // las experiencias IA necesitan internet
+    return modesParam === 'selfie' ? m === 'selfie' : modesParam === 'ai' ? m !== 'selfie' : true;
+  };
 
   const [step, setStep] = useState<Step>('splash');
   const [mode, setMode] = useState<Mode>(null);
@@ -176,7 +179,12 @@ export default function KioskAI() {
   // Control remoto de la TV box: las flechas recorren los botones de cada pantalla
   const bodyRef = useRef<HTMLElement>(document.body);
   const splashEnterRef = useRef(false);
-  useRemoteFocus(bodyRef, [step]);
+  // Candado: bloquea esta sección (no se puede volver al inicio); se abre con la clave
+  const [locked, setLocked] = useState(() => !!getSectionLock());
+  const [unlockOpen, setUnlockOpen] = useState(false);
+  // Toma original de la cámara, para respaldarla junto a la foto final
+  const originalShotRef = useRef<string | null>(null);
+  useRemoteFocus(bodyRef, [step], !unlockOpen);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -196,6 +204,8 @@ export default function KioskAI() {
     try { return JSON.parse(localStorage.getItem('kiosk_general_settings') || '{}'); }
     catch { return {}; }
   })();
+  // Sin conexión: solo foto, marco, impresión y respaldo en el equipo (sin IA, QR ni subidas)
+  const offlineMode = !!generalSettings.offline;
 
   // Fullscreen effect fallback
   useEffect(() => {
@@ -304,12 +314,24 @@ export default function KioskAI() {
 
   useConfettiBurst(step === 'result');
 
-  // Vuelve solo al inicio después del resultado (Ajustes → Resultado y tiempos)
-  const resultTimeout = Number(generalSettings.resultTimeout) || 0;
+  // Vuelve solo al inicio si nadie toca nada mientras ve su foto o la pantalla de
+  // imprimir (Ajustes → Resultado y tiempos; 30 s si no se configuró)
+  const resultTimeout = generalSettings.resultTimeout === undefined ? 30 : Number(generalSettings.resultTimeout) || 0;
   useEffect(() => {
-    if (step !== 'result' || resultTimeout <= 0) return;
-    const t = setTimeout(() => resetKiosk(), resultTimeout * 1000);
-    return () => clearTimeout(t);
+    const photoSteps: Step[] = ['photoPreview', 'flashResult', 'result'];
+    if (resultTimeout <= 0 || !photoSteps.includes(step)) return;
+    let t = setTimeout(() => resetKiosk(), resultTimeout * 1000);
+    const restart = () => {
+      clearTimeout(t);
+      t = setTimeout(() => resetKiosk(), resultTimeout * 1000);
+    };
+    const events = ['pointerdown', 'keydown', 'touchstart'] as const;
+    events.forEach(e => window.addEventListener(e, restart));
+    return () => {
+      clearTimeout(t);
+      events.forEach(e => window.removeEventListener(e, restart));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, resultTimeout]);
 
   // Sin actividad en las pantallas de elección, vuelve al inicio
@@ -343,14 +365,49 @@ export default function KioskAI() {
     setStep('modeSelect');
   };
 
-  const homeButton = showHomeButton && (
-    <button
-      onClick={(e) => { e.stopPropagation(); navigate('/box'); }}
-      className="absolute top-6 left-6 z-30 flex items-center gap-2 px-5 py-3 rounded-full bg-black/50 border border-white/20 text-white/80 hover:text-white hover:bg-black/70"
-    >
-      <Home className="w-5 h-5" /> Inicio
-    </button>
+  const toggleLock = () => {
+    if (locked) {
+      setUnlockOpen(true);
+      return;
+    }
+    setSectionLock(modesParam || 'all');
+    setLocked(true);
+    toast.success('Sección bloqueada. Para salir tocá el candado y poné la clave.');
+  };
+
+  const unlockDialog = unlockOpen && (
+    <PinDialog
+      title="Clave para desbloquear"
+      onCancel={() => setUnlockOpen(false)}
+      onSuccess={() => {
+        setSectionLock(null);
+        setLocked(false);
+        setUnlockOpen(false);
+      }}
+    />
   );
+
+  const homeButton = showHomeButton && (
+    <div className="absolute top-6 left-6 z-30 flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+      {!locked && (
+        <button
+          onClick={() => navigate('/box')}
+          className="flex items-center gap-2 px-5 py-3 rounded-full bg-black/50 border border-white/20 text-white/80 hover:text-white hover:bg-black/70 focus:outline-none focus:ring-4 focus:ring-white/70"
+        >
+          <Home className="w-5 h-5" /> Inicio
+        </button>
+      )}
+      <button
+        onClick={toggleLock}
+        aria-label={locked ? 'Desbloquear sección' : 'Bloquear sección'}
+        className={`w-12 h-12 rounded-full flex items-center justify-center border focus:outline-none focus:ring-4 focus:ring-white/70 ${locked ? 'bg-black/30 border-white/10 text-white/40' : 'bg-black/50 border-white/20 text-white/80 hover:text-white'}`}
+      >
+        {locked ? <Lock className="w-5 h-5" /> : <LockOpen className="w-5 h-5" />}
+      </button>
+      {unlockDialog}
+    </div>
+  );
+
 
   const handleModeSelect = (m: Mode) => {
     setMode(m);
@@ -413,13 +470,21 @@ export default function KioskAI() {
     try { new Audio('/kiosk-camera-sound.mp3').play(); } catch {}
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    originalShotRef.current = dataUrl;
     setCapturedImage(dataUrl);
     // Always go to preview first — user can approve or retake
     setStep('photoPreview');
   };
 
   const savePhotoToAlbum = async (dataUrl: string): Promise<string | null> => {
-    if (!kioskEventId) return null;
+    // Respaldo en el equipo (original + final), siempre: con o sin evento e internet
+    try {
+      await backupPhoto(dataUrl, originalShotRef.current, mode || 'foto');
+    } catch (e) {
+      console.error('No se pudo guardar la foto en el equipo', e);
+      toast.error('No se pudo guardar la foto en el equipo');
+    }
+    if (!kioskEventId || offlineMode) return null;
     try {
       const blob = await (await fetch(dataUrl)).blob();
       const fileName = `kiosk_sessions/${kioskEventId}/${Date.now()}.jpg`;
@@ -544,7 +609,8 @@ The subject must perfectly match the facial features and gender of the reference
     if (isGlassFrame(frame)) {
       return renderGlassFrame(base, {
         style: glassStyleOf(frame),
-        title: generalSettings.frameTitle || getCachedDeviceState()?.eventName || undefined,
+        // Siempre el nombre del evento de "Pantalla de inicio", nunca el del equipo
+        title: generalSettings.eventTitle || undefined,
         subtitle: generalSettings.frameSubtitle || undefined,
       });
     }
@@ -848,6 +914,9 @@ The subject must perfectly match the facial features and gender of the reference
         <h1 className="carlmarx-bold text-[clamp(4rem,12vw,9rem)] text-white drop-shadow-2xl text-center leading-tight animate-pulse-slow">
           {generalSettings.welcomeTitle || <>Toca para<br />empezar</>}
         </h1>
+        {generalSettings.eventTitle && (
+          <p className="carlmarx-bold mt-6 text-[clamp(2.5rem,5vw,4.5rem)] text-center px-8 bg-gradient-to-r from-[#ff2e93] via-[#ffd23f] to-[#00d4ff] bg-clip-text text-transparent drop-shadow-2xl">{generalSettings.eventTitle}</p>
+        )}
         {generalSettings.welcomeSubtitle && (
           <p className="mt-6 text-white/90 text-[clamp(1.5rem,3vw,2.5rem)] text-center drop-shadow-xl px-8">{generalSettings.welcomeSubtitle}</p>
         )}
@@ -944,7 +1013,7 @@ The subject must perfectly match the facial features and gender of the reference
             className="px-10 py-5 rounded-3xl bg-violet-600 hover:bg-violet-500 text-white text-2xl font-bold focus:outline-none focus:ring-8 focus:ring-white/70">
             Reintentar
           </button>
-          <button onClick={() => (showHomeButton ? navigate('/box') : resetKiosk())}
+          <button onClick={() => (showHomeButton && !locked ? navigate('/box') : resetKiosk())}
             className="px-10 py-5 rounded-3xl bg-white/10 hover:bg-white/20 text-white text-2xl font-bold focus:outline-none focus:ring-8 focus:ring-white/70">
             Volver
           </button>
@@ -1041,13 +1110,15 @@ The subject must perfectly match the facial features and gender of the reference
         {/* Gradient bottom overlay for buttons */}
         <div className="absolute bottom-0 inset-x-0 h-48 bg-gradient-to-t from-black to-transparent" />
         <div className="absolute bottom-0 inset-x-0 flex items-end justify-center gap-6 p-8 z-10">
+          {generalSettings.allowRetake !== false && (
           <button onClick={() => setStep('lookCamera')}
-            className="flex-1 max-w-xs py-5 rounded-2xl border-2 border-white/30 bg-black/60 carlmarx-bold text-white text-2xl backdrop-blur hover:border-white/60 transition-all">
+            className="flex-1 max-w-xs py-5 rounded-2xl border-2 border-white/30 bg-black/60 carlmarx-bold text-white text-2xl backdrop-blur hover:border-white/60 transition-all focus:outline-none focus:ring-4 focus:ring-white/80">
             ↩ Repetir foto
           </button>
-          <button onClick={goNext}
-            className="flex-1 max-w-xs py-5 rounded-2xl carlmarx-bold text-white text-2xl transition-all"
-            style={{ background: 'linear-gradient(135deg,#7c3aed,#db2777)', boxShadow: '0 0 40px rgba(124,58,237,0.5)' }}>
+          )}
+          <button data-autofocus onClick={goNext}
+            className="flex-1 max-w-xs py-5 rounded-2xl carlmarx-bold text-white text-2xl transition-all focus:outline-none focus:ring-4 focus:ring-white/80"
+            style={{ background: 'linear-gradient(135deg,#ff2e93,#7b2ff7)', boxShadow: '0 0 40px rgba(255,46,147,0.5)' }}>
             ¡Me gusta! →
           </button>
         </div>
@@ -1296,7 +1367,7 @@ The subject must perfectly match the facial features and gender of the reference
     const printerCfg = (() => { try { return JSON.parse(localStorage.getItem('kiosk_print_settings') || '{}'); } catch { return {}; } })();
     const igCfg = (() => { try { return JSON.parse(localStorage.getItem('kiosk_ig_settings') || '{}'); } catch { return {}; } })();
     const showPrint = generalSettings.showPrintButton !== false && printerCfg.autoPrint !== false;
-    const showQr = generalSettings.showQr !== false;
+    const showQr = generalSettings.showQr !== false && !offlineMode && !!lastPublicUrl;
     // The QR points directly to the photo for downloading
     const qrUrl = lastPublicUrl 
       ? `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(lastPublicUrl)}&bgcolor=ffffff&color=000000`
@@ -1340,6 +1411,8 @@ The subject must perfectly match the facial features and gender of the reference
             </button>
             )}
 
+            {/* En la TV box compartir desde el equipo no le sirve al invitado: usa el QR */}
+            {!offlineMode && !showHomeButton && (
             <button onClick={async () => {
               if (!navigator.share) { toast.info("Guardá la foto con un toque largo"); return; }
               try {
@@ -1352,6 +1425,7 @@ The subject must perfectly match the facial features and gender of the reference
               className="py-7 px-8 bg-gradient-to-br from-violet-600 to-pink-600 hover:from-violet-500 hover:to-pink-500 text-white rounded-[2rem] carlmarx-bold text-2xl flex items-center justify-center gap-4 shadow-[0_10px_40px_rgba(139,92,246,0.4)] transition-all hover:scale-[1.05] active:scale-95">
               <Instagram className="w-8 h-8" /> Compartir
             </button>
+            )}
           </div>
         </div>
 

@@ -3,14 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
-import { Camera, Sparkles, Ticket, Wifi, Settings, Delete, Loader2, AlertTriangle, type LucideIcon } from 'lucide-react';
+import { Camera, Sparkles, Ticket, Wifi, Settings, Loader2, AlertTriangle, Images, WifiOff, type LucideIcon } from 'lucide-react';
 import { useRemoteFocus } from '@/hooks/use-remote-focus';
 import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
-import { EventPixLogo, EventPixMark } from '@/components/kiosk/brand/EventPixLogo';
+import { EventPixLogo } from '@/components/kiosk/brand/EventPixLogo';
+import PinDialog from '@/components/kiosk/PinDialog';
 import {
-  checkinDevice, getCachedDeviceState, getDeviceCode, getBoxPin, getVipAppPackage,
+  checkinDevice, getCachedDeviceState, getDeviceCode, getVipAppPackage,
   openAndroidApp, openWifiSettings, type KioskDeviceState,
 } from '@/lib/kioskDevice';
+import { getGeneralSettings, getSectionLock } from '@/lib/kioskSettings';
 
 // Inicio de la app "EventPix Kiosco" en la TV box: sin login. Si el equipo no
 // está vinculado muestra su código para registrarlo en el panel; si lo está,
@@ -66,6 +68,15 @@ export default function KioskBox() {
       window.clearInterval(timer);
     };
   }, [refresh, device?.pairingStatus]);
+
+  // Con una sección bloqueada (candado en el kiosco) el inicio no se muestra: se vuelve a ella
+  useEffect(() => {
+    const lock = getSectionLock();
+    if (!lock || device?.pairingStatus !== 'linked') return;
+    const params = new URLSearchParams({ modes: lock, home: '1' });
+    if (device.kioskEventId) params.set('event', device.kioskEventId);
+    navigate(`/kiosco?${params.toString()}`, { replace: true });
+  }, [device?.pairingStatus, device?.kioskEventId, navigate]);
 
   // Con el PIN abierto, el foco lo maneja el diálogo
   useRemoteFocus(rootRef, [device?.pairingStatus], !pinOpen);
@@ -125,9 +136,13 @@ export default function KioskBox() {
   }
 
   // ─── Inicio ──────────────────────────────────────────────────────
+  const general = getGeneralSettings();
+  const aiEnabled = !general.offline && (['enableAI', 'enableMundial', 'enableCaricatura', 'enableFiguritas', 'enablePortada'] as const)
+    .some(k => general[k] !== false);
   const tiles: { key: string; label: string; hint: string; icon: LucideIcon; gradient: string; glow: string; onClick: () => void }[] = [
-    { key: 'fotos', label: 'Fotos', hint: 'Selfie con marco', icon: Camera, gradient: 'from-[#00d4ff] via-[#2b8cff] to-[#5b3bff]', glow: 'rgba(0,212,255,0.55)', onClick: () => openExperience('selfie') },
-    { key: 'ia', label: 'Fotos IA', hint: 'Retratos, Mundial y más', icon: Sparkles, gradient: 'from-[#ff2e93] via-[#c03bff] to-[#7b2ff7]', glow: 'rgba(255,46,147,0.55)', onClick: () => openExperience('ai') },
+    ...(general.enableSelfie !== false ? [{ key: 'fotos', label: 'Fotos', hint: 'Selfie con marco', icon: Camera, gradient: 'from-[#00d4ff] via-[#2b8cff] to-[#5b3bff]', glow: 'rgba(0,212,255,0.55)', onClick: () => openExperience('selfie') }] : []),
+    ...(aiEnabled ? [{ key: 'ia', label: 'Fotos IA', hint: 'Retratos, Mundial y más', icon: Sparkles, gradient: 'from-[#ff2e93] via-[#c03bff] to-[#7b2ff7]', glow: 'rgba(255,46,147,0.55)', onClick: () => openExperience('ai') }] : []),
+    ...(general.enableGallery ? [{ key: 'galeria', label: 'Galería', hint: 'Las fotos del evento', icon: Images, gradient: 'from-[#2ee6a6] via-[#00b3c7] to-[#2b6cff]', glow: 'rgba(46,230,166,0.5)', onClick: () => navigate('/box/galeria') }] : []),
     ...(vipPackage ? [{ key: 'vip', label: 'Ingreso VIP', hint: 'Acceso de invitados', icon: Ticket, gradient: 'from-[#ffd23f] via-[#ff9f1c] to-[#ff4d6d]', glow: 'rgba(255,159,28,0.55)', onClick: openVip }] : []),
   ];
 
@@ -142,13 +157,18 @@ export default function KioskBox() {
             <p className="text-xl font-bold">{device.eventName || 'Sin evento asignado'}</p>
           </div>
           <div className="flex items-center gap-4">
+            {general.offline && (
+              <span className="kiosk-glass rounded-full px-4 py-2 flex items-center gap-2 text-amber-200 text-sm font-semibold">
+                <WifiOff className="w-4 h-4" /> Sin conexión
+              </span>
+            )}
             <span className="text-3xl font-light tabular-nums text-white/85 mr-2">{clock}</span>
             <button onClick={openWifiSettings} className={roundButton} aria-label="WiFi"><Wifi className="w-7 h-7" /></button>
             <button onClick={() => setPinOpen(true)} className={roundButton} aria-label="Ajustes"><Settings className="w-7 h-7" /></button>
           </div>
         </header>
 
-        {(!device.kioskEventId || offline) && (
+        {!general.offline && (!device.kioskEventId || offline) && (
           <div className="mx-12 mt-6 kiosk-glass rounded-2xl px-6 py-3 flex items-center gap-3 text-amber-100">
             <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
             {!device.kioskEventId
@@ -158,7 +178,7 @@ export default function KioskBox() {
         )}
 
         <main className="flex-1 flex items-center justify-center px-12">
-          <div className="flex gap-20">
+          <div className={`flex ${tiles.length > 3 ? 'gap-12' : 'gap-20'}`}>
             {tiles.map((t, i) => (
               <motion.button
                 key={t.key}
@@ -198,61 +218,6 @@ export default function KioskBox() {
           onSuccess={() => navigate('/box/ajustes')}
         />
       )}
-    </div>
-  );
-}
-
-function PinDialog({ onCancel, onSuccess }: { onCancel: () => void; onSuccess: () => void }) {
-  const [pin, setPin] = useState('');
-  const [error, setError] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useRemoteFocus(ref);
-
-  const press = (digit: string) => {
-    setError(false);
-    setPin((pin + digit).slice(0, 8));
-  };
-  const submit = () => {
-    if (pin === getBoxPin()) onSuccess();
-    else {
-      setError(true);
-      setPin('');
-    }
-  };
-
-  const keyClass = 'h-16 rounded-2xl bg-white/10 text-2xl font-bold hover:bg-white/20 focus:bg-white/25 focus:outline-none focus:ring-4 focus:ring-[#00d4ff]';
-  return (
-    <div className="fixed inset-0 z-50 bg-[#07051a]/80 backdrop-blur-md flex items-center justify-center">
-      <motion.div
-        ref={ref}
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="kiosk-glass w-[24rem] rounded-[2rem] p-7 space-y-5"
-      >
-        <div className="flex flex-col items-center gap-3">
-          <EventPixMark size={52} />
-          <p className="text-lg font-semibold">Clave de ajustes</p>
-        </div>
-        <div className="flex justify-center gap-3 h-6">
-          {Array.from({ length: Math.max(4, pin.length) }).map((_, i) => (
-            <span key={i} className={`w-4 h-4 rounded-full ${i < pin.length ? 'bg-gradient-to-br from-[#ff2e93] to-[#00d4ff]' : 'bg-white/20'}`} />
-          ))}
-        </div>
-        {error && <p className="text-center text-[#ff6b9d] font-semibold">Clave incorrecta</p>}
-        <div className="grid grid-cols-3 gap-3">
-          {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(d => (
-            <button key={d} onClick={() => press(d)} className={keyClass}>{d}</button>
-          ))}
-          <button onClick={() => setPin(pin.slice(0, -1))} className={`${keyClass} flex items-center justify-center`} aria-label="Borrar">
-            <Delete className="w-6 h-6" />
-          </button>
-          <button onClick={() => press('0')} className={keyClass}>0</button>
-          <button onClick={submit} className="h-16 rounded-2xl text-lg font-bold bg-gradient-to-br from-[#ff2e93] to-[#7b2ff7] focus:outline-none focus:ring-4 focus:ring-[#00d4ff]">OK</button>
-        </div>
-        <button onClick={onCancel} className="w-full py-3 rounded-2xl text-white/70 hover:text-white focus:outline-none focus:ring-4 focus:ring-[#00d4ff]">
-          Cancelar
-        </button>
-      </motion.div>
     </div>
   );
 }

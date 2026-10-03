@@ -6,6 +6,8 @@ const CAMERA_KEY = 'kiosk_camera_settings';
 const FRAME_KEY = 'kiosk_frame_url';
 
 export interface KioskGeneralSettings {
+  /** Nombre del evento (ej. "15 de Pía"): se muestra en la bienvenida y va en los marcos */
+  eventTitle?: string;
   welcomeTitle?: string;
   welcomeSubtitle?: string;
   /** Animación de la pantalla "Toca para empezar": '1' | '2' | '3' | 'none' */
@@ -22,8 +24,15 @@ export interface KioskGeneralSettings {
   /** Segundos sin tocar nada en las pantallas de elección antes de volver al inicio (0 = nunca) */
   idleTimeout?: number;
   autoFullscreen?: boolean;
-  /** Textos del marco de vidrio (vacío = nombre del evento) */
-  frameTitle?: string;
+  /** Sin conexión: solo foto, marco, impresión y respaldo (sin IA, QR ni subidas) */
+  offline?: boolean;
+  /** Mostrar "Repetir foto" en la vista previa (por defecto sí) */
+  allowRetake?: boolean;
+  /** Ícono "Galería" en el inicio */
+  enableGallery?: boolean;
+  /** Carpeta del equipo donde se guardan las fotos (vacío = nombre del evento) */
+  localFolder?: string;
+  /** Texto chico del marco de vidrio (el grande es siempre eventTitle) */
   frameSubtitle?: string;
   [key: string]: unknown;
 }
@@ -126,4 +135,24 @@ export const savePrintSettings = (patch: Partial<KioskPrintSettings>) => {
   const next = { ...getPrintSettings(), ...patch };
   writeJson(PRINT_KEY, next);
   return next;
+};
+
+// Bloqueo de sección: con una sección bloqueada (p. ej. "Fotos") el invitado no
+// puede volver al inicio; se desbloquea con la clave de Ajustes. Persiste al reiniciar.
+const LOCK_KEY = 'kiosk_section_lock';
+
+export const getSectionLock = () => {
+  try {
+    return localStorage.getItem(LOCK_KEY) || null;
+  } catch {
+    return null;
+  }
+};
+export const setSectionLock = (modes: string | null) => {
+  try {
+    if (modes) localStorage.setItem(LOCK_KEY, modes);
+    else localStorage.removeItem(LOCK_KEY);
+  } catch {
+    // sin almacenamiento
+  }
 };

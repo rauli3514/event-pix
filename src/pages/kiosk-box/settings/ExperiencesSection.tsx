@@ -3,7 +3,6 @@ import { toast } from 'sonner';
 import { Upload } from 'lucide-react';
 import { BUILT_IN_FRAMES, getFrameUrl, getGeneralSettings, saveFrameUrl, saveGeneralSettings } from '@/lib/kioskSettings';
 import { GLASS_PREFIX, GLASS_STYLES, renderGlassFrame, type GlassStyle } from '@/lib/glassFrame';
-import { getCachedDeviceState } from '@/lib/kioskDevice';
 import { buttonClass, Field, inputClass, Panel, Toggle } from './ui';
 
 const MODES = [
@@ -23,8 +22,8 @@ export default function ExperiencesSection() {
   const [frame, setFrame] = useState(getFrameUrl);
   const [previews, setPreviews] = useState<Partial<Record<GlassStyle, string>>>({});
   const fileRef = useRef<HTMLInputElement>(null);
-  const eventName = getCachedDeviceState()?.eventName || '';
-  const title = settings.frameTitle || eventName;
+  // El marco lleva siempre el nombre del evento de "Pantalla de inicio"
+  const title = settings.eventTitle || '';
   const subtitle = settings.frameSubtitle || '';
 
   // Vistas previas de los marcos de vidrio con los textos actuales (chicas, para la TV box)
@@ -76,10 +75,12 @@ export default function ExperiencesSection() {
 
       <Panel title="Marco Liquid Glass" description="Se genera sobre cada foto: el borde es la misma foto como vidrio esmerilado, con el nombre del evento abajo.">
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Texto principal">
-            <input className={inputClass} placeholder={eventName || 'Ej: XV de Camila'} value={settings.frameTitle || ''}
-              onChange={e => setSettings(saveGeneralSettings({ frameTitle: e.target.value }))} />
-          </Field>
+          <div className="space-y-2">
+            <span className="text-white/70">Nombre del evento</span>
+            <p className="rounded-2xl bg-black/20 border border-white/10 px-5 py-4 text-lg">
+              {title || <span className="text-amber-300">Cargalo en Pantalla de inicio</span>}
+            </p>
+          </div>
           <Field label="Texto chico (opcional)">
             <input className={inputClass} placeholder="Ej: 12 · 10 · 2026" value={settings.frameSubtitle || ''}
               onChange={e => setSettings(saveGeneralSettings({ frameSubtitle: e.target.value }))} />
