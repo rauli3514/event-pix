@@ -1,4 +1,4 @@
-import { drawCover, drawGlassPage, glassStyleOf, isGlassFrame, loadPhoto, type Rect } from '@/lib/glassFrame';
+import { drawCover, drawGlassPage, drawSignature, glassStyleOf, isGlassFrame, loadPhoto, type Rect } from '@/lib/glassFrame';
 
 // Arma la hoja final del kiosco (10×15 a 300 dpi aprox.: 1200×1800 o 1800×1200)
 // con una o varias fotos:
@@ -95,27 +95,9 @@ function planPage(n: number, orientation: 'portrait' | 'landscape', strips: bool
 }
 
 /** Une las fotos en la hoja final y devuelve un JPEG en data URL. */
-/** Etiqueta con el nombre del invitado, abajo y centrada (para marcos PNG). */
-function drawNameLabel(ctx: CanvasRenderingContext2D, name: string, W: number, H: number) {
-  const k = Math.min(W, H) / 1200;
-  ctx.save();
-  ctx.font = `700 ${Math.round(56 * k)}px 'CarlMarx', system-ui, sans-serif`;
-  const tw = Math.min(ctx.measureText(name).width, W * 0.8);
-  const ph = 92 * k;
-  const pw = tw + 90 * k;
-  const x = (W - pw) / 2;
-  const y = H - ph - 46 * k;
-  ctx.fillStyle = 'rgba(0,0,0,0.45)';
-  ctx.beginPath();
-  if (typeof ctx.roundRect === 'function') ctx.roundRect(x, y, pw, ph, ph / 2);
-  else ctx.rect(x, y, pw, ph); // WebView viejo
-  ctx.fill();
-  ctx.fillStyle = '#fff';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(name, W / 2, y + ph / 2 + 3 * k, W * 0.8);
-  ctx.restore();
-}
+/** Lugares donde va la firma: la última foto (de cada tira, en la tira doble). */
+const signatureSlots = (photoIndex: number[], n: number) =>
+  photoIndex.map((p, i) => (p === n - 1 ? i : -1)).filter(i => i >= 0);
 
 export async function composePhotos(photoSrcs: string[], options: LayoutOptions): Promise<string> {
   const imgs = await Promise.all(photoSrcs.map(loadPhoto));
@@ -123,8 +105,9 @@ export async function composePhotos(photoSrcs: string[], options: LayoutOptions)
   const n = imgs.length;
   const strips = !!options.strips && n > 1;
   const bgImg = options.background ? await loadPhoto(options.background).catch(() => null) : null;
-  // El nombre del invitado va primero en la línea chica (ej: "Sofi y Juan · 26-09-2026")
-  const subtitle = [options.guestName, options.subtitle].filter(Boolean).join(' · ') || undefined;
+  const subtitle = options.subtitle;
+  // El nombre del invitado va como firma sobre la foto, igual con cualquier marco
+  const guest = options.guestName?.trim();
 
   // ─── Marco de vidrio ────────────────────────────────────────────
   if (isGlassFrame(options.frame)) {
@@ -140,6 +123,7 @@ export async function composePhotos(photoSrcs: string[], options: LayoutOptions)
       // Una sola foto se muestra entera; varias llenan su lugar
       fit: n === 1 ? 'contain' : 'cover',
       background: bgImg,
+      signature: guest ? { name: guest, slots: signatureSlots(plan.photoIndex, n) } : undefined,
     }, { style: glassStyleOf(options.frame), title: options.title, subtitle });
     return canvas.toDataURL('image/jpeg', 0.93);
   }
@@ -162,11 +146,13 @@ export async function composePhotos(photoSrcs: string[], options: LayoutOptions)
     const page = await drawGlassPage(plan.photoIndex.map(i => imgs[i]), {
       width: W, height: H, slots: plan.slots, captions: plan.captions,
       fit: n === 1 ? 'contain' : 'cover', background: bgImg,
+      // Con PNG la firma va encima del marco (abajo); sin PNG, sobre la foto
+      signature: guest && !frameImg ? { name: guest, slots: signatureSlots(plan.photoIndex, n) } : undefined,
     }, { style: 'clear', title: caption ? options.title : undefined, subtitle: caption ? subtitle : undefined });
     if (frameImg) {
       const ctx = page.getContext('2d')!;
       ctx.drawImage(frameImg, 0, 0, W, H);
-      if (options.guestName) drawNameLabel(ctx, options.guestName, W, H);
+      if (guest) plan.slots.forEach((slot, i) => { if (signatureSlots(plan.photoIndex, n).includes(i)) drawSignature(ctx, guest, slot); });
     }
     return page.toDataURL('image/jpeg', 0.94);
   }
@@ -176,6 +162,8 @@ export async function composePhotos(photoSrcs: string[], options: LayoutOptions)
   canvas.height = H;
   const ctx = canvas.getContext('2d')!;
 
+  // Dónde va la firma: con una foto a sangre, dentro de la parte libre del marco
+  let signArea: Rect[] = [{ x: W * 0.08, y: H * 0.08, w: W * 0.84, h: H * 0.76 }];
   if (n === 1 && !strips) {
     // Una foto: a sangre (el PNG la recorta con su ventana)
     ctx.fillStyle = '#000';
@@ -186,6 +174,7 @@ export async function composePhotos(photoSrcs: string[], options: LayoutOptions)
     ctx.fillRect(0, 0, W, H);
     const plan = planPage(n, orientation, strips, false);
     plan.slots.forEach((slot, i) => drawCover(ctx, imgs[plan.photoIndex[i]], slot.x, slot.y, slot.w, slot.h));
+    signArea = plan.slots.filter((_, i) => signatureSlots(plan.photoIndex, n).includes(i));
     if (!frameImg && (options.title || options.subtitle)) {
       // Sin marco: el nombre del evento abajo, chico, sobre el blanco
       ctx.fillStyle = '#222';
@@ -201,7 +190,7 @@ export async function composePhotos(photoSrcs: string[], options: LayoutOptions)
     }
   }
   if (frameImg) ctx.drawImage(frameImg, 0, 0, W, H);
-  if (options.guestName && (frameImg || n === 1)) drawNameLabel(ctx, options.guestName, W, H);
+  if (guest) signArea.forEach(area => drawSignature(ctx, guest, area));
   return canvas.toDataURL('image/jpeg', 0.95);
 }
 

@@ -14,6 +14,7 @@ import { composePhotos, type PageOrientation } from '@/lib/photoLayout';
 import AttractScreen from '@/components/kiosk/AttractScreen';
 import FrameChooser from '@/components/kiosk/FrameChooser';
 import NextShot from '@/components/kiosk/NextShot';
+import CameraVideo from '@/components/kiosk/CameraVideo';
 import GuestNameScreen from '@/components/kiosk/GuestNameScreen';
 import { queueForDrive, startDriveSync } from '@/lib/driveBackup';
 import { guestPhotoUrl } from '@/lib/kioskShare';
@@ -964,7 +965,7 @@ The subject must perfectly match the facial features and gender of the reference
       <div className="kiosk-root">
         <AuroraBackground />
         <Corners />
-        <video ref={videoRef} autoPlay playsInline muted className={`absolute inset-0 w-full h-full object-cover ${cameraSettings.mirror ? 'scale-x-[-1]' : ''}`} />
+        <CameraVideo videoRef={videoRef} mirror={!!cameraSettings.mirror} rotation={Number(cameraSettings.rotation) || 0} />
         <div className="absolute inset-0 bg-black/40 z-0" />
         <div className="relative z-10 flex flex-col items-center justify-center h-full gap-8">
           <p className="carlmarx-regular text-white/60 text-2xl uppercase tracking-widest">
@@ -981,7 +982,7 @@ The subject must perfectly match the facial features and gender of the reference
   if (step === 'countdown') return (
     <div className="kiosk-root">
       <div className="absolute inset-0 bg-black" />
-      <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" style={{ transform: `scaleX(${cameraSettings.mirror ? -1 : 1}) rotate(${cameraSettings.rotation || 0}deg)` }} />
+      <CameraVideo videoRef={videoRef} mirror={!!cameraSettings.mirror} rotation={Number(cameraSettings.rotation) || 0} />
       <canvas ref={canvasRef} className="hidden" />
       <div className="absolute inset-0 bg-black/30" />
       <div className="relative z-10 flex items-center justify-center h-full">

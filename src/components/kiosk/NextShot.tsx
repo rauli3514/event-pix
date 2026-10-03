@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import ScreenBackground from '@/components/kiosk/ScreenBackground';
+import CameraVideo from '@/components/kiosk/CameraVideo';
 
 // Pausa entre fotos de una toma múltiple: las fotos ya sacadas caen como
 // polaroids, se sugiere una pose nueva y se ve la cámara en vivo para
@@ -67,11 +68,11 @@ export default function NextShot({ shots, total, seconds, videoRef, mirror, rota
             const angle = (i % 2 ? 1 : -1) * (4 + i * 3);
             return (
               <motion.div key={i}
-                className="absolute inset-0 m-auto w-[28vmin] h-fit bg-white p-[1vmin] pb-[4vmin] rounded-[0.8vmin] shadow-[0_2vmin_5vmin_rgba(0,0,0,0.55)]"
+                className="absolute inset-0 m-auto w-fit h-fit bg-white p-[1vmin] pb-[4vmin] rounded-[0.8vmin] shadow-[0_2vmin_5vmin_rgba(0,0,0,0.55)]"
                 initial={latest ? { scale: 2.2, y: '-30vmin', rotate: 0, opacity: 0 } : false}
                 animate={{ scale: 1, y: i * -6, x: i * 10, rotate: angle, opacity: 1 }}
                 transition={{ type: 'spring', stiffness: 120, damping: 14, delay: latest ? 0.15 : 0 }}>
-                <img src={src} alt={`Foto ${i + 1}`} className="w-full rounded-[0.4vmin]" />
+                <img src={src} alt={`Foto ${i + 1}`} className="block max-w-[28vmin] max-h-[26vmin] w-auto h-auto rounded-[0.4vmin]" />
               </motion.div>
             );
           })}
@@ -95,9 +96,8 @@ export default function NextShot({ shots, total, seconds, videoRef, mirror, rota
 
           <div className="flex items-center gap-[4vmin] mt-[1vmin]">
             {/* Cámara en vivo, para acomodarse */}
-            <div className="relative w-[30vmin] aspect-video rounded-[2vmin] overflow-hidden border-[0.4vmin] border-white/70 shadow-2xl bg-black">
-              <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover"
-                style={{ transform: `scaleX(${mirror ? -1 : 1}) rotate(${rotation || 0}deg)` }} />
+            <div className={`relative ${rotation === 90 || rotation === 270 ? 'w-[18vmin] aspect-[9/16]' : 'w-[30vmin] aspect-video'} rounded-[2vmin] overflow-hidden border-[0.4vmin] border-white/70 shadow-2xl bg-black`}>
+              <CameraVideo videoRef={videoRef} mirror={mirror} rotation={rotation} />
               <span className="absolute bottom-1 inset-x-0 text-center text-[1.6vmin] text-white/85 drop-shadow">Así te ve la cámara</span>
             </div>
             {/* Tiempo que falta */}

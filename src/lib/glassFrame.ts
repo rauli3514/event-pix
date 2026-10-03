@@ -109,6 +109,27 @@ function fitFont(ctx: CanvasRenderingContext2D, text: string, weight: string, ma
 
 export interface Rect { x: number; y: number; w: number; h: number }
 
+/**
+ * Nombre del invitado como firma, abajo a la derecha dentro de la foto,
+ * con letra manuscrita y sombra para que se lea sobre cualquier imagen.
+ */
+export function drawSignature(ctx: CanvasRenderingContext2D, name: string, area: Rect) {
+  const size = Math.max(28, Math.min(area.w * 0.13, area.h * 0.16, 130));
+  const pad = size * 0.45;
+  ctx.save();
+  ctx.translate(area.x + area.w - pad, area.y + area.h - pad);
+  ctx.rotate(-0.07);
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'alphabetic';
+  ctx.font = `700 ${Math.round(size)}px 'Dancing Script', 'Segoe Script', 'Brush Script MT', 'Apple Chancery', cursive`;
+  ctx.shadowColor = 'rgba(0,0,0,0.75)';
+  ctx.shadowBlur = size * 0.18;
+  ctx.shadowOffsetY = size * 0.04;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(name, 0, 0, area.w - pad * 2);
+  ctx.restore();
+}
+
 export const loadPhoto = loadImage;
 export { drawCover };
 
@@ -123,6 +144,8 @@ export interface GlassPage {
   fit: 'cover' | 'contain';
   /** Imagen de fondo propia (en lugar de la foto desenfocada) */
   background?: HTMLImageElement | null;
+  /** Nombre del invitado: va como firma en los lugares indicados */
+  signature?: { name: string; slots: number[] };
 }
 
 /**
@@ -206,6 +229,8 @@ export async function drawGlassPage(imgs: HTMLImageElement[], page: GlassPage, o
     ctx.strokeStyle = edge;
     ctx.lineWidth = 4 * k;
     ctx.stroke();
+
+    if (page.signature?.slots.includes(i)) drawSignature(ctx, page.signature.name, { x: px, y: py, w: pw, h: ph });
   });
 
   if (!page.background) {
