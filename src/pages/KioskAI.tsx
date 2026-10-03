@@ -13,6 +13,7 @@ import { backupPhoto } from '@/lib/kioskStorage';
 import { composePhotos, type PageOrientation } from '@/lib/photoLayout';
 import AttractScreen from '@/components/kiosk/AttractScreen';
 import FrameChooser from '@/components/kiosk/FrameChooser';
+import NextShot from '@/components/kiosk/NextShot';
 import { guestFrameOptions, type FrameOption } from '@/lib/frameOptions';
 import { motion } from 'framer-motion';
 import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
@@ -28,6 +29,7 @@ type Step =
   | 'getReady'
   | 'lookCamera'
   | 'countdown'
+  | 'nextShot'
   | 'photoPreview'
   | 'frameSelect'
   | 'flashResult'
@@ -296,7 +298,7 @@ export default function KioskAI() {
   };
 
   // La cámara queda prendida entre "Mirá a la cámara" y la cuenta regresiva
-  const cameraActive = step === 'lookCamera' || step === 'countdown';
+  const cameraActive = step === 'lookCamera' || step === 'countdown' || step === 'nextShot';
   useEffect(() => {
     if (cameraActive) startCamera();
     else stopCamera();
@@ -495,8 +497,8 @@ export default function KioskAI() {
     shotsRef.current = [...shotsRef.current, dataUrl];
     setShotCount(shotsRef.current.length);
     if (shotsRef.current.length < shotsWanted()) {
-      // Falta otra: un respiro con el flash y otra cuenta regresiva
-      setTimeout(() => startCountdown(), 1600);
+      // Falta otra: pausa para prepararse (Ajustes → Diseño de la foto) y otra cuenta regresiva
+      setTimeout(() => setStep('nextShot'), 700);
       return;
     }
     originalShotRef.current = dataUrl;
@@ -963,6 +965,18 @@ The subject must perfectly match the facial features and gender of the reference
   );
 
   // ── PHOTO PREVIEW — approve or retake ───────────────────────
+  if (step === 'nextShot') return (
+    <NextShot
+      shots={shotsRef.current}
+      total={shotsWanted()}
+      seconds={Math.max(3, Number(generalSettings.shotPause) || 10)}
+      videoRef={videoRef}
+      mirror={!!cameraSettings.mirror}
+      rotation={Number(cameraSettings.rotation) || 0}
+      onReady={startCountdown}
+    />
+  );
+
   if (step === 'photoPreview') {
     const goNext = async () => {
       if (!capturedImage) return;

@@ -75,6 +75,11 @@ export default function PhotoLayoutPanel() {
             ]}
             onChange={photoOrientation => update({ photoOrientation, photoStrips: false })} />
           {shots > 1 && (
+            <Choice label="Pausa entre fotos (para prepararse)" value={Number(settings.shotPause) || 10}
+              options={[5, 10, 15, 20].map(v => ({ value: v, label: `${v} s` }))}
+              onChange={shotPause => update({ shotPause })} />
+          )}
+          {shots > 1 && (
             <Toggle label="Tira doble" hint="Dos tiras iguales con las fotos una debajo de otra: se corta al medio y se lleva una cada uno."
               checked={strips} onChange={photoStrips => update({ photoStrips })} />
           )}

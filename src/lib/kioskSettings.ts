@@ -18,6 +18,8 @@ export interface KioskGeneralSettings {
   photoOrientation?: 'auto' | 'portrait' | 'landscape';
   /** Fotos por toma (1 a 4) */
   photoShots?: number;
+  /** Segundos de pausa entre fotos de una toma múltiple (por defecto 10) */
+  shotPause?: number;
   /** Tira doble (dos tiras iguales para cortar al medio) */
   photoStrips?: boolean;
   /** Fondo de cada pantalla (ver kioskMedia.ts) */
