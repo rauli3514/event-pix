@@ -14,6 +14,12 @@ export interface KioskGeneralSettings {
   splashVideo?: string;
   /** Color del nombre del evento en la bienvenida (ver NAME_STYLES) */
   nameStyle?: 'white' | 'gold' | 'gradient' | 'neon';
+  /** Diseño de la hoja (experiencia Fotos): 'auto' | 'portrait' | 'landscape' */
+  photoOrientation?: 'auto' | 'portrait' | 'landscape';
+  /** Fotos por toma (1 a 4) */
+  photoShots?: number;
+  /** Tira doble (dos tiras iguales para cortar al medio) */
+  photoStrips?: boolean;
   /** Fondo de cada pantalla (ver kioskMedia.ts) */
   screenBackgrounds?: Record<string, string>;
   /** Rotación de la pantalla en grados (tele colgada en vertical) */

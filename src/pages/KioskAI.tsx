@@ -10,7 +10,7 @@ import { openCameraStream, stopStream } from '@/lib/kioskCamera';
 import { getSectionLock, setSectionLock } from '@/lib/kioskSettings';
 import PinDialog from '@/components/kiosk/PinDialog';
 import { backupPhoto } from '@/lib/kioskStorage';
-import { glassStyleOf, isGlassFrame, renderGlassFrame } from '@/lib/glassFrame';
+import { composePhotos, type PageOrientation } from '@/lib/photoLayout';
 import AttractScreen from '@/components/kiosk/AttractScreen';
 import FrameChooser from '@/components/kiosk/FrameChooser';
 import { guestFrameOptions, type FrameOption } from '@/lib/frameOptions';
@@ -314,6 +314,9 @@ export default function KioskAI() {
   // "Mirá a la cámara" pasa a la cuenta regresiva recién cuando la cámara anda
   useEffect(() => {
     if (step === 'lookCamera' && cameraReady) {
+      // Toma nueva (o "Repetir"): se descartan las fotos anteriores
+      shotsRef.current = [];
+      setShotCount(0);
       const t = setTimeout(() => startCountdown(), 2500);
       return () => clearTimeout(t);
     }
@@ -437,49 +440,67 @@ export default function KioskAI() {
   };
 
   // Countdown + capture
+  const countdownTimerRef = useRef<number | null>(null);
   const startCountdown = () => {
     setStep('countdown');
     const timer = cameraSettings.timer || 5;
-    setCountdown(timer);
-    const interval = setInterval(() => {
-      setCountdown(prev => {
-        if (prev === null || prev <= 1) {
-          clearInterval(interval);
-          capturePhoto();
-          return null;
-        }
-        return prev - 1;
-      });
+    // La foto se saca fuera del actualizador de estado: React puede ejecutarlo dos veces
+    let left = timer;
+    setCountdown(left);
+    if (countdownTimerRef.current) window.clearInterval(countdownTimerRef.current);
+    countdownTimerRef.current = window.setInterval(() => {
+      left -= 1;
+      if (left <= 0) {
+        window.clearInterval(countdownTimerRef.current!);
+        countdownTimerRef.current = null;
+        setCountdown(null);
+        capturePhoto();
+      } else {
+        setCountdown(left);
+      }
     }, 1000);
   };
+
+  // Varias fotos por toma (solo Fotos/selfie): Ajustes → Experiencias y marco → Diseño de la foto
+  const shotsRef = useRef<string[]>([]);
+  const [shotCount, setShotCount] = useState(0);
+  const shotsWanted = () => (mode === 'selfie' ? Math.min(4, Math.max(1, Number(generalSettings.photoShots) || 1)) : 1);
 
   const capturePhoto = () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
 
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
+    const vw = video.videoWidth || 1280;
+    const vh = video.videoHeight || 720;
+    const rot = ((Number(cameraSettings.rotation) || 0) % 360 + 360) % 360;
+    // Con la cámara girada 90°/270° la foto queda vertical: se intercambian ancho y alto
+    const sideways = rot === 90 || rot === 270;
+    canvas.width = sideways ? vh : vw;
+    canvas.height = sideways ? vw : vh;
     const ctx = canvas.getContext('2d')!;
-
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     if (cameraSettings.mirror) {
       ctx.translate(canvas.width, 0);
       ctx.scale(-1, 1);
     }
-    const rot = cameraSettings.rotation || 0;
-    if (rot !== 0) {
-      ctx.translate(canvas.width / 2, canvas.height / 2);
-      ctx.rotate((rot * Math.PI) / 180);
-      ctx.translate(-canvas.width / 2, -canvas.height / 2);
-    }
-    ctx.drawImage(video, 0, 0);
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate((rot * Math.PI) / 180);
+    ctx.drawImage(video, -vw / 2, -vh / 2, vw, vh);
 
     // Play shutter sound
-    try { new Audio('/kiosk-camera-sound.mp3').play(); } catch {}
+    try { new Audio('/kiosk-camera-sound.mp3').play(); } catch { /* sin sonido */ }
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    shotsRef.current = [...shotsRef.current, dataUrl];
+    setShotCount(shotsRef.current.length);
+    if (shotsRef.current.length < shotsWanted()) {
+      // Falta otra: un respiro con el flash y otra cuenta regresiva
+      setTimeout(() => startCountdown(), 1600);
+      return;
+    }
     originalShotRef.current = dataUrl;
-    setCapturedImage(dataUrl);
+    setCapturedImage(shotsRef.current[0]);
     // Always go to preview first — user can approve or retake
     setStep('photoPreview');
   };
@@ -487,7 +508,7 @@ export default function KioskAI() {
   const savePhotoToAlbum = async (dataUrl: string): Promise<string | null> => {
     // Respaldo en el equipo (original + final), siempre: con o sin evento e internet
     try {
-      await backupPhoto(dataUrl, originalShotRef.current, mode || 'foto');
+      await backupPhoto(dataUrl, shotsRef.current.length ? shotsRef.current : originalShotRef.current, mode || 'foto');
     } catch (e) {
       console.error('No se pudo guardar la foto en el equipo', e);
       toast.error('No se pudo guardar la foto en el equipo');
@@ -631,56 +652,15 @@ The subject must perfectly match the facial features and gender of the reference
   };
 
   const mergeImages = (base: string, frame: string | null): Promise<string> => {
-    // Marco "Liquid Glass": se genera sobre la foto, con el nombre del evento
-    if (isGlassFrame(frame)) {
-      return renderGlassFrame(base, {
-        style: glassStyleOf(frame),
-        // Siempre el nombre del evento de "Pantalla de inicio", nunca el del equipo
-        title: generalSettings.eventTitle || undefined,
-        subtitle: generalSettings.frameSubtitle || undefined,
-      });
-    }
-    return new Promise((resolve, reject) => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d')!;
-      canvas.width = 1200;
-      canvas.height = 1800;
-
-      const img = new Image(); img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        const imgAspect = img.width / img.height;
-        const canvasAspect = canvas.width / canvas.height;
-        let sx, sy, sw, sh;
-
-        if (imgAspect > canvasAspect) {
-          sw = img.height * canvasAspect;
-          sh = img.height;
-          sx = (img.width - sw) / 2;
-          sy = 0;
-        } else {
-          sw = img.width;
-          sh = img.width / canvasAspect;
-          sx = 0;
-          sy = (img.height - sh) / 2;
-        }
-
-        // Aplicamos un pequeño "zoom out" artificial si es posible para no quedar tan cerca
-        ctx.fillStyle = 'black';
-        ctx.fillRect(0,0, canvas.width, canvas.height);
-        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-        
-        if (!frame) return resolve(canvas.toDataURL('image/jpeg', 0.95));
-        
-        const fi = new Image(); fi.crossOrigin = 'anonymous';
-        fi.onload = () => { 
-          ctx.drawImage(fi, 0, 0, canvas.width, canvas.height); 
-          resolve(canvas.toDataURL('image/jpeg', 0.95)); 
-        };
-        fi.onerror = () => resolve(canvas.toDataURL('image/jpeg', 0.95));
-        fi.src = frame;
-      };
-      img.onerror = reject;
-      img.src = base;
+    // Hoja final: vertical u horizontal según la foto, con una o varias fotos.
+    // El marco lleva siempre el nombre del evento de "Pantalla de inicio", nunca el del equipo.
+    const multi = mode === 'selfie' && shotsRef.current.length > 1;
+    return composePhotos(multi ? shotsRef.current : [base], {
+      frame,
+      orientation: (generalSettings.photoOrientation as PageOrientation) || 'auto',
+      strips: !!generalSettings.photoStrips,
+      title: generalSettings.eventTitle || undefined,
+      subtitle: generalSettings.frameSubtitle || undefined,
     });
   };
 
@@ -791,6 +771,7 @@ The subject must perfectly match the facial features and gender of the reference
 
   const resetKiosk = () => {
     photoSessionRef.current++;
+    if (countdownTimerRef.current) window.clearInterval(countdownTimerRef.current);
     setUploading(false);
     setLastPublicUrl(null);
     setStep('splash');
@@ -970,6 +951,13 @@ The subject must perfectly match the facial features and gender of the reference
       <div className="relative z-10 flex items-center justify-center h-full">
         <CountdownRing value={countdown} total={cameraSettings.timer || 5} />
       </div>
+      {shotsWanted() > 1 && (
+        <div className="absolute top-8 inset-x-0 z-20 flex justify-center">
+          <span className="kiosk-glass rounded-full px-8 py-3 carlmarx-bold text-white text-3xl">
+            Foto {Math.min(shotCount + 1, shotsWanted())} de {shotsWanted()}
+          </span>
+        </div>
+      )}
       <Corners />
     </div>
   );
@@ -1002,12 +990,10 @@ The subject must perfectly match the facial features and gender of the reference
         
         // Apply frame if exists
         let finalImage = capturedImage!;
-        if (frameUrl) {
-          try {
-            finalImage = await mergeImages(capturedImage!, frameUrl);
-          } catch (e) {
-            console.error("Error applying frame to selfie:", e);
-          }
+        try {
+          finalImage = await mergeImages(capturedImage!, frameUrl);
+        } catch (e) {
+          console.error("Error applying frame to selfie:", e);
         }
         
         finishPhoto(finalImage);
@@ -1024,12 +1010,22 @@ The subject must perfectly match the facial features and gender of the reference
       <div className="kiosk-root">
         <div className="absolute inset-0 bg-black" />
         <Corners />
-        {capturedImage && (
+        {/* La foto tal cual se guarda (el espejo ya está aplicado al sacarla) */}
+        {capturedImage && shotsRef.current.length <= 1 && (
           <motion.div className="absolute inset-0" initial={{ scale: 1.08 }} animate={{ scale: 1 }} transition={{ duration: 0.7, ease: 'easeOut' }}>
-            <img src={capturedImage} alt="preview"
-              className="absolute inset-0 w-full h-full object-contain"
-              style={{ transform: `scaleX(${cameraSettings.mirror ? -1 : 1})` }} />
+            <img src={capturedImage} alt="preview" className="absolute inset-0 w-full h-full object-contain" />
           </motion.div>
+        )}
+        {shotsRef.current.length > 1 && (
+          <div className="absolute inset-0 pb-40 pt-10 px-10 flex items-center justify-center gap-6">
+            {shotsRef.current.map((src, i) => (
+              <motion.img key={i} src={src} alt={`Foto ${i + 1}`}
+                className="min-w-0 max-h-full rounded-2xl shadow-2xl object-contain"
+                style={{ maxWidth: `${92 / shotsRef.current.length}%` }}
+                initial={{ opacity: 0, y: 40, rotate: (i - 1) * 3 }} animate={{ opacity: 1, y: 0, rotate: 0 }}
+                transition={{ delay: i * 0.15, type: 'spring', stiffness: 160, damping: 18 }} />
+            ))}
+          </div>
         )}
         <CameraFlash key={capturedImage ?? 'flash'} />
         {/* Gradient bottom overlay for buttons */}
@@ -1321,8 +1317,9 @@ The subject must perfectly match the facial features and gender of the reference
         
         <div className="relative z-10 flex flex-col md:flex-row h-full items-center justify-center gap-6 md:gap-12 p-6 animate-in fade-in zoom-in duration-500 overflow-y-auto">
           {/* Photo Preview - ACHICADO PARA QUE ENTREN BOTONES */}
-          <div className="relative flex-shrink-0 h-[45vh] md:h-[70vh] aspect-[2/3] rounded-[2rem] overflow-hidden shadow-[0_0_80px_rgba(139,92,246,0.3)] border border-violet-500/30 group">
-            {capturedImage && <motion.img key={capturedImage} src={capturedImage} alt="result" className="w-full h-full object-cover" {...revealPhoto} />}
+          {/* Se adapta a la hoja: vertical u horizontal */}
+          <div className="relative flex-shrink-0 rounded-[2rem] overflow-hidden shadow-[0_0_80px_rgba(139,92,246,0.3)] border border-violet-500/30 group">
+            {capturedImage && <motion.img key={capturedImage} src={capturedImage} alt="result" className="block w-auto h-auto max-h-[45vh] md:max-h-[70vh] max-w-[90vw] md:max-w-[55vw]" {...revealPhoto} />}
           </div>
 
           {/* Actions Column */}

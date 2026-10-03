@@ -88,7 +88,7 @@ export async function savePhotoLocally(dataUrl: string, fileName: string, folder
  * Guarda la foto final (con marco o IA) y, si la hay, la original de la cámara.
  * Las fotos que no son data URL (p. ej. una URL de la IA) se descargan primero.
  */
-export async function backupPhoto(final: string, original: string | null, kind: string) {
+export async function backupPhoto(final: string, original: string | string[] | null, kind: string) {
   const base = `${stamp()}-${kind}`;
   const toDataUrl = async (src: string) => {
     if (src.startsWith('data:')) return src;
@@ -102,8 +102,11 @@ export async function backupPhoto(final: string, original: string | null, kind: 
   };
   const results: string[] = [];
   results.push(await savePhotoLocally(await toDataUrl(final), `${base}.jpg`));
-  if (original && original !== final) {
-    results.push(await savePhotoLocally(await toDataUrl(original), `${base}-original.jpg`));
+  // Originales de la cámara (varias si la toma fue de 2 a 4 fotos)
+  const originals = (Array.isArray(original) ? original : original ? [original] : []).filter(o => o !== final);
+  for (let i = 0; i < originals.length; i++) {
+    const suffix = originals.length > 1 ? `-original-${i + 1}` : '-original';
+    results.push(await savePhotoLocally(await toDataUrl(originals[i]), `${base}${suffix}.jpg`));
   }
   return results;
 }

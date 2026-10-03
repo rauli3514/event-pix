@@ -5,6 +5,7 @@ import { BUILT_IN_FRAMES, getFrameUrl, getGeneralSettings, saveFrameUrl, saveGen
 import { GLASS_PREFIX, GLASS_STYLES, renderGlassFrame, type GlassStyle } from '@/lib/glassFrame';
 import { allFrameOptions, isCustomFrame } from '@/lib/frameOptions';
 import { buttonClass, Field, inputClass, Panel, Toggle } from './ui';
+import PhotoLayoutPanel from './PhotoLayoutPanel';
 
 const MODES = [
   { key: 'enableSelfie', label: 'Fotos (selfie con marco)', hint: 'Ícono "Fotos" del inicio.' },
@@ -73,6 +74,8 @@ export default function ExperiencesSection() {
             onChange={v => setSettings(saveGeneralSettings({ [m.key]: v }))} />
         ))}
       </Panel>
+
+      <PhotoLayoutPanel />
 
       <Panel title="Marco Liquid Glass" description="Se genera sobre cada foto: el borde es la misma foto como vidrio esmerilado, con el nombre del evento abajo.">
         <div className="grid grid-cols-2 gap-4">

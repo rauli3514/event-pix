@@ -19,6 +19,22 @@ export default function FrameChooser({ photo, options, initialIndex = 0, merge, 
   const [index, setIndex] = useState(initialIndex);
   const [direction, setDirection] = useState(1);
   const [rendered, setRendered] = useState<Record<number, string>>({});
+  // La caja se ajusta a la hoja (vertical u horizontal) dentro del espacio libre
+  const areaRef = useRef<HTMLDivElement>(null);
+  const [area, setArea] = useState({ w: 0, h: 0 });
+  const [ratio, setRatio] = useState(2 / 3);
+  useEffect(() => {
+    const el = areaRef.current;
+    if (!el) return;
+    const update = () => setArea({ w: el.clientWidth, h: el.clientHeight });
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  // Lugar para las flechas a los costados
+  const room = { w: Math.max(0, area.w - area.h * 0.3), h: area.h };
+  const box = room.w / room.h > ratio ? { w: room.h * ratio, h: room.h } : { w: room.w, h: room.w / ratio };
   const preview = rendered[index] ?? null;
   // La función de unir puede cambiar en cada render del kiosco: no debe volver a generar
   const mergeRef = useRef(merge);
@@ -73,12 +89,13 @@ export default function FrameChooser({ photo, options, initialIndex = 0, merge, 
       <div className="relative z-10 h-full flex flex-col items-center gap-[2.5vmin] p-[4vmin]">
         <h2 className="carlmarx-bold text-[clamp(2rem,6vmin,4rem)] text-center">Elegí tu marco</h2>
 
-        <div className="flex-1 min-h-0 w-full flex items-center justify-center">
-          <div className="relative h-full max-w-full aspect-[2/3]">
+        <div ref={areaRef} className="flex-1 min-h-0 w-full flex items-center justify-center">
+          <div className="relative" style={{ width: box.w, height: box.h }}>
             <div className="absolute inset-0 rounded-[2vmin] overflow-hidden shadow-[0_3vmin_8vmin_-2vmin_rgba(0,0,0,0.8)] bg-black/40">
               <AnimatePresence initial={false} custom={direction} mode="popLayout">
                 {preview ? (
                   <motion.img key={`${index}`} src={preview} alt="Tu foto con el marco" className="absolute inset-0 w-full h-full object-contain"
+                    onLoad={(e) => { const im = e.currentTarget; if (im.naturalHeight) setRatio(im.naturalWidth / im.naturalHeight); }}
                     custom={direction}
                     initial={{ x: `${direction * 60}%`, opacity: 0, rotate: direction * 6 }}
                     animate={{ x: 0, opacity: 1, rotate: 0 }}

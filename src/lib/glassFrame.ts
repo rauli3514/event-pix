@@ -1,7 +1,7 @@
 // Marcos "Liquid Glass" generados sobre cada foto (sin PNG): el borde es la misma
 // foto desenfocada y saturada, como vidrio esmerilado, con brillos en los bordes,
 // gotas de luz y una píldora de vidrio con el nombre del evento.
-// Salida 1200×1800 (proporción 10×15), igual que el resto del kiosco.
+// La hoja la arma photoLayout.ts (vertical u horizontal, una o varias fotos).
 
 export type GlassStyle = 'clear' | 'dark' | 'aurora' | 'sunset';
 
@@ -107,11 +107,29 @@ function fitFont(ctx: CanvasRenderingContext2D, text: string, weight: string, ma
   return size;
 }
 
-export async function renderGlassFrame(photoSrc: string, options: GlassFrameOptions): Promise<string> {
-  const W = options.width ?? 1200;
-  const H = Math.round(W * 1.5);
-  const k = W / 1200; // todas las medidas están pensadas para 1200 px de ancho
-  const img = await loadImage(photoSrc);
+export interface Rect { x: number; y: number; w: number; h: number }
+
+export const loadPhoto = loadImage;
+export { drawCover };
+
+export interface GlassPage {
+  width: number;
+  height: number;
+  /** Lugar de cada foto (misma cantidad que imgs) */
+  slots: Rect[];
+  /** Píldoras con el nombre del evento (una, o dos en las tiras dobles) */
+  captions: Rect[];
+  /** 'cover' recorta para llenar el lugar; 'contain' muestra la foto entera */
+  fit: 'cover' | 'contain';
+}
+
+/**
+ * Dibuja una hoja con marco de vidrio: fondo con la primera foto desenfocada,
+ * cada foto nítida con esquinas redondeadas y las píldoras con el nombre.
+ */
+export async function drawGlassPage(imgs: HTMLImageElement[], page: GlassPage, options: GlassFrameOptions): Promise<HTMLCanvasElement> {
+  const { width: W, height: H } = page;
+  const k = Math.min(W, H) / 1200; // las medidas están pensadas para 1200 px del lado corto
 
   const titleFamily = "'CarlMarx', 'Fredoka', system-ui, sans-serif";
   const textFamily = "system-ui, 'Segoe UI', Roboto, sans-serif";
@@ -128,7 +146,7 @@ export async function renderGlassFrame(photoSrc: string, options: GlassFrameOpti
   ctx.save();
   ctx.filter = `blur(${Math.round(42 * k)}px) saturate(185%) brightness(1.06)`;
   const bleed = 80 * k;
-  drawCover(ctx, img, -bleed, -bleed, W + bleed * 2, H + bleed * 2);
+  drawCover(ctx, imgs[0], -bleed, -bleed, W + bleed * 2, H + bleed * 2);
   ctx.restore();
   TINTS[options.style](ctx, W, H);
 
@@ -141,39 +159,48 @@ export async function renderGlassFrame(photoSrc: string, options: GlassFrameOpti
   ctx.fillStyle = sheen;
   ctx.fillRect(0, 0, W, H);
 
-  // 3. Foto nítida con esquinas redondeadas, "flotando" sobre el vidrio
-  const margin = 64 * k;
-  const captionH = options.title || options.subtitle ? 300 * k : margin;
-  const px = margin;
-  const py = margin;
-  const pw = W - margin * 2;
-  const ph = H - margin - captionH;
-  const radius = 58 * k;
+  // 3. Fotos nítidas con esquinas redondeadas, "flotando" sobre el vidrio
+  imgs.forEach((img, i) => {
+    const slot = page.slots[i];
+    if (!slot) return;
+    let { x: px, y: py, w: pw, h: ph } = slot;
+    if (page.fit === 'contain') {
+      // La foto entera: el lugar se achica a la proporción de la foto
+      const scale = Math.min(pw / img.width, ph / img.height);
+      const fw = img.width * scale;
+      const fh = img.height * scale;
+      px += (pw - fw) / 2;
+      py += (ph - fh) / 2;
+      pw = fw;
+      ph = fh;
+    }
+    const radius = Math.min(58 * k, Math.min(pw, ph) * 0.07);
 
-  ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,0.38)';
-  ctx.shadowBlur = 48 * k;
-  ctx.shadowOffsetY = 18 * k;
-  roundRect(ctx, px, py, pw, ph, radius);
-  ctx.fillStyle = '#000';
-  ctx.fill();
-  ctx.restore();
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.38)';
+    ctx.shadowBlur = 48 * k;
+    ctx.shadowOffsetY = 18 * k;
+    roundRect(ctx, px, py, pw, ph, radius);
+    ctx.fillStyle = '#000';
+    ctx.fill();
+    ctx.restore();
 
-  ctx.save();
-  roundRect(ctx, px, py, pw, ph, radius);
-  ctx.clip();
-  drawCover(ctx, img, px, py, pw, ph);
-  ctx.restore();
+    ctx.save();
+    roundRect(ctx, px, py, pw, ph, radius);
+    ctx.clip();
+    drawCover(ctx, img, px, py, pw, ph);
+    ctx.restore();
 
-  // Borde de luz de la foto (más fuerte arriba a la izquierda, como luz cenital)
-  const edge = ctx.createLinearGradient(px, py, px + pw, py + ph);
-  edge.addColorStop(0, 'rgba(255,255,255,0.95)');
-  edge.addColorStop(0.45, 'rgba(255,255,255,0.25)');
-  edge.addColorStop(1, 'rgba(255,255,255,0.6)');
-  roundRect(ctx, px, py, pw, ph, radius);
-  ctx.strokeStyle = edge;
-  ctx.lineWidth = 4 * k;
-  ctx.stroke();
+    // Borde de luz de la foto (más fuerte arriba a la izquierda, como luz cenital)
+    const edge = ctx.createLinearGradient(px, py, px + pw, py + ph);
+    edge.addColorStop(0, 'rgba(255,255,255,0.95)');
+    edge.addColorStop(0.45, 'rgba(255,255,255,0.25)');
+    edge.addColorStop(1, 'rgba(255,255,255,0.6)');
+    roundRect(ctx, px, py, pw, ph, radius);
+    ctx.strokeStyle = edge;
+    ctx.lineWidth = 4 * k;
+    ctx.stroke();
+  });
 
   // 4. Borde exterior del vidrio
   roundRect(ctx, 6 * k, 6 * k, W - 12 * k, H - 12 * k, 70 * k);
@@ -184,58 +211,79 @@ export async function renderGlassFrame(photoSrc: string, options: GlassFrameOpti
   ctx.lineWidth = 3 * k;
   ctx.stroke();
 
-  // 5. Gotas de vidrio líquido, solo sobre el borde (no encima de la foto)
-  drawDrop(ctx, W - margin / 2, py + ph * 0.22, 17 * k);
-  drawDrop(ctx, W - margin / 2, py + ph * 0.22 + 44 * k, 8 * k);
-  drawDrop(ctx, margin / 2, py + ph * 0.68, 12 * k);
+  // 5. Gotas de vidrio líquido, sobre el borde de la hoja
+  const edgeX = 32 * k;
+  drawDrop(ctx, W - edgeX, H * 0.18, 17 * k);
+  drawDrop(ctx, W - edgeX, H * 0.18 + 44 * k, 8 * k);
+  drawDrop(ctx, edgeX, H * 0.6, 12 * k);
 
-  // 6. Píldora de vidrio con el nombre del evento
+  // 6. Píldoras de vidrio con el nombre del evento
   if (options.title || options.subtitle) {
-    const pillW = W - margin * 2;
-    const pillH = 200 * k;
-    const pillX = margin;
-    const pillY = py + ph + (captionH - pillH) / 2;
+    for (const cap of page.captions) {
+      const pillH = Math.min(cap.h, 200 * k);
+      const pillW = cap.w;
+      const pillX = cap.x;
+      const pillY = cap.y + (cap.h - pillH) / 2;
+      const kk = pillH / (200 * k) * k; // texto proporcional a la píldora
 
-    ctx.save();
-    roundRect(ctx, pillX, pillY, pillW, pillH, pillH / 2);
-    ctx.fillStyle = options.style === 'dark' ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.20)';
-    ctx.fill();
-    const pillEdge = ctx.createLinearGradient(0, pillY, 0, pillY + pillH);
-    pillEdge.addColorStop(0, 'rgba(255,255,255,0.85)');
-    pillEdge.addColorStop(1, 'rgba(255,255,255,0.2)');
-    ctx.strokeStyle = pillEdge;
-    ctx.lineWidth = 3 * k;
-    ctx.stroke();
-    // reflejo en la mitad de arriba de la píldora
-    roundRect(ctx, pillX + 10 * k, pillY + 8 * k, pillW - 20 * k, pillH * 0.42, pillH * 0.3);
-    const pillShine = ctx.createLinearGradient(0, pillY, 0, pillY + pillH * 0.5);
-    pillShine.addColorStop(0, 'rgba(255,255,255,0.35)');
-    pillShine.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = pillShine;
-    ctx.fill();
-    ctx.restore();
+      ctx.save();
+      roundRect(ctx, pillX, pillY, pillW, pillH, pillH / 2);
+      ctx.fillStyle = options.style === 'dark' ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.20)';
+      ctx.fill();
+      const pillEdge = ctx.createLinearGradient(0, pillY, 0, pillY + pillH);
+      pillEdge.addColorStop(0, 'rgba(255,255,255,0.85)');
+      pillEdge.addColorStop(1, 'rgba(255,255,255,0.2)');
+      ctx.strokeStyle = pillEdge;
+      ctx.lineWidth = 3 * k;
+      ctx.stroke();
+      roundRect(ctx, pillX + 10 * k, pillY + 8 * k, pillW - 20 * k, pillH * 0.42, pillH * 0.3);
+      const pillShine = ctx.createLinearGradient(0, pillY, 0, pillY + pillH * 0.5);
+      pillShine.addColorStop(0, 'rgba(255,255,255,0.35)');
+      pillShine.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = pillShine;
+      ctx.fill();
+      ctx.restore();
 
-    ctx.save();
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#fff';
-    ctx.shadowColor = 'rgba(0,0,0,0.35)';
-    ctx.shadowBlur = 12 * k;
-    const cx = W / 2;
-    const maxTextW = pillW - 120 * k;
-    if (options.title && options.subtitle) {
-      fitFont(ctx, options.title, '700', 76 * k, maxTextW, titleFamily);
-      ctx.fillText(options.title, cx, pillY + pillH * 0.4);
-      fitFont(ctx, options.subtitle, '600', 36 * k, maxTextW, textFamily);
-      ctx.fillStyle = 'rgba(255,255,255,0.85)';
-      ctx.fillText(options.subtitle, cx, pillY + pillH * 0.75);
-    } else {
-      const text = (options.title || options.subtitle)!;
-      fitFont(ctx, text, '700', 84 * k, maxTextW, titleFamily);
-      ctx.fillText(text, cx, pillY + pillH / 2 + 4 * k);
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#fff';
+      ctx.shadowColor = 'rgba(0,0,0,0.35)';
+      ctx.shadowBlur = 12 * k;
+      const cx = pillX + pillW / 2;
+      const maxTextW = pillW - 120 * kk;
+      if (options.title && options.subtitle) {
+        fitFont(ctx, options.title, '700', 76 * kk, maxTextW, titleFamily);
+        ctx.fillText(options.title, cx, pillY + pillH * 0.4);
+        fitFont(ctx, options.subtitle, '600', 36 * kk, maxTextW, textFamily);
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        ctx.fillText(options.subtitle, cx, pillY + pillH * 0.75);
+      } else {
+        const text = (options.title || options.subtitle)!;
+        fitFont(ctx, text, '700', 84 * kk, maxTextW, titleFamily);
+        ctx.fillText(text, cx, pillY + pillH / 2 + 4 * kk);
+      }
+      ctx.restore();
     }
-    ctx.restore();
   }
 
+  return canvas;
+}
+
+/** Marco de vidrio para una foto, en hoja vertical 10×15 (vistas previas de Ajustes). */
+export async function renderGlassFrame(photoSrc: string, options: GlassFrameOptions): Promise<string> {
+  const W = options.width ?? 1200;
+  const H = Math.round(W * 1.5);
+  const k = W / 1200;
+  const img = await loadImage(photoSrc);
+  const margin = 64 * k;
+  const captionH = options.title || options.subtitle ? 300 * k : margin;
+  const canvas = await drawGlassPage([img], {
+    width: W,
+    height: H,
+    slots: [{ x: margin, y: margin, w: W - margin * 2, h: H - margin - captionH }],
+    captions: [{ x: margin, y: H - captionH, w: W - margin * 2, h: captionH }],
+    fit: 'cover',
+  }, options);
   return canvas.toDataURL('image/jpeg', 0.93);
 }

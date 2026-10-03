@@ -1,11 +1,14 @@
 import { toast } from 'sonner';
 import { isNativePrintAvailable, printImageNative, printErrorMessage } from '@/lib/nativePrint';
+import { toPortraitForPrint } from '@/lib/photoLayout';
 
 // Imprime una foto del kiosco con la configuración de Ajustes → Impresora
 // (en la app: directo a la impresora o diálogo de Android; en la web: servidor
 // local o diálogo del navegador). La usan el resultado y la galería.
 
-export const printKioskPhoto = async (imageUrl: string) => {
+export const printKioskPhoto = async (photo: string) => {
+  // El papel 10×15 entra vertical: una hoja horizontal se gira antes de imprimir
+  const imageUrl = await toPortraitForPrint(photo).catch(() => photo);
   const cfg = (() => {
     try { return JSON.parse(localStorage.getItem('kiosk_print_settings') || '{}'); }
     catch { return {}; }
@@ -16,7 +19,7 @@ export const printKioskPhoto = async (imageUrl: string) => {
     const options = {
       image: imageUrl,
       paper: cfg.paper || '4x6',
-      orientation: cfg.orientation || 'portrait',
+      orientation: 'portrait' as const, // la hoja ya llega vertical (toPortraitForPrint)
       rotation: cfg.rotation || 0,
       scaleMode: cfg.imageAdjust || 'cover',
       copies: cfg.copies || 1,
@@ -72,7 +75,7 @@ export const printKioskPhoto = async (imageUrl: string) => {
 
 
   const rotation = cfg.rotation || 0;
-  const orientation = cfg.orientation || 'portrait';
+  const orientation = 'portrait';
 
   pw.document.write(`
     <!DOCTYPE html>
