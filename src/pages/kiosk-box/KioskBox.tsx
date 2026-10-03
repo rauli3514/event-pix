@@ -6,6 +6,7 @@ import { Capacitor } from '@capacitor/core';
 import { Camera, Sparkles, Ticket, Wifi, Settings, Loader2, AlertTriangle, Images, WifiOff, type LucideIcon } from 'lucide-react';
 import { useRemoteFocus } from '@/hooks/use-remote-focus';
 import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
+import ScreenBackground from '@/components/kiosk/ScreenBackground';
 import { EventPixLogo } from '@/components/kiosk/brand/EventPixLogo';
 import PinDialog from '@/components/kiosk/PinDialog';
 import {
@@ -156,7 +157,7 @@ export default function KioskBox() {
 
   return (
     <div ref={rootRef} className="relative min-h-screen overflow-hidden text-white">
-      <AuroraBackground />
+      <ScreenBackground screen="home" />
       <div className="relative min-h-screen flex flex-col">
         <header className="flex items-center justify-between px-12 pt-10">
           <EventPixLogo size={60} />

@@ -4,6 +4,7 @@ import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
 import { nameStyleProps, type NameStyle } from '@/components/kiosk/attractStyles';
 import { listEventPhotos, readStoredPhoto } from '@/lib/kioskStorage';
 import { isAnimatedSplash, splashStyleOf, splashVideoSrc } from '@/lib/kioskSettings';
+import { getScreenMedia } from '@/lib/kioskMedia';
 
 // Pantalla de bienvenida ("Tocá para empezar") con animaciones de photobooth hechas
 // con CSS: livianas para la TV box y se acomodan a la tele horizontal o vertical
@@ -131,7 +132,45 @@ function PartyScene() {
   );
 }
 
+/** Video o imagen propia subida en Ajustes (guardada en el equipo). */
+function CustomMedia({ screen }: { screen: string }) {
+  const [media, setMedia] = useState<{ url: string; video: boolean } | null>(null);
+  const [version, setVersion] = useState(0);
+  useEffect(() => {
+    const onChange = (e: Event) => { if ((e as CustomEvent).detail === screen) setVersion(v => v + 1); };
+    window.addEventListener('kiosk-media-changed', onChange);
+    return () => window.removeEventListener('kiosk-media-changed', onChange);
+  }, [screen]);
+  useEffect(() => {
+    let url: string | null = null;
+    let alive = true;
+    getScreenMedia(screen).then(rec => {
+      if (!alive) return;
+      if (!rec) { setMedia(null); return; }
+      url = URL.createObjectURL(rec.blob);
+      setMedia({ url, video: rec.type.startsWith('video/') });
+    }).catch(() => alive && setMedia(null));
+    return () => {
+      alive = false;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [screen, version]);
+  if (!media) return <AuroraBackground />;
+  return (
+    <>
+      <div className="absolute inset-0 bg-black" />
+      {media.video
+        ? <video key={media.url} src={media.url} autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover" />
+        : <img src={media.url} alt="" className="absolute inset-0 w-full h-full object-cover" />}
+      {/* leve viñeta para que se lean los textos encima */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(0,0,0,0.35),rgba(0,0,0,0.15)_70%)]" />
+    </>
+  );
+}
+
 export function AttractBackground({ splash }: { splash?: string }) {
+  if (splash?.startsWith('custom:')) return <CustomMedia screen={splash.slice(7)} />;
+  if (splash === 'aurora') return <AuroraBackground />;
   const style = splashStyleOf(splash);
   if (style === 'polaroids') return <PolaroidRain />;
   if (style === 'flash') return <CameraFlashScene />;

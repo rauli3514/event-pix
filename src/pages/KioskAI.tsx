@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'; // Kiosk AI Optimized Flow
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Printer, Users, Sparkles, Trophy, QrCode, Instagram, Palette, Sticker, Home, Lock, LockOpen } from 'lucide-react';
+import { Printer, Users, Sparkles, Trophy, QrCode, Loader2, Instagram, Palette, Sticker, Home, Lock, LockOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { isNativePrintAvailable, printImageNative, printErrorMessage } from '@/lib/nativePrint';
@@ -16,6 +16,8 @@ import FrameChooser from '@/components/kiosk/FrameChooser';
 import { guestFrameOptions, type FrameOption } from '@/lib/frameOptions';
 import { motion } from 'framer-motion';
 import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
+import ScreenBackground from '@/components/kiosk/ScreenBackground';
+import { getScreenBackground } from '@/lib/kioskMedia';
 import { AIProcessing, CameraFlash, CountdownRing } from '@/components/kiosk/KioskAnimations';
 import { revealPhoto, useConfettiBurst } from '@/components/kiosk/kioskEffects';
 
@@ -494,14 +496,32 @@ export default function KioskAI() {
     try {
       const blob = await (await fetch(dataUrl)).blob();
       const fileName = `kiosk_sessions/${kioskEventId}/${Date.now()}.jpg`;
-      await supabase.storage.from('photos').upload(fileName, blob, { contentType: 'image/jpeg' });
+      const { error: uploadError } = await supabase.storage.from('photos').upload(fileName, blob, { contentType: 'image/jpeg' });
+      if (uploadError) throw uploadError;
       const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(fileName);
       await supabase.from('kiosk_photos').insert([{ kiosk_event_id: kioskEventId, image_url: publicUrl }]);
       return publicUrl;
     } catch (e) { 
       console.error(e);
+      toast.error('No se pudo subir la foto: el QR no va a estar disponible');
       return null;
     }
+  };
+
+  // Guarda y sube la foto final en segundo plano: el invitado ve su foto enseguida
+  // y el QR aparece cuando termina la subida
+  const photoSessionRef = useRef(0);
+  const [uploading, setUploading] = useState(false);
+  const finishPhoto = (finalImage: string) => {
+    const session = ++photoSessionRef.current;
+    setCapturedImage(finalImage);
+    setLastPublicUrl(null);
+    setUploading(true);
+    savePhotoToAlbum(finalImage).then(url => {
+      if (photoSessionRef.current !== session) return;
+      setLastPublicUrl(url);
+      setUploading(false);
+    });
   };
 
   const runAI = async (imageDataUrl: string, theme: any) => {
@@ -880,6 +900,9 @@ The subject must perfectly match the facial features and gender of the reference
   };
 
   const resetKiosk = () => {
+    photoSessionRef.current++;
+    setUploading(false);
+    setLastPublicUrl(null);
     setStep('splash');
     setMode(null);
     setCapturedImage(null);
@@ -910,7 +933,7 @@ The subject must perfectly match the facial features and gender of the reference
     >
       {homeButton}
       <AttractScreen
-        splash={generalSettings.splashVideo}
+        splash={getScreenBackground('splash')}
         eventTitle={generalSettings.eventTitle}
         welcomeTitle={generalSettings.welcomeTitle}
         subtitle={generalSettings.welcomeSubtitle}
@@ -922,7 +945,7 @@ The subject must perfectly match the facial features and gender of the reference
   if (step === 'modeSelect') return (
     <div className="kiosk-root">
       {homeButton}
-      <AuroraBackground />
+      <ScreenBackground screen="modes" />
       <Corners />
       <div className="relative z-10 flex flex-col items-center justify-center h-full gap-12 px-8">
         <h2 className="carlmarx-bold text-[clamp(2rem,5vw,4rem)] text-white text-center">¿Cómo querés tu foto?</h2>
@@ -983,7 +1006,7 @@ The subject must perfectly match the facial features and gender of the reference
 
   if (step === 'getReady') return (
     <div className="kiosk-root">
-      <AuroraBackground />
+      <ScreenBackground screen="getReady" />
       <Corners />
       <div className="relative z-10 flex items-center justify-center h-full">
         <h1 className="carlmarx-bold text-[clamp(4rem,10vw,8rem)] text-white text-center animate-fade-in">
@@ -1082,8 +1105,7 @@ The subject must perfectly match the facial features and gender of the reference
           }
         }
         
-        setCapturedImage(finalImage);
-        await savePhotoToAlbum(finalImage);
+        finishPhoto(finalImage);
         setStep('flashResult');
       } else if (mode === 'retrato') {
         setStep('themeSelect');
@@ -1128,14 +1150,12 @@ The subject must perfectly match the facial features and gender of the reference
     <FrameChooser
       photo={capturedImage}
       options={frameChoices}
+      // Arranca en el marco que está elegido en Ajustes
+      initialIndex={Math.max(0, frameChoices.findIndex(o => o.url === frameUrl))}
       merge={mergeImages}
-      title={generalSettings.eventTitle || undefined}
-      subtitle={generalSettings.frameSubtitle || undefined}
       onConfirm={async (finalImage) => {
         setResultPhrase(SELFIE_PHRASES[Math.floor(Math.random() * SELFIE_PHRASES.length)]);
-        setCapturedImage(finalImage);
-        setStep('processing');
-        await savePhotoToAlbum(finalImage);
+        finishPhoto(finalImage);
         setStep('flashResult');
       }}
     />
@@ -1143,7 +1163,7 @@ The subject must perfectly match the facial features and gender of the reference
 
   if (step === 'flashResult') return (
     <div className="kiosk-root" onClick={() => setStep('result')}>
-      <AuroraBackground />
+      <ScreenBackground screen="reveal" />
       <Corners />
       {capturedImage && (
         <img src={capturedImage} alt="captured" className="absolute inset-0 w-full h-full object-cover opacity-20 blur-sm" />
@@ -1297,7 +1317,7 @@ The subject must perfectly match the facial features and gender of the reference
 
     return (
       <div className="kiosk-root">
-        <AuroraBackground />
+        <ScreenBackground screen="modes" />
         <Corners />
         <div className="relative z-10 flex flex-col h-full overflow-auto">
           {/* Header */}
@@ -1368,7 +1388,7 @@ The subject must perfectly match the facial features and gender of the reference
 
   if (step === 'processing') return (
     <div className="kiosk-root">
-      <AuroraBackground />
+      <ScreenBackground screen="processing" />
       <Corners />
       {capturedImage && <img src={capturedImage} className="absolute inset-0 w-full h-full object-cover opacity-10 blur-md grayscale" />}
       <AIProcessing
@@ -1382,7 +1402,8 @@ The subject must perfectly match the facial features and gender of the reference
     const printerCfg = (() => { try { return JSON.parse(localStorage.getItem('kiosk_print_settings') || '{}'); } catch { return {}; } })();
     const igCfg = (() => { try { return JSON.parse(localStorage.getItem('kiosk_ig_settings') || '{}'); } catch { return {}; } })();
     const showPrint = generalSettings.showPrintButton !== false && printerCfg.autoPrint !== false;
-    const showQr = generalSettings.showQr !== false && !offlineMode && !!lastPublicUrl;
+    // QR solo con internet y con el equipo asignado a un evento (las fotos se suben ahí)
+    const showQrBlock = generalSettings.showQr !== false && !offlineMode && !!kioskEventId;
     // The QR points directly to the photo for downloading
     const qrUrl = lastPublicUrl 
       ? `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(lastPublicUrl)}&bgcolor=ffffff&color=000000`
@@ -1390,7 +1411,7 @@ The subject must perfectly match the facial features and gender of the reference
 
     return (
       <div className="kiosk-root">
-        <AuroraBackground />
+        <ScreenBackground screen="result" />
         <Corners />
         
         <div className="relative z-10 flex flex-col md:flex-row h-full items-center justify-center gap-6 md:gap-12 p-6 animate-in fade-in zoom-in duration-500 overflow-y-auto">
@@ -1419,11 +1440,24 @@ The subject must perfectly match the facial features and gender of the reference
               </button>
             )}
 
-            {showQr && (
-            <button onClick={() => setShowQrModal(true)}
-              className="py-6 px-8 bg-slate-800/80 hover:bg-slate-700 text-white rounded-3xl carlmarx-bold text-2xl flex items-center justify-center gap-4 border border-white/10 transition-all hover:scale-[1.02]">
-              <QrCode className="w-7 h-7 text-pink-400" /> Obtener QR
-            </button>
+            {/* QR a la vista: el invitado lo escanea y se lleva la foto al celular */}
+            {showQrBlock && (
+              <div className="flex items-center gap-5 rounded-3xl bg-white/95 p-4 shadow-[0_10px_40px_rgba(139,92,246,0.35)]">
+                <div className="w-36 h-36 shrink-0 rounded-2xl bg-white flex items-center justify-center overflow-hidden">
+                  {qrUrl ? (
+                    <motion.img src={qrUrl} alt="QR para descargar la foto" className="w-full h-full"
+                      initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} />
+                  ) : uploading ? (
+                    <Loader2 className="w-10 h-10 text-violet-500 animate-spin" />
+                  ) : (
+                    <QrCode className="w-12 h-12 text-slate-300" />
+                  )}
+                </div>
+                <div className="text-slate-900">
+                  <p className="carlmarx-bold text-2xl leading-tight">{qrUrl ? 'Escaneá y llevátela' : uploading ? 'Preparando tu QR…' : 'QR no disponible'}</p>
+                  <p className="text-slate-500 text-sm mt-1">{qrUrl ? 'Bajala al celular y compartila por WhatsApp o Instagram' : uploading ? 'Un segundo' : 'La foto quedó guardada en el equipo'}</p>
+                </div>
+              </div>
             )}
 
             {/* En la TV box compartir desde el equipo no le sirve al invitado: usa el QR */}

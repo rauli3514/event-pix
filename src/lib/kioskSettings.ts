@@ -14,6 +14,8 @@ export interface KioskGeneralSettings {
   splashVideo?: string;
   /** Color del nombre del evento en la bienvenida (ver NAME_STYLES) */
   nameStyle?: 'white' | 'gold' | 'gradient' | 'neon';
+  /** Fondo de cada pantalla (ver kioskMedia.ts) */
+  screenBackgrounds?: Record<string, string>;
   /** Rotación de la pantalla en grados (tele colgada en vertical) */
   screenRotation?: number;
   /** El invitado elige el marco después de la foto */

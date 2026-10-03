@@ -99,6 +99,12 @@ export default function ExperiencesSection() {
         <Toggle label="Dejar que el invitado elija el marco" hint="Si está apagado, se usa siempre el marco elegido."
           checked={!!settings.guestFrameChoice} onChange={guestFrameChoice => setSettings(saveGeneralSettings({ guestFrameChoice }))} />
         {settings.guestFrameChoice && (
+          <p className="text-white/70">
+            Arranca con: <b className="text-white">{allFrameOptions().find(o => o.url === frame)?.label ?? 'Sin marco'}</b>
+            <span className="text-white/50"> (el marco elegido en "Marco Liquid Glass" u "Otros marcos")</span>
+          </p>
+        )}
+        {settings.guestFrameChoice && (
           <div className="grid grid-cols-3 gap-3">
             {allFrameOptions().map(o => {
               const enabled = (settings.guestFrames ?? []).includes(o.key);

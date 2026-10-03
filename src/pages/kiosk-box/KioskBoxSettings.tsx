@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Camera, FolderOpen, Image as ImageIcon, LayoutGrid, Monitor, Printer, Timer } from 'lucide-react';
+import { ArrowLeft, Camera, Film, FolderOpen, Image as ImageIcon, LayoutGrid, Monitor, Printer, Timer } from 'lucide-react';
 import { useRemoteFocus } from '@/hooks/use-remote-focus';
 import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
 import { EventPixLogo } from '@/components/kiosk/brand/EventPixLogo';
@@ -9,6 +9,7 @@ import CameraSection from './settings/CameraSection';
 import ExperiencesSection from './settings/ExperiencesSection';
 import ResultSection from './settings/ResultSection';
 import PhotosSection from './settings/PhotosSection';
+import BackgroundsSection from './settings/BackgroundsSection';
 import PrinterSection from './settings/PrinterSection';
 import DeviceSection from './settings/DeviceSection';
 
@@ -17,6 +18,7 @@ import DeviceSection from './settings/DeviceSection';
 
 const SECTIONS = [
   { key: 'splash', label: 'Pantalla de inicio', icon: ImageIcon, Component: SplashSection },
+  { key: 'backgrounds', label: 'Fondos animados', icon: Film, Component: BackgroundsSection },
   { key: 'camera', label: 'Cámara', icon: Camera, Component: CameraSection },
   { key: 'experiences', label: 'Experiencias y marco', icon: LayoutGrid, Component: ExperiencesSection },
   { key: 'result', label: 'Resultado y tiempos', icon: Timer, Component: ResultSection },
