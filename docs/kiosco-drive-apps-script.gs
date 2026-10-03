@@ -33,12 +33,14 @@ function doPost(e) {
       var def = DriveApp.getRootFolder().getFoldersByName('EventPix Kiosco');
       root = def.hasNext() ? def.next() : DriveApp.getRootFolder().createFolder('EventPix Kiosco');
     }
-    if (body.test) return json({ ok: true, folder: root.getName() });
-
     var folder = root;
     if (body.folder) {
       var found = root.getFoldersByName(body.folder);
       folder = found.hasNext() ? found.next() : root.createFolder(body.folder);
+    }
+    // Prueba de conexión: devuelve los links de la carpeta principal y la del evento
+    if (body.test) {
+      return json({ ok: true, folder: root.getName(), url: root.getUrl(), eventFolder: folder.getName(), eventUrl: folder.getUrl() });
     }
     // Si ya está (reintento), no se duplica
     if (!folder.getFilesByName(body.name).hasNext()) {

@@ -50,11 +50,20 @@ const doneSet = () => new Set(read<string[]>(DONE_KEY, []));
 
 const notify = () => window.dispatchEvent(new Event(DRIVE_EVENT));
 
+interface DriveInfo { folder: string; url?: string; eventFolder?: string; eventUrl?: string }
+const LINKS_KEY = 'kiosk_drive_links';
+
+/** Último link conocido de la carpeta del evento en Drive (para el QR del operador). */
+export const getDriveLinks = (): DriveInfo | null => {
+  const all = read<Record<string, DriveInfo>>(LINKS_KEY, {});
+  return all[eventFolder()] ?? null;
+};
+
 async function post(body: Record<string, unknown>) {
   const { scriptUrl } = driveConfig();
   // text/plain: pedido "simple", sin consulta previa de CORS (Apps Script no la responde)
   const res = await fetch(scriptUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) });
-  const json = await res.json().catch(() => null) as { ok?: boolean; error?: string; folder?: string } | null;
+  const json = await res.json().catch(() => null) as ({ ok?: boolean; error?: string } & Partial<DriveInfo>) | null;
   if (!json?.ok) throw new Error(json?.error || `Drive respondió ${res.status}`);
   return json;
 }
@@ -63,8 +72,12 @@ async function post(body: Record<string, unknown>) {
 export async function testDrive() {
   const { folderId } = driveConfig();
   if (!isDriveConfigured()) throw new Error('Falta el link de la carpeta');
-  const res = await post({ test: true, folderId });
-  return res.folder as string;
+  const folder = eventFolder();
+  const res = await post({ test: true, folderId, folder });
+  const info: DriveInfo = { folder: res.folder || '', url: res.url, eventFolder: res.eventFolder, eventUrl: res.eventUrl };
+  write(LINKS_KEY, { ...read<Record<string, DriveInfo>>(LINKS_KEY, {}), [folder]: info });
+  notify();
+  return info;
 }
 
 /** Agrega fotos recién guardadas a la cola de Drive. */

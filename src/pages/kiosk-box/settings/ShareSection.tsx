@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { CheckCircle2, CloudUpload, Loader2 } from 'lucide-react';
 import { getGeneralSettings, saveGeneralSettings } from '@/lib/kioskSettings';
 import {
-  DEFAULT_DRIVE_SCRIPT_URL, DRIVE_EVENT, folderIdFromLink, isDriveConfigured, pendingCount, processDriveQueue, queueWholeEvent, testDrive,
+  DEFAULT_DRIVE_SCRIPT_URL, DRIVE_EVENT, folderIdFromLink, getDriveLinks, isDriveConfigured, pendingCount, processDriveQueue, queueWholeEvent, testDrive,
 } from '@/lib/driveBackup';
 import { publicSiteUrl } from '@/lib/kioskShare';
 import { buttonClass, Field, inputClass, Panel, primaryClass, Toggle } from './ui';
@@ -14,10 +14,10 @@ export default function ShareSection() {
   const update = (patch: Parameters<typeof saveGeneralSettings>[0]) => setSettings(saveGeneralSettings(patch));
   const [pending, setPending] = useState(pendingCount);
   const [testing, setTesting] = useState(false);
-  const [driveFolder, setDriveFolder] = useState<string | null>(null);
+  const [links, setLinks] = useState(getDriveLinks);
 
   useEffect(() => {
-    const onChange = () => setPending(pendingCount());
+    const onChange = () => { setPending(pendingCount()); setLinks(getDriveLinks()); };
     window.addEventListener(DRIVE_EVENT, onChange);
     return () => window.removeEventListener(DRIVE_EVENT, onChange);
   }, []);
@@ -29,11 +29,10 @@ export default function ShareSection() {
   const test = async () => {
     setTesting(true);
     try {
-      const name = await testDrive();
-      setDriveFolder(name);
-      toast.success(`Conectado a la carpeta "${name}"`);
+      const info = await testDrive();
+      setLinks(info);
+      toast.success(`Conectado a la carpeta "${info.folder}"`);
     } catch (e) {
-      setDriveFolder(null);
       toast.error(`No se pudo conectar: ${e instanceof Error ? e.message : e}`);
     } finally {
       setTesting(false);
@@ -95,7 +94,21 @@ export default function ShareSection() {
             Subir todas las fotos del evento
           </button>
         </div>
-        {driveFolder && <p className="text-emerald-300">Conectado a "{driveFolder}".</p>}
+        {/* Link de la carpeta del evento: el operador lo escanea con el celular para ver las fotos en Drive */}
+        {links?.eventUrl ? (
+          <div className="flex items-center gap-5 rounded-2xl bg-white/95 p-4 text-slate-900">
+            <img alt="QR de la carpeta de Drive" className="w-36 h-36 shrink-0"
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=8&data=${encodeURIComponent(links.eventUrl)}`} />
+            <div className="min-w-0">
+              <p className="font-bold text-lg">Carpeta del evento en Drive</p>
+              <p className="text-slate-600">{links.folder} / <b>{links.eventFolder}</b></p>
+              <p className="text-slate-500 text-sm mt-1">Escaneá con el celular para ver las fotos que se van subiendo.</p>
+              <p className="text-violet-700 text-sm mt-1 break-all">{links.eventUrl}</p>
+            </div>
+          </div>
+        ) : isDriveConfigured() && (
+          <p className="text-white/60">Tocá "Probar conexión" para ver el QR con el link a la carpeta del evento en Drive.</p>
+        )}
         <div className="rounded-2xl bg-black/20 border border-white/10 p-5 text-white/75 space-y-1 text-sm">
           <p className="font-bold text-white">Cómo se configura (una vez, desde una computadora)</p>
           <p>1. Entrá a script.google.com → Nuevo proyecto, y pegá el script de EventPix (docs/kiosco-drive-apps-script.gs).</p>
