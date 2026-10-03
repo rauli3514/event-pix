@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from 'sonner';
-import { isNativePrintAvailable, discoverNativePrinters, printImageNative, PAPER_SIZES, printErrorMessage, isPrintableDirect, type NativePrinter } from '@/lib/nativePrint';
+import { isNativePrintAvailable, discoverNativePrinters, printImageNative, PAPER_SIZES, printErrorMessage, isPrintableDirect, connectWifiDirectPrinter, type NativePrinter } from '@/lib/nativePrint';
 import {
     Sparkles, ArrowLeft, Trash2, Save,
     Monitor, Download, Printer, Settings, ExternalLink, Camera, Instagram, Users,
@@ -91,6 +91,31 @@ const KioskManager = () => {
         printerSettings.nativePrinter ? [printerSettings.nativePrinter] : []
     );
     const [isTestPrinting, setIsTestPrinting] = useState(false);
+    const [wifiDirectSsid, setWifiDirectSsid] = useState<string>(printerSettings.nativePrinter?.wifiDirect?.ssid || '');
+    const [wifiDirectPass, setWifiDirectPass] = useState<string>(printerSettings.nativePrinter?.wifiDirect?.passphrase || '');
+    const [isConnectingWifiDirect, setIsConnectingWifiDirect] = useState(false);
+
+    const connectWifiDirect = async () => {
+        setIsConnectingWifiDirect(true);
+        try {
+            const { printer, result } = await connectWifiDirectPrinter({
+                ssid: wifiDirectSsid.trim(),
+                passphrase: wifiDirectPass,
+            });
+            setNativePrinters(prev => [printer, ...prev.filter(p => p.serviceName !== printer.serviceName)]);
+            setPrinterSettings({ ...printerSettings, nativePrinter: printer, selectedPrinter: printer.name });
+            if (result.mode === 'p2p') {
+                toast.success(`Conectada a ${printer.name} por Wi-Fi Direct${result.internet ? ', con internet' : ', pero sin internet'}`);
+            } else {
+                toast.success(`Conectada a ${printer.name}. Este equipo no permite impresora e internet a la vez: al imprimir se desconecta de internet unos segundos.`);
+            }
+            if (!isPrintableDirect(printer)) toast.error(`La impresora no acepta un formato compatible (${printer.pdl})`);
+        } catch (err) {
+            toast.error(printErrorMessage(err));
+        } finally {
+            setIsConnectingWifiDirect(false);
+        }
+    };
 
 
     // Persist printer settings
@@ -1037,6 +1062,44 @@ const KioskManager = () => {
                                                         ? 'Las fotos se imprimen directo por WiFi, sin diálogo. Si falla, se abre el diálogo de Android.'
                                                         : 'Tocá "Actualizar" para buscar impresoras en la WiFi e imprimir sin diálogo.'}
                                                 </p>
+                                            )}
+
+                                            {isNativePrint && (
+                                                <div className="space-y-3">
+                                                    <Label className="text-slate-300 text-[10px] uppercase font-bold tracking-wider">Impresora por Wi-Fi Direct (sin router)</Label>
+                                                    <p className="text-slate-500 text-xs">
+                                                        Para usar la red DIRECT-... de la impresora sin dejar la WiFi con internet. El nombre y la clave están en la hoja de estado de red de la impresora.
+                                                    </p>
+                                                    <div className="flex flex-col sm:flex-row gap-3">
+                                                        <Input
+                                                            placeholder="DIRECT-xx-EPSON-..."
+                                                            value={wifiDirectSsid}
+                                                            onChange={(e) => setWifiDirectSsid(e.target.value)}
+                                                            className="flex-1 bg-slate-950 border-slate-800 text-white py-6 rounded-xl"
+                                                        />
+                                                        <Input
+                                                            type="password"
+                                                            placeholder="Clave"
+                                                            value={wifiDirectPass}
+                                                            onChange={(e) => setWifiDirectPass(e.target.value)}
+                                                            className="flex-1 bg-slate-950 border-slate-800 text-white py-6 rounded-xl"
+                                                        />
+                                                    </div>
+                                                    <Button
+                                                        disabled={isConnectingWifiDirect || !wifiDirectSsid.trim() || wifiDirectPass.length < 8}
+                                                        onClick={connectWifiDirect}
+                                                        className="w-full bg-slate-800 hover:bg-slate-700 text-white py-6 rounded-xl flex items-center justify-center gap-2"
+                                                    >
+                                                        {isConnectingWifiDirect && <RefreshCw className="w-4 h-4 animate-spin" />} Conectar y probar
+                                                    </Button>
+                                                    {printerSettings.nativePrinter?.wifiDirect?.mode && (
+                                                        <p className="text-slate-500 text-xs">
+                                                            {printerSettings.nativePrinter.wifiDirect.mode === 'p2p'
+                                                                ? 'Modo: impresora e internet a la vez.'
+                                                                : 'Modo: conexión temporal (sin internet unos segundos al imprimir).'}
+                                                        </p>
+                                                    )}
+                                                </div>
                                             )}
 
                                             {isNativePrint && (

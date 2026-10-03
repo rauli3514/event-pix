@@ -11,7 +11,9 @@ import android.graphics.RectF;
 import android.graphics.pdf.PdfDocument;
 import android.net.nsd.NsdManager;
 import android.net.nsd.NsdServiceInfo;
+import android.Manifest;
 import android.net.wifi.WifiManager;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Base64;
@@ -22,8 +24,11 @@ import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
+import com.getcapacitor.PermissionState;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -44,8 +49,17 @@ import java.util.concurrent.Executors;
  *  - discoverPrinters: busca impresoras IPP en la WiFi (mDNS "_ipp._tcp").
  *  - printImage con `printer`: manda el trabajo directo por IPP, sin diálogo.
  *  - printImage sin `printer`: abre el diálogo de impresión de Android.
+ *  - connectWifiDirect: prueba la conexión con la red DIRECT-... de la impresora,
+ *    para imprimir sin router (ver WifiDirectLink).
  */
-@CapacitorPlugin(name = "NativePrint")
+@CapacitorPlugin(
+        name = "NativePrint",
+        permissions = {
+                // Wi-Fi Direct: Android 10-12 pide ubicación; Android 13+ "dispositivos Wi-Fi cercanos"
+                @Permission(alias = "location", strings = {Manifest.permission.ACCESS_FINE_LOCATION}),
+                @Permission(alias = "nearbyWifi", strings = {Manifest.permission.NEARBY_WIFI_DEVICES})
+        }
+)
 public class NativePrintPlugin extends Plugin {
 
     private static final String SERVICE_TYPE = "_ipp._tcp.";
@@ -243,15 +257,18 @@ public class NativePrintPlugin extends Plugin {
 
         executor.execute(() -> {
             Bitmap page = null;
+            WifiDirectLink.Session session = null;
             try {
                 Bitmap source = loadBitmap(image);
                 int totalRotation = rotation + ("landscape".equals(orientation) ? 90 : 0);
 
-                if (printer != null && printer.has("host")) {
-                    Capabilities caps = capabilitiesFor(printer, paper);
+                if (printer != null && (printer.has("host") || printer.has("wifiDirect"))) {
+                    session = openWifiDirect(printer);
+                    Target target = targetFor(printer, session);
+                    Capabilities caps = capabilitiesFor(target, paper);
                     page = composePage(source, paper, totalRotation, scaleMode, caps.dpi);
                     source.recycle();
-                    printSilently(call, printer, page, paper, caps, copies, borderless, jobName);
+                    printSilently(call, target, page, paper, caps, copies, borderless, jobName);
                     page.recycle();
                 } else {
                     page = composePage(source, paper, totalRotation, scaleMode, DPI);
@@ -261,8 +278,152 @@ public class NativePrintPlugin extends Plugin {
             } catch (Exception e) {
                 if (page != null) page.recycle();
                 call.reject(e.getMessage() != null ? e.getMessage() : e.toString(), e);
+            } finally {
+                if (session != null) session.close();
             }
         });
+    }
+
+    // ─── Wi-Fi Direct ───────────────────────────────────────────────
+
+    /**
+     * Prueba la conexión Wi-Fi Direct con la impresora y devuelve cómo quedó:
+     * modo (p2p/temporary), impresora encontrada, formatos y si sigue habiendo internet.
+     */
+    @PluginMethod
+    public void connectWifiDirect(PluginCall call) {
+        if (!hasWifiDirectPermission()) {
+            requestPermissionForAlias(wifiDirectPermissionAlias(), call, "wifiDirectPermissionCallback");
+            return;
+        }
+        String ssid = call.getString("ssid", "");
+        String passphrase = call.getString("passphrase", "");
+        String mode = call.getString("mode");
+        if (ssid.isEmpty() || passphrase.length() < 8) {
+            call.reject("Falta el nombre de la red DIRECT-... o la clave (mínimo 8 caracteres)");
+            return;
+        }
+        executor.execute(() -> {
+            JSObject printer = new JSObject();
+            JSObject wifiDirect = new JSObject();
+            wifiDirect.put("ssid", ssid);
+            wifiDirect.put("passphrase", passphrase);
+            if (mode != null) wifiDirect.put("mode", mode);
+            printer.put("wifiDirect", wifiDirect);
+
+            try (WifiDirectLink.Session session = openWifiDirect(printer)) {
+                Target target = targetFor(printer, session);
+                IppClient.Result attrs = IppClient.getPrinterAttributes(target.sockets, target.host, target.port,
+                        target.rp, "printer-make-and-model", "document-format-supported");
+                StringBuilder formats = new StringBuilder();
+                for (IppClient.Value v : attrs.get("document-format-supported")) {
+                    if (formats.length() > 0) formats.append(',');
+                    formats.append(v.asString());
+                }
+                java.util.List<IppClient.Value> model = attrs.get("printer-make-and-model");
+
+                JSObject ret = new JSObject();
+                ret.put("mode", session.mode);
+                ret.put("host", target.host);
+                ret.put("port", target.port);
+                ret.put("rp", target.rp);
+                ret.put("pdl", formats.toString());
+                ret.put("name", model.isEmpty() ? target.name : model.get(0).asString());
+                ret.put("internet", wifiDirectLink().hasInternet());
+                call.resolve(ret);
+            } catch (Exception e) {
+                call.reject(e.getMessage() != null ? e.getMessage() : e.toString(), e);
+            }
+        });
+    }
+
+    @PermissionCallback
+    private void wifiDirectPermissionCallback(PluginCall call) {
+        if (hasWifiDirectPermission()) {
+            connectWifiDirect(call);
+        } else {
+            call.reject("Sin permiso para usar Wi-Fi Direct");
+        }
+    }
+
+    private String wifiDirectPermissionAlias() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ? "nearbyWifi" : "location";
+    }
+
+    private boolean hasWifiDirectPermission() {
+        return getPermissionState(wifiDirectPermissionAlias()) == PermissionState.GRANTED;
+    }
+
+    private WifiDirectLink wifiDirectLink;
+
+    private synchronized WifiDirectLink wifiDirectLink() {
+        if (wifiDirectLink == null) wifiDirectLink = new WifiDirectLink(getContext());
+        return wifiDirectLink;
+    }
+
+    /** Si la impresora se usa por Wi-Fi Direct abre la conexión; si no, devuelve null. */
+    private WifiDirectLink.Session openWifiDirect(JSObject printer) throws IOException {
+        JSObject wd = jsObject(printer, "wifiDirect");
+        if (wd == null) return null;
+        String mode = wd.getString("mode");
+        // Sin permiso solo se puede usar la conexión temporal
+        if (!hasWifiDirectPermission()) mode = WifiDirectLink.MODE_TEMPORARY;
+        return wifiDirectLink().open(wd.getString("ssid", ""), wd.getString("passphrase", ""), mode);
+    }
+
+    private static JSObject jsObject(JSObject parent, String key) {
+        try {
+            org.json.JSONObject o = parent.optJSONObject(key);
+            return o == null ? null : JSObject.fromJSONObject(o);
+        } catch (org.json.JSONException e) {
+            return null;
+        }
+    }
+
+    // ─── Destino y capacidades ──────────────────────────────────────
+
+    /** Dónde y por qué red mandar el trabajo. */
+    private static final class Target {
+        String name = "";
+        String host;
+        int port = 631;
+        String rp = "ipp/print";
+        String pdl = "";
+        javax.net.SocketFactory sockets;
+    }
+
+    private static Target targetFor(JSObject printer, WifiDirectLink.Session session) throws IOException {
+        Target t = new Target();
+        t.name = printer.getString("name", "");
+        t.host = printer.getString("host");
+        t.port = printer.getInteger("port", 631);
+        t.rp = printer.getString("rp", "ipp/print");
+        t.pdl = printer.getString("pdl", "");
+        if (session == null) {
+            if (t.host == null || t.host.isEmpty()) throw new IOException("Falta la dirección de la impresora");
+            return t;
+        }
+
+        t.sockets = session.sockets;
+        t.host = session.host;
+        // En P2P la IP la da el grupo (el dueño del grupo es la impresora). En modo temporal
+        // se busca por mDNS atado a esa red; nunca por la red por defecto, que podría
+        // devolver otra impresora del salón.
+        if (session.network == null) return t;
+        try {
+            java.util.List<MdnsLookup.Printer> found = MdnsLookup.findIppPrinters(session.network::bindSocket, 2500);
+            if (!found.isEmpty()) {
+                MdnsLookup.Printer p = found.get(0);
+                t.name = p.name;
+                t.host = p.host;
+                t.port = p.port;
+                t.rp = p.rp;
+                if (!p.pdl.isEmpty()) t.pdl = p.pdl;
+            }
+        } catch (IOException ignored) {
+            // Sin respuesta mDNS: se usa la IP de la impresora según la conexión
+        }
+        return t;
     }
 
     /** Formato y parámetros con los que se le va a mandar el trabajo a la impresora. */
@@ -273,8 +434,26 @@ public class NativePrintPlugin extends Plugin {
         String mediaType;
     }
 
-    private static Capabilities capabilitiesFor(JSObject printer, Paper paper) throws IOException {
-        String pdl = printer.getString("pdl", "").toLowerCase(Locale.ROOT);
+    private static Capabilities capabilitiesFor(Target target, Paper paper) throws IOException {
+        IppClient.Result attrs = null;
+        IOException queryError = null;
+        try {
+            attrs = IppClient.getPrinterAttributes(target.sockets, target.host, target.port, target.rp,
+                    "document-format-supported",
+                    "pwg-raster-document-resolution-supported",
+                    "pwg-raster-document-type-supported",
+                    "media-type-supported");
+        } catch (IOException e) {
+            queryError = e;
+        }
+
+        String pdl = target.pdl.toLowerCase(Locale.ROOT);
+        if (attrs != null) {
+            StringBuilder sb = new StringBuilder();
+            for (IppClient.Value v : attrs.get("document-format-supported")) sb.append(v.asString()).append(',');
+            if (sb.length() > 0) pdl = sb.toString().toLowerCase(Locale.ROOT);
+        }
+
         Capabilities caps = new Capabilities();
         if (pdl.isEmpty() || pdl.contains("image/jpeg")) {
             caps.format = "image/jpeg";
@@ -286,19 +465,10 @@ public class NativePrintPlugin extends Plugin {
             throw new IOException("La impresora no acepta JPEG, PDF ni PWG raster (formatos: " + pdl + ")");
         }
 
-        // Para PWG raster hay que usar una resolución y un tipo de color que la impresora acepte
-        String host = printer.getString("host");
-        int port = printer.getInteger("port", 631);
-        String rp = printer.getString("rp", "ipp/print");
-        IppClient.Result attrs;
-        try {
-            attrs = IppClient.getPrinterAttributes(host, port, rp,
-                    "pwg-raster-document-resolution-supported",
-                    "pwg-raster-document-type-supported",
-                    "media-type-supported");
-        } catch (IOException e) {
+        if (attrs == null) {
+            // Para PWG raster hay que saber la resolución y el color que acepta
             if (caps.format.equals("image/pwg-raster")) {
-                throw new IOException("No se pudo consultar la impresora: " + e.getMessage(), e);
+                throw new IOException("No se pudo consultar la impresora: " + queryError.getMessage(), queryError);
             }
             return caps; // JPEG/PDF funcionan sin estos datos
         }
@@ -319,12 +489,8 @@ public class NativePrintPlugin extends Plugin {
         return caps;
     }
 
-    private void printSilently(PluginCall call, JSObject printer, Bitmap page, Paper paper, Capabilities caps,
+    private void printSilently(PluginCall call, Target target, Bitmap page, Paper paper, Capabilities caps,
                                int copies, boolean borderless, String jobName) throws IOException {
-        String host = printer.getString("host");
-        int port = printer.getInteger("port", 631);
-        String rp = printer.getString("rp", "ipp/print");
-
         String format = caps.format;
         byte[] document;
         if (format.equals("image/jpeg")) {
@@ -346,7 +512,8 @@ public class NativePrintPlugin extends Plugin {
         // En raster la página ya viene al tamaño exacto; print-scaling es para JPEG/PDF
         options.printScaling = format.equals("image/pwg-raster") ? null : "fill";
 
-        IppClient.Result result = IppClient.printJob(host, port, rp, format, document, options);
+        IppClient.Result result = IppClient.printJob(target.sockets, target.host, target.port, target.rp,
+                format, document, options);
         if (!result.isSuccess()) {
             String msg = result.statusMessage != null ? result.statusMessage
                     : String.format(Locale.ROOT, "código IPP 0x%04x", result.statusCode);

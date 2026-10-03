@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import javax.net.SocketFactory;
+
 /**
  * Cliente IPP mínimo (RFC 8010/8011) para mandar un Print-Job directo a una
  * impresora de red, sin diálogo del sistema. Java puro, sin dependencias de
@@ -136,13 +138,24 @@ public final class IppClient {
 
     public static Result printJob(String host, int port, String resourcePath, String documentFormat,
                                   byte[] document, Options options) throws IOException {
+        return printJob(null, host, port, resourcePath, documentFormat, document, options);
+    }
+
+    /** @param sockets fábrica de sockets de una red puntual (Network.getSocketFactory), o null. */
+    public static Result printJob(SocketFactory sockets, String host, int port, String resourcePath,
+                                  String documentFormat, byte[] document, Options options) throws IOException {
         String uri = printerUri(host, port, resourcePath);
         byte[] ippRequest = buildPrintJobRequest(uri, documentFormat, document, options, 1);
-        byte[] ippResponse = httpPost(host, port, normalizePath(resourcePath), ippRequest);
+        byte[] ippResponse = httpPost(sockets, host, port, normalizePath(resourcePath), ippRequest);
         return parseResponse(ippResponse);
     }
 
     public static Result getPrinterAttributes(String host, int port, String resourcePath,
+                                              String... requested) throws IOException {
+        return getPrinterAttributes(null, host, port, resourcePath, requested);
+    }
+
+    public static Result getPrinterAttributes(SocketFactory sockets, String host, int port, String resourcePath,
                                               String... requested) throws IOException {
         String uri = printerUri(host, port, resourcePath);
         ByteArrayOutputStream buf = new ByteArrayOutputStream();
@@ -162,7 +175,7 @@ public final class IppClient {
         }
         out.writeByte(TAG_END_OF_ATTRIBUTES);
         out.flush();
-        return parseResponse(httpPost(host, port, normalizePath(resourcePath), buf.toByteArray()));
+        return parseResponse(httpPost(sockets, host, port, normalizePath(resourcePath), buf.toByteArray()));
     }
 
     /** La resolución preferida si está; si no, la menor que la supere (las Epson suelen pedir 360). */
@@ -329,8 +342,9 @@ public final class IppClient {
 
     // ─── HTTP/1.1 mínimo ────────────────────────────────────────────
 
-    static byte[] httpPost(String host, int port, String path, byte[] payload) throws IOException {
-        try (Socket socket = new Socket()) {
+    static byte[] httpPost(SocketFactory sockets, String host, int port, String path, byte[] payload)
+            throws IOException {
+        try (Socket socket = sockets != null ? sockets.createSocket() : new Socket()) {
             socket.connect(new InetSocketAddress(host, port), CONNECT_TIMEOUT_MS);
             socket.setSoTimeout(READ_TIMEOUT_MS);
 
