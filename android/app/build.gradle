@@ -4,7 +4,17 @@ android {
     namespace = "com.eventpix.app"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.eventpix.app"
+        // -PeventpixAppId / -PeventpixAppLabel permiten instalar otra variante (p. ej. el
+        // kiosco) al lado de la app de TV sin pisarla. Solo la app de TV es lanzador y
+        // arranca sola al prender el equipo.
+        def eventpixAppId = project.findProperty('eventpixAppId') ?: "com.eventpix.app"
+        def isTvApp = eventpixAppId == "com.eventpix.app"
+        applicationId eventpixAppId
+        manifestPlaceholders = [
+                appLabel    : project.findProperty('eventpixAppLabel') ?: "@string/app_name",
+                homeCategory: isTvApp ? "android.intent.category.HOME" : "android.intent.category.DEFAULT",
+                launchOnBoot: isTvApp ? "true" : "false",
+        ]
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
@@ -14,6 +24,18 @@ android {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        // Firma de debug fija para que las builds de CI se puedan instalar una encima de otra
+        debug {
+            def keystore = project.findProperty('eventpixDebugKeystore')
+            if (keystore) {
+                storeFile file(keystore)
+                storePassword 'android'
+                keyAlias 'androiddebugkey'
+                keyPassword 'android'
+            }
         }
     }
     buildTypes {

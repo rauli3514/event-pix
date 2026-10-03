@@ -103,11 +103,14 @@ const App = () => (
 
             {/* 
               VITE_APP_FLAVOR=mobile → celular (va a /usuarios)
+              VITE_APP_FLAVOR=kiosk → kiosco de fotos (va a los ajustes del kiosco)
               VITE_APP_FLAVOR=tv (default) → Tanix (va al /tv-boot)
             */}
             <Route path="/" element={<Navigate to={
               Capacitor.isNativePlatform() && import.meta.env.VITE_APP_FLAVOR === 'mobile'
                 ? "/usuarios"
+                : Capacitor.isNativePlatform() && import.meta.env.VITE_APP_FLAVOR === 'kiosk'
+                ? "/admin/kiosco-manager"
                 : Capacitor.isNativePlatform()
                   ? "/tv-boot"
                   : "/usuarios"

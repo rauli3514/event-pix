@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from 'sonner';
+import { Capacitor } from '@capacitor/core';
 import { isNativePrintAvailable, discoverNativePrinters, printImageNative, PAPER_SIZES, printErrorMessage, isPrintableDirect, connectWifiDirectPrinter, type NativePrinter } from '@/lib/nativePrint';
 import {
     Sparkles, ArrowLeft, Trash2, Save,
@@ -87,6 +88,8 @@ const KioskManager = () => {
     const [availablePrinters, setAvailablePrinters] = useState<string[]>([]);
     const [isLoadingPrinters, setIsLoadingPrinters] = useState(false);
     const isNativePrint = isNativePrintAvailable();
+    // En la app, target=_blank abriría el navegador del sistema (sin impresión nativa ni ajustes)
+    const kioskLinkTarget = Capacitor.isNativePlatform() ? {} : { target: '_blank', rel: 'noreferrer' };
     const [nativePrinters, setNativePrinters] = useState<NativePrinter[]>(() =>
         printerSettings.nativePrinter ? [printerSettings.nativePrinter] : []
     );
@@ -557,7 +560,7 @@ const KioskManager = () => {
                         </Link>
                     </Button>
                     <Button asChild className="bg-violet-600 hover:bg-violet-700 text-white shadow-[0_0_15px_rgba(139,92,246,0.3)]">
-                        <a href={`/kiosco${selectedEvent ? `?event=${selectedEvent.id}` : ''}`} target="_blank" rel="noreferrer">
+                        <a href={`/kiosco${selectedEvent ? `?event=${selectedEvent.id}` : ''}`} {...kioskLinkTarget}>
                             <ExternalLink className="w-4 h-4 mr-2" /> Lanzar Kiosco (Pantalla Completa)
                         </a>
                     </Button>
@@ -943,7 +946,7 @@ const KioskManager = () => {
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <Button asChild size="sm" className="bg-violet-600 hover:bg-violet-700">
-                                                        <a href={`/kiosco?event=${selectedEvent.id}`} target="_blank" rel="noreferrer">
+                                                        <a href={`/kiosco?event=${selectedEvent.id}`} {...kioskLinkTarget}>
                                                             <Monitor className="w-4 h-4 mr-2" /> Iniciar Kiosco
                                                         </a>
                                                     </Button>
