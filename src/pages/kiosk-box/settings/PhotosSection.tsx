@@ -42,6 +42,8 @@ export default function PhotosSection() {
       <Panel title="Opciones para el invitado">
         <Toggle label="Permitir repetir la foto" hint='Muestra "Repetir foto" antes de confirmar.'
           checked={settings.allowRetake !== false} onChange={allowRetake => update({ allowRetake })} />
+        <Toggle label="Galería en la bienvenida" hint='Botón chico en "Tocá para empezar" para ver las fotos de esa sección y reimprimirlas.'
+          checked={settings.splashGallery !== false} onChange={splashGallery => update({ splashGallery })} />
         <Toggle label="Galería en el inicio" hint="Ícono para ver las fotos que se sacaron en el evento."
           checked={!!settings.enableGallery} onChange={enableGallery => update({ enableGallery })} />
       </Panel>

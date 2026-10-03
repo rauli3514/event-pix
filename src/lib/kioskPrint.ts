@@ -1,0 +1,118 @@
+import { toast } from 'sonner';
+import { isNativePrintAvailable, printImageNative, printErrorMessage } from '@/lib/nativePrint';
+
+// Imprime una foto del kiosco con la configuración de Ajustes → Impresora
+// (en la app: directo a la impresora o diálogo de Android; en la web: servidor
+// local o diálogo del navegador). La usan el resultado y la galería.
+
+export const printKioskPhoto = async (imageUrl: string) => {
+  const cfg = (() => {
+    try { return JSON.parse(localStorage.getItem('kiosk_print_settings') || '{}'); }
+    catch { return {}; }
+  })();
+
+  // 0. APP ANDROID: impresión nativa (directa por WiFi o diálogo del sistema)
+  if (isNativePrintAvailable()) {
+    const options = {
+      image: imageUrl,
+      paper: cfg.paper || '4x6',
+      orientation: cfg.orientation || 'portrait',
+      rotation: cfg.rotation || 0,
+      scaleMode: cfg.imageAdjust || 'cover',
+      copies: cfg.copies || 1,
+      borderless: !!cfg.borderless,
+      jobName: 'EventPix',
+    };
+    try {
+      const res = await printImageNative({ ...options, printer: cfg.nativePrinter || null });
+      if (res.mode === 'silent') toast.success("Impresión enviada correctamente");
+    } catch (err) {
+      if (!cfg.nativePrinter) {
+        toast.error(`No se pudo imprimir: ${printErrorMessage(err)}`);
+        return;
+      }
+      toast.error(`No se pudo imprimir directo (${printErrorMessage(err)}). Abriendo el diálogo de impresión.`);
+      try {
+        await printImageNative(options);
+      } catch (dialogErr) {
+        toast.error(`No se pudo imprimir: ${printErrorMessage(dialogErr)}`);
+      }
+    }
+    return;
+  }
+
+  // 1. INTENTAR IMPRESIÓN SILENCIOSA (Local Server)
+  if (cfg.selectedPrinter && cfg.selectedPrinter !== 'Impresora del Sistema (diálogo del navegador)') {
+    try {
+      const res = await fetch('http://localhost:3001/print', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageUrl: imageUrl,
+          printerName: cfg.selectedPrinter,
+          copies: cfg.copies || 1
+        })
+      });
+      
+      if (res.ok) {
+        toast.success("Impresión enviada correctamente");
+        return; // Éxito, no necesitamos abrir el diálogo del navegador
+      }
+    } catch {
+      console.warn("Servidor de impresión local no disponible, usando diálogo del navegador.");
+    }
+  }
+
+  // 2. FALLBACK: DIÁLOGO DEL NAVEGADOR (Si el servidor no está o falla)
+  const pw = window.open('', '_blank', 'width=800,height=600');
+  if (!pw) {
+    toast.error("Por favor, permite las ventanas emergentes para imprimir");
+    return;
+  }
+
+
+  const rotation = cfg.rotation || 0;
+  const orientation = cfg.orientation || 'portrait';
+
+  pw.document.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Imprimir Foto - Kiosco</title>
+        <style>
+          @page {
+            size: 4in 6in ${orientation};
+            margin: 0;
+          }
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body {
+            width: 4in;
+            height: 6in;
+            background: white;
+            overflow: hidden;
+          }
+          .print-container {
+            width: 4in;
+            height: 6in;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            ${rotation !== 0 ? `transform: rotate(${rotation}deg); transform-origin: center;` : ''}
+          }
+          img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            image-rendering: -webkit-optimize-contrast;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="print-container">
+          <img src="${imageUrl}" onload="setTimeout(() => { window.print(); window.close(); }, 500)"/>
+        </div>
+      </body>
+    </html>
+  `);
+  pw.document.close();
+};

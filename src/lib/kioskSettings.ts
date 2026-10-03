@@ -38,6 +38,8 @@ export interface KioskGeneralSettings {
   offline?: boolean;
   /** Mostrar "Repetir foto" en la vista previa (por defecto sí) */
   allowRetake?: boolean;
+  /** Botón "Galería" en la bienvenida de cada sección (por defecto sí) */
+  splashGallery?: boolean;
   /** Ícono "Galería" en el inicio */
   enableGallery?: boolean;
   /** Carpeta del equipo donde se guardan las fotos (vacío = nombre del evento) */
