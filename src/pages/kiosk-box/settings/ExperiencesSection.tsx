@@ -1,8 +1,10 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Upload } from 'lucide-react';
 import { BUILT_IN_FRAMES, getFrameUrl, getGeneralSettings, saveFrameUrl, saveGeneralSettings } from '@/lib/kioskSettings';
-import { buttonClass, Panel, Toggle } from './ui';
+import { GLASS_PREFIX, GLASS_STYLES, renderGlassFrame, type GlassStyle } from '@/lib/glassFrame';
+import { getCachedDeviceState } from '@/lib/kioskDevice';
+import { buttonClass, Field, inputClass, Panel, Toggle } from './ui';
 
 const MODES = [
   { key: 'enableSelfie', label: 'Fotos (selfie con marco)', hint: 'Ícono "Fotos" del inicio.' },
@@ -14,11 +16,35 @@ const MODES = [
 
 // Un PNG de marco pesado puede no entrar en el almacenamiento del equipo
 const MAX_FRAME_BYTES = 3 * 1024 * 1024;
+const SAMPLE_PHOTO = '/ai-themes/polaroid-party.jpg';
 
 export default function ExperiencesSection() {
   const [settings, setSettings] = useState(getGeneralSettings);
   const [frame, setFrame] = useState(getFrameUrl);
+  const [previews, setPreviews] = useState<Partial<Record<GlassStyle, string>>>({});
   const fileRef = useRef<HTMLInputElement>(null);
+  const eventName = getCachedDeviceState()?.eventName || '';
+  const title = settings.frameTitle || eventName;
+  const subtitle = settings.frameSubtitle || '';
+
+  // Vistas previas de los marcos de vidrio con los textos actuales (chicas, para la TV box)
+  useEffect(() => {
+    let cancelled = false;
+    const t = window.setTimeout(async () => {
+      for (const s of GLASS_STYLES) {
+        try {
+          const url = await renderGlassFrame(SAMPLE_PHOTO, { style: s.value, title, subtitle, width: 360 });
+          if (!cancelled) setPreviews(prev => ({ ...prev, [s.value]: url }));
+        } catch {
+          // sin vista previa para ese estilo
+        }
+      }
+    }, 400);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [title, subtitle]);
 
   const chooseFrame = (url: string | null) => {
     if (saveFrameUrl(url)) setFrame(url);
@@ -36,7 +62,7 @@ export default function ExperiencesSection() {
     reader.readAsDataURL(file);
   };
 
-  const isCustom = !!frame && !BUILT_IN_FRAMES.some(f => f.url === frame);
+  const isCustom = !!frame && !frame.startsWith(GLASS_PREFIX) && !BUILT_IN_FRAMES.some(f => f.url === frame);
 
   return (
     <div className="space-y-6">
@@ -48,7 +74,26 @@ export default function ExperiencesSection() {
         ))}
       </Panel>
 
-      <Panel title="Marco de las fotos" description="Se pone encima de las fotos de la experiencia Fotos. Usá un PNG con el centro transparente.">
+      <Panel title="Marco Liquid Glass" description="Se genera sobre cada foto: el borde es la misma foto como vidrio esmerilado, con el nombre del evento abajo.">
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Texto principal">
+            <input className={inputClass} placeholder={eventName || 'Ej: XV de Camila'} value={settings.frameTitle || ''}
+              onChange={e => setSettings(saveGeneralSettings({ frameTitle: e.target.value }))} />
+          </Field>
+          <Field label="Texto chico (opcional)">
+            <input className={inputClass} placeholder="Ej: 12 · 10 · 2026" value={settings.frameSubtitle || ''}
+              onChange={e => setSettings(saveGeneralSettings({ frameSubtitle: e.target.value }))} />
+          </Field>
+        </div>
+        <div className="grid grid-cols-4 gap-4">
+          {GLASS_STYLES.map(s => (
+            <FrameOption key={s.value} label={s.label} src={previews[s.value]} loading={!previews[s.value]}
+              selected={frame === `${GLASS_PREFIX}${s.value}`} onClick={() => chooseFrame(`${GLASS_PREFIX}${s.value}`)} />
+          ))}
+        </div>
+      </Panel>
+
+      <Panel title="Otros marcos" description="Marcos de imagen (PNG con el centro transparente).">
         <div className="grid grid-cols-4 gap-4">
           <FrameOption label="Sin marco" selected={!frame} onClick={() => chooseFrame(null)} />
           {BUILT_IN_FRAMES.map(f => (
@@ -65,14 +110,21 @@ export default function ExperiencesSection() {
   );
 }
 
-function FrameOption({ label, src, selected, onClick }: { label: string; src?: string; selected: boolean; onClick: () => void }) {
+function FrameOption({ label, src, selected, loading, onClick }: {
+  label: string;
+  src?: string;
+  selected: boolean;
+  loading?: boolean;
+  onClick: () => void;
+}) {
   return (
     <button onClick={onClick}
-      className={`rounded-2xl overflow-hidden border-4 text-left focus:outline-none focus:ring-4 focus:ring-cyan-400 ${selected ? 'border-violet-500' : 'border-transparent'}`}>
+      className={`rounded-2xl overflow-hidden border-4 text-left transition-transform focus:outline-none focus:ring-4 focus:ring-[#00d4ff] focus:scale-[1.03] ${selected ? 'border-[#ff2e93]' : 'border-transparent'}`}>
       <div className="aspect-[2/3] bg-[repeating-conic-gradient(#ffffff14_0_25%,transparent_0_50%)] bg-[length:24px_24px] flex items-center justify-center">
-        {src ? <img src={src} alt={label} className="w-full h-full object-contain" /> : <span className="text-white/50 text-lg">Ninguno</span>}
+        {src ? <img src={src} alt={label} className="w-full h-full object-contain" />
+          : <span className="text-white/50 text-lg">{loading ? 'Generando…' : 'Ninguno'}</span>}
       </div>
-      <p className="px-3 py-2 bg-black/30 font-semibold">{label}</p>
+      <p className="px-3 py-2 bg-black/30 font-semibold">{label}{selected ? '  ✓' : ''}</p>
     </button>
   );
 }

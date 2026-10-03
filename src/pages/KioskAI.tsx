@@ -8,6 +8,12 @@ import { StickerEditor } from '@/components/stickers/StickerEditor';
 import { useRemoteFocus } from '@/hooks/use-remote-focus';
 import { openCameraStream, stopStream } from '@/lib/kioskCamera';
 import { splashVideoSrc } from '@/lib/kioskSettings';
+import { glassStyleOf, isGlassFrame, renderGlassFrame } from '@/lib/glassFrame';
+import { getCachedDeviceState } from '@/lib/kioskDevice';
+import { motion } from 'framer-motion';
+import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
+import { AIProcessing, CameraFlash, CountdownRing } from '@/components/kiosk/KioskAnimations';
+import { revealPhoto, useConfettiBurst } from '@/components/kiosk/kioskEffects';
 
 // ---- Types ----
 type Step =
@@ -169,6 +175,7 @@ export default function KioskAI() {
 
   // Control remoto de la TV box: las flechas recorren los botones de cada pantalla
   const bodyRef = useRef<HTMLElement>(document.body);
+  const splashEnterRef = useRef(false);
   useRemoteFocus(bodyRef, [step]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -294,6 +301,8 @@ export default function KioskAI() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, cameraReady]);
+
+  useConfettiBurst(step === 'result');
 
   // Vuelve solo al inicio después del resultado (Ajustes → Resultado y tiempos)
   const resultTimeout = Number(generalSettings.resultTimeout) || 0;
@@ -530,8 +539,16 @@ The subject must perfectly match the facial features and gender of the reference
     }
   };
 
-  const mergeImages = (base: string, frame: string | null): Promise<string> =>
-    new Promise((resolve, reject) => {
+  const mergeImages = (base: string, frame: string | null): Promise<string> => {
+    // Marco "Liquid Glass": se genera sobre la foto, con el nombre del evento
+    if (isGlassFrame(frame)) {
+      return renderGlassFrame(base, {
+        style: glassStyleOf(frame),
+        title: generalSettings.frameTitle || getCachedDeviceState()?.eventName || undefined,
+        subtitle: generalSettings.frameSubtitle || undefined,
+      });
+    }
+    return new Promise((resolve, reject) => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d')!;
       canvas.width = 1200;
@@ -573,6 +590,7 @@ The subject must perfectly match the facial features and gender of the reference
       img.onerror = reject;
       img.src = base;
     });
+  };
 
   // Build World Cup player card on canvas
   const buildMundialCard = (portraitUrl: string): Promise<string> =>
@@ -808,7 +826,14 @@ The subject must perfectly match the facial features and gender of the reference
       // OK del control remoto = tocar la pantalla
       tabIndex={0}
       data-autofocus
-      onKeyDown={(e) => { if (e.key === 'Enter' && e.target === e.currentTarget) handleSplashTap(); }}
+      // Al soltar OK: con keydown, la pulsación de la misma tecla caía en el botón
+      // que quedaba enfocado en la pantalla siguiente (p. ej. "Inicio"). Solo si OK
+      // se apretó acá: al entrar desde el inicio con OK, la tecla se suelta ya en esta pantalla.
+      onKeyDown={(e) => { if (e.key === 'Enter') splashEnterRef.current = true; }}
+      onKeyUp={(e) => {
+        if (e.key === 'Enter' && e.target === e.currentTarget && splashEnterRef.current) handleSplashTap();
+        splashEnterRef.current = false;
+      }}
       style={{ cursor: 'pointer' }}
     >
       {homeButton}
@@ -836,7 +861,7 @@ The subject must perfectly match the facial features and gender of the reference
   if (step === 'modeSelect') return (
     <div className="kiosk-root">
       {homeButton}
-      <div className="absolute inset-0 bg-[#0a0a1a]" />
+      <AuroraBackground />
       <Corners />
       <div className="relative z-10 flex flex-col items-center justify-center h-full gap-12 px-8">
         <h2 className="carlmarx-bold text-[clamp(2rem,5vw,4rem)] text-white text-center">¿Cómo querés tu foto?</h2>
@@ -844,8 +869,8 @@ The subject must perfectly match the facial features and gender of the reference
 
           {/* SELFIE GRUPAL */}
           {(generalSettings.enableSelfie !== false && isModeAllowed('selfie')) && (
-            <button onClick={() => handleModeSelect('selfie')}
-              className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-cyan-400 bg-black/40 backdrop-blur hover:bg-cyan-400/10 transition-all">
+            <button data-autofocus onClick={() => handleModeSelect('selfie')}
+              className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-cyan-400 kiosk-glass hover:scale-[1.03] focus:scale-[1.03] focus:outline-none focus:ring-4 focus:ring-white/80 hover:bg-cyan-400/10 transition-all">
               <Users className="w-16 h-16 text-cyan-400" />
               <span className="carlmarx-bold text-cyan-400 text-2xl uppercase tracking-wider">Selfie Grupal</span>
               <p className="text-white/70 text-sm text-center">Una foto con amigos o familia.<br />Podés ponerle un marco decorativo.</p>
@@ -854,8 +879,8 @@ The subject must perfectly match the facial features and gender of the reference
 
           {/* RETRATO MÁGICO */}
           {(generalSettings.enableAI !== false && isModeAllowed('retrato')) && (
-            <button onClick={() => handleModeSelect('retrato')}
-              className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-violet-400 bg-black/40 backdrop-blur hover:bg-violet-400/10 transition-all">
+            <button data-autofocus onClick={() => handleModeSelect('retrato')}
+              className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-violet-400 kiosk-glass hover:scale-[1.03] focus:scale-[1.03] focus:outline-none focus:ring-4 focus:ring-white/80 hover:bg-violet-400/10 transition-all">
               <Sparkles className="w-16 h-16 text-violet-400" />
               <span className="carlmarx-bold text-violet-400 text-2xl uppercase tracking-wider">Retrato Mágico</span>
               <p className="text-white/70 text-sm text-center">Una foto de vos solo.<br />Elegí entre muchos estilos de retrato.</p>
@@ -864,8 +889,8 @@ The subject must perfectly match the facial features and gender of the reference
 
           {/* MUNDIAL */}
           {(generalSettings.enableMundial !== false && isModeAllowed('mundial')) && (
-            <button onClick={() => handleModeSelect('mundial')}
-              className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-green-400 bg-black/40 backdrop-blur hover:bg-green-400/10 transition-all">
+            <button data-autofocus onClick={() => handleModeSelect('mundial')}
+              className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-green-400 kiosk-glass hover:scale-[1.03] focus:scale-[1.03] focus:outline-none focus:ring-4 focus:ring-white/80 hover:bg-green-400/10 transition-all">
               <Trophy className="w-16 h-16 text-green-400" />
               <span className="carlmarx-bold text-green-400 text-2xl uppercase tracking-wider">Mundial 2026</span>
               <p className="text-white/70 text-sm text-center">¡Convertite en una estrella del fútbol!<br />Tu carta de jugador con nombre y posición.</p>
@@ -873,8 +898,8 @@ The subject must perfectly match the facial features and gender of the reference
           )}
           {/* CARICATURA MUNDIAL */}
           {(generalSettings.enableCaricatura !== false && isModeAllowed('caricatura')) && (
-            <button onClick={() => handleModeSelect('caricatura')}
-              className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-orange-400 bg-black/40 backdrop-blur hover:bg-orange-400/10 transition-all">
+            <button data-autofocus onClick={() => handleModeSelect('caricatura')}
+              className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-orange-400 kiosk-glass hover:scale-[1.03] focus:scale-[1.03] focus:outline-none focus:ring-4 focus:ring-white/80 hover:bg-orange-400/10 transition-all">
               <Palette className="w-16 h-16 text-orange-400" />
               <span className="carlmarx-bold text-orange-400 text-2xl uppercase tracking-wider">Caricatura Mundial</span>
               <p className="text-white/70 text-sm text-center">¡Tu caricatura del Mundial!<br />Transformate en dibujo con tu nombre.</p>
@@ -883,8 +908,8 @@ The subject must perfectly match the facial features and gender of the reference
 
           {/* FIGURITAS */}
           {generalSettings.enableFiguritas !== false && isModeAllowed('figuritas') && (
-          <button onClick={() => handleModeSelect('figuritas')}
-            className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-teal-400 bg-black/40 backdrop-blur hover:bg-teal-400/10 transition-all">
+          <button data-autofocus onClick={() => handleModeSelect('figuritas')}
+            className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-teal-400 kiosk-glass hover:scale-[1.03] focus:scale-[1.03] focus:outline-none focus:ring-4 focus:ring-white/80 hover:bg-teal-400/10 transition-all">
             <Sticker className="w-16 h-16 text-teal-400" />
             <span className="carlmarx-bold text-teal-400 text-2xl uppercase tracking-wider">Hacer Figurita</span>
             <p className="text-white/70 text-sm text-center">¡Crea tu propia carta oficial!<br />Quita el fondo y personalízala.</p>
@@ -897,7 +922,7 @@ The subject must perfectly match the facial features and gender of the reference
 
   if (step === 'getReady') return (
     <div className="kiosk-root">
-      <div className="absolute inset-0 bg-[#0a0a1a]" />
+      <AuroraBackground />
       <Corners />
       <div className="relative z-10 flex items-center justify-center h-full">
         <h1 className="carlmarx-bold text-[clamp(4rem,10vw,8rem)] text-white text-center animate-fade-in">
@@ -909,7 +934,7 @@ The subject must perfectly match the facial features and gender of the reference
 
   if (cameraActive && cameraError) return (
     <div className="kiosk-root">
-      <div className="absolute inset-0 bg-[#0a0a1a]" />
+      <AuroraBackground />
       <Corners />
       <div className="relative z-10 flex flex-col items-center justify-center h-full gap-8 px-10 text-center">
         <h2 className="carlmarx-bold text-white text-5xl">No encontramos la cámara</h2>
@@ -931,7 +956,7 @@ The subject must perfectly match the facial features and gender of the reference
   if (step === 'lookCamera') {
     return (
       <div className="kiosk-root">
-        <div className="absolute inset-0 bg-[#0a0a1a]" />
+        <AuroraBackground />
         <Corners />
         <video ref={videoRef} autoPlay playsInline muted className={`absolute inset-0 w-full h-full object-cover ${cameraSettings.mirror ? 'scale-x-[-1]' : ''}`} />
         <div className="absolute inset-0 bg-black/40 z-0" />
@@ -954,9 +979,7 @@ The subject must perfectly match the facial features and gender of the reference
       <canvas ref={canvasRef} className="hidden" />
       <div className="absolute inset-0 bg-black/30" />
       <div className="relative z-10 flex items-center justify-center h-full">
-        <span className="carlmarx-bold text-[clamp(8rem,25vw,18rem)] text-white drop-shadow-2xl animate-ping-once" style={{ textShadow: '0 0 80px rgba(139,92,246,0.8)' }}>
-          {countdown}
-        </span>
+        <CountdownRing value={countdown} total={cameraSettings.timer || 5} />
       </div>
       <Corners />
     </div>
@@ -1008,10 +1031,13 @@ The subject must perfectly match the facial features and gender of the reference
         <div className="absolute inset-0 bg-black" />
         <Corners />
         {capturedImage && (
-          <img src={capturedImage} alt="preview"
-            className="absolute inset-0 w-full h-full object-contain"
-            style={{ transform: `scaleX(${cameraSettings.mirror ? -1 : 1})` }} />
+          <motion.div className="absolute inset-0" initial={{ scale: 1.08 }} animate={{ scale: 1 }} transition={{ duration: 0.7, ease: 'easeOut' }}>
+            <img src={capturedImage} alt="preview"
+              className="absolute inset-0 w-full h-full object-contain"
+              style={{ transform: `scaleX(${cameraSettings.mirror ? -1 : 1})` }} />
+          </motion.div>
         )}
+        <CameraFlash key={capturedImage ?? 'flash'} />
         {/* Gradient bottom overlay for buttons */}
         <div className="absolute bottom-0 inset-x-0 h-48 bg-gradient-to-t from-black to-transparent" />
         <div className="absolute bottom-0 inset-x-0 flex items-end justify-center gap-6 p-8 z-10">
@@ -1031,7 +1057,7 @@ The subject must perfectly match the facial features and gender of the reference
 
   if (step === 'flashResult') return (
     <div className="kiosk-root" onClick={() => setStep('result')}>
-      <div className="absolute inset-0 bg-[#0a0a1a]" />
+      <AuroraBackground />
       <Corners />
       {capturedImage && (
         <img src={capturedImage} alt="captured" className="absolute inset-0 w-full h-full object-cover opacity-20 blur-sm" />
@@ -1185,7 +1211,7 @@ The subject must perfectly match the facial features and gender of the reference
 
     return (
       <div className="kiosk-root">
-        <div className="absolute inset-0 bg-[#0a0a1a]" />
+        <AuroraBackground />
         <Corners />
         <div className="relative z-10 flex flex-col h-full overflow-auto">
           {/* Header */}
@@ -1256,21 +1282,13 @@ The subject must perfectly match the facial features and gender of the reference
 
   if (step === 'processing') return (
     <div className="kiosk-root">
-      <div className="absolute inset-0 bg-[#0a0a1a]" />
+      <AuroraBackground />
       <Corners />
       {capturedImage && <img src={capturedImage} className="absolute inset-0 w-full h-full object-cover opacity-10 blur-md grayscale" />}
-      <div className="relative z-10 flex flex-col items-center justify-center h-full gap-8">
-        <div className="w-40 h-40 rounded-full border-4 border-violet-500/30 flex items-center justify-center relative">
-          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-violet-500 animate-spin" />
-          <Sparkles className="w-16 h-16 text-white animate-pulse" />
-        </div>
-        <h2 className="carlmarx-bold text-[clamp(3rem,7vw,6rem)] text-white text-center">
-          {mode === 'selfie' ? 'Preparando Foto' : 'Creando Magia'}
-        </h2>
-        <p className="carlmarx-regular text-white/60 text-2xl">
-          {mode === 'selfie' ? 'Estamos aplicando los últimos retoques...' : 'La IA está dibujando tu retrato...'}
-        </p>
-      </div>
+      <AIProcessing
+        title={mode === 'selfie' ? 'Preparando tu foto' : 'Creando magia'}
+        subtitle={mode === 'selfie' ? 'Aplicando los últimos retoques…' : undefined}
+      />
     </div>
   );
 
@@ -1286,13 +1304,13 @@ The subject must perfectly match the facial features and gender of the reference
 
     return (
       <div className="kiosk-root">
-        <div className="absolute inset-0 bg-[#0a0a1a]" />
+        <AuroraBackground />
         <Corners />
         
         <div className="relative z-10 flex flex-col md:flex-row h-full items-center justify-center gap-6 md:gap-12 p-6 animate-in fade-in zoom-in duration-500 overflow-y-auto">
           {/* Photo Preview - ACHICADO PARA QUE ENTREN BOTONES */}
           <div className="relative flex-shrink-0 h-[45vh] md:h-[70vh] aspect-[2/3] rounded-[2rem] overflow-hidden shadow-[0_0_80px_rgba(139,92,246,0.3)] border border-violet-500/30 group">
-            {capturedImage && <img src={capturedImage} alt="result" className="w-full h-full object-cover" />}
+            {capturedImage && <motion.img key={capturedImage} src={capturedImage} alt="result" className="w-full h-full object-cover" {...revealPhoto} />}
           </div>
 
           {/* Actions Column */}

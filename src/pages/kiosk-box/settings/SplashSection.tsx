@@ -39,7 +39,7 @@ export default function SplashSection() {
             const selected = (settings.splashVideo || '1') === v.value;
             return (
               <button key={v.value} onClick={() => update({ splashVideo: v.value })}
-                className={`rounded-2xl overflow-hidden border-4 text-left focus:outline-none focus:ring-4 focus:ring-cyan-400 ${selected ? 'border-violet-500' : 'border-transparent'}`}>
+                className={`rounded-2xl overflow-hidden border-4 text-left focus:outline-none focus:ring-4 focus:ring-[#00d4ff] ${selected ? 'border-[#ff2e93]' : 'border-transparent'}`}>
                 <div className="aspect-video bg-[#0a0a1a]">
                   {/* Cuadro fijo (#t=1): cuatro videos a la vez son mucho para la TV box */}
                   {v.src && <video src={`${v.src}#t=1`} preload="metadata" muted playsInline className="w-full h-full object-cover" />}

@@ -22,6 +22,9 @@ export interface KioskGeneralSettings {
   /** Segundos sin tocar nada en las pantallas de elección antes de volver al inicio (0 = nunca) */
   idleTimeout?: number;
   autoFullscreen?: boolean;
+  /** Textos del marco de vidrio (vacío = nombre del evento) */
+  frameTitle?: string;
+  frameSubtitle?: string;
   [key: string]: unknown;
 }
 

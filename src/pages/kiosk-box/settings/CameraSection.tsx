@@ -70,7 +70,7 @@ export default function CameraSection() {
             <p className="text-white/70">Cámaras conectadas</p>
             {cameras.map(c => (
               <button key={c.deviceId} onClick={() => choose(c)}
-                className={`w-full text-left rounded-2xl px-6 py-4 text-lg focus:outline-none focus:ring-4 focus:ring-cyan-400 ${c.deviceId === settings.deviceId ? 'bg-violet-600' : 'bg-white/10 hover:bg-white/20'}`}>
+                className={`w-full text-left rounded-2xl px-6 py-4 text-lg focus:outline-none focus:ring-4 focus:ring-[#00d4ff] ${c.deviceId === settings.deviceId ? 'bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7]' : 'bg-white/10 hover:bg-white/20'}`}>
                 {c.label}{c.deviceId === settings.deviceId ? '  ✓' : ''}
               </button>
             ))}

@@ -54,7 +54,7 @@ export default function DeviceSection() {
         <div className="grid grid-cols-2 gap-3 max-h-80 overflow-y-auto p-1">
           {[{ label: 'Ninguna', packageName: '' }, ...apps].map(a => (
             <button key={a.packageName || 'none'} onClick={() => { setVip(a.packageName); setVipAppPackage(a.packageName); }}
-              className={`text-left rounded-2xl px-5 py-3 text-lg focus:outline-none focus:ring-4 focus:ring-cyan-400 ${vipPackage === a.packageName ? 'bg-violet-600' : 'bg-white/10 hover:bg-white/20'}`}>
+              className={`text-left rounded-2xl px-5 py-3 text-lg focus:outline-none focus:ring-4 focus:ring-[#00d4ff] ${vipPackage === a.packageName ? 'bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7]' : 'bg-white/10 hover:bg-white/20'}`}>
               {a.label}
             </button>
           ))}

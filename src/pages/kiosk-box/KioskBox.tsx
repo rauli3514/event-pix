@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
-import { Camera, Sparkles, Ticket, Wifi, Settings, Delete, Loader2, AlertTriangle } from 'lucide-react';
+import { Camera, Sparkles, Ticket, Wifi, Settings, Delete, Loader2, AlertTriangle, type LucideIcon } from 'lucide-react';
 import { useRemoteFocus } from '@/hooks/use-remote-focus';
+import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
+import { EventPixLogo, EventPixMark } from '@/components/kiosk/brand/EventPixLogo';
 import {
   checkinDevice, getCachedDeviceState, getDeviceCode, getBoxPin, getVipAppPackage,
   openAndroidApp, openWifiSettings, type KioskDeviceState,
@@ -25,6 +28,17 @@ const appVersion = async () => {
   }
 };
 
+const roundButton = 'kiosk-glass w-16 h-16 rounded-full flex items-center justify-center text-white/90 hover:text-white focus:outline-none focus:ring-4 focus:ring-[#00d4ff] transition-transform focus:scale-110';
+
+function useClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(new Date()), 15000);
+    return () => window.clearInterval(t);
+  }, []);
+  return now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+}
+
 export default function KioskBox() {
   const navigate = useNavigate();
   const [device, setDevice] = useState<KioskDeviceState | null>(() => getCachedDeviceState());
@@ -32,6 +46,7 @@ export default function KioskBox() {
   const [pinOpen, setPinOpen] = useState(false);
   const [vipError, setVipError] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const clock = useClock();
 
   const refresh = useCallback(async () => {
     try {
@@ -70,94 +85,112 @@ export default function KioskBox() {
   if (!device || device.pairingStatus !== 'linked') {
     const code = device?.deviceCode ?? getDeviceCode();
     return (
-      <div ref={rootRef} className="min-h-screen bg-gradient-to-br from-[#0b1026] via-[#151a4a] to-[#3b0f5c] text-white flex flex-col items-center justify-center gap-10 p-10">
-        <h1 className="carlmarx-bold text-5xl text-center">EventPix Kiosco</h1>
-        <div className="text-center space-y-4">
-          <p className="text-xl text-white/70">Código de este equipo</p>
-          <p className="font-mono text-[clamp(4rem,12vw,9rem)] font-bold tracking-[0.25em] text-cyan-300 drop-shadow-[0_0_30px_rgba(34,211,238,0.5)]">
-            {code}
-          </p>
-        </div>
-        <div className="max-w-2xl text-center text-lg text-white/80 space-y-2">
-          <p>Para usarlo, en el panel de EventPix entrá a <b>Kiosco IA → Equipos</b>,</p>
-          <p>cargá este código y elegí el evento.</p>
-        </div>
-        <div className="flex items-center gap-3 text-white/60">
-          {offline ? (
-            <>
-              <AlertTriangle className="w-5 h-5 text-amber-400" />
-              <span>Sin conexión a internet.</span>
-              <button onClick={openWifiSettings} className="ml-2 px-4 py-2 rounded-xl bg-white/10 focus:bg-white/25 focus:outline-none focus:ring-4 focus:ring-cyan-400">
-                Configurar WiFi
-              </button>
-            </>
-          ) : (
-            <>
-              <Loader2 className="w-5 h-5 animate-spin" />
-              <span>Esperando que lo vincules…</span>
-            </>
-          )}
+      <div ref={rootRef} className="relative min-h-screen overflow-hidden text-white">
+        <AuroraBackground />
+        <div className="relative min-h-screen flex flex-col items-center justify-center gap-10 p-10">
+          <EventPixLogo size={72} subtitle="Kiosco" />
+          <motion.div
+            initial={{ opacity: 0, y: 30, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ type: 'spring', stiffness: 120, damping: 16 }}
+            className="kiosk-glass rounded-[2.5rem] px-16 py-12 text-center"
+          >
+            <p className="text-xl text-white/70 uppercase tracking-[0.3em]">Código de este equipo</p>
+            <p className="font-mono text-[clamp(4rem,11vw,8.5rem)] font-black tracking-[0.22em] mt-4 bg-gradient-to-r from-[#ff2e93] via-[#c86bff] to-[#00d4ff] bg-clip-text text-transparent">
+              {code}
+            </p>
+            <p className="text-lg text-white/75 mt-6">
+              En el panel de EventPix entrá a <b className="text-white">Kiosco IA → Equipos</b>,<br />cargá este código y elegí el evento.
+            </p>
+          </motion.div>
+          <div className="flex items-center gap-3 text-white/70 text-lg">
+            {offline ? (
+              <>
+                <AlertTriangle className="w-6 h-6 text-amber-400" />
+                <span>Sin conexión a internet.</span>
+                <button onClick={openWifiSettings} className="ml-2 kiosk-glass px-5 py-3 rounded-2xl font-semibold focus:outline-none focus:ring-4 focus:ring-[#00d4ff]">
+                  Configurar WiFi
+                </button>
+              </>
+            ) : (
+              <>
+                <Loader2 className="w-6 h-6 animate-spin text-[#00d4ff]" />
+                <span>Esperando que lo vincules…</span>
+              </>
+            )}
+          </div>
         </div>
       </div>
     );
   }
 
   // ─── Inicio ──────────────────────────────────────────────────────
-  const tiles = [
-    { key: 'fotos', label: 'Fotos', hint: 'Selfie con marco', icon: Camera, color: 'from-cyan-500 to-blue-600', onClick: () => openExperience('selfie') },
-    { key: 'ia', label: 'Fotos IA', hint: 'Retratos, Mundial y más', icon: Sparkles, color: 'from-violet-500 to-fuchsia-600', onClick: () => openExperience('ai') },
-    ...(vipPackage ? [{ key: 'vip', label: 'Ingreso VIP', hint: 'Acceso de invitados', icon: Ticket, color: 'from-amber-400 to-orange-600', onClick: openVip }] : []),
+  const tiles: { key: string; label: string; hint: string; icon: LucideIcon; gradient: string; glow: string; onClick: () => void }[] = [
+    { key: 'fotos', label: 'Fotos', hint: 'Selfie con marco', icon: Camera, gradient: 'from-[#00d4ff] via-[#2b8cff] to-[#5b3bff]', glow: 'rgba(0,212,255,0.55)', onClick: () => openExperience('selfie') },
+    { key: 'ia', label: 'Fotos IA', hint: 'Retratos, Mundial y más', icon: Sparkles, gradient: 'from-[#ff2e93] via-[#c03bff] to-[#7b2ff7]', glow: 'rgba(255,46,147,0.55)', onClick: () => openExperience('ai') },
+    ...(vipPackage ? [{ key: 'vip', label: 'Ingreso VIP', hint: 'Acceso de invitados', icon: Ticket, gradient: 'from-[#ffd23f] via-[#ff9f1c] to-[#ff4d6d]', glow: 'rgba(255,159,28,0.55)', onClick: openVip }] : []),
   ];
 
   return (
-    <div ref={rootRef} className="min-h-screen bg-gradient-to-br from-[#0b1026] via-[#151a4a] to-[#3b0f5c] text-white flex flex-col">
-      <header className="flex items-center justify-between px-10 pt-8">
-        <div>
-          <p className="text-white/50 text-sm uppercase tracking-widest">{device.name || `Equipo ${device.deviceCode}`}</p>
-          <p className="text-2xl font-bold">{device.eventName || 'Sin evento asignado'}</p>
-        </div>
-        <div className="flex gap-3">
-          <button onClick={openWifiSettings} className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/10 hover:bg-white/20 focus:bg-white/25 focus:outline-none focus:ring-4 focus:ring-cyan-400">
-            <Wifi className="w-5 h-5" /> WiFi
-          </button>
-          <button onClick={() => setPinOpen(true)} className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/10 hover:bg-white/20 focus:bg-white/25 focus:outline-none focus:ring-4 focus:ring-cyan-400">
-            <Settings className="w-5 h-5" /> Ajustes
-          </button>
-        </div>
-      </header>
+    <div ref={rootRef} className="relative min-h-screen overflow-hidden text-white">
+      <AuroraBackground />
+      <div className="relative min-h-screen flex flex-col">
+        <header className="flex items-center justify-between px-12 pt-10">
+          <EventPixLogo size={60} />
+          <div className="kiosk-glass rounded-full px-8 py-3 text-center">
+            <p className="text-white/60 text-xs uppercase tracking-[0.3em]">{device.name || `Equipo ${device.deviceCode}`}</p>
+            <p className="text-xl font-bold">{device.eventName || 'Sin evento asignado'}</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="text-3xl font-light tabular-nums text-white/85 mr-2">{clock}</span>
+            <button onClick={openWifiSettings} className={roundButton} aria-label="WiFi"><Wifi className="w-7 h-7" /></button>
+            <button onClick={() => setPinOpen(true)} className={roundButton} aria-label="Ajustes"><Settings className="w-7 h-7" /></button>
+          </div>
+        </header>
 
-      {!device.kioskEventId && (
-        <div className="mx-10 mt-6 flex items-center gap-3 rounded-2xl bg-amber-500/15 border border-amber-400/40 px-5 py-3 text-amber-200">
-          <AlertTriangle className="w-5 h-5 shrink-0" />
-          Asigná un evento a este equipo desde el panel (Kiosco IA → Equipos) para que las fotos se guarden.
-        </div>
-      )}
-      {offline && (
-        <div className="mx-10 mt-4 flex items-center gap-3 rounded-2xl bg-white/5 border border-white/15 px-5 py-3 text-white/70">
-          <AlertTriangle className="w-5 h-5 shrink-0 text-amber-400" /> Sin conexión: usando la última configuración guardada.
-        </div>
-      )}
+        {(!device.kioskEventId || offline) && (
+          <div className="mx-12 mt-6 kiosk-glass rounded-2xl px-6 py-3 flex items-center gap-3 text-amber-100">
+            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
+            {!device.kioskEventId
+              ? 'Asigná un evento a este equipo desde el panel (Kiosco IA → Equipos) para que las fotos se guarden.'
+              : 'Sin conexión: usando la última configuración guardada.'}
+          </div>
+        )}
 
-      <main className="flex-1 flex items-center justify-center p-10">
-        <div className={`grid gap-10 w-full ${tiles.length === 3 ? 'grid-cols-3 max-w-6xl' : 'grid-cols-2 max-w-4xl'}`}>
-          {tiles.map((t, i) => (
-            <button
-              key={t.key}
-              data-autofocus={i === 0 ? true : undefined}
-              onClick={t.onClick}
-              className={`group aspect-square rounded-[2.5rem] bg-gradient-to-br ${t.color} p-8 flex flex-col items-center justify-center gap-6 shadow-2xl transition-transform focus:outline-none focus:ring-8 focus:ring-white/80 focus:scale-105 hover:scale-105`}
-            >
-              <t.icon className="w-28 h-28 drop-shadow-lg" />
-              <span className="carlmarx-bold text-4xl">{t.label}</span>
-              <span className="text-white/80 text-lg">{t.hint}</span>
-            </button>
-          ))}
-        </div>
-      </main>
+        <main className="flex-1 flex items-center justify-center px-12">
+          <div className="flex gap-20">
+            {tiles.map((t, i) => (
+              <motion.button
+                key={t.key}
+                data-autofocus={i === 0 ? true : undefined}
+                onClick={t.onClick}
+                initial={{ opacity: 0, y: 40 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 + i * 0.1, type: 'spring', stiffness: 140, damping: 15 }}
+                className="group flex flex-col items-center gap-6 rounded-[3rem] p-4 focus:outline-none"
+              >
+                <span
+                  className={`relative w-64 h-64 rounded-[4rem] bg-gradient-to-br ${t.gradient} flex items-center justify-center transition-transform duration-300 group-hover:scale-105 group-focus:scale-110 group-focus:-translate-y-2`}
+                  style={{ boxShadow: `0 30px 70px -20px ${t.glow}, inset 0 2px 0 rgba(255,255,255,0.45)` }}
+                >
+                  {/* brillo de vidrio */}
+                  <span className="absolute inset-x-6 top-4 h-1/2 rounded-[3rem] bg-gradient-to-b from-white/45 to-transparent" />
+                  <span className="absolute inset-0 rounded-[4rem] ring-0 group-focus:ring-[6px] ring-white/90 transition-all" />
+                  <t.icon className="relative w-32 h-32 text-white drop-shadow-[0_6px_14px_rgba(0,0,0,0.35)]" strokeWidth={1.6} />
+                </span>
+                <span className="text-center">
+                  <span className="block text-4xl font-black tracking-tight">{t.label}</span>
+                  <span className="block text-lg text-white/65 mt-1">{t.hint}</span>
+                </span>
+              </motion.button>
+            ))}
+          </div>
+        </main>
 
-      {vipError && (
-        <p className="text-center text-amber-300 pb-6">No se pudo abrir Ingreso VIP. Revisá en Ajustes que esté instalada y elegida.</p>
-      )}
+        {vipError && (
+          <p className="text-center text-amber-300 pb-6">No se pudo abrir Ingreso VIP. Revisá en Ajustes que esté instalada y elegida.</p>
+        )}
+      </div>
 
       {pinOpen && (
         <PinDialog
@@ -177,8 +210,7 @@ function PinDialog({ onCancel, onSuccess }: { onCancel: () => void; onSuccess: (
 
   const press = (digit: string) => {
     setError(false);
-    const next = (pin + digit).slice(0, 8);
-    setPin(next);
+    setPin((pin + digit).slice(0, 8));
   };
   const submit = () => {
     if (pin === getBoxPin()) onSuccess();
@@ -188,13 +220,25 @@ function PinDialog({ onCancel, onSuccess }: { onCancel: () => void; onSuccess: (
     }
   };
 
-  const keyClass = 'h-16 rounded-2xl bg-white/10 text-2xl font-bold hover:bg-white/20 focus:bg-white/25 focus:outline-none focus:ring-4 focus:ring-cyan-400';
+  const keyClass = 'h-16 rounded-2xl bg-white/10 text-2xl font-bold hover:bg-white/20 focus:bg-white/25 focus:outline-none focus:ring-4 focus:ring-[#00d4ff]';
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur flex items-center justify-center">
-      <div ref={ref} className="w-[22rem] rounded-3xl bg-[#121640] border border-white/15 p-6 space-y-4">
-        <p className="text-center text-lg">Clave de ajustes</p>
-        <p className="text-center font-mono text-4xl tracking-[0.5em] h-12">{'•'.repeat(pin.length)}</p>
-        {error && <p className="text-center text-red-400">Clave incorrecta</p>}
+    <div className="fixed inset-0 z-50 bg-[#07051a]/80 backdrop-blur-md flex items-center justify-center">
+      <motion.div
+        ref={ref}
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="kiosk-glass w-[24rem] rounded-[2rem] p-7 space-y-5"
+      >
+        <div className="flex flex-col items-center gap-3">
+          <EventPixMark size={52} />
+          <p className="text-lg font-semibold">Clave de ajustes</p>
+        </div>
+        <div className="flex justify-center gap-3 h-6">
+          {Array.from({ length: Math.max(4, pin.length) }).map((_, i) => (
+            <span key={i} className={`w-4 h-4 rounded-full ${i < pin.length ? 'bg-gradient-to-br from-[#ff2e93] to-[#00d4ff]' : 'bg-white/20'}`} />
+          ))}
+        </div>
+        {error && <p className="text-center text-[#ff6b9d] font-semibold">Clave incorrecta</p>}
         <div className="grid grid-cols-3 gap-3">
           {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(d => (
             <button key={d} onClick={() => press(d)} className={keyClass}>{d}</button>
@@ -203,12 +247,12 @@ function PinDialog({ onCancel, onSuccess }: { onCancel: () => void; onSuccess: (
             <Delete className="w-6 h-6" />
           </button>
           <button onClick={() => press('0')} className={keyClass}>0</button>
-          <button onClick={submit} className="h-16 rounded-2xl text-lg font-bold bg-violet-600 hover:bg-violet-500 focus:outline-none focus:ring-4 focus:ring-cyan-400">OK</button>
+          <button onClick={submit} className="h-16 rounded-2xl text-lg font-bold bg-gradient-to-br from-[#ff2e93] to-[#7b2ff7] focus:outline-none focus:ring-4 focus:ring-[#00d4ff]">OK</button>
         </div>
-        <button onClick={onCancel} className="w-full py-3 rounded-2xl text-white/70 hover:text-white focus:outline-none focus:ring-4 focus:ring-cyan-400">
+        <button onClick={onCancel} className="w-full py-3 rounded-2xl text-white/70 hover:text-white focus:outline-none focus:ring-4 focus:ring-[#00d4ff]">
           Cancelar
         </button>
-      </div>
+      </motion.div>
     </div>
   );
 }

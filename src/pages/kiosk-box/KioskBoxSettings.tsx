@@ -2,6 +2,8 @@ import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Camera, Image as ImageIcon, LayoutGrid, Monitor, Printer, Timer } from 'lucide-react';
 import { useRemoteFocus } from '@/hooks/use-remote-focus';
+import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
+import { EventPixLogo } from '@/components/kiosk/brand/EventPixLogo';
 import SplashSection from './settings/SplashSection';
 import CameraSection from './settings/CameraSection';
 import ExperiencesSection from './settings/ExperiencesSection';
@@ -30,26 +32,27 @@ export default function KioskBoxSettings() {
   const current = SECTIONS.find(s => s.key === active) ?? SECTIONS[0];
 
   return (
-    <div ref={rootRef} className="h-screen flex bg-gradient-to-br from-[#0b1026] via-[#151a4a] to-[#3b0f5c] text-white">
-      <aside className="w-80 shrink-0 flex flex-col gap-2 p-6 border-r border-white/10 bg-black/20">
-        <h1 className="text-2xl font-bold px-3 pb-4">Ajustes</h1>
+    <div ref={rootRef} className="relative h-screen flex text-white overflow-hidden">
+      <AuroraBackground />
+      <aside className="relative w-80 shrink-0 flex flex-col gap-2 p-6 border-r border-white/10 bg-[#07051a]/55">
+        <div className="px-2 pb-6"><EventPixLogo size={44} subtitle="Ajustes" /></div>
         {SECTIONS.map(s => (
           <button
             key={s.key}
             onClick={() => setActive(s.key)}
-            className={`flex items-center gap-3 rounded-2xl px-4 py-4 text-left text-lg font-semibold focus:outline-none focus:ring-4 focus:ring-cyan-400 ${s.key === active ? 'bg-violet-600' : 'hover:bg-white/10 text-white/80'}`}
+            className={`flex items-center gap-3 rounded-2xl px-4 py-4 text-left text-lg font-semibold focus:outline-none focus:ring-4 focus:ring-[#00d4ff] ${s.key === active ? 'bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7] shadow-[0_10px_30px_-12px_rgba(255,46,147,0.8)]' : 'hover:bg-white/10 text-white/80'}`}
           >
             <s.icon className="w-6 h-6" /> {s.label}
           </button>
         ))}
         <div className="flex-1" />
         <button onClick={() => navigate('/box')}
-          className="flex items-center gap-3 rounded-2xl px-4 py-4 text-lg font-semibold bg-white/10 hover:bg-white/20 focus:outline-none focus:ring-4 focus:ring-cyan-400">
+          className="flex items-center gap-3 rounded-2xl px-4 py-4 text-lg font-semibold bg-white/10 hover:bg-white/20 focus:outline-none focus:ring-4 focus:ring-[#00d4ff]">
           <ArrowLeft className="w-6 h-6" /> Volver al inicio
         </button>
       </aside>
 
-      <main className="flex-1 overflow-y-auto p-8">
+      <main className="relative flex-1 overflow-y-auto p-8">
         <div className="max-w-4xl mx-auto space-y-6">
           <h2 className="text-3xl font-bold">{current.label}</h2>
           <current.Component key={current.key} />
