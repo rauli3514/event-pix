@@ -26,10 +26,14 @@ export const folderIdFromLink = (link?: string) => {
   return /^[\w-]{10,}$/.test(v) ? v : '';
 };
 
+/** Script de Drive incluido al compilar la app (secreto VITE_KIOSK_DRIVE_SCRIPT_URL), igual para todos los equipos. */
+export const DEFAULT_DRIVE_SCRIPT_URL = ((import.meta.env.VITE_KIOSK_DRIVE_SCRIPT_URL as string | undefined) || '').trim();
+
 export const driveConfig = () => {
   const s = getGeneralSettings();
   return {
-    scriptUrl: ((s.driveScriptUrl as string) || '').trim(),
+    scriptUrl: ((s.driveScriptUrl as string) || '').trim() || DEFAULT_DRIVE_SCRIPT_URL,
+    // Sin carpeta elegida, el script usa "EventPix Kiosco" en Mi unidad
     folderId: folderIdFromLink(s.driveFolderLink as string),
     originals: !!s.driveOriginals,
     offline: !!s.offline,
@@ -37,7 +41,8 @@ export const driveConfig = () => {
 };
 export const isDriveConfigured = () => {
   const c = driveConfig();
-  return !!c.scriptUrl && !!c.folderId;
+  // Con el script de la app alcanza (carpeta por defecto); con uno propio hace falta la carpeta
+  return !!c.scriptUrl && (!!c.folderId || c.scriptUrl === DEFAULT_DRIVE_SCRIPT_URL);
 };
 
 export const pendingCount = () => read<QueueItem[]>(QUEUE_KEY, []).length;
@@ -57,7 +62,7 @@ async function post(body: Record<string, unknown>) {
 /** Prueba la conexión: devuelve el nombre de la carpeta. */
 export async function testDrive() {
   const { folderId } = driveConfig();
-  if (!folderId) throw new Error('El link de la carpeta no es válido');
+  if (!isDriveConfigured()) throw new Error('Falta el link de la carpeta');
   const res = await post({ test: true, folderId });
   return res.folder as string;
 }

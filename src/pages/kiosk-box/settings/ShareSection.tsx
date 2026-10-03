@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { CheckCircle2, CloudUpload, Loader2 } from 'lucide-react';
 import { getGeneralSettings, saveGeneralSettings } from '@/lib/kioskSettings';
 import {
-  DRIVE_EVENT, folderIdFromLink, isDriveConfigured, pendingCount, processDriveQueue, queueWholeEvent, testDrive,
+  DEFAULT_DRIVE_SCRIPT_URL, DRIVE_EVENT, folderIdFromLink, isDriveConfigured, pendingCount, processDriveQueue, queueWholeEvent, testDrive,
 } from '@/lib/driveBackup';
 import { publicSiteUrl } from '@/lib/kioskShare';
 import { buttonClass, Field, inputClass, Panel, primaryClass, Toggle } from './ui';
@@ -73,7 +73,12 @@ export default function ShareSection() {
             onChange={e => update({ driveFolderLink: e.target.value })} />
         </Field>
         {badLink && <p className="text-amber-300">Ese link no parece de una carpeta de Drive.</p>}
-        <Field label="URL del script de Drive (termina en /exec)">
+        {DEFAULT_DRIVE_SCRIPT_URL && (
+          <p className="text-emerald-300">
+            Esta app ya trae el script de Drive de EventPix. Solo pegá el link de la carpeta (sin carpeta se usa "EventPix Kiosco" en Mi unidad).
+          </p>
+        )}
+        <Field label={DEFAULT_DRIVE_SCRIPT_URL ? 'Otro script de Drive (opcional, termina en /exec)' : 'URL del script de Drive (termina en /exec)'}>
           <input className={inputClass} placeholder="https://script.google.com/macros/s/…/exec" value={(settings.driveScriptUrl as string) || ''}
             onChange={e => update({ driveScriptUrl: e.target.value })} />
         </Field>

@@ -15,13 +15,24 @@
  *  5. Copiá la "URL de la aplicación web" (termina en /exec) y pegala en el
  *     kiosco, junto con el link de la carpeta de Drive.
  *
+ * Para actualizarlo sin cambiar la URL: pegá el código nuevo, guardá y
+ * "Implementar" → "Gestionar implementaciones" → editar (lápiz) →
+ * Versión: "Nueva versión" → Implementar.
+ *
  * Cualquiera que tenga esa URL puede subir archivos a carpetas a las que tenga
  * acceso tu cuenta: no la publiques.
  */
 function doPost(e) {
   try {
     var body = JSON.parse(e.postData.contents);
-    var root = DriveApp.getFolderById(body.folderId);
+    // Sin carpeta indicada se usa (o se crea) "EventPix Kiosco" en Mi unidad
+    var root;
+    if (body.folderId) {
+      root = DriveApp.getFolderById(body.folderId);
+    } else {
+      var def = DriveApp.getRootFolder().getFoldersByName('EventPix Kiosco');
+      root = def.hasNext() ? def.next() : DriveApp.getRootFolder().createFolder('EventPix Kiosco');
+    }
     if (body.test) return json({ ok: true, folder: root.getName() });
 
     var folder = root;

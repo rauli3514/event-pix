@@ -39,6 +39,7 @@ jobs:
           VITE_APP_FLAVOR: kiosk
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_KIOSK_DRIVE_SCRIPT_URL: ${{ secrets.VITE_KIOSK_DRIVE_SCRIPT_URL }}
 
       - name: Sincronizar con Android
         run: npx cap sync android
