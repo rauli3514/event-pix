@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Camera, Film, FolderOpen, Image as ImageIcon, LayoutGrid, Monitor, Printer, Timer } from 'lucide-react';
+import { ArrowLeft, Camera, Film, FolderOpen, Image as ImageIcon, LayoutGrid, Monitor, Printer, Share2, Timer } from 'lucide-react';
 import { useRemoteFocus } from '@/hooks/use-remote-focus';
 import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
 import { EventPixLogo } from '@/components/kiosk/brand/EventPixLogo';
@@ -10,6 +10,7 @@ import ExperiencesSection from './settings/ExperiencesSection';
 import ResultSection from './settings/ResultSection';
 import PhotosSection from './settings/PhotosSection';
 import BackgroundsSection from './settings/BackgroundsSection';
+import ShareSection from './settings/ShareSection';
 import PrinterSection from './settings/PrinterSection';
 import DeviceSection from './settings/DeviceSection';
 
@@ -23,6 +24,7 @@ const SECTIONS = [
   { key: 'experiences', label: 'Experiencias y marco', icon: LayoutGrid, Component: ExperiencesSection },
   { key: 'result', label: 'Resultado y tiempos', icon: Timer, Component: ResultSection },
   { key: 'photos', label: 'Fotos y respaldo', icon: FolderOpen, Component: PhotosSection },
+  { key: 'share', label: 'Compartir y nube', icon: Share2, Component: ShareSection },
   { key: 'printer', label: 'Impresora', icon: Printer, Component: PrinterSection },
   { key: 'device', label: 'Equipo', icon: Monitor, Component: DeviceSection },
 ] as const;

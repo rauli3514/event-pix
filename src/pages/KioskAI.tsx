@@ -14,11 +14,14 @@ import { composePhotos, type PageOrientation } from '@/lib/photoLayout';
 import AttractScreen from '@/components/kiosk/AttractScreen';
 import FrameChooser from '@/components/kiosk/FrameChooser';
 import NextShot from '@/components/kiosk/NextShot';
+import GuestNameScreen from '@/components/kiosk/GuestNameScreen';
+import { queueForDrive, startDriveSync } from '@/lib/driveBackup';
+import { guestPhotoUrl } from '@/lib/kioskShare';
 import { guestFrameOptions, type FrameOption } from '@/lib/frameOptions';
 import { motion } from 'framer-motion';
 import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
 import ScreenBackground from '@/components/kiosk/ScreenBackground';
-import { getScreenBackground } from '@/lib/kioskMedia';
+import { getPageBackground, getScreenBackground } from '@/lib/kioskMedia';
 import { AIProcessing, CameraFlash, CountdownRing } from '@/components/kiosk/KioskAnimations';
 import { revealPhoto, useConfettiBurst } from '@/components/kiosk/kioskEffects';
 
@@ -30,6 +33,7 @@ type Step =
   | 'lookCamera'
   | 'countdown'
   | 'nextShot'
+  | 'guestName'
   | 'photoPreview'
   | 'frameSelect'
   | 'flashResult'
@@ -326,6 +330,7 @@ export default function KioskAI() {
   }, [step, cameraReady]);
 
   useConfettiBurst(step === 'result');
+  useEffect(() => { startDriveSync(); }, []);
 
   // Vuelve solo al inicio si nadie toca nada mientras ve su foto o la pantalla de
   // imprimir (Ajustes → Resultado y tiempos; 30 s si no se configuró)
@@ -510,12 +515,14 @@ export default function KioskAI() {
   const savePhotoToAlbum = async (dataUrl: string): Promise<string | null> => {
     // Respaldo en el equipo (original + final), siempre: con o sin evento e internet
     try {
-      await backupPhoto(dataUrl, shotsRef.current.length ? shotsRef.current : originalShotRef.current, mode || 'foto');
+      const saved = await backupPhoto(dataUrl, shotsRef.current.length ? shotsRef.current : originalShotRef.current, mode || 'foto');
+      queueForDrive(saved); // respaldo en Drive si está configurado (se sube cuando hay internet)
     } catch (e) {
       console.error('No se pudo guardar la foto en el equipo', e);
       toast.error('No se pudo guardar la foto en el equipo');
     }
-    if (!kioskEventId || offlineMode) return null;
+    // A la nube (Supabase) solo si el QR está activado: sin QR la foto queda solo en el equipo
+    if (!kioskEventId || offlineMode || generalSettings.showQr === false) return null;
     try {
       const blob = await (await fetch(dataUrl)).blob();
       const fileName = `kiosk_sessions/${kioskEventId}/${Date.now()}.jpg`;
@@ -653,7 +660,7 @@ The subject must perfectly match the facial features and gender of the reference
     }
   };
 
-  const mergeImages = (base: string, frame: string | null): Promise<string> => {
+  const mergeImages = async (base: string, frame: string | null): Promise<string> => {
     // Hoja final: vertical u horizontal según la foto, con una o varias fotos.
     // El marco lleva siempre el nombre del evento de "Pantalla de inicio", nunca el del equipo.
     const multi = mode === 'selfie' && shotsRef.current.length > 1;
@@ -663,6 +670,9 @@ The subject must perfectly match the facial features and gender of the reference
       strips: !!generalSettings.photoStrips,
       title: generalSettings.eventTitle || undefined,
       subtitle: generalSettings.frameSubtitle || undefined,
+      guestName: mode === 'selfie' ? guestNameRef.current || undefined : undefined,
+      // Fondo de la hoja subido en Ajustes (detrás de las fotos)
+      background: generalSettings.pageBackground ? await getPageBackground() : null,
     });
   };
 
@@ -770,6 +780,30 @@ The subject must perfectly match the facial features and gender of the reference
     });
 
   const triggerPrint = (imageUrl: string) => printKioskPhoto(imageUrl);
+
+  // Nombre que escribió el invitado (va en la foto); ref para usarlo enseguida al armarla
+  const guestNameRef = useRef('');
+
+  // Fotos (selfie): elegir marco si está habilitado, o armar la hoja directamente
+  const continueSelfie = async () => {
+    if (!capturedImage) return;
+    const choices = guestFrameOptions();
+    if (choices.length > 1) {
+      setFrameChoices(choices);
+      setStep('frameSelect');
+      return;
+    }
+    setStep('processing'); // Show a brief processing state while merging
+    setResultPhrase(SELFIE_PHRASES[Math.floor(Math.random() * SELFIE_PHRASES.length)]);
+    let finalImage = capturedImage;
+    try {
+      finalImage = await mergeImages(capturedImage, frameUrl);
+    } catch (e) {
+      console.error("Error applying frame to selfie:", e);
+    }
+    finishPhoto(finalImage);
+    setStep('flashResult');
+  };
 
   const resetKiosk = () => {
     photoSessionRef.current++;
@@ -965,6 +999,16 @@ The subject must perfectly match the facial features and gender of the reference
   );
 
   // ── PHOTO PREVIEW — approve or retake ───────────────────────
+  if (step === 'guestName') return (
+    <GuestNameScreen
+      photo={capturedImage}
+      onDone={(name) => {
+        guestNameRef.current = name;
+        void continueSelfie();
+      }}
+    />
+  );
+
   if (step === 'nextShot') return (
     <NextShot
       shots={shotsRef.current}
@@ -992,26 +1036,13 @@ The subject must perfectly match the facial features and gender of the reference
       }
 
       if (mode === 'selfie') {
-        const choices = guestFrameOptions();
-        if (choices.length > 1) {
-          setFrameChoices(choices);
-          setStep('frameSelect');
+        // Nombre del invitado antes de armar la foto (Ajustes → Experiencias y marco)
+        guestNameRef.current = '';
+        if (generalSettings.askGuestName) {
+          setStep('guestName');
           return;
         }
-        setStep('processing'); // Show a brief processing state while merging
-        const phrase = SELFIE_PHRASES[Math.floor(Math.random() * SELFIE_PHRASES.length)];
-        setResultPhrase(phrase);
-        
-        // Apply frame if exists
-        let finalImage = capturedImage!;
-        try {
-          finalImage = await mergeImages(capturedImage!, frameUrl);
-        } catch (e) {
-          console.error("Error applying frame to selfie:", e);
-        }
-        
-        finishPhoto(finalImage);
-        setStep('flashResult');
+        await continueSelfie();
       } else if (mode === 'retrato') {
         setStep('themeSelect');
       } else if (mode === 'mundial') {
@@ -1320,8 +1351,9 @@ The subject must perfectly match the facial features and gender of the reference
     // QR solo con internet y con el equipo asignado a un evento (las fotos se suben ahí)
     const showQrBlock = generalSettings.showQr !== false && !offlineMode && !!kioskEventId;
     // The QR points directly to the photo for downloading
-    const qrUrl = lastPublicUrl 
-      ? `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(lastPublicUrl)}&bgcolor=ffffff&color=000000`
+    // El QR abre la página del invitado (bajar / compartir por WhatsApp o Instagram)
+    const qrUrl = lastPublicUrl
+      ? `https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=8&data=${encodeURIComponent(guestPhotoUrl(lastPublicUrl, generalSettings.eventTitle || undefined))}&bgcolor=ffffff&color=000000`
       : null;
 
     return (

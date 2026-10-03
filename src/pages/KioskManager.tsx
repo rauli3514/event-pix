@@ -318,6 +318,7 @@ const KioskManager = () => {
     const handleDeleteKioskEvent = async (id: string) => {
         if (!confirm('¿Eliminar este evento y todas sus fotos?')) return;
         try {
+            await deleteEventUploads(id);
             const { error } = await supabase.from('kiosk_events').delete().eq('id', id);
             if (error) throw error;
             toast.success('Evento eliminado');
@@ -325,6 +326,37 @@ const KioskManager = () => {
             if (selectedEvent?.id === id) setSelectedEvent(null);
         } catch (err: any) {
             toast.error('Error al eliminar: ' + err.message);
+        }
+    };
+
+    // Borra de Supabase las fotos subidas por el kiosco para un evento (archivos y registros).
+    // En el equipo quedan las copias locales.
+    const deleteEventUploads = async (eventId: string) => {
+        const folder = `kiosk_sessions/${eventId}`;
+        let removed = 0;
+        for (;;) {
+            const { data, error } = await supabase.storage.from('photos').list(folder, { limit: 100 });
+            if (error) throw error;
+            if (!data?.length) break;
+            const { error: rmError } = await supabase.storage.from('photos').remove(data.map(f => `${folder}/${f.name}`));
+            if (rmError) throw rmError;
+            removed += data.length;
+            if (data.length < 100) break;
+        }
+        const { error } = await supabase.from('kiosk_photos').delete().eq('kiosk_event_id', eventId);
+        if (error) throw error;
+        return removed;
+    };
+
+    const handleDeleteUploads = async () => {
+        if (!selectedEvent) return;
+        if (!confirm(`¿Borrar de la nube todas las fotos de "${selectedEvent.name}"? Los QR de esas fotos dejan de funcionar. Las copias guardadas en el equipo no se tocan.`)) return;
+        try {
+            const n = await deleteEventUploads(selectedEvent.id);
+            setEventPhotos([]);
+            toast.success(`Se borraron ${n} fotos de la nube`);
+        } catch (err: any) {
+            toast.error('No se pudieron borrar: ' + err.message);
         }
     };
 
@@ -956,6 +988,9 @@ const KioskManager = () => {
                                                     </Button>
                                                     <Button onClick={handleDownloadAll} variant="outline" size="sm" className="bg-slate-950 border-slate-800">
                                                         <Download className="w-4 h-4 mr-2" /> Descargar Todo
+                                                    </Button>
+                                                    <Button onClick={handleDeleteUploads} variant="outline" size="sm" className="bg-slate-950 border-red-900 text-red-300 hover:bg-red-950">
+                                                        <Trash2 className="w-4 h-4 mr-2" /> Borrar de la nube
                                                     </Button>
                                                 </div>
                                             </CardHeader>

@@ -15,6 +15,7 @@ import {
 } from '@/lib/kioskDevice';
 import { getGeneralSettings, getSectionLock } from '@/lib/kioskSettings';
 import { isSupabaseConfigured, supabaseProjectRef } from '@/lib/supabase';
+import { startDriveSync } from '@/lib/driveBackup';
 
 // Inicio de la app "EventPix Kiosco" en la TV box: sin login. Si el equipo no
 // está vinculado muestra su código para registrarlo en el panel; si lo está,
@@ -85,6 +86,9 @@ export default function KioskBox() {
     if (device.kioskEventId) params.set('event', device.kioskEventId);
     navigate(`/kiosco?${params.toString()}`, { replace: true });
   }, [device?.pairingStatus, device?.kioskEventId, navigate]);
+
+  // Fotos pendientes de subir a Drive: se reintentan mientras la app está abierta
+  useEffect(() => { startDriveSync(); }, []);
 
   // Con el PIN abierto, el foco lo maneja el diálogo
   useRemoteFocus(rootRef, [device?.pairingStatus], !pinOpen);

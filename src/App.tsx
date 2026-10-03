@@ -13,6 +13,7 @@ import KioskBox from "./pages/kiosk-box/KioskBox";
 import KioskBoxSettings from "./pages/kiosk-box/KioskBoxSettings";
 import KioskGallery from "./pages/kiosk-box/KioskGallery";
 import RotatedScreen from "./components/kiosk/RotatedScreen";
+import GuestPhoto from "./pages/GuestPhoto";
 import Display from "./pages/Display";
 import Login from "./pages/Login";
 import DisplayUserLogin from "./pages/DisplayUserLogin";
@@ -65,6 +66,8 @@ const App = () => (
             <Route path="/box" element={<KioskBox />} />
             <Route path="/box/ajustes" element={<KioskBoxSettings />} />
             <Route path="/box/galeria" element={<KioskGallery />} />
+            {/* Página pública del QR del kiosco: el invitado baja o comparte su foto */}
+            <Route path="/foto" element={<GuestPhoto />} />
             <Route path="/sticker-test" element={<div className="min-h-screen bg-zinc-950 pt-10"><StickerEditor userPhotoUrl="/placeholder-user.jpg" onSave={(url) => console.log(url)} onCancel={() => console.log("cancel")} /></div>} />
 
             <Route element={<EventProvider><Outlet /></EventProvider>}>

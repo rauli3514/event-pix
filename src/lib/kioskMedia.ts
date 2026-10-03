@@ -68,3 +68,28 @@ export const removeScreenMedia = async (screen: ScreenKey) => {
   await tx('readwrite', s => s.delete(screen));
   window.dispatchEvent(new CustomEvent('kiosk-media-changed', { detail: screen }));
 };
+
+// ─── Fondo de la hoja impresa (detrás de las fotos) ─────────────────
+const PAGE_BG = 'page-bg';
+
+export const savePageBackground = async (file: File) => {
+  if (file.size > MAX_MEDIA_BYTES) throw new Error('El archivo pesa más de 40 MB');
+  await tx('readwrite', s => s.put({ screen: PAGE_BG, blob: file, type: file.type, name: file.name } satisfies MediaRecord));
+  window.dispatchEvent(new CustomEvent('kiosk-media-changed', { detail: PAGE_BG }));
+};
+export const removePageBackground = async () => {
+  await tx('readwrite', s => s.delete(PAGE_BG));
+  window.dispatchEvent(new CustomEvent('kiosk-media-changed', { detail: PAGE_BG }));
+};
+/** Imagen de fondo de la hoja como data URL (o null si no hay). */
+export const getPageBackground = async (): Promise<string | null> => {
+  const rec = await getScreenMedia(PAGE_BG).catch(() => null);
+  if (!rec) return null;
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(rec.blob);
+  });
+};
+export const getPageBackgroundName = async () => (await getScreenMedia(PAGE_BG).catch(() => null))?.name ?? null;

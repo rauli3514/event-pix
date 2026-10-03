@@ -121,6 +121,8 @@ export interface GlassPage {
   captions: Rect[];
   /** 'cover' recorta para llenar el lugar; 'contain' muestra la foto entera */
   fit: 'cover' | 'contain';
+  /** Imagen de fondo propia (en lugar de la foto desenfocada) */
+  background?: HTMLImageElement | null;
 }
 
 /**
@@ -142,13 +144,17 @@ export async function drawGlassPage(imgs: HTMLImageElement[], page: GlassPage, o
   canvas.height = H;
   const ctx = canvas.getContext('2d')!;
 
-  // 1. Fondo: la foto desenfocada y saturada (algo agrandada para que el blur no deje bordes)
-  ctx.save();
-  ctx.filter = `blur(${Math.round(42 * k)}px) saturate(185%) brightness(1.06)`;
-  const bleed = 80 * k;
-  drawCover(ctx, imgs[0], -bleed, -bleed, W + bleed * 2, H + bleed * 2);
-  ctx.restore();
-  TINTS[options.style](ctx, W, H);
+  // 1. Fondo: la imagen propia, o la foto desenfocada y saturada (algo agrandada para que el blur no deje bordes)
+  if (page.background) {
+    drawCover(ctx, page.background, 0, 0, W, H);
+  } else {
+    ctx.save();
+    ctx.filter = `blur(${Math.round(42 * k)}px) saturate(185%) brightness(1.06)`;
+    const bleed = 80 * k;
+    drawCover(ctx, imgs[0], -bleed, -bleed, W + bleed * 2, H + bleed * 2);
+    ctx.restore();
+    TINTS[options.style](ctx, W, H);
+  }
 
   // 2. Reflejo diagonal sobre todo el vidrio
   const sheen = ctx.createLinearGradient(0, 0, W, H * 0.6);
@@ -157,7 +163,7 @@ export async function drawGlassPage(imgs: HTMLImageElement[], page: GlassPage, o
   sheen.addColorStop(0.5, 'rgba(255,255,255,0.12)');
   sheen.addColorStop(0.62, 'rgba(255,255,255,0)');
   ctx.fillStyle = sheen;
-  ctx.fillRect(0, 0, W, H);
+  if (!page.background) ctx.fillRect(0, 0, W, H); // con fondo propio se respeta el diseño
 
   // 3. Fotos nítidas con esquinas redondeadas, "flotando" sobre el vidrio
   imgs.forEach((img, i) => {
@@ -202,20 +208,22 @@ export async function drawGlassPage(imgs: HTMLImageElement[], page: GlassPage, o
     ctx.stroke();
   });
 
-  // 4. Borde exterior del vidrio
-  roundRect(ctx, 6 * k, 6 * k, W - 12 * k, H - 12 * k, 70 * k);
-  const outer = ctx.createLinearGradient(0, 0, 0, H);
-  outer.addColorStop(0, 'rgba(255,255,255,0.75)');
-  outer.addColorStop(1, 'rgba(255,255,255,0.18)');
-  ctx.strokeStyle = outer;
-  ctx.lineWidth = 3 * k;
-  ctx.stroke();
+  if (!page.background) {
+    // 4. Borde exterior del vidrio
+    roundRect(ctx, 6 * k, 6 * k, W - 12 * k, H - 12 * k, 70 * k);
+    const outer = ctx.createLinearGradient(0, 0, 0, H);
+    outer.addColorStop(0, 'rgba(255,255,255,0.75)');
+    outer.addColorStop(1, 'rgba(255,255,255,0.18)');
+    ctx.strokeStyle = outer;
+    ctx.lineWidth = 3 * k;
+    ctx.stroke();
 
-  // 5. Gotas de vidrio líquido, sobre el borde de la hoja
-  const edgeX = 32 * k;
-  drawDrop(ctx, W - edgeX, H * 0.18, 17 * k);
-  drawDrop(ctx, W - edgeX, H * 0.18 + 44 * k, 8 * k);
-  drawDrop(ctx, edgeX, H * 0.6, 12 * k);
+    // 5. Gotas de vidrio líquido, sobre el borde de la hoja
+    const edgeX = 32 * k;
+    drawDrop(ctx, W - edgeX, H * 0.18, 17 * k);
+    drawDrop(ctx, W - edgeX, H * 0.18 + 44 * k, 8 * k);
+    drawDrop(ctx, edgeX, H * 0.6, 12 * k);
+  }
 
   // 6. Píldoras de vidrio con el nombre del evento
   if (options.title || options.subtitle) {

@@ -18,6 +18,10 @@ export interface LayoutOptions {
   strips?: boolean;
   title?: string;
   subtitle?: string;
+  /** Nombre que escribió el invitado: va en la píldora o, con un PNG, en una etiqueta abajo */
+  guestName?: string;
+  /** Imagen de fondo de la hoja (detrás de las fotos) */
+  background?: string | null;
 }
 
 const LONG = 1800;
@@ -91,17 +95,42 @@ function planPage(n: number, orientation: 'portrait' | 'landscape', strips: bool
 }
 
 /** Une las fotos en la hoja final y devuelve un JPEG en data URL. */
+/** Etiqueta con el nombre del invitado, abajo y centrada (para marcos PNG). */
+function drawNameLabel(ctx: CanvasRenderingContext2D, name: string, W: number, H: number) {
+  const k = Math.min(W, H) / 1200;
+  ctx.save();
+  ctx.font = `700 ${Math.round(56 * k)}px 'CarlMarx', system-ui, sans-serif`;
+  const tw = Math.min(ctx.measureText(name).width, W * 0.8);
+  const ph = 92 * k;
+  const pw = tw + 90 * k;
+  const x = (W - pw) / 2;
+  const y = H - ph - 46 * k;
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.beginPath();
+  if (typeof ctx.roundRect === 'function') ctx.roundRect(x, y, pw, ph, ph / 2);
+  else ctx.rect(x, y, pw, ph); // WebView viejo
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(name, W / 2, y + ph / 2 + 3 * k, W * 0.8);
+  ctx.restore();
+}
+
 export async function composePhotos(photoSrcs: string[], options: LayoutOptions): Promise<string> {
   const imgs = await Promise.all(photoSrcs.map(loadPhoto));
   if (!imgs.length) throw new Error('No hay fotos para armar');
   const n = imgs.length;
   const strips = !!options.strips && n > 1;
+  const bgImg = options.background ? await loadPhoto(options.background).catch(() => null) : null;
+  // El nombre del invitado va primero en la línea chica (ej: "Sofi y Juan · 26-09-2026")
+  const subtitle = [options.guestName, options.subtitle].filter(Boolean).join(' · ') || undefined;
 
   // ─── Marco de vidrio ────────────────────────────────────────────
   if (isGlassFrame(options.frame)) {
     const orientation = strips ? 'portrait'
       : options.orientation && options.orientation !== 'auto' ? options.orientation : autoOrientation(imgs);
-    const caption = !!(options.title || options.subtitle);
+    const caption = !!(options.title || subtitle);
     const plan = planPage(n, orientation, strips, caption);
     const canvas = await drawGlassPage(plan.photoIndex.map(i => imgs[i]), {
       width: plan.width,
@@ -110,7 +139,8 @@ export async function composePhotos(photoSrcs: string[], options: LayoutOptions)
       captions: plan.captions,
       // Una sola foto se muestra entera; varias llenan su lugar
       fit: n === 1 ? 'contain' : 'cover',
-    }, { style: glassStyleOf(options.frame), title: options.title, subtitle: options.subtitle });
+      background: bgImg,
+    }, { style: glassStyleOf(options.frame), title: options.title, subtitle });
     return canvas.toDataURL('image/jpeg', 0.93);
   }
 
@@ -124,6 +154,23 @@ export async function composePhotos(photoSrcs: string[], options: LayoutOptions)
 
   const W = orientation === 'portrait' ? SHORT : LONG;
   const H = orientation === 'portrait' ? LONG : SHORT;
+
+  if (bgImg) {
+    // Fondo propio: las fotos van sobre la imagen; el PNG (si hay) encima de todo
+    const caption = !frameImg && !!(options.title || subtitle);
+    const plan = planPage(n, orientation, strips, caption);
+    const page = await drawGlassPage(plan.photoIndex.map(i => imgs[i]), {
+      width: W, height: H, slots: plan.slots, captions: plan.captions,
+      fit: n === 1 ? 'contain' : 'cover', background: bgImg,
+    }, { style: 'clear', title: caption ? options.title : undefined, subtitle: caption ? subtitle : undefined });
+    if (frameImg) {
+      const ctx = page.getContext('2d')!;
+      ctx.drawImage(frameImg, 0, 0, W, H);
+      if (options.guestName) drawNameLabel(ctx, options.guestName, W, H);
+    }
+    return page.toDataURL('image/jpeg', 0.94);
+  }
+
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
@@ -144,7 +191,7 @@ export async function composePhotos(photoSrcs: string[], options: LayoutOptions)
       ctx.fillStyle = '#222';
       ctx.textAlign = 'center';
       ctx.font = "700 44px 'CarlMarx', system-ui, sans-serif";
-      const text = [options.title, options.subtitle].filter(Boolean).join(' · ');
+      const text = [options.title, subtitle].filter(Boolean).join(' · ');
       if (strips) {
         ctx.fillText(text, W / 4, H - 20, W / 2 - 40);
         ctx.fillText(text, (W * 3) / 4, H - 20, W / 2 - 40);
@@ -154,6 +201,7 @@ export async function composePhotos(photoSrcs: string[], options: LayoutOptions)
     }
   }
   if (frameImg) ctx.drawImage(frameImg, 0, 0, W, H);
+  if (options.guestName && (frameImg || n === 1)) drawNameLabel(ctx, options.guestName, W, H);
   return canvas.toDataURL('image/jpeg', 0.95);
 }
 

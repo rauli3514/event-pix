@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { ImagePlus, Loader2, Trash2 } from 'lucide-react';
 import { composePhotos, type PageOrientation } from '@/lib/photoLayout';
 import { getCameraSettings, getFrameUrl, getGeneralSettings, saveGeneralSettings } from '@/lib/kioskSettings';
-import { Choice, Panel, Toggle } from './ui';
+import { getPageBackground, getPageBackgroundName, removePageBackground, savePageBackground } from '@/lib/kioskMedia';
+import { buttonClass, Choice, Panel, Toggle } from './ui';
 
 // Diseño de la hoja: orientación y cantidad de fotos por toma (solo "Fotos").
 // La vista previa usa fotos de muestra recortadas como las daría la cámara.
@@ -33,6 +35,27 @@ export default function PhotoLayoutPanel() {
   const orientation = (settings.photoOrientation as PageOrientation) || 'auto';
   const strips = !!settings.photoStrips && shots > 1;
   const [preview, setPreview] = useState<string | null>(null);
+  // Fondo de la hoja (imagen propia detrás de las fotos)
+  const bgInput = useRef<HTMLInputElement>(null);
+  const [bgName, setBgName] = useState<string | null>(null);
+  useEffect(() => { getPageBackgroundName().then(setBgName).catch(() => {}); }, []);
+  const uploadBg = async (file?: File) => {
+    if (!file) return;
+    try {
+      await savePageBackground(file);
+      setBgName(file.name);
+      update({ pageBackground: true });
+      toast.success('Fondo cargado');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudo guardar el fondo');
+    }
+  };
+  const removeBg = async () => {
+    await removePageBackground();
+    setBgName(null);
+    update({ pageBackground: false });
+  };
+
   // Se rehace al cambiar el marco en esta misma sección
   const [frameVersion, setFrameVersion] = useState(0);
   useEffect(() => {
@@ -50,6 +73,8 @@ export default function PhotoLayoutPanel() {
         const photos = await Promise.all(SAMPLES.slice(0, shots).map(s => cameraLike(s, landscape)));
         const out = await composePhotos(photos, {
           frame: getFrameUrl(), orientation, strips,
+          guestName: settings.askGuestName ? 'Sofi y Juan' : undefined,
+          background: settings.pageBackground ? await getPageBackground() : null,
           title: settings.eventTitle || undefined, subtitle: settings.frameSubtitle || undefined,
         });
         if (alive) setPreview(out);
@@ -58,7 +83,7 @@ export default function PhotoLayoutPanel() {
       }
     }, 250);
     return () => { alive = false; window.clearTimeout(t); };
-  }, [shots, orientation, strips, settings.eventTitle, settings.frameSubtitle, frameVersion]);
+  }, [shots, orientation, strips, settings.eventTitle, settings.frameSubtitle, settings.askGuestName, settings.pageBackground, bgName, frameVersion]);
 
   return (
     <Panel title="Diseño de la foto" description="Cómo se arma la hoja de 10×15 en la experiencia Fotos. En automático, una foto apaisada usa la hoja horizontal y se ve entera; con la cámara girada (Ajustes → Cámara) la hoja queda vertical.">
@@ -83,6 +108,25 @@ export default function PhotoLayoutPanel() {
             <Toggle label="Tira doble" hint="Dos tiras iguales con las fotos una debajo de otra: se corta al medio y se lleva una cada uno."
               checked={strips} onChange={photoStrips => update({ photoStrips })} />
           )}
+          <div className="space-y-2">
+            <p className="text-white/70">Fondo de la hoja (detrás de las fotos)</p>
+            <input ref={bgInput} type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
+              onChange={e => { uploadBg(e.target.files?.[0]); e.target.value = ''; }} />
+            <div className="flex flex-wrap items-center gap-3">
+              <button onClick={() => bgInput.current?.click()} className={buttonClass}>
+                <ImagePlus className="w-5 h-5" /> {bgName ? 'Cambiar fondo' : 'Subir imagen de fondo'}
+              </button>
+              {bgName && (
+                <>
+                  <span className="text-white/60 truncate max-w-xs">{bgName}</span>
+                  <button onClick={removeBg} className={buttonClass} aria-label="Quitar fondo"><Trash2 className="w-5 h-5" /></button>
+                </>
+              )}
+            </div>
+            <p className="text-white/45 text-sm">Medida: 1200 × 1800 (vertical) o 1800 × 1200 (horizontal); para la tira doble, 1200 × 1800. Un marco PNG va encima del fondo.</p>
+          </div>
+          <Toggle label="Pedir el nombre del invitado" hint='Después de "¡Me gusta!" escribe su nombre (se puede saltear) y queda en la foto.'
+            checked={!!settings.askGuestName} onChange={askGuestName => update({ askGuestName })} />
           <p className="text-white/50 text-sm">
             Los marcos de vidrio se adaptan a cualquier diseño. Un marco PNG define su propia orientación (vertical u horizontal)
             y tiene que estar pensado para la cantidad de fotos.

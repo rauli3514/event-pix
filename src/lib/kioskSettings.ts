@@ -22,6 +22,10 @@ export interface KioskGeneralSettings {
   shotPause?: number;
   /** Tira doble (dos tiras iguales para cortar al medio) */
   photoStrips?: boolean;
+  /** Hay una imagen de fondo para la hoja impresa (guardada en el equipo) */
+  pageBackground?: boolean;
+  /** Pedir el nombre del invitado para ponerlo en la foto */
+  askGuestName?: boolean;
   /** Fondo de cada pantalla (ver kioskMedia.ts) */
   screenBackgrounds?: Record<string, string>;
   /** Rotación de la pantalla en grados (tele colgada en vertical) */
