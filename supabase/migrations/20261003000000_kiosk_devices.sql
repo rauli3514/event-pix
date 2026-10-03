@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS public.kiosk_devices (
 ALTER TABLE public.kiosk_devices ENABLE ROW LEVEL SECURITY;
 
 -- El panel (usuarios logueados) administra los equipos
+DROP POLICY IF EXISTS "Authenticated can manage kiosk devices" ON public.kiosk_devices;
 CREATE POLICY "Authenticated can manage kiosk devices" ON public.kiosk_devices
     FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
@@ -67,6 +68,7 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS kiosk_devices_updated_at ON public.kiosk_devices;
 CREATE TRIGGER kiosk_devices_updated_at
     BEFORE UPDATE ON public.kiosk_devices
     FOR EACH ROW EXECUTE FUNCTION public.kiosk_devices_touch_updated_at();
