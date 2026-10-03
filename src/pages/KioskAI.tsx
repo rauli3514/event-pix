@@ -7,7 +7,7 @@ import { printKioskPhoto } from '@/lib/kioskPrint';
 import { StickerEditor } from '@/components/stickers/StickerEditor';
 import { useRemoteFocus } from '@/hooks/use-remote-focus';
 import { openCameraStream, stopStream } from '@/lib/kioskCamera';
-import { getSectionLock, setSectionLock } from '@/lib/kioskSettings';
+import { getFrameUrl, getSectionLock, setSectionLock } from '@/lib/kioskSettings';
 import PinDialog from '@/components/kiosk/PinDialog';
 import { backupPhoto, type SavedPhoto } from '@/lib/kioskStorage';
 import { composePhotos, type PageOrientation } from '@/lib/photoLayout';
@@ -249,20 +249,9 @@ export default function KioskAI() {
 
   // Load themes + frame
   useEffect(() => {
-    const loadFrame = () => {
-      const savedFrame = localStorage.getItem('kiosk_frame_url');
-      if (savedFrame === 'none') {
-        setFrameUrl(null);
-      } else if (savedFrame) {
-        setFrameUrl(savedFrame);
-      } else {
-        // Fallback to legacy Supabase frame if nothing in localStorage
-        (async () => {
-              const { data: fd } = supabase.storage.from('photos').getPublicUrl('kiosk_frame.png');
-          if (fd?.publicUrl) setFrameUrl(fd.publicUrl);
-        })();
-      }
-    };
+    // El marco es solo el elegido en Ajustes del equipo (sin elegir = sin marco).
+    // Antes, sin elección, se usaba un kiosk_frame.png viejo de Supabase que no se veía en Ajustes.
+    const loadFrame = () => setFrameUrl(getFrameUrl());
 
     loadFrame();
     window.addEventListener('kiosk-frame-changed', loadFrame);
