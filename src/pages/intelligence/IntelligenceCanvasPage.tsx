@@ -846,7 +846,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
     toast.success('¡Tarjeta de Chat con IA agregada al lienzo!');
   };
 
-  const handleSendChatMessage = async (nodeId: string, text: string, mode: ContentFormatMode) => {
+  const handleSendChatMessage = async (nodeId: string, text: string, mode: ContentFormatMode, referenceReelText?: string) => {
     const userMsg: ChatMessage = {
       id: `msg-${Date.now()}-user`,
       sender: 'user',
@@ -884,12 +884,14 @@ export const IntelligenceCanvasPage: React.FC = () => {
 
       // 4. Llamar al orquestador adaptScriptWithChat
       const result = await AIProviderService.adaptScriptWithChat({
+        businessId: business.id,
         userInstruction: text,
         mode,
         sourcePosts,
         profileContext: profileContext || undefined,
         connections: currentConns,
-        chatHistory: previousMessages
+        chatHistory: previousMessages,
+        referenceReelText
       });
 
       const aiMsg: ChatMessage = {
@@ -945,6 +947,7 @@ export const IntelligenceCanvasPage: React.FC = () => {
       const currentConns = ConnectionStorageService.loadConnections(business.id);
 
       const result = await AIProviderService.adaptScriptWithChat({
+        businessId: business.id,
         userInstruction: text,
         mode: quickIdeaMode,
         sourcePosts: posts,

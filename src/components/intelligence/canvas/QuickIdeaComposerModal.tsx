@@ -13,7 +13,7 @@
 // ================================================================
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Sparkles, X, Send, Copy, Check, Video, Play, FileText, RefreshCw, RotateCcw } from 'lucide-react';
+import { Sparkles, X, Send, Copy, Check, Video, Play, FileText, RefreshCw, RotateCcw, Mic } from 'lucide-react';
 import { ChatMessage, ContentFormatMode } from './AiChatCardNode';
 
 interface QuickIdeaComposerModalProps {
@@ -29,10 +29,10 @@ interface QuickIdeaComposerModalProps {
   postsCount: number;
 }
 
+// Único formato de contenido que EventPix Intelligence genera: reel yapping
+// (reel hablado a cámara). Ver la misma nota en AiChatCardNode.tsx.
 const FORMAT_PILLS: Array<{ id: ContentFormatMode; label: string; icon: any }> = [
-  { id: 'reel_hablado', label: 'Reel hablado', icon: Play },
-  { id: 'b_roll', label: 'B-roll', icon: Video },
-  { id: 'carrusel', label: 'Carrusel', icon: FileText },
+  { id: 'reel_hablado', label: 'Reel hablado', icon: Play }
 ];
 
 export const QuickIdeaComposerModal: React.FC<QuickIdeaComposerModalProps> = ({
@@ -50,10 +50,20 @@ export const QuickIdeaComposerModal: React.FC<QuickIdeaComposerModalProps> = ({
   const [inputText, setInputText] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // Dictado por voz, igual que en el Guion del Lienzo (Web Speech API del
+  // navegador, sin costo de IA).
+  const recognitionRef = useRef<any>(null);
+  const [isListening, setIsListening] = useState(false);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isGenerating]);
+
+  useEffect(() => {
+    return () => {
+      try { recognitionRef.current?.stop?.(); } catch { /* noop */ }
+    };
+  }, []);
 
   if (!isOpen) return null;
 
@@ -70,6 +80,36 @@ export const QuickIdeaComposerModal: React.FC<QuickIdeaComposerModalProps> = ({
     if (!clean || isGenerating) return;
     setInputText('');
     await onSend(clean);
+  };
+
+  const handleToggleDictation = () => {
+    const SpeechRecognitionImpl = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognitionImpl) {
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+
+    const recognition = new SpeechRecognitionImpl();
+    recognition.lang = 'es-AR';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results?.[0]?.[0]?.transcript?.trim();
+      if (transcript) {
+        setInputText(prev => (prev ? `${prev} ${transcript}` : transcript));
+      }
+    };
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => setIsListening(false);
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
   };
 
   const handleCopy = (text: string, id: string) => {
@@ -235,27 +275,29 @@ export const QuickIdeaComposerModal: React.FC<QuickIdeaComposerModalProps> = ({
 
         {/* BARRA DE FORMATO + ENTRADA */}
         <div className="p-3 bg-slate-950 border-t border-slate-800 space-y-2.5">
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scrollbar">
-            {FORMAT_PILLS.map((pill) => {
-              const isSelected = activeMode === pill.id;
-              const Icon = pill.icon;
-              return (
-                <button
-                  key={pill.id}
-                  type="button"
-                  onClick={() => onModeChange(pill.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold transition-all shrink-0 ${
-                    isSelected
-                      ? 'bg-pink-600 text-white shadow-md shadow-pink-600/30'
-                      : 'bg-slate-900 hover:bg-slate-850 text-slate-400 hover:text-slate-200 border border-slate-800'
-                  }`}
-                >
-                  <Icon className="w-3 h-3" />
-                  <span>{pill.label}</span>
-                </button>
-              );
-            })}
-          </div>
+          {FORMAT_PILLS.length > 1 && (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scrollbar">
+              {FORMAT_PILLS.map((pill) => {
+                const isSelected = activeMode === pill.id;
+                const Icon = pill.icon;
+                return (
+                  <button
+                    key={pill.id}
+                    type="button"
+                    onClick={() => onModeChange(pill.id)}
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold transition-all shrink-0 ${
+                      isSelected
+                        ? 'bg-pink-600 text-white shadow-md shadow-pink-600/30'
+                        : 'bg-slate-900 hover:bg-slate-850 text-slate-400 hover:text-slate-200 border border-slate-800'
+                    }`}
+                  >
+                    <Icon className="w-3 h-3" />
+                    <span>{pill.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           <form
             onSubmit={(e) => { e.preventDefault(); handleSend(inputText); }}
@@ -266,9 +308,22 @@ export const QuickIdeaComposerModal: React.FC<QuickIdeaComposerModalProps> = ({
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               disabled={isGenerating}
-              placeholder="Contame tu idea..."
+              placeholder={isListening ? 'Escuchando...' : 'Contame tu idea...'}
               className="flex-1 rounded-xl bg-slate-900 border border-slate-800 px-3 py-2.5 text-xs text-slate-100 outline-none focus:border-pink-500/50 disabled:opacity-50"
             />
+            <button
+              type="button"
+              onClick={handleToggleDictation}
+              disabled={isGenerating}
+              title={isListening ? 'Detener dictado' : 'Dictar instrucción por voz'}
+              className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm transition-all disabled:opacity-40 ${
+                isListening
+                  ? 'bg-rose-600 text-white animate-pulse'
+                  : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+              }`}
+            >
+              <Mic className="w-3.5 h-3.5" />
+            </button>
             <button
               type="submit"
               disabled={!inputText.trim() || isGenerating}

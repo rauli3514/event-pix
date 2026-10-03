@@ -17,7 +17,9 @@ import {
   ChevronDown,
   FileText,
   MessageCircle,
-  Smartphone,
+  Mic,
+  Link2,
+  Trash2,
   RefreshCw,
   FlaskConical,
   TrendingUp,
@@ -33,7 +35,8 @@ import {
   ScriptVariant,
   ContentExperiment,
   LearnedInsight,
-  EmpiricalPattern
+  EmpiricalPattern,
+  BusinessSnapshot
 } from '../../../types/intelligence';
 import { AIProviderService } from '../../../services/intelligence/AIProviderService';
 import { IntelligenceStorageService } from '../../../services/intelligence/IntelligenceStorageService';
@@ -65,7 +68,7 @@ interface AiChatCardNodeProps {
   messages: ChatMessage[];
   activeMode: ContentFormatMode;
   onModeChange: (mode: ContentFormatMode) => void;
-  onSendMessage: (text: string, mode: ContentFormatMode) => Promise<void>;
+  onSendMessage: (text: string, mode: ContentFormatMode, referenceReelText?: string) => Promise<void>;
   onDisconnectAll: () => void;
   onDisconnectSource: (postId: string) => void;
   onOpenTeleprompter: (scriptText: string, title: string) => void;
@@ -75,12 +78,12 @@ interface AiChatCardNodeProps {
   onSelectAIProvider?: (provider: 'claude' | 'gemini' | 'openai' | 'auto') => void;
 }
 
+// Único formato de contenido que EventPix Intelligence genera: reel yapping
+// (reel hablado a cámara). B-roll, Carrusel, Frase/tweet y Stories se sacaron
+// de la interfaz porque no se usan — todo el esfuerzo de calidad se concentra
+// en este único formato.
 const FORMAT_PILLS: Array<{ id: ContentFormatMode; label: string; icon: any }> = [
-  { id: 'reel_hablado', label: 'Reel hablado', icon: Play },
-  { id: 'b_roll', label: 'B-roll', icon: Video },
-  { id: 'carrusel', label: 'Carrusel', icon: FileText },
-  { id: 'tweet', label: 'Frase/tweet', icon: MessageCircle },
-  { id: 'stories', label: 'Stories', icon: Smartphone }
+  { id: 'reel_hablado', label: 'Reel hablado', icon: Play }
 ];
 
 export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
@@ -98,8 +101,13 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
   preferredAIProvider = 'claude',
   onSelectAIProvider
 }) => {
-  // Pestañas principales de la tarjeta
-  const [activeTab, setActiveTab] = useState<'strategy' | 'experiments' | 'chat'>('strategy');
+  // Pestañas principales de la tarjeta: Guion (Copiloto, con el modo avanzado
+  // de 3 variantes plegado adentro) y Experimentos — se fusionaron "Estrategia
+  // & Variantes" y "Copiloto" en una sola pestaña para que el panel quede
+  // simple como Scripty (un solo generador), sin perder la posibilidad de
+  // crear un experimento y mantener vivo el Learning Loop.
+  const [activeTab, setActiveTab] = useState<'experiments' | 'chat'>('chat');
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Estado de estrategia e hipótesis
   const [isGeneratingStrategy, setIsGeneratingStrategy] = useState(false);
@@ -113,6 +121,7 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
   const [benchmark, setBenchmark] = useState<AccountMedianBenchmark | null>(null);
   const [, setPatterns] = useState<EmpiricalPattern[]>([]);
   const [, setWinningRules] = useState<string[]>([]);
+  const [businessSnapshot, setBusinessSnapshot] = useState<BusinessSnapshot | null>(null);
 
   // Estado de experimentos y bucle de aprendizaje
   const [experiments, setExperiments] = useState<ContentExperiment[]>([]);
@@ -127,6 +136,17 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
   const [isAiMenuOpen, setIsAiMenuOpen] = useState(false);
   const [copiedScriptId, setCopiedScriptId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Clonar Reel de referencia (opcional): pegar el link de un Reel ajeno
+  // (propio o de un competidor/viral) para usar su estructura/caption como
+  // inspiración del próximo guion — nunca se copia su texto literal, se usa
+  // solo como referencia opcional sobre lo ya existente (Content DNA, CTAs,
+  // Business Snapshot).
+  const [showCloneReel, setShowCloneReel] = useState(false);
+  const [cloneReelUrl, setCloneReelUrl] = useState('');
+  const [isCloningReel, setIsCloningReel] = useState(false);
+  const [cloneReelResult, setCloneReelResult] = useState<{ username: string; caption: string; imageUrl: string } | null>(null);
+  const [useCloneReelAsReference, setUseCloneReelAsReference] = useState(false);
 
   const businessId = IntelligenceStorageService.getActiveBusinessId() || 'tecno_eventos_arg';
 
@@ -174,6 +194,7 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
       setBenchmark(result.benchmark);
       setPatterns(result.patterns);
       setWinningRules(result.winningRules);
+      setBusinessSnapshot(result.business_snapshot);
 
       toast.success('¡Estrategia y 3 variantes generadas basadas en datos reales!');
     } catch (err: any) {
@@ -297,7 +318,95 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
     if (!inputText.trim() || isGenerating) return;
     const textToSend = inputText.trim();
     setInputText('');
-    await onSendMessage(textToSend, activeMode);
+    const referenceReelText = (useCloneReelAsReference && cloneReelResult?.caption)
+      ? cloneReelResult.caption
+      : undefined;
+    await onSendMessage(textToSend, activeMode, referenceReelText);
+  };
+
+  // Clonar Reel de referencia: trae el caption público de un Reel (propio o
+  // ajeno) vía el scraper existente (/api/instagram-scrape, ya usado para
+  // métricas) — reutilizado acá para no sumar una función serverless nueva
+  // (Vercel Hobby está en el límite de 12). No hay transcripción de audio
+  // para Reels ajenos: Whisper en producción solo funciona con el archivo
+  // de video de una cuenta conectada por Meta Graph API.
+  const handleCloneReel = async () => {
+    const url = cloneReelUrl.trim();
+    if (!url) {
+      toast.error('Pegá el link de un Reel de Instagram primero.');
+      return;
+    }
+    setIsCloningReel(true);
+    try {
+      const res = await fetch(`/api/instagram-scrape?url=${encodeURIComponent(url)}`);
+      const data = await res.json();
+      if (!data.success || data.isProfile) {
+        toast.error(data.error || 'Ese link no parece ser un Reel específico. Pegá el link directo del Reel.');
+        return;
+      }
+      if (!data.caption) {
+        toast.error('No pudimos leer el texto de ese Reel. Puede ser privado o Instagram bloqueó la lectura pública.');
+        return;
+      }
+      setCloneReelResult({
+        username: data.username || '',
+        caption: data.caption,
+        imageUrl: data.imageUrl || ''
+      });
+      setUseCloneReelAsReference(true);
+      toast.success('Reel leído. Lo vamos a usar como referencia de estructura en el próximo guion (nunca copiamos su texto literal).');
+    } catch {
+      toast.error('No pudimos leer ese Reel ahora mismo. Probá de nuevo.');
+    } finally {
+      setIsCloningReel(false);
+    }
+  };
+
+  // Dictado por voz de la instrucción, como el micrófono de Scripty: usa la
+  // Web Speech API del navegador (sin costo de IA, no pasa por ningún
+  // proveedor). Si el navegador no la soporta (ej. Firefox de escritorio),
+  // avisamos en vez de fallar en silencio.
+  const recognitionRef = useRef<any>(null);
+  const [isListening, setIsListening] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      try { recognitionRef.current?.stop?.(); } catch { /* noop */ }
+    };
+  }, []);
+
+  const handleToggleDictation = () => {
+    const SpeechRecognitionImpl = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognitionImpl) {
+      toast.error('Tu navegador no soporta dictado por voz. Probá desde Chrome.');
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+
+    const recognition = new SpeechRecognitionImpl();
+    recognition.lang = 'es-AR';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results?.[0]?.[0]?.transcript?.trim();
+      if (transcript) {
+        setInputText(prev => (prev ? `${prev} ${transcript}` : transcript));
+      }
+    };
+    recognition.onerror = () => {
+      setIsListening(false);
+      toast.error('No se pudo escuchar el dictado. Intentá de nuevo.');
+    };
+    recognition.onend = () => setIsListening(false);
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
   };
 
   const handleCopy = (fullScript: string, idKey: string) => {
@@ -473,19 +582,19 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
         )}
       </div>
 
-      {/* 3. NAVEGACIÓN POR PESTAÑAS (ESTRATEGIA | EXPERIMENTOS | COPILOTO) */}
+      {/* 3. NAVEGACIÓN POR PESTAÑAS (GUION | EXPERIMENTOS) */}
       <div className="flex border-b border-slate-800/80 bg-slate-950/40 text-[11px] font-semibold">
         <button
           type="button"
-          onClick={() => setActiveTab('strategy')}
+          onClick={() => setActiveTab('chat')}
           className={`flex-1 py-2 px-2 flex items-center justify-center gap-1.5 transition-colors border-b-2 ${
-            activeTab === 'strategy'
-              ? 'border-pink-500 text-pink-300 bg-pink-500/10 font-bold'
+            activeTab === 'chat'
+              ? 'border-sky-500 text-sky-300 bg-sky-500/10 font-bold'
               : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
-          <Sparkles className="w-3 h-3" />
-          <span>Estrategia & Variantes</span>
+          <MessageCircle className="w-3 h-3" />
+          <span>Guion</span>
         </button>
 
         <button
@@ -500,28 +609,111 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
           <FlaskConical className="w-3 h-3" />
           <span>Experimentos ({experiments.length})</span>
         </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('chat')}
-          className={`flex-1 py-2 px-2 flex items-center justify-center gap-1.5 transition-colors border-b-2 ${
-            activeTab === 'chat'
-              ? 'border-sky-500 text-sky-300 bg-sky-500/10 font-bold'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <MessageCircle className="w-3 h-3" />
-          <span>Copiloto</span>
-        </button>
       </div>
 
       {/* 4. CONTENIDO SEGÚN LA PESTAÑA ACTIVA */}
       <div className="flex-1 overflow-y-auto p-3.5 space-y-3.5 text-xs custom-scrollbar bg-[#080C14]">
 
+        {/* Toggle del modo avanzado (3 variantes + Crear Experimento), plegado
+            por defecto para que el panel por defecto sea un solo generador de
+            guion simple, como Scripty. */}
+        {activeTab === 'chat' && (
+          <button
+            type="button"
+            onClick={() => setShowAdvanced(v => !v)}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-900/70 border border-slate-800 text-[11px] font-bold text-slate-300 hover:text-slate-100 transition-colors"
+          >
+            <span className="flex items-center gap-1.5">
+              <FlaskConical className="w-3.5 h-3.5 text-emerald-400" />
+              Modo avanzado: 3 variantes + Crear Experimento
+            </span>
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+          </button>
+        )}
+
+        {/* Clonar Reel de referencia (opcional): pegar el link de un Reel
+            propio o ajeno para usar su estructura como inspiración, sin
+            copiar su texto literal. No reemplaza el Content DNA ya
+            existente — lo refuerza. */}
+        {activeTab === 'chat' && (
+          <button
+            type="button"
+            onClick={() => setShowCloneReel(v => !v)}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-900/70 border border-slate-800 text-[11px] font-bold text-slate-300 hover:text-slate-100 transition-colors"
+          >
+            <span className="flex items-center gap-1.5">
+              <Link2 className="w-3.5 h-3.5 text-sky-400" />
+              Clonar estructura de un Reel de referencia (opcional)
+              {cloneReelResult && useCloneReelAsReference && (
+                <span className="px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 text-[8px] font-bold uppercase">Activo</span>
+              )}
+            </span>
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showCloneReel ? 'rotate-180' : ''}`} />
+          </button>
+        )}
+
+        {activeTab === 'chat' && showCloneReel && (
+          <div className="p-3 rounded-xl bg-slate-900/70 border border-slate-800 space-y-2.5">
+            <p className="text-[10px] text-slate-400 leading-relaxed">
+              Pegá el link de un Reel (tuyo o de referencia) y leemos su texto completo. Lo usamos solo como inspiración de estructura para el próximo guion — nunca copiamos su contenido literal.
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={cloneReelUrl}
+                onChange={(e) => setCloneReelUrl(e.target.value)}
+                placeholder="https://www.instagram.com/reel/..."
+                className="flex-1 rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-xs text-slate-100 outline-none focus:border-sky-500/60"
+              />
+              <button
+                type="button"
+                onClick={handleCloneReel}
+                disabled={isCloningReel || !cloneReelUrl.trim()}
+                className="px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-white text-xs font-bold shrink-0"
+              >
+                {isCloningReel ? 'Leyendo...' : 'Analizar'}
+              </button>
+            </div>
+
+            {cloneReelResult && (
+              <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-sky-400">
+                    {cloneReelResult.username ? `@${cloneReelResult.username}` : 'Texto completo del Reel'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCloneReelResult(null);
+                      setUseCloneReelAsReference(false);
+                      setCloneReelUrl('');
+                    }}
+                    className="text-slate-500 hover:text-rose-400"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-300 whitespace-pre-wrap leading-relaxed max-h-32 overflow-y-auto custom-scrollbar">
+                  {cloneReelResult.caption}
+                </p>
+                <label className="flex items-center gap-2 text-[10px] text-slate-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={useCloneReelAsReference}
+                    onChange={(e) => setUseCloneReelAsReference(e.target.checked)}
+                    className="accent-sky-500"
+                  />
+                  Usar como referencia en el próximo guion que genere
+                </label>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ============================================================ */}
-        {/* PESTAÑA 1: ESTRATEGIA Y 3 VARIANTES (PRE-PUBLICACIÓN) */}
+        {/* ESTRATEGIA Y 3 VARIANTES (PRE-PUBLICACIÓN) — modo avanzado, plegado */}
         {/* ============================================================ */}
-        {activeTab === 'strategy' && (
+        {activeTab === 'chat' && showAdvanced && (
           <div className="space-y-3">
             {/* Si no hay estrategia generada aún */}
             {!variants && !isGeneratingStrategy && (
@@ -576,6 +768,39 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
             {/* Estrategia generada con Hipótesis y 3 Variantes */}
             {variants && hypothesis && !isGeneratingStrategy && (
               <div className="space-y-3">
+                {/* Business Snapshot: qué entendió la IA del negocio antes de escribir */}
+                {businessSnapshot && (
+                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
+                      <BrainCircuit className="w-3.5 h-3.5" />
+                      Business Snapshot
+                    </span>
+                    {([
+                      ['Qué vende', businessSnapshot.que_vende],
+                      ['A quién', businessSnapshot.a_quien],
+                      ['Problema que resuelve', businessSnapshot.problema_que_resuelve],
+                      ['Deseo del cliente', businessSnapshot.deseo_del_cliente],
+                      ['Objeciones', businessSnapshot.objeciones],
+                      ['Por qué comprarían', businessSnapshot.por_que_comprarian],
+                      ['Diferenciador', businessSnapshot.diferenciador],
+                      ['Productos clave', businessSnapshot.productos_clave]
+                    ] as const).map(([label, field]) => (
+                      <div key={label} className="flex items-start gap-1.5 text-[10px]">
+                        <span className={`shrink-0 mt-0.5 px-1 py-px rounded text-[8px] font-bold uppercase ${
+                          field.basis === 'hecho'
+                            ? 'bg-emerald-500/20 text-emerald-300'
+                            : field.basis === 'inferencia'
+                            ? 'bg-amber-500/20 text-amber-300'
+                            : 'bg-slate-800 text-slate-500'
+                        }`}>
+                          {field.basis === 'hecho' ? 'HECHO' : field.basis === 'inferencia' ? 'INFERENCIA' : 'FALTA INFO'}
+                        </span>
+                        <span className="text-slate-300"><strong className="text-slate-400">{label}:</strong> {field.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {/* Caja de Hipótesis y Evidencia */}
                 <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
                   <div className="flex items-center justify-between">
@@ -645,7 +870,14 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
                 {currentVariant && (
                   <div className="p-3.5 rounded-xl bg-slate-950 border border-pink-500/30 space-y-2.5">
                     <div className="flex items-center justify-between pb-1.5 border-b border-slate-800 text-[10px]">
-                      <span className="font-bold text-pink-300">{currentVariant.label}</span>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="font-bold text-pink-300 truncate">{currentVariant.label}</span>
+                        {currentVariant.content_angle && (
+                          <span className="shrink-0 px-1.5 py-0.5 rounded bg-fuchsia-500/20 text-fuchsia-300 text-[8px] font-bold uppercase border border-fuchsia-500/30">
+                            Ángulo: {currentVariant.content_angle}
+                          </span>
+                        )}
+                      </div>
                       <button
                         type="button"
                         onClick={() => handleCopy(`${currentVariant.hook_0_3s}\n\n${currentVariant.script_body}\n\n${currentVariant.cta_trigger}`, selectedVariantKey)}
@@ -716,6 +948,18 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
                       💡 {currentVariant.why_this_variant}
                     </p>
 
+                    {/* Hipótesis a comprobar y qué medir */}
+                    {(currentVariant.hypothesis_to_test || currentVariant.what_to_measure) && (
+                      <div className="p-2 rounded-lg bg-slate-900/40 border border-slate-800/60 text-[10px] space-y-1">
+                        {currentVariant.hypothesis_to_test && (
+                          <p className="text-slate-400"><strong className="text-sky-400">🧪 Hipótesis a comprobar:</strong> {currentVariant.hypothesis_to_test}</p>
+                        )}
+                        {currentVariant.what_to_measure && (
+                          <p className="text-slate-400"><strong className="text-sky-400">📏 Qué medir:</strong> {currentVariant.what_to_measure}</p>
+                        )}
+                      </div>
+                    )}
+
                     {/* Botones de Acción */}
                     <div className="pt-2 flex gap-2">
                       <button
@@ -758,7 +1002,7 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
               </span>
               <button
                 type="button"
-                onClick={() => setActiveTab('strategy')}
+                onClick={() => { setActiveTab('chat'); setShowAdvanced(true); }}
                 className="text-[10px] text-pink-400 hover:underline"
               >
                 + Nuevo Experimento
@@ -769,14 +1013,14 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
               <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-center space-y-2">
                 <p className="text-slate-400 text-xs">No hay experimentos registrados todavía.</p>
                 <p className="text-[11px] text-slate-500">
-                  Genera una estrategia en la primera pestaña y presiona "Crear Experimento" para comenzar el ciclo.
+                  Abrí el modo avanzado en la pestaña Guion y presioná "Crear Experimento" para comenzar el ciclo.
                 </p>
                 <button
                   type="button"
-                  onClick={() => setActiveTab('strategy')}
+                  onClick={() => { setActiveTab('chat'); setShowAdvanced(true); }}
                   className="mt-2 py-1.5 px-3 rounded-lg bg-pink-600 hover:bg-pink-500 text-white font-bold text-xs"
                 >
-                  Ir a Estrategia
+                  Ir al Guion
                 </button>
               </div>
             ) : (
@@ -1039,28 +1283,30 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
       {/* 5. SELECTOR DE FORMATO & BARRA DE ENTRADA (Siempre visible para interacción fluida) */}
       <div className="p-3 bg-slate-950 border-t border-slate-800 space-y-2.5">
         
-        {/* Pastillas de Formato */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scrollbar">
-          {FORMAT_PILLS.map((pill) => {
-            const isSelected = activeMode === pill.id;
-            const Icon = pill.icon;
-            return (
-              <button
-                key={pill.id}
-                type="button"
-                onClick={() => onModeChange(pill.id)}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold transition-all shrink-0 ${
-                  isSelected
-                    ? 'bg-pink-600 text-white shadow-md shadow-pink-600/30'
-                    : 'bg-slate-900 hover:bg-slate-850 text-slate-400 hover:text-slate-200 border border-slate-800'
-                }`}
-              >
-                <Icon className="w-3 h-3" />
-                <span>{pill.label}</span>
-              </button>
-            );
-          })}
-        </div>
+        {/* Pastillas de Formato: ocultas cuando hay un solo formato disponible (reel yapping) */}
+        {FORMAT_PILLS.length > 1 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scrollbar">
+            {FORMAT_PILLS.map((pill) => {
+              const isSelected = activeMode === pill.id;
+              const Icon = pill.icon;
+              return (
+                <button
+                  key={pill.id}
+                  type="button"
+                  onClick={() => onModeChange(pill.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold transition-all shrink-0 ${
+                    isSelected
+                      ? 'bg-pink-600 text-white shadow-md shadow-pink-600/30'
+                      : 'bg-slate-900 hover:bg-slate-850 text-slate-400 hover:text-slate-200 border border-slate-800'
+                  }`}
+                >
+                  <Icon className="w-3 h-3" />
+                  <span>{pill.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Input conversacional */}
         <form onSubmit={handleSend} className="flex items-center gap-2">
@@ -1069,9 +1315,22 @@ export const AiChatCardNode: React.FC<AiChatCardNodeProps> = ({
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             disabled={isGenerating || isGeneratingStrategy}
-            placeholder={activeTab === 'chat' ? 'Ajustar guion, cambiar gancho o pedir alternativa...' : 'Escribí un objetivo o instrucción para la IA...'}
+            placeholder={isListening ? 'Escuchando...' : activeTab === 'chat' ? 'Ajustar guion, cambiar gancho o pedir alternativa...' : 'Escribí un objetivo o instrucción para la IA...'}
             className="flex-1 rounded-xl bg-slate-900 border border-slate-800 px-3 py-2 text-xs text-slate-100 outline-none focus:border-pink-500/50 disabled:opacity-50"
           />
+          <button
+            type="button"
+            onClick={handleToggleDictation}
+            disabled={isGenerating || isGeneratingStrategy}
+            title={isListening ? 'Detener dictado' : 'Dictar instrucción por voz'}
+            className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-sm transition-all disabled:opacity-40 ${
+              isListening
+                ? 'bg-rose-600 text-white animate-pulse'
+                : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+            }`}
+          >
+            <Mic className="w-3.5 h-3.5" />
+          </button>
           <button
             type="submit"
             disabled={!inputText.trim() || isGenerating || isGeneratingStrategy}

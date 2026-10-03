@@ -592,7 +592,9 @@ export class IntelligenceStorageService {
           'No inventar datos falsos ni prometer fórmulas mágicas de la noche a la mañana.',
           'Evitar saludos lentos tipo "¿Cómo están chicos?" al inicio de los videos.'
         ],
-        favorite_catchphrases: brandDna?.voice_and_tone?.favorite_catchphrases || []
+        favorite_catchphrases: brandDna?.voice_and_tone?.favorite_catchphrases || [],
+        identifying_words: [],
+        never_words: []
       },
       cta_list: [
         {

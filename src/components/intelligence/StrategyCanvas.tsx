@@ -57,7 +57,7 @@ interface StrategyCanvasProps {
   onOpenCrm?: () => void;
   onToggleConnectEdge?: (sourceId: string, targetId: string) => void;
   onDisconnectAllFromTarget?: (targetId: string) => void;
-  onSendChatMessage?: (nodeId: string, text: string, mode: ContentFormatMode) => Promise<void>;
+  onSendChatMessage?: (nodeId: string, text: string, mode: ContentFormatMode, referenceReelText?: string) => Promise<void>;
   onUpdateNodeChatMode?: (nodeId: string, mode: ContentFormatMode) => void;
   onCreateAiChatNode?: (position?: { x: number; y: number }, sourceReelId?: string) => void;
   preferredAIProvider?: 'claude' | 'gemini' | 'openai' | 'local_engine' | 'auto';
@@ -1377,7 +1377,7 @@ export const StrategyCanvas: React.FC<StrategyCanvasProps> = ({
                   messages={node.chatMessages || []}
                   activeMode={node.activeMode || 'reel_hablado'}
                   onModeChange={(mode) => onUpdateNodeChatMode && onUpdateNodeChatMode(node.id, mode)}
-                  onSendMessage={(text, mode) => onSendChatMessage ? onSendChatMessage(node.id, text, mode) : Promise.resolve()}
+                  onSendMessage={(text, mode, referenceReelText) => onSendChatMessage ? onSendChatMessage(node.id, text, mode, referenceReelText) : Promise.resolve()}
                   onDisconnectAll={() => onDisconnectAllFromTarget && onDisconnectAllFromTarget(node.id)}
                   onDisconnectSource={(postId) => {
                     const srcNode = nodes.find(n => n.post?.id === postId);

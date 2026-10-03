@@ -22,6 +22,11 @@ export interface AiPermanentContext {
   must_do_rules: string[]; // Reglas de estilo que la IA DEBE cumplir
   forbidden_rules: string[]; // Cosas que la IA NUNCA debe hacer
   favorite_catchphrases: string[]; // Frases de cabecera favoritas
+  // Vocabulario de identidad, opcional: refuerza el tono sin agregar un paso
+  // obligatorio al onboarding. Distinto de forbidden_rules (que son reglas de
+  // contenido/estilo) — esto es específicamente vocabulario/jerga personal.
+  identifying_words?: string[]; // Palabras o regionalismos que normalmente usás y te identifican
+  never_words?: string[]; // Palabras o estilos con los que JAMÁS te identificarías
 }
 
 export interface CtaItem {
