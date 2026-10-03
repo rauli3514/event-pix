@@ -65,8 +65,11 @@ public class NativePrintPlugin extends Plugin {
             this.heightHmm = heightHmm;
         }
 
-        int widthPx() { return Math.round(widthHmm / 2540f * DPI); }
-        int heightPx() { return Math.round(heightHmm / 2540f * DPI); }
+        int widthPx(int dpi) { return Math.round(widthHmm / 2540f * dpi); }
+        int heightPx(int dpi) { return Math.round(heightHmm / 2540f * dpi); }
+
+        /** 10x15 y 13x18 son papel fotográfico; A4 y Carta, papel común. */
+        boolean isPhoto() { return keyword.startsWith("na_index-4x6") || keyword.startsWith("na_5x7"); }
         int widthPt() { return Math.round(widthHmm / 2540f * 72); }
         int heightPt() { return Math.round(heightHmm / 2540f * 72); }
     }
@@ -243,13 +246,16 @@ public class NativePrintPlugin extends Plugin {
             try {
                 Bitmap source = loadBitmap(image);
                 int totalRotation = rotation + ("landscape".equals(orientation) ? 90 : 0);
-                page = composePage(source, paper, totalRotation, scaleMode);
-                source.recycle();
 
                 if (printer != null && printer.has("host")) {
-                    printSilently(call, printer, page, paper, copies, borderless, jobName);
+                    Capabilities caps = capabilitiesFor(printer, paper);
+                    page = composePage(source, paper, totalRotation, scaleMode, caps.dpi);
+                    source.recycle();
+                    printSilently(call, printer, page, paper, caps, copies, borderless, jobName);
                     page.recycle();
                 } else {
+                    page = composePage(source, paper, totalRotation, scaleMode, DPI);
+                    source.recycle();
                     printWithDialog(call, page, jobName);
                 }
             } catch (Exception e) {
@@ -259,23 +265,74 @@ public class NativePrintPlugin extends Plugin {
         });
     }
 
-    private void printSilently(PluginCall call, JSObject printer, Bitmap page, Paper paper,
+    /** Formato y parámetros con los que se le va a mandar el trabajo a la impresora. */
+    private static final class Capabilities {
+        String format;
+        int dpi = DPI;
+        boolean color = true;
+        String mediaType;
+    }
+
+    private static Capabilities capabilitiesFor(JSObject printer, Paper paper) throws IOException {
+        String pdl = printer.getString("pdl", "").toLowerCase(Locale.ROOT);
+        Capabilities caps = new Capabilities();
+        if (pdl.isEmpty() || pdl.contains("image/jpeg")) {
+            caps.format = "image/jpeg";
+        } else if (pdl.contains("application/pdf")) {
+            caps.format = "application/pdf";
+        } else if (pdl.contains("image/pwg-raster")) {
+            caps.format = "image/pwg-raster";
+        } else {
+            throw new IOException("La impresora no acepta JPEG, PDF ni PWG raster (formatos: " + pdl + ")");
+        }
+
+        // Para PWG raster hay que usar una resolución y un tipo de color que la impresora acepte
+        String host = printer.getString("host");
+        int port = printer.getInteger("port", 631);
+        String rp = printer.getString("rp", "ipp/print");
+        IppClient.Result attrs;
+        try {
+            attrs = IppClient.getPrinterAttributes(host, port, rp,
+                    "pwg-raster-document-resolution-supported",
+                    "pwg-raster-document-type-supported",
+                    "media-type-supported");
+        } catch (IOException e) {
+            if (caps.format.equals("image/pwg-raster")) {
+                throw new IOException("No se pudo consultar la impresora: " + e.getMessage(), e);
+            }
+            return caps; // JPEG/PDF funcionan sin estos datos
+        }
+
+        if (caps.format.equals("image/pwg-raster")) {
+            caps.dpi = IppClient.pickResolution(attrs.get("pwg-raster-document-resolution-supported"), DPI);
+            boolean srgb = false;
+            boolean gray = false;
+            for (IppClient.Value v : attrs.get("pwg-raster-document-type-supported")) {
+                srgb |= v.asString().equals("srgb_8");
+                gray |= v.asString().equals("sgray_8");
+            }
+            if (!srgb && gray) caps.color = false;
+            else if (!srgb) throw new IOException("La impresora no acepta PWG raster sRGB de 8 bits");
+        }
+
+        if (paper.isPhoto()) caps.mediaType = IppClient.pickPhotoMediaType(attrs.get("media-type-supported"));
+        return caps;
+    }
+
+    private void printSilently(PluginCall call, JSObject printer, Bitmap page, Paper paper, Capabilities caps,
                                int copies, boolean borderless, String jobName) throws IOException {
         String host = printer.getString("host");
         int port = printer.getInteger("port", 631);
         String rp = printer.getString("rp", "ipp/print");
-        String pdl = printer.getString("pdl", "").toLowerCase(Locale.ROOT);
 
-        String format;
+        String format = caps.format;
         byte[] document;
-        if (pdl.isEmpty() || pdl.contains("image/jpeg")) {
-            format = "image/jpeg";
+        if (format.equals("image/jpeg")) {
             document = toJpeg(page);
-        } else if (pdl.contains("application/pdf")) {
-            format = "application/pdf";
+        } else if (format.equals("application/pdf")) {
             document = toPdf(page, paper);
         } else {
-            throw new IOException("La impresora no acepta JPEG ni PDF (formatos: " + pdl + ")");
+            document = toPwgRaster(page, paper, caps);
         }
 
         IppClient.Options options = new IppClient.Options();
@@ -284,8 +341,10 @@ public class NativePrintPlugin extends Plugin {
         options.mediaKeyword = paper.keyword;
         options.mediaWidthHmm = paper.widthHmm;
         options.mediaHeightHmm = paper.heightHmm;
+        options.mediaType = caps.mediaType;
         options.borderless = borderless;
-        options.printScaling = "fill";
+        // En raster la página ya viene al tamaño exacto; print-scaling es para JPEG/PDF
+        options.printScaling = format.equals("image/pwg-raster") ? null : "fill";
 
         IppClient.Result result = IppClient.printJob(host, port, rp, format, document, options);
         if (!result.isSuccess()) {
@@ -357,9 +416,9 @@ public class NativePrintPlugin extends Plugin {
     }
 
     /** Arma la página completa (vertical, 300 dpi) con fondo blanco. */
-    private static Bitmap composePage(Bitmap source, Paper paper, int rotation, String scaleMode) {
-        int pageW = paper.widthPx();
-        int pageH = paper.heightPx();
+    private static Bitmap composePage(Bitmap source, Paper paper, int rotation, String scaleMode, int dpi) {
+        int pageW = paper.widthPx(dpi);
+        int pageH = paper.heightPx(dpi);
         Bitmap page = Bitmap.createBitmap(pageW, pageH, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(page);
         canvas.drawColor(Color.WHITE);
@@ -384,6 +443,17 @@ public class NativePrintPlugin extends Plugin {
         m.postTranslate(pageW / 2f, pageH / 2f);
         canvas.drawBitmap(source, m, new Paint(Paint.FILTER_BITMAP_FLAG | Paint.ANTI_ALIAS_FLAG));
         return page;
+    }
+
+    private static byte[] toPwgRaster(Bitmap page, Paper paper, Capabilities caps) throws IOException {
+        PwgRaster.Page p = new PwgRaster.Page();
+        p.widthPx = page.getWidth();
+        p.heightPx = page.getHeight();
+        p.dpi = caps.dpi;
+        p.color = caps.color;
+        p.pageSizeName = paper.keyword;
+        p.mediaType = caps.mediaType != null ? caps.mediaType : "";
+        return PwgRaster.encode(p, (y, out) -> page.getPixels(out, 0, p.widthPx, 0, y, p.widthPx, 1));
     }
 
     private static byte[] toJpeg(Bitmap page) {

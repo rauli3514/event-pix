@@ -1011,7 +1011,7 @@ const KioskManager = () => {
                                                             <option value="">Diálogo de Android (elegir al imprimir)</option>
                                                             {nativePrinters.map(p => (
                                                                 <option key={p.serviceName} value={p.serviceName}>
-                                                                    {p.name} — {p.host}{isPrintableDirect(p) ? '' : ' (no acepta JPEG/PDF)'}
+                                                                    {p.name} — {p.host}{isPrintableDirect(p) ? '' : ' (formato no compatible)'}
                                                                 </option>
                                                             ))}
                                                         </select>

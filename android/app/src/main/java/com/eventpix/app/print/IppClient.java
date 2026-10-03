@@ -9,7 +9,11 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Cliente IPP mínimo (RFC 8010/8011) para mandar un Print-Job directo a una
@@ -28,6 +32,7 @@ public final class IppClient {
 
     // Tipos de valor
     private static final int TAG_INTEGER = 0x21;
+    private static final int TAG_RESOLUTION = 0x32;
     private static final int TAG_ENUM = 0x23;
     private static final int TAG_BEG_COLLECTION = 0x34;
     private static final int TAG_END_COLLECTION = 0x37;
@@ -41,6 +46,8 @@ public final class IppClient {
     private static final int TAG_MEMBER_ATTR_NAME = 0x4A;
 
     private static final int OP_PRINT_JOB = 0x0002;
+    private static final int OP_GET_PRINTER_ATTRIBUTES = 0x000B;
+    private static final int RESOLUTION_UNITS_DPI = 3;
     private static final int PRINT_QUALITY_HIGH = 5;
 
     private static final int CONNECT_TIMEOUT_MS = 5000;
@@ -54,24 +61,61 @@ public final class IppClient {
         public int copies = 1;
         /** Keyword PWG 5101.1, p. ej. "na_index-4x6_4x6in". Null = default de la impresora. */
         public String mediaKeyword;
-        /** Tamaño en centésimas de mm; se usa solo con borderless. */
+        /** Tamaño en centésimas de mm. Si está, se manda media-col en vez de `media`. */
         public int mediaWidthHmm;
         public int mediaHeightHmm;
+        /** Keyword PWG, p. ej. "photographic-glossy". Null = default de la impresora. */
+        public String mediaType;
         public boolean borderless;
         /** "fill", "fit", "auto"... Null = no se envía. */
         public String printScaling;
         public boolean highQuality = true;
     }
 
+    /** Un valor de atributo IPP crudo (tag + bytes). */
+    public static final class Value {
+        public final int tag;
+        public final byte[] bytes;
+
+        Value(int tag, byte[] bytes) {
+            this.tag = tag;
+            this.bytes = bytes;
+        }
+
+        public String asString() {
+            return new String(bytes, StandardCharsets.UTF_8);
+        }
+
+        public int asInt() {
+            return bytes.length == 4 ? readInt(bytes, 0) : -1;
+        }
+
+        /** Para resoluciones: dpi horizontal, o -1 si no es una resolución en dpi. */
+        public int asDpi() {
+            if (tag != TAG_RESOLUTION || bytes.length != 9) return -1;
+            int x = readInt(bytes, 0);
+            int units = bytes[8] & 0xFF;
+            return units == RESOLUTION_UNITS_DPI ? x : Math.round(x * 2.54f);
+        }
+    }
+
     public static final class Result {
         public final int statusCode;
         public final int jobId;
         public final String statusMessage;
+        /** Atributos de primer nivel de la respuesta (los valores extra se agregan a la lista). */
+        public final Map<String, List<Value>> attributes;
 
-        Result(int statusCode, int jobId, String statusMessage) {
+        Result(int statusCode, int jobId, String statusMessage, Map<String, List<Value>> attributes) {
             this.statusCode = statusCode;
             this.jobId = jobId;
             this.statusMessage = statusMessage;
+            this.attributes = attributes;
+        }
+
+        public List<Value> get(String name) {
+            List<Value> v = attributes.get(name);
+            return v != null ? v : new ArrayList<>();
         }
 
         /** 0x0000-0x00FF son "successful-ok*". */
@@ -98,6 +142,55 @@ public final class IppClient {
         return parseResponse(ippResponse);
     }
 
+    public static Result getPrinterAttributes(String host, int port, String resourcePath,
+                                              String... requested) throws IOException {
+        String uri = printerUri(host, port, resourcePath);
+        ByteArrayOutputStream buf = new ByteArrayOutputStream();
+        DataOutputStream out = new DataOutputStream(buf);
+        out.writeByte(1);
+        out.writeByte(1);
+        out.writeShort(OP_GET_PRINTER_ATTRIBUTES);
+        out.writeInt(1);
+        out.writeByte(TAG_OPERATION_ATTRIBUTES);
+        writeString(out, TAG_CHARSET, "attributes-charset", "utf-8");
+        writeString(out, TAG_NATURAL_LANGUAGE, "attributes-natural-language", "es");
+        writeString(out, TAG_URI, "printer-uri", uri);
+        writeString(out, TAG_NAME_WITHOUT_LANGUAGE, "requesting-user-name", "EventPix");
+        for (int i = 0; i < requested.length; i++) {
+            // 1setOf: el primer valor lleva el nombre, los siguientes van sin nombre
+            writeString(out, TAG_KEYWORD, i == 0 ? "requested-attributes" : "", requested[i]);
+        }
+        out.writeByte(TAG_END_OF_ATTRIBUTES);
+        out.flush();
+        return parseResponse(httpPost(host, port, normalizePath(resourcePath), buf.toByteArray()));
+    }
+
+    /** La resolución preferida si está; si no, la menor que la supere (las Epson suelen pedir 360). */
+    public static int pickResolution(List<Value> values, int preferredDpi) {
+        int best = -1;
+        int max = -1;
+        for (Value v : values) {
+            int dpi = v.asDpi();
+            if (dpi <= 0) continue;
+            if (dpi == preferredDpi) return preferredDpi;
+            if (dpi > preferredDpi && (best < 0 || dpi < best)) best = dpi;
+            max = Math.max(max, dpi);
+        }
+        if (best > 0) return best;
+        return max > 0 ? max : preferredDpi;
+    }
+
+    /** "photographic-glossy" si está; si no, el primer tipo fotográfico; si no, null. */
+    public static String pickPhotoMediaType(List<Value> values) {
+        String fallback = null;
+        for (Value v : values) {
+            String type = v.asString();
+            if (type.equals("photographic-glossy")) return type;
+            if (fallback == null && type.startsWith("photographic")) fallback = type;
+        }
+        return fallback;
+    }
+
     static byte[] buildPrintJobRequest(String printerUri, String documentFormat, byte[] document,
                                        Options o, int requestId) throws IOException {
         ByteArrayOutputStream buf = new ByteArrayOutputStream(document.length + 1024);
@@ -121,8 +214,8 @@ public final class IppClient {
         if (o.highQuality) writeInt(out, TAG_ENUM, "print-quality", PRINT_QUALITY_HIGH);
         if (o.printScaling != null) writeString(out, TAG_KEYWORD, "print-scaling", o.printScaling);
 
-        if (o.borderless && o.mediaWidthHmm > 0 && o.mediaHeightHmm > 0) {
-            // media-col { media-size { x-dimension, y-dimension }, márgenes en 0 }
+        if (o.mediaWidthHmm > 0 && o.mediaHeightHmm > 0) {
+            // media-col { media-size { x-dimension, y-dimension }, [media-type], [márgenes en 0] }
             writeValue(out, TAG_BEG_COLLECTION, "media-col", new byte[0]);
             writeMember(out, "media-size");
             writeValue(out, TAG_BEG_COLLECTION, "", new byte[0]);
@@ -131,10 +224,16 @@ public final class IppClient {
             writeMember(out, "y-dimension");
             writeInt(out, TAG_INTEGER, "", o.mediaHeightHmm);
             writeValue(out, TAG_END_COLLECTION, "", new byte[0]);
-            for (String margin : new String[]{"media-top-margin", "media-bottom-margin",
-                    "media-left-margin", "media-right-margin"}) {
-                writeMember(out, margin);
-                writeInt(out, TAG_INTEGER, "", 0);
+            if (o.mediaType != null && !o.mediaType.isEmpty()) {
+                writeMember(out, "media-type");
+                writeString(out, TAG_KEYWORD, "", o.mediaType);
+            }
+            if (o.borderless) {
+                for (String margin : new String[]{"media-top-margin", "media-bottom-margin",
+                        "media-left-margin", "media-right-margin"}) {
+                    writeMember(out, margin);
+                    writeInt(out, TAG_INTEGER, "", 0);
+                }
             }
             writeValue(out, TAG_END_COLLECTION, "", new byte[0]);
         } else if (o.mediaKeyword != null && !o.mediaKeyword.isEmpty()) {
@@ -171,11 +270,12 @@ public final class IppClient {
 
     static Result parseResponse(byte[] body) throws IOException {
         if (body.length < 8) throw new IOException("Respuesta IPP inválida (" + body.length + " bytes)");
-        int status = ((body[2] & 0xFF) << 8) | (body[3] & 0xFF);
-        int jobId = -1;
-        String message = null;
+        int status = readShort(body, 2);
+        Map<String, List<Value>> attrs = new HashMap<>();
 
         int i = 8;
+        int depth = 0; // dentro de una colección se ignoran los miembros
+        List<Value> current = null;
         while (i < body.length) {
             int tag = body[i++] & 0xFF;
             if (tag == TAG_END_OF_ATTRIBUTES) break;
@@ -189,15 +289,38 @@ public final class IppClient {
             int valueLen = readShort(body, i);
             i += 2;
             if (i + valueLen > body.length) break;
-            if ("job-id".equals(name) && tag == TAG_INTEGER && valueLen == 4) {
-                jobId = ((body[i] & 0xFF) << 24) | ((body[i + 1] & 0xFF) << 16)
-                        | ((body[i + 2] & 0xFF) << 8) | (body[i + 3] & 0xFF);
-            } else if ("status-message".equals(name) && tag == TAG_TEXT_WITHOUT_LANGUAGE) {
-                message = new String(body, i, valueLen, StandardCharsets.UTF_8);
-            }
+            byte[] value = new byte[valueLen];
+            System.arraycopy(body, i, value, 0, valueLen);
             i += valueLen;
+
+            if (tag == TAG_BEG_COLLECTION) {
+                if (depth == 0 && !name.isEmpty()) current = null;
+                depth++;
+                continue;
+            }
+            if (tag == TAG_END_COLLECTION) {
+                depth = Math.max(0, depth - 1);
+                continue;
+            }
+            if (depth > 0) continue;
+            if (!name.isEmpty()) {
+                current = new ArrayList<>();
+                attrs.put(name, current);
+            }
+            if (current != null) current.add(new Value(tag, value));
         }
-        return new Result(status, jobId, message);
+
+        List<Value> jobIds = attrs.get("job-id");
+        int jobId = jobIds != null && !jobIds.isEmpty() && jobIds.get(0).tag == TAG_INTEGER
+                ? jobIds.get(0).asInt() : -1;
+        List<Value> messages = attrs.get("status-message");
+        String message = messages != null && !messages.isEmpty()
+                && messages.get(0).tag == TAG_TEXT_WITHOUT_LANGUAGE ? messages.get(0).asString() : null;
+        return new Result(status, jobId, message, attrs);
+    }
+
+    private static int readInt(byte[] b, int i) {
+        return ((b[i] & 0xFF) << 24) | ((b[i + 1] & 0xFF) << 16) | ((b[i + 2] & 0xFF) << 8) | (b[i + 3] & 0xFF);
     }
 
     private static int readShort(byte[] b, int i) {
