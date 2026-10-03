@@ -150,10 +150,10 @@ export default function KioskBox() {
 
   // ─── Inicio ──────────────────────────────────────────────────────
   const general = getGeneralSettings();
-  const aiEnabled = !general.offline && (['enableAI', 'enableMundial', 'enableCaricatura', 'enableFiguritas', 'enablePortada'] as const)
+  const aiEnabled = !general.offline && (['enableAI', 'enableMundial', 'enableCaricatura', 'enableFiguritas'] as const)
     .some(k => general[k] !== false);
   const tiles: { key: string; label: string; hint: string; icon: LucideIcon; gradient: string; glow: string; onClick: () => void }[] = [
-    ...(general.enableSelfie !== false ? [{ key: 'fotos', label: 'Fotos', hint: 'Selfie con marco', icon: Camera, gradient: 'from-[#00d4ff] via-[#2b8cff] to-[#5b3bff]', glow: 'rgba(0,212,255,0.55)', onClick: () => openExperience('selfie') }] : []),
+    ...(general.enableSelfie !== false ? [{ key: 'fotos', label: 'Fotos', hint: general.enablePortada ? 'Selfie y Portada Fashion' : 'Selfie con marco', icon: Camera, gradient: 'from-[#00d4ff] via-[#2b8cff] to-[#5b3bff]', glow: 'rgba(0,212,255,0.55)', onClick: () => openExperience('selfie') }] : []),
     ...(aiEnabled ? [{ key: 'ia', label: 'Fotos IA', hint: 'Retratos, Mundial y más', icon: Sparkles, gradient: 'from-[#ff2e93] via-[#c03bff] to-[#7b2ff7]', glow: 'rgba(255,46,147,0.55)', onClick: () => openExperience('ai') }] : []),
     ...(general.enableGallery ? [{ key: 'galeria', label: 'Galería', hint: 'Las fotos del evento', icon: Images, gradient: 'from-[#2ee6a6] via-[#00b3c7] to-[#2b6cff]', glow: 'rgba(46,230,166,0.5)', onClick: () => navigate('/box/galeria') }] : []),
     ...(vipPackage ? [{ key: 'vip', label: 'Ingreso VIP', hint: 'Acceso de invitados', icon: Ticket, gradient: 'from-[#ffd23f] via-[#ff9f1c] to-[#ff4d6d]', glow: 'rgba(255,159,28,0.55)', onClick: openVip }] : []),

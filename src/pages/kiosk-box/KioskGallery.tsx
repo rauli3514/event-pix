@@ -42,7 +42,7 @@ export default function KioskGallery() {
 
   useEffect(() => {
     listEventPhotos(120)
-      .then(list => setPhotos(list.filter(p => !kind || (kind === 'selfie') === /-selfie\.\w+$/.test(p.name))))
+      .then(list => setPhotos(list.filter(p => !kind || (kind === 'selfie') === /-(selfie|portada)\.\w+$/.test(p.name))))
       .catch(() => setPhotos([]));
   }, [kind]);
 

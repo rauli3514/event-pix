@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'; // Kiosk AI Optimized Flow
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Printer, Users, Sparkles, Trophy, QrCode, Loader2, Images, Instagram, Palette, Sticker, Home, Lock, LockOpen } from 'lucide-react';
+import { Printer, Users, Sparkles, Trophy, QrCode, Loader2, Images, Crown, Instagram, Palette, Sticker, Home, Lock, LockOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { printKioskPhoto } from '@/lib/kioskPrint';
@@ -11,6 +11,7 @@ import { getSectionLock, setSectionLock } from '@/lib/kioskSettings';
 import PinDialog from '@/components/kiosk/PinDialog';
 import { backupPhoto, type SavedPhoto } from '@/lib/kioskStorage';
 import { composePhotos, type PageOrientation } from '@/lib/photoLayout';
+import { coverOptionsFrom, renderMagazineCover } from '@/lib/magazineCover';
 import AttractScreen from '@/components/kiosk/AttractScreen';
 import FrameChooser from '@/components/kiosk/FrameChooser';
 import NextShot from '@/components/kiosk/NextShot';
@@ -45,7 +46,7 @@ type Step =
   | 'stickerEditor'
   | 'result';
 
-type Mode = 'selfie' | 'retrato' | 'mundial' | 'caricatura' | 'figuritas' | null;
+type Mode = 'selfie' | 'portada' | 'retrato' | 'mundial' | 'caricatura' | 'figuritas' | null;
 
 // ---- Mundial Data ----
 const COUNTRIES = [
@@ -162,9 +163,11 @@ export default function KioskAI() {
   // muestra el botón para volver al inicio de la app
   const modesParam = searchParams.get('modes');
   const showHomeButton = searchParams.get('home') === '1';
+  // "Fotos" = selfie y Portada Fashion (sin IA); "Fotos IA" = el resto
+  const isPhotoMode = (m: Exclude<Mode, null>) => m === 'selfie' || m === 'portada';
   const isModeAllowed = (m: Exclude<Mode, null>) => {
-    if (offlineMode && m !== 'selfie') return false; // las experiencias IA necesitan internet
-    return modesParam === 'selfie' ? m === 'selfie' : modesParam === 'ai' ? m !== 'selfie' : true;
+    if (offlineMode && !isPhotoMode(m)) return false; // las experiencias IA necesitan internet
+    return modesParam === 'selfie' ? isPhotoMode(m) : modesParam === 'ai' ? !isPhotoMode(m) : true;
   };
 
   const [step, setStep] = useState<Step>('splash');
@@ -377,7 +380,7 @@ export default function KioskAI() {
       document.documentElement.requestFullscreen().catch(() => {});
     }
     // Con un solo modo posible (p. ej. "Fotos" = selfie) se saltea la elección
-    if (modesParam === 'selfie') {
+    if (modesParam === 'selfie' && generalSettings.enablePortada !== true) {
       handleModeSelect('selfie');
       return;
     }
@@ -810,6 +813,20 @@ The subject must perfectly match the facial features and gender of the reference
   // Fotos (selfie): elegir marco si está habilitado, o armar la hoja directamente
   const continueSelfie = async () => {
     if (!capturedImage) return;
+    if (mode === 'portada') {
+      // Portada Fashion: la foto como tapa de revista con los textos de Ajustes
+      setStep('processing');
+      setResultPhrase('¡Sos la tapa del momento! 📸✨');
+      let cover = capturedImage;
+      try {
+        cover = await renderMagazineCover(capturedImage, coverOptionsFrom(generalSettings, guestNameRef.current || undefined));
+      } catch (e) {
+        console.error('No se pudo armar la portada', e);
+      }
+      finishPhoto(cover);
+      setStep('flashResult');
+      return;
+    }
     const choices = guestFrameOptions();
     if (choices.length > 1) {
       setFrameChoices(choices);
@@ -906,6 +923,16 @@ The subject must perfectly match the facial features and gender of the reference
             </button>
           )}
 
+          {/* PORTADA FASHION (tapa de revista, sin IA) */}
+          {(generalSettings.enablePortada === true && isModeAllowed('portada')) && (
+            <button data-autofocus onClick={() => handleModeSelect('portada')}
+              className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-pink-400 kiosk-glass hover:scale-[1.03] focus:scale-[1.03] focus:outline-none focus:ring-4 focus:ring-white/80 hover:bg-pink-400/10 transition-all">
+              <Crown className="w-16 h-16 text-pink-400" />
+              <span className="carlmarx-bold text-pink-400 text-2xl uppercase tracking-wider">Portada Fashion</span>
+              <p className="text-white/70 text-sm text-center">¡Sé la tapa de la revista!<br />Con tu nombre y titulares de la fiesta.</p>
+            </button>
+          )}
+
           {/* RETRATO MÁGICO */}
           {(generalSettings.enableAI !== false && isModeAllowed('retrato')) && (
             <button data-autofocus onClick={() => handleModeSelect('retrato')}
@@ -991,7 +1018,7 @@ The subject must perfectly match the facial features and gender of the reference
         <div className="absolute inset-0 bg-black/40 z-0" />
         <div className="relative z-10 flex flex-col items-center justify-center h-full gap-8">
           <p className="carlmarx-regular text-white/60 text-2xl uppercase tracking-widest">
-            {mode === 'selfie' ? '📸 Selfie Grupal' : mode === 'retrato' ? '✨ Retrato Mágico' : '⚽ Mundial 2026'}
+            {mode === 'selfie' ? '📸 Selfie Grupal' : mode === 'portada' ? '👑 Portada Fashion' : mode === 'retrato' ? '✨ Retrato Mágico' : '⚽ Mundial 2026'}
           </p>
           <h1 className="carlmarx-bold text-7xl text-white text-center uppercase tracking-widest">
             ¡Mirá a la<br /><span className="text-violet-400">Cámara! 📸</span>
@@ -1058,6 +1085,12 @@ The subject must perfectly match the facial features and gender of the reference
         return;
       }
 
+      if (mode === 'portada') {
+        // La tapa siempre pide el nombre de la estrella (se puede saltear)
+        guestNameRef.current = '';
+        setStep('guestName');
+        return;
+      }
       if (mode === 'selfie') {
         // Nombre del invitado antes de armar la foto (Ajustes → Experiencias y marco)
         guestNameRef.current = '';

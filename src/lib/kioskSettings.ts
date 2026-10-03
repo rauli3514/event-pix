@@ -41,6 +41,15 @@ export interface KioskGeneralSettings {
   enableMundial?: boolean;
   enableCaricatura?: boolean;
   enableFiguritas?: boolean;
+  /** Portada Fashion (tapa de revista, sin IA): aparece en "Fotos" */
+  enablePortada?: boolean;
+  portadaTitle?: string;
+  portadaIssue?: string;
+  /** Titulares, uno por línea */
+  portadaHeadlines?: string;
+  portadaStarLabel?: string;
+  portadaBadge?: string;
+  portadaColor?: 'white' | 'black' | 'red' | 'gold' | 'pink';
   showQr?: boolean;
   showPrintButton?: boolean;
   /** Segundos en la pantalla del resultado antes de volver solo al inicio (0 = no vuelve) */

@@ -6,6 +6,7 @@ import { GLASS_PREFIX, GLASS_STYLES, renderGlassFrame, type GlassStyle } from '@
 import { allFrameOptions, isCustomFrame } from '@/lib/frameOptions';
 import { buttonClass, Field, inputClass, Panel, Toggle } from './ui';
 import PhotoLayoutPanel from './PhotoLayoutPanel';
+import CoverPanel from './CoverPanel';
 
 const MODES = [
   { key: 'enableSelfie', label: 'Fotos (selfie con marco)', hint: 'Ícono "Fotos" del inicio.' },
@@ -74,6 +75,8 @@ export default function ExperiencesSection() {
             onChange={v => setSettings(saveGeneralSettings({ [m.key]: v }))} />
         ))}
       </Panel>
+
+      <CoverPanel />
 
       <PhotoLayoutPanel />
 
