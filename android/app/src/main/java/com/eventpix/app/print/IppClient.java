@@ -9,13 +9,21 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
 import javax.net.SocketFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 
 /**
  * Cliente IPP mínimo (RFC 8010/8011) para mandar un Print-Job directo a una
@@ -54,6 +62,7 @@ public final class IppClient {
 
     private static final int CONNECT_TIMEOUT_MS = 5000;
     private static final int READ_TIMEOUT_MS = 90000;
+    private static final int TLS_HANDSHAKE_TIMEOUT_MS = 10000;
 
     private IppClient() {}
 
@@ -342,25 +351,151 @@ public final class IppClient {
 
     // ─── HTTP/1.1 mínimo ────────────────────────────────────────────
 
+    /**
+     * Impresoras ("host:puerto") que ya pidieron conexión cifrada y cómo aceptaron TLS,
+     * para no repetir el intento que falla en cada foto.
+     */
+    private static final Map<String, String> TLS_MODE = Collections.synchronizedMap(new HashMap<>());
+    private static final String TLS_DIRECT = "direct";
+    private static final String TLS_UPGRADE = "upgrade";
+
+    /** La impresora respondió un estado HTTP distinto de 200. */
+    static final class HttpStatusException extends IOException {
+        final int status;
+
+        HttpStatusException(int status) {
+            super("La impresora respondió HTTP " + status);
+            this.status = status;
+        }
+    }
+
+    /**
+     * POST de IPP. Si la impresora exige cifrado (HTTP 426 Upgrade Required, como las
+     * Epson con TLS=1.2) se reintenta por TLS: primero TLS directo en el mismo puerto
+     * y, si no lo acepta, pidiendo el cambio a TLS en la conexión (RFC 2817), que es
+     * lo que hace CUPS.
+     */
     static byte[] httpPost(SocketFactory sockets, String host, int port, String path, byte[] payload)
             throws IOException {
-        try (Socket socket = sockets != null ? sockets.createSocket() : new Socket()) {
+        String key = host + ":" + port;
+        String tlsMode = TLS_MODE.get(key);
+        if (tlsMode == null) {
+            try {
+                return exchange(connect(sockets, host, port), host, port, path, payload);
+            } catch (HttpStatusException e) {
+                if (e.status != 426) throw e;
+            }
+        }
+        if (!TLS_UPGRADE.equals(tlsMode)) {
+            try {
+                byte[] body = exchange(startTls(connect(sockets, host, port), host, port), host, port, path, payload);
+                TLS_MODE.put(key, TLS_DIRECT);
+                return body;
+            } catch (javax.net.ssl.SSLException | java.net.SocketException | java.net.SocketTimeoutException e) {
+                // No acepta TLS directo: se pide el cambio a TLS
+            }
+        }
+        byte[] body = exchange(upgradeToTls(connect(sockets, host, port), host, port), host, port, path, payload);
+        TLS_MODE.put(key, TLS_UPGRADE);
+        return body;
+    }
+
+    private static Socket connect(SocketFactory sockets, String host, int port) throws IOException {
+        Socket socket = sockets != null ? sockets.createSocket() : new Socket();
+        try {
             socket.connect(new InetSocketAddress(host, port), CONNECT_TIMEOUT_MS);
             socket.setSoTimeout(READ_TIMEOUT_MS);
+            return socket;
+        } catch (IOException e) {
+            socket.close();
+            throw e;
+        }
+    }
 
-            String hostHeader = (host.contains(":") ? "[" + host + "]" : host) + ":" + port;
+    private static String hostHeader(String host, int port) {
+        return (host.contains(":") ? "[" + host + "]" : host) + ":" + port;
+    }
+
+    /** Manda el POST por el socket (plano o TLS), lee la respuesta y lo cierra. */
+    private static byte[] exchange(Socket socket, String host, int port, String path, byte[] payload)
+            throws IOException {
+        try (Socket s = socket) {
             String headers = "POST " + path + " HTTP/1.1\r\n"
-                    + "Host: " + hostHeader + "\r\n"
+                    + "Host: " + hostHeader(host, port) + "\r\n"
                     + "Content-Type: application/ipp\r\n"
                     + "Content-Length: " + payload.length + "\r\n"
                     + "User-Agent: EventPix\r\n"
                     + "Connection: close\r\n\r\n";
-            OutputStream os = socket.getOutputStream();
+            OutputStream os = s.getOutputStream();
             os.write(headers.getBytes(StandardCharsets.US_ASCII));
             os.write(payload);
             os.flush();
+            return readHttpBody(new BufferedInputStream(s.getInputStream()));
+        }
+    }
 
-            return readHttpBody(new BufferedInputStream(socket.getInputStream()));
+    /** TLS sobre un socket ya conectado (así se respeta la red a la que está atado). */
+    private static Socket startTls(Socket plain, String host, int port) throws IOException {
+        try {
+            SSLSocket tls = (SSLSocket) trustAllContext().getSocketFactory()
+                    .createSocket(plain, host, port, true);
+            // Si la impresora no habla TLS directo puede quedarse esperando HTTP: corte corto
+            tls.setSoTimeout(TLS_HANDSHAKE_TIMEOUT_MS);
+            tls.startHandshake();
+            tls.setSoTimeout(READ_TIMEOUT_MS);
+            return tls;
+        } catch (IOException e) {
+            plain.close();
+            throw e;
+        }
+    }
+
+    /** RFC 2817: OPTIONS con "Upgrade: TLS", la impresora responde 101 y se pasa a TLS. */
+    private static Socket upgradeToTls(Socket plain, String host, int port) throws IOException {
+        try {
+            String request = "OPTIONS * HTTP/1.1\r\n"
+                    + "Host: " + hostHeader(host, port) + "\r\n"
+                    + "Connection: Upgrade\r\n"
+                    + "Upgrade: TLS/1.2, TLS/1.1, TLS/1.0\r\n"
+                    + "Content-Length: 0\r\n\r\n";
+            OutputStream os = plain.getOutputStream();
+            os.write(request.getBytes(StandardCharsets.US_ASCII));
+            os.flush();
+
+            // Se lee byte a byte para no consumir el inicio del handshake TLS
+            InputStream in = plain.getInputStream();
+            String status = readLine(in);
+            if (status == null || !status.matches("HTTP/1\\.\\d 101.*")) {
+                throw new IOException("La impresora pide conexión cifrada y no aceptó el cambio a TLS ("
+                        + (status == null ? "sin respuesta" : status) + ")");
+            }
+            String line;
+            while ((line = readLine(in)) != null && !line.isEmpty()) {
+                // encabezados de la respuesta 101
+            }
+            return startTls(plain, host, port);
+        } catch (IOException e) {
+            plain.close();
+            throw e;
+        }
+    }
+
+    /**
+     * Las impresoras usan certificados autofirmados que no se pueden validar contra una
+     * autoridad; igual la conexión queda cifrada. Solo se usa para hablar con la impresora.
+     */
+    private static SSLContext trustAllContext() throws IOException {
+        try {
+            X509TrustManager trustAll = new X509TrustManager() {
+                @Override public void checkClientTrusted(X509Certificate[] chain, String authType) { }
+                @Override public void checkServerTrusted(X509Certificate[] chain, String authType) { }
+                @Override public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
+            };
+            SSLContext context = SSLContext.getInstance("TLS");
+            context.init(null, new TrustManager[]{trustAll}, new SecureRandom());
+            return context;
+        } catch (GeneralSecurityException e) {
+            throw new IOException("No se pudo preparar la conexión cifrada: " + e.getMessage(), e);
         }
     }
 
@@ -391,7 +526,7 @@ public final class IppClient {
             chunked = false;
         }
 
-        if (httpStatus != 200) throw new IOException("La impresora respondió HTTP " + httpStatus);
+        if (httpStatus != 200) throw new HttpStatusException(httpStatus);
 
         ByteArrayOutputStream body = new ByteArrayOutputStream();
         if (chunked) {
