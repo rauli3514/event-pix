@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react'; // Kiosk AI Optimized Flow
-import { useSearchParams } from 'react-router-dom';
-import { Printer, Users, Sparkles, Trophy, QrCode, Instagram, Palette, Sticker } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Printer, Users, Sparkles, Trophy, QrCode, Instagram, Palette, Sticker, Home } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { isNativePrintAvailable, printImageNative, printErrorMessage } from '@/lib/nativePrint';
 import { StickerEditor } from '@/components/stickers/StickerEditor';
+import { useRemoteFocus } from '@/hooks/use-remote-focus';
 
 // ---- Types ----
 type Step =
@@ -133,7 +134,14 @@ const Corners = () => (
 
 export default function KioskAI() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const kioskEventId = searchParams.get('event');
+  // Desde la app de la TV box: ?modes=selfie (Fotos) o ?modes=ai (Fotos IA), y ?home=1
+  // muestra el botón para volver al inicio de la app
+  const modesParam = searchParams.get('modes');
+  const showHomeButton = searchParams.get('home') === '1';
+  const isModeAllowed = (m: Exclude<Mode, null>) =>
+    modesParam === 'selfie' ? m === 'selfie' : modesParam === 'ai' ? m !== 'selfie' : true;
 
   const [step, setStep] = useState<Step>('splash');
   const [mode, setMode] = useState<Mode>(null);
@@ -154,6 +162,10 @@ export default function KioskAI() {
   const [selectedAITheme, setSelectedAITheme] = useState<any>(null);
 
 
+
+  // Control remoto de la TV box: las flechas recorren los botones de cada pantalla
+  const bodyRef = useRef<HTMLElement>(document.body);
+  useRemoteFocus(bodyRef, [step]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -282,8 +294,22 @@ export default function KioskAI() {
     if (generalSettings.autoFullscreen && !document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(() => {});
     }
+    // Con un solo modo posible (p. ej. "Fotos" = selfie) se saltea la elección
+    if (modesParam === 'selfie') {
+      handleModeSelect('selfie');
+      return;
+    }
     setStep('modeSelect');
   };
+
+  const homeButton = showHomeButton && (
+    <button
+      onClick={(e) => { e.stopPropagation(); navigate('/box'); }}
+      className="absolute top-6 left-6 z-30 flex items-center gap-2 px-5 py-3 rounded-full bg-black/50 border border-white/20 text-white/80 hover:text-white hover:bg-black/70"
+    >
+      <Home className="w-5 h-5" /> Inicio
+    </button>
+  );
 
   const handleModeSelect = (m: Mode) => {
     setMode(m);
@@ -744,7 +770,16 @@ The subject must perfectly match the facial features and gender of the reference
   // ─── SCREENS ────────────────────────────────────────────────
 
   if (step === 'splash') return (
-    <div className="kiosk-root" onClick={handleSplashTap} style={{ cursor: 'pointer' }}>
+    <div
+      className="kiosk-root outline-none"
+      onClick={handleSplashTap}
+      // OK del control remoto = tocar la pantalla
+      tabIndex={0}
+      data-autofocus
+      onKeyDown={(e) => { if (e.key === 'Enter' && e.target === e.currentTarget) handleSplashTap(); }}
+      style={{ cursor: 'pointer' }}
+    >
+      {homeButton}
       <video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover opacity-80">
         <source src="/kiosk-animacion1.mp4" type="video/mp4" />
       </video>
@@ -763,6 +798,7 @@ The subject must perfectly match the facial features and gender of the reference
 
   if (step === 'modeSelect') return (
     <div className="kiosk-root">
+      {homeButton}
       <div className="absolute inset-0 bg-[#0a0a1a]" />
       <Corners />
       <div className="relative z-10 flex flex-col items-center justify-center h-full gap-12 px-8">
@@ -770,7 +806,7 @@ The subject must perfectly match the facial features and gender of the reference
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl overflow-y-auto max-h-[70vh] p-4">
 
           {/* SELFIE GRUPAL */}
-          {(generalSettings.enableSelfie !== false) && (
+          {(generalSettings.enableSelfie !== false && isModeAllowed('selfie')) && (
             <button onClick={() => handleModeSelect('selfie')}
               className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-cyan-400 bg-black/40 backdrop-blur hover:bg-cyan-400/10 transition-all">
               <Users className="w-16 h-16 text-cyan-400" />
@@ -780,7 +816,7 @@ The subject must perfectly match the facial features and gender of the reference
           )}
 
           {/* RETRATO MÁGICO */}
-          {(generalSettings.enableAI !== false) && (
+          {(generalSettings.enableAI !== false && isModeAllowed('retrato')) && (
             <button onClick={() => handleModeSelect('retrato')}
               className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-violet-400 bg-black/40 backdrop-blur hover:bg-violet-400/10 transition-all">
               <Sparkles className="w-16 h-16 text-violet-400" />
@@ -790,7 +826,7 @@ The subject must perfectly match the facial features and gender of the reference
           )}
 
           {/* MUNDIAL */}
-          {(generalSettings.enableMundial !== false) && (
+          {(generalSettings.enableMundial !== false && isModeAllowed('mundial')) && (
             <button onClick={() => handleModeSelect('mundial')}
               className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-green-400 bg-black/40 backdrop-blur hover:bg-green-400/10 transition-all">
               <Trophy className="w-16 h-16 text-green-400" />
@@ -799,7 +835,7 @@ The subject must perfectly match the facial features and gender of the reference
             </button>
           )}
           {/* CARICATURA MUNDIAL */}
-          {(generalSettings.enableCaricatura !== false) && (
+          {(generalSettings.enableCaricatura !== false && isModeAllowed('caricatura')) && (
             <button onClick={() => handleModeSelect('caricatura')}
               className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-orange-400 bg-black/40 backdrop-blur hover:bg-orange-400/10 transition-all">
               <Palette className="w-16 h-16 text-orange-400" />
@@ -809,12 +845,14 @@ The subject must perfectly match the facial features and gender of the reference
           )}
 
           {/* FIGURITAS */}
+          {isModeAllowed('figuritas') && (
           <button onClick={() => handleModeSelect('figuritas')}
             className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-teal-400 bg-black/40 backdrop-blur hover:bg-teal-400/10 transition-all">
             <Sticker className="w-16 h-16 text-teal-400" />
             <span className="carlmarx-bold text-teal-400 text-2xl uppercase tracking-wider">Hacer Figurita</span>
             <p className="text-white/70 text-sm text-center">¡Crea tu propia carta oficial!<br />Quita el fondo y personalízala.</p>
           </button>
+          )}
         </div>
       </div>
     </div>

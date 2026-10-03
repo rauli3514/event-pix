@@ -11,8 +11,9 @@ import { isNativePrintAvailable, discoverNativePrinters, printImageNative, PAPER
 import {
     Sparkles, ArrowLeft, Trash2, Save,
     Monitor, Download, Printer, Settings, ExternalLink, Camera, Instagram, Users,
-    FolderOpen, Plus, RefreshCw, AlertCircle
+    FolderOpen, Plus, RefreshCw, AlertCircle, Tv
 } from 'lucide-react';
+import KioskDevicesPanel from '@/components/kiosk/KioskDevicesPanel';
 import { Link } from 'react-router-dom';
 
 // Simple Modal Component
@@ -582,6 +583,9 @@ const KioskManager = () => {
                         <TabsTrigger value="albums" className="justify-start gap-2 data-[state=active]:bg-slate-800 data-[state=active]:text-white text-slate-400">
                             <FolderOpen className="w-4 h-4" /> Álbumes / Eventos
                         </TabsTrigger>
+                        <TabsTrigger value="devices" className="justify-start gap-2 data-[state=active]:bg-slate-800 data-[state=active]:text-white text-slate-400">
+                            <Tv className="w-4 h-4" /> Equipos
+                        </TabsTrigger>
                         <TabsTrigger value="printing" className="justify-start gap-2 data-[state=active]:bg-slate-800 data-[state=active]:text-white text-slate-400">
                             <Printer className="w-4 h-4" /> Impresoras
                         </TabsTrigger>
@@ -1010,6 +1014,10 @@ const KioskManager = () => {
                                     </div>
                                 </div>
                             </Modal>
+                        </TabsContent>
+
+                        <TabsContent value="devices" className="m-0">
+                            <KioskDevicesPanel events={kioskEvents} />
                         </TabsContent>
 
                         <TabsContent value="printing" className="m-0">

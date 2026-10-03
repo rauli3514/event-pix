@@ -9,6 +9,8 @@ import AdminDashboard from "./pages/AdminDashboard";
 import ProvidersList from "./pages/ProvidersList";
 import KioskManager from "./pages/KioskManager";
 import KioskAI from "./pages/KioskAI";
+import KioskBox from "./pages/kiosk-box/KioskBox";
+import KioskBoxSettings from "./pages/kiosk-box/KioskBoxSettings";
 import Display from "./pages/Display";
 import Login from "./pages/Login";
 import DisplayUserLogin from "./pages/DisplayUserLogin";
@@ -56,6 +58,9 @@ const App = () => (
             <Route path="/intelligence/login" element={<IntelligenceLogin />} />
 
             <Route path="/kiosco" element={<KioskAI />} />
+            {/* App dedicada de la TV box (sin login; ajustes con PIN en el equipo) */}
+            <Route path="/box" element={<KioskBox />} />
+            <Route path="/box/ajustes" element={<KioskBoxSettings />} />
             <Route path="/sticker-test" element={<div className="min-h-screen bg-zinc-950 pt-10"><StickerEditor userPhotoUrl="/placeholder-user.jpg" onSave={(url) => console.log(url)} onCancel={() => console.log("cancel")} /></div>} />
 
             <Route element={<EventProvider><Outlet /></EventProvider>}>
@@ -103,14 +108,14 @@ const App = () => (
 
             {/* 
               VITE_APP_FLAVOR=mobile → celular (va a /usuarios)
-              VITE_APP_FLAVOR=kiosk → kiosco de fotos (va a los ajustes del kiosco)
+              VITE_APP_FLAVOR=kiosk → app dedicada del kiosco (va a /box)
               VITE_APP_FLAVOR=tv (default) → Tanix (va al /tv-boot)
             */}
             <Route path="/" element={<Navigate to={
               Capacitor.isNativePlatform() && import.meta.env.VITE_APP_FLAVOR === 'mobile'
                 ? "/usuarios"
                 : Capacitor.isNativePlatform() && import.meta.env.VITE_APP_FLAVOR === 'kiosk'
-                ? "/admin/kiosco-manager"
+                ? "/box"
                 : Capacitor.isNativePlatform()
                   ? "/tv-boot"
                   : "/usuarios"
