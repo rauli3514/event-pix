@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { Printer, RefreshCw } from 'lucide-react';
 import {
-  connectWifiDirectPrinter, discoverNativePrinters, isNativePrintAvailable, isPrintableDirect,
-  printErrorMessage, printImageNative, PAPER_SIZES, type NativePrinter, type PaperSize,
+  connectWifiDirectPrinter, discoverNativePrinters, findUsbPrinters, isNativePrintAvailable, isPrintableDirect,
+  printErrorMessage, printImageNative, testUsbPrinter, usbPrinterToNative, PAPER_SIZES,
+  type NativePrinter, type PaperSize, type UsbPrinterInfo,
 } from '@/lib/nativePrint';
 import { getPrintSettings, savePrintSettings } from '@/lib/kioskSettings';
 import { buttonClass, Choice, inputClass, Panel, primaryClass, Toggle } from './ui';
@@ -13,14 +14,15 @@ export default function PrinterSection() {
   const [ssid, setSsid] = useState(settings.nativePrinter?.wifiDirect?.ssid || '');
   const [passphrase, setPassphrase] = useState(settings.nativePrinter?.wifiDirect?.passphrase || '');
   const [networkPrinters, setNetworkPrinters] = useState<NativePrinter[]>([]);
-  const [busy, setBusy] = useState<'' | 'wifi' | 'scan' | 'test'>('');
+  const [busy, setBusy] = useState<'' | 'wifi' | 'scan' | 'test' | 'usb'>('');
+  const [usbPrinters, setUsbPrinters] = useState<UsbPrinterInfo[] | null>(null);
   const native = isNativePrintAvailable();
   const printer = settings.nativePrinter;
 
   const update = (patch: Parameters<typeof savePrintSettings>[0]) => setSettings(savePrintSettings(patch));
   const choosePrinter = (p: NativePrinter | null) => update({ nativePrinter: p, selectedPrinter: p?.name || '' });
 
-  const run = async (kind: 'wifi' | 'scan' | 'test', action: () => Promise<void>) => {
+  const run = async (kind: 'wifi' | 'scan' | 'test' | 'usb', action: () => Promise<void>) => {
     setBusy(kind);
     try {
       await action();
@@ -38,6 +40,22 @@ export default function PrinterSection() {
       ? `Conectada a ${p.name} por Wi-Fi Direct${result.internet ? ', con internet' : ', pero sin internet'}`
       : `Conectada a ${p.name}. Este equipo no permite impresora e internet a la vez: al imprimir se desconecta de internet unos segundos.`);
     if (!isPrintableDirect(p)) toast.error(`La impresora no acepta un formato compatible (${p.pdl})`);
+  });
+
+  const scanUsb = () => run('usb', async () => {
+    const found = await findUsbPrinters();
+    setUsbPrinters(found);
+    if (!found.length) toast.info('No hay impresoras conectadas por USB. Revisá el cable y el hub (mejor con fuente propia).');
+  });
+
+  const chooseUsb = (u: UsbPrinterInfo) => run('usb', async () => {
+    if (!u.ippUsb) {
+      toast.error(`${u.name} no tiene "IPP por USB": por cable todavía no es compatible. Usá WiFi o Wi-Fi Direct.`);
+      return;
+    }
+    const res = await testUsbPrinter(u.usb);
+    choosePrinter(usbPrinterToNative({ ...u, name: res.model || u.name }));
+    toast.success(`Conectada por cable: ${res.model || u.name}`);
   });
 
   const scan = () => run('scan', async () => {
@@ -71,7 +89,7 @@ export default function PrinterSection() {
             <p className="text-2xl font-bold">{printer?.name || 'Ninguna'}</p>
             {printer && (
               <p className="text-white/55">
-                {printer.wifiDirect
+                {printer.usb ? 'Por cable USB' : printer.wifiDirect
                   ? (printer.wifiDirect.mode === 'temporary' ? 'Wi-Fi Direct · sin internet unos segundos al imprimir' : 'Wi-Fi Direct · impresora e internet a la vez')
                   : `En la red · ${printer.host}`}
               </p>
@@ -81,6 +99,21 @@ export default function PrinterSection() {
             {busy === 'test' ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Printer className="w-5 h-5" />} Imprimir prueba
           </button>
         </div>
+      </Panel>
+
+      <Panel title="Conectar por cable USB" description="Enchufá la impresora a la TV box (con hub, mejor si tiene fuente propia). La primera vez Android pide permiso: aceptalo.">
+        <button onClick={scanUsb} disabled={!native || !!busy} className={buttonClass}>
+          <RefreshCw className={`w-5 h-5 ${busy === 'usb' ? 'animate-spin' : ''}`} /> Buscar impresora USB
+        </button>
+        {usbPrinters?.map(u => (
+          <button key={u.usb} onClick={() => chooseUsb(u)}
+            className={`w-full text-left rounded-2xl px-6 py-4 text-lg focus:outline-none focus:ring-4 focus:ring-[#00d4ff] ${printer?.usb === u.usb ? 'bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7]' : 'bg-white/10 hover:bg-white/20'}`}>
+            {u.name}
+            <span className="block text-sm text-white/60">
+              {u.ippUsb ? 'Compatible por cable (IPP por USB)' : `Sin IPP por USB (protocolos ${u.protocols.join(', ')}): por cable no es compatible todavía`}
+            </span>
+          </button>
+        ))}
       </Panel>
 
       <Panel title="Conectar por Wi-Fi Direct (sin router)" description="El nombre (DIRECT-…) y la clave están en la hoja de estado de red de la impresora.">

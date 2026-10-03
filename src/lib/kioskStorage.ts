@@ -15,6 +15,20 @@ interface KioskStoragePlugin {
   saveImage(options: { dataUrl: string; folder: string; fileName: string }): Promise<{ uri: string; folder: string }>;
   listImages(options: { folder: string; limit?: number }): Promise<{ items: StoredPhoto[] }>;
   readImage(options: { uri: string; maxSize?: number }): Promise<{ dataUrl: string }>;
+  storageInfo(options: { folder: string }): Promise<StorageInfo>;
+  deleteImages(options: { folder?: string }): Promise<{ deleted: number }>;
+}
+
+export interface StorageInfo {
+  /** bytes del almacenamiento del equipo */
+  total: number;
+  free: number;
+  /** fotos de EventPix (todas las carpetas) */
+  photosBytes: number;
+  photosCount: number;
+  /** fotos del evento actual */
+  eventBytes: number;
+  eventCount: number;
 }
 
 const KioskStorage = registerPlugin<KioskStoragePlugin>('KioskStorage');
@@ -133,3 +147,47 @@ export async function readStoredPhoto(uri: string, maxSize = 1200) {
   if (isNative()) return (await KioskStorage.readImage({ uri, maxSize })).dataUrl;
   return webRead(uri);
 }
+
+// ─── Espacio y borrado ─────────────────────────────────────────────
+const webAllRows = async () => {
+  const db = await openDb();
+  return new Promise<{ uri: string; folder: string; dataUrl: string }[]>((resolve, reject) => {
+    const req = db.transaction(STORE).objectStore(STORE).getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+};
+
+/** Espacio del equipo y cuánto ocupan las fotos (todas y del evento actual). */
+export async function storageInfo(folder = eventFolder()): Promise<StorageInfo> {
+  if (isNative()) return KioskStorage.storageInfo({ folder });
+  const rows = await webAllRows().catch(() => []);
+  const size = (r: { dataUrl: string }) => Math.round(r.dataUrl.length * 0.75);
+  const est = await navigator.storage?.estimate?.().catch(() => undefined);
+  const total = est?.quota ?? 0;
+  return {
+    total,
+    free: Math.max(0, total - (est?.usage ?? 0)),
+    photosBytes: rows.reduce((a, r) => a + size(r), 0),
+    photosCount: rows.length,
+    eventBytes: rows.filter(r => r.folder === folder).reduce((a, r) => a + size(r), 0),
+    eventCount: rows.filter(r => r.folder === folder).length,
+  };
+}
+
+/** Borra las fotos del evento indicado, o todas las de EventPix (folder = null). */
+export async function deletePhotos(folder: string | null): Promise<number> {
+  if (isNative()) return (await KioskStorage.deleteImages(folder ? { folder } : {})).deleted;
+  const rows = (await webAllRows()).filter(r => !folder || r.folder === folder);
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    rows.forEach(r => tx.objectStore(STORE).delete(r.uri));
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+  return rows.length;
+}
+
+export const formatBytes = (b: number) =>
+  b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b >= 1e6 ? `${Math.round(b / 1e6)} MB` : `${Math.round(b / 1e3)} KB`;

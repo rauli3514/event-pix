@@ -3,6 +3,7 @@ import { FolderOpen } from 'lucide-react';
 import { getGeneralSettings, saveGeneralSettings } from '@/lib/kioskSettings';
 import { eventFolder, listEventPhotos } from '@/lib/kioskStorage';
 import { Field, inputClass, Panel, Toggle } from './ui';
+import StoragePanel from './StoragePanel';
 
 export default function PhotosSection() {
   const [settings, setSettings] = useState(getGeneralSettings);
@@ -38,6 +39,8 @@ export default function PhotosSection() {
           las fotos nuevas van a una carpeta nueva y las anteriores quedan en la suya.
         </p>
       </Panel>
+
+      <StoragePanel />
 
       <Panel title="Opciones para el invitado">
         <Toggle label="Permitir repetir la foto" hint='Muestra "Repetir foto" antes de confirmar.'

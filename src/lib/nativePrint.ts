@@ -12,6 +12,18 @@ export interface NativePrinter {
   pdl: string;
   /** Si está, se imprime conectándose a la red Wi-Fi Direct de la impresora (sin router) */
   wifiDirect?: WifiDirectConfig;
+  /** Si está, se imprime por cable USB (IPP por USB); es el nombre del dispositivo */
+  usb?: string;
+}
+
+export interface UsbPrinterInfo {
+  usb: string;
+  name: string;
+  vendorId: number;
+  productId: number;
+  /** Si acepta IPP por USB (lo que usa la app para imprimir por cable) */
+  ippUsb: boolean;
+  protocols: number[];
 }
 
 export interface WifiDirectConfig {
@@ -63,6 +75,8 @@ interface NativePrintPlugin {
   discoverPrinters(options?: { timeoutMs?: number }): Promise<{ printers: NativePrinter[] }>;
   printImage(options: NativePrintOptions): Promise<NativePrintResult>;
   connectWifiDirect(options: WifiDirectConfig): Promise<WifiDirectResult>;
+  findUsbPrinters(): Promise<{ printers: UsbPrinterInfo[] }>;
+  testUsbPrinter(options: { usb: string }): Promise<{ name: string; formats: string; model?: string }>;
 }
 
 const NativePrint = registerPlugin<NativePrintPlugin>('NativePrint');
@@ -97,6 +111,23 @@ export const connectWifiDirectPrinter = async (config: WifiDirectConfig) => {
   };
   return { printer, result: res };
 };
+
+/** Impresoras conectadas por cable USB (con o sin hub). */
+export const findUsbPrinters = async () => (await NativePrint.findUsbPrinters()).printers;
+
+/** Prueba la impresora USB: pide permiso la primera vez y devuelve qué acepta. */
+export const testUsbPrinter = (usb: string) => NativePrint.testUsbPrinter({ usb });
+
+/** Impresora USB lista para guardar en los ajustes. */
+export const usbPrinterToNative = (u: UsbPrinterInfo): NativePrinter => ({
+  serviceName: `usb:${u.vendorId}:${u.productId}`,
+  name: u.name,
+  host: '',
+  port: 0,
+  rp: 'ipp/print',
+  pdl: '',
+  usb: u.usb,
+});
 
 export const discoverNativePrinters = async (timeoutMs = 5000) =>
   (await NativePrint.discoverPrinters({ timeoutMs })).printers;

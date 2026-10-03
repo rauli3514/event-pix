@@ -159,6 +159,27 @@ public final class IppClient {
         return parseResponse(ippResponse);
     }
 
+    /** Por dónde viaja el pedido IPP (HTTP por la red o por el cable USB). */
+    public interface Transport {
+        byte[] post(String path, byte[] payload) throws IOException;
+    }
+
+    /** Transporte por la red (sockets planos o TLS, de una red puntual si se indica). */
+    public static Transport network(SocketFactory sockets, String host, int port) {
+        return (path, payload) -> httpPost(sockets, host, port, path, payload);
+    }
+
+    public static Result printJob(Transport transport, String printerUri, String resourcePath,
+                                  String documentFormat, byte[] document, Options options) throws IOException {
+        byte[] ippRequest = buildPrintJobRequest(printerUri, documentFormat, document, options, 1);
+        return parseResponse(transport.post(normalizePath(resourcePath), ippRequest));
+    }
+
+    public static Result getPrinterAttributes(Transport transport, String printerUri, String resourcePath,
+                                              String... requested) throws IOException {
+        return parseResponse(transport.post(normalizePath(resourcePath), buildGetAttributesRequest(printerUri, requested)));
+    }
+
     public static Result getPrinterAttributes(String host, int port, String resourcePath,
                                               String... requested) throws IOException {
         return getPrinterAttributes(null, host, port, resourcePath, requested);
@@ -167,6 +188,10 @@ public final class IppClient {
     public static Result getPrinterAttributes(SocketFactory sockets, String host, int port, String resourcePath,
                                               String... requested) throws IOException {
         String uri = printerUri(host, port, resourcePath);
+        return parseResponse(httpPost(sockets, host, port, normalizePath(resourcePath), buildGetAttributesRequest(uri, requested)));
+    }
+
+    static byte[] buildGetAttributesRequest(String uri, String... requested) throws IOException {
         ByteArrayOutputStream buf = new ByteArrayOutputStream();
         DataOutputStream out = new DataOutputStream(buf);
         out.writeByte(1);
@@ -184,7 +209,7 @@ public final class IppClient {
         }
         out.writeByte(TAG_END_OF_ATTRIBUTES);
         out.flush();
-        return parseResponse(httpPost(sockets, host, port, normalizePath(resourcePath), buf.toByteArray()));
+        return buf.toByteArray();
     }
 
     /** La resolución preferida si está; si no, la menor que la supere (las Epson suelen pedir 360). */

@@ -9,6 +9,7 @@ import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
+import android.os.StatFs;
 import android.provider.MediaStore;
 import android.util.Base64;
 
@@ -188,6 +189,99 @@ public class KioskStoragePlugin extends Plugin {
                 call.resolve(ret);
             } catch (Exception e) {
                 call.reject("No se pudo leer la foto: " + e.getMessage(), e);
+            }
+        });
+    }
+
+    /**
+     * Espacio del equipo y de las fotos de EventPix: total y libre del almacenamiento
+     * compartido, más cantidad y bytes de las fotos (todas y del evento indicado).
+     */
+    @PluginMethod
+    public void storageInfo(PluginCall call) {
+        String folder = safeName(call.getString("folder"), "EventPix");
+        executor.execute(() -> {
+            try {
+                StatFs stat = new StatFs(Environment.getExternalStorageDirectory().getPath());
+                long[] all = countPhotos(null);
+                long[] event = countPhotos(folder);
+                JSObject ret = new JSObject();
+                ret.put("total", stat.getTotalBytes());
+                ret.put("free", stat.getAvailableBytes());
+                ret.put("photosBytes", all[1]);
+                ret.put("photosCount", all[0]);
+                ret.put("eventBytes", event[1]);
+                ret.put("eventCount", event[0]);
+                call.resolve(ret);
+            } catch (Exception e) {
+                call.reject("No se pudo leer el almacenamiento: " + e.getMessage(), e);
+            }
+        });
+    }
+
+    /** [cantidad, bytes] de las fotos de una carpeta del evento, o de todas (folder null). */
+    private long[] countPhotos(String folder) {
+        long count = 0;
+        long bytes = 0;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            String where = folder == null
+                    ? MediaStore.Images.Media.RELATIVE_PATH + " LIKE ?"
+                    : MediaStore.Images.Media.RELATIVE_PATH + "=?";
+            String[] args = { folder == null ? Environment.DIRECTORY_PICTURES + "/" + ROOT + "/%" : relativePath(folder) };
+            try (Cursor c = getContext().getContentResolver().query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                    new String[]{MediaStore.Images.Media.SIZE}, where, args, null)) {
+                while (c != null && c.moveToNext()) {
+                    count++;
+                    bytes += c.getLong(0);
+                }
+            }
+        } else {
+            File base = new File(getContext().getExternalFilesDir(Environment.DIRECTORY_PICTURES), ROOT);
+            File[] dirs = folder == null ? base.listFiles() : new File[]{new File(base, folder)};
+            if (dirs != null) {
+                for (File d : dirs) {
+                    File[] files = d.listFiles();
+                    if (files == null) continue;
+                    for (File f : files) { count++; bytes += f.length(); }
+                }
+            }
+        }
+        return new long[]{count, bytes};
+    }
+
+    /** Borra las fotos del evento indicado, o todas las de EventPix si no se indica carpeta. */
+    @PluginMethod
+    public void deleteImages(PluginCall call) {
+        String folderArg = call.getString("folder");
+        String folder = folderArg == null ? null : safeName(folderArg, "EventPix");
+        executor.execute(() -> {
+            try {
+                int deleted = 0;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    String where = folder == null
+                            ? MediaStore.Images.Media.RELATIVE_PATH + " LIKE ?"
+                            : MediaStore.Images.Media.RELATIVE_PATH + "=?";
+                    String[] args = { folder == null ? Environment.DIRECTORY_PICTURES + "/" + ROOT + "/%" : relativePath(folder) };
+                    // Solo se pueden borrar sin permiso las fotos que creó esta app
+                    deleted = getContext().getContentResolver().delete(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, where, args);
+                } else {
+                    File base = new File(getContext().getExternalFilesDir(Environment.DIRECTORY_PICTURES), ROOT);
+                    File[] dirs = folder == null ? base.listFiles() : new File[]{new File(base, folder)};
+                    if (dirs != null) {
+                        for (File d : dirs) {
+                            File[] files = d.listFiles();
+                            if (files == null) continue;
+                            for (File f : files) if (f.delete()) deleted++;
+                            //noinspection ResultOfMethodCallIgnored
+                            d.delete();
+                        }
+                    }
+                }
+                JSObject ret = new JSObject();
+                ret.put("deleted", deleted);
+                call.resolve(ret);
+            } catch (Exception e) {
+                call.reject("No se pudieron borrar las fotos: " + e.getMessage(), e);
             }
         });
     }

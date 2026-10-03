@@ -237,6 +237,44 @@ public class NativePrintPlugin extends Plugin {
         }
     }
 
+    // ─── USB ────────────────────────────────────────────────────────
+
+    /** Impresoras conectadas por cable (y si se pueden usar: IPP por USB). */
+    @PluginMethod
+    public void findUsbPrinters(PluginCall call) {
+        JSArray list = new JSArray();
+        for (android.hardware.usb.UsbDevice d : UsbPrinterLink.printers(getContext())) list.put(UsbPrinterLink.describe(d));
+        JSObject ret = new JSObject();
+        ret.put("printers", list);
+        call.resolve(ret);
+    }
+
+    /** Consulta la impresora USB (pide permiso si hace falta) y devuelve qué acepta. */
+    @PluginMethod
+    public void testUsbPrinter(PluginCall call) {
+        String usb = call.getString("usb", "");
+        executor.execute(() -> {
+            Target target = new Target();
+            try {
+                target.usb = UsbPrinterLink.open(getContext(), usb);
+                IppClient.Result attrs = IppClient.getPrinterAttributes(target.transport(), target.uri(), target.rp,
+                        "printer-make-and-model", "document-format-supported", "printer-state");
+                JSObject ret = new JSObject();
+                ret.put("name", target.usb.name);
+                StringBuilder formats = new StringBuilder();
+                for (IppClient.Value v : attrs.get("document-format-supported")) formats.append(v.asString()).append(' ');
+                ret.put("formats", formats.toString().trim());
+                java.util.List<IppClient.Value> model = attrs.get("printer-make-and-model");
+                if (!model.isEmpty()) ret.put("model", model.get(0).asString());
+                call.resolve(ret);
+            } catch (Exception e) {
+                call.reject(e.getMessage() != null ? e.getMessage() : e.toString(), e);
+            } finally {
+                if (target.usb != null) target.usb.close();
+            }
+        });
+    }
+
     // ─── Impresión ──────────────────────────────────────────────────
 
     @PluginMethod
@@ -262,7 +300,21 @@ public class NativePrintPlugin extends Plugin {
                 Bitmap source = loadBitmap(image);
                 int totalRotation = rotation + ("landscape".equals(orientation) ? 90 : 0);
 
-                if (printer != null && (printer.has("host") || printer.has("wifiDirect"))) {
+                if (printer != null && printer.has("usb")) {
+                    // Por cable USB (IPP por USB)
+                    Target target = new Target();
+                    target.name = printer.getString("name", "");
+                    target.usb = UsbPrinterLink.open(getContext(), printer.getString("usb"));
+                    try {
+                        Capabilities caps = capabilitiesFor(target, paper);
+                        page = composePage(source, paper, totalRotation, scaleMode, caps.dpi);
+                        source.recycle();
+                        printSilently(call, target, page, paper, caps, copies, borderless, jobName);
+                        page.recycle();
+                    } finally {
+                        target.usb.close();
+                    }
+                } else if (printer != null && (printer.has("host") || printer.has("wifiDirect"))) {
                     session = openWifiDirect(printer);
                     Target target = targetFor(printer, session);
                     Capabilities caps = capabilitiesFor(target, paper);
@@ -390,6 +442,16 @@ public class NativePrintPlugin extends Plugin {
         String rp = "ipp/print";
         String pdl = "";
         javax.net.SocketFactory sockets;
+        /** Por cable USB (IPP por USB); si no, por la red */
+        UsbPrinterLink usb;
+
+        IppClient.Transport transport() {
+            return usb != null ? usb : IppClient.network(sockets, host, port);
+        }
+
+        String uri() {
+            return usb != null ? UsbPrinterLink.printerUri(rp) : IppClient.printerUri(host, port, rp);
+        }
     }
 
     private static Target targetFor(JSObject printer, WifiDirectLink.Session session) throws IOException {
@@ -438,7 +500,7 @@ public class NativePrintPlugin extends Plugin {
         IppClient.Result attrs = null;
         IOException queryError = null;
         try {
-            attrs = IppClient.getPrinterAttributes(target.sockets, target.host, target.port, target.rp,
+            attrs = IppClient.getPrinterAttributes(target.transport(), target.uri(), target.rp,
                     "document-format-supported",
                     "pwg-raster-document-resolution-supported",
                     "pwg-raster-document-type-supported",
@@ -512,7 +574,7 @@ public class NativePrintPlugin extends Plugin {
         // En raster la página ya viene al tamaño exacto; print-scaling es para JPEG/PDF
         options.printScaling = format.equals("image/pwg-raster") ? null : "fill";
 
-        IppClient.Result result = IppClient.printJob(target.sockets, target.host, target.port, target.rp,
+        IppClient.Result result = IppClient.printJob(target.transport(), target.uri(), target.rp,
                 format, document, options);
         if (!result.isSuccess()) {
             String msg = result.statusMessage != null ? result.statusMessage
