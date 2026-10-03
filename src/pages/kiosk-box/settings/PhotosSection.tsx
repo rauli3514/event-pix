@@ -33,7 +33,10 @@ export default function PhotosSection() {
             {count !== null && <span className="text-white/55"> · {count} foto{count === 1 ? '' : 's'}</span>}
           </p>
         </div>
-        <p className="text-white/50 text-sm">Usá una carpeta distinta por evento. Si la dejás vacía, se usa el nombre del evento.</p>
+        <p className="text-white/50 text-sm">
+          La carpeta se crea sola con la primera foto. Si la dejás vacía se usa el nombre del evento: al cambiar el nombre,
+          las fotos nuevas van a una carpeta nueva y las anteriores quedan en la suya.
+        </p>
       </Panel>
 
       <Panel title="Opciones para el invitado">

@@ -1,4 +1,5 @@
 import { useEffect, type RefObject } from 'react';
+import { rotateArrowKey } from '@/lib/screenRotation';
 
 const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex="0"]';
 
@@ -21,12 +22,14 @@ export function useRemoteFocus(container: RefObject<HTMLElement | null>, deps: u
     }
 
     const onKey = (e: KeyboardEvent) => {
-      const delta = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1
-        : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+      // Con la tele girada, la flecha del control se traduce a la dirección en la página
+      const key = rotateArrowKey(e.key);
+      const delta = key === 'ArrowRight' || key === 'ArrowDown' ? 1
+        : key === 'ArrowLeft' || key === 'ArrowUp' ? -1 : 0;
       if (!delta) return;
       // Dentro de un campo de texto las flechas mueven el cursor
       const active = document.activeElement as HTMLElement | null;
-      if (active?.tagName === 'INPUT' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) return;
+      if (active?.tagName === 'INPUT' && (key === 'ArrowLeft' || key === 'ArrowRight')) return;
       const list = items();
       if (!list.length) return;
       const index = active ? list.indexOf(active) : -1;

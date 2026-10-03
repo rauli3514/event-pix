@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Upload } from 'lucide-react';
+import { Check, Upload } from 'lucide-react';
 import { BUILT_IN_FRAMES, getFrameUrl, getGeneralSettings, saveFrameUrl, saveGeneralSettings } from '@/lib/kioskSettings';
 import { GLASS_PREFIX, GLASS_STYLES, renderGlassFrame, type GlassStyle } from '@/lib/glassFrame';
+import { allFrameOptions, isCustomFrame } from '@/lib/frameOptions';
 import { buttonClass, Field, inputClass, Panel, Toggle } from './ui';
 
 const MODES = [
@@ -61,7 +62,7 @@ export default function ExperiencesSection() {
     reader.readAsDataURL(file);
   };
 
-  const isCustom = !!frame && !frame.startsWith(GLASS_PREFIX) && !BUILT_IN_FRAMES.some(f => f.url === frame);
+  const isCustom = isCustomFrame(frame);
 
   return (
     <div className="space-y-6">
@@ -92,6 +93,32 @@ export default function ExperiencesSection() {
               selected={frame === `${GLASS_PREFIX}${s.value}`} onClick={() => chooseFrame(`${GLASS_PREFIX}${s.value}`)} />
           ))}
         </div>
+      </Panel>
+
+      <Panel title="El invitado elige el marco" description="Después de la foto, el invitado ve su foto con cada marco habilitado y elige. El marco elegido arriba es el que aparece primero.">
+        <Toggle label="Dejar que el invitado elija el marco" hint="Si está apagado, se usa siempre el marco elegido."
+          checked={!!settings.guestFrameChoice} onChange={guestFrameChoice => setSettings(saveGeneralSettings({ guestFrameChoice }))} />
+        {settings.guestFrameChoice && (
+          <div className="grid grid-cols-3 gap-3">
+            {allFrameOptions().map(o => {
+              const enabled = (settings.guestFrames ?? []).includes(o.key);
+              const toggle = () => {
+                const list = new Set(settings.guestFrames ?? []);
+                if (enabled) list.delete(o.key); else list.add(o.key);
+                setSettings(saveGeneralSettings({ guestFrames: [...list] }));
+              };
+              return (
+                <button key={o.key} onClick={toggle}
+                  className={`flex items-center gap-3 rounded-2xl px-5 py-4 text-left text-lg font-semibold focus:outline-none focus:ring-4 focus:ring-[#00d4ff] ${enabled ? 'bg-gradient-to-r from-[#ff2e93]/80 to-[#7b2ff7]/80' : 'bg-black/20 border border-white/10 hover:bg-white/10'}`}>
+                  <span className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${enabled ? 'bg-white text-[#7b2ff7]' : 'bg-white/10'}`}>
+                    {enabled && <Check className="w-5 h-5" strokeWidth={3} />}
+                  </span>
+                  {o.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </Panel>
 
       <Panel title="Otros marcos" description="Marcos de imagen (PNG con el centro transparente).">

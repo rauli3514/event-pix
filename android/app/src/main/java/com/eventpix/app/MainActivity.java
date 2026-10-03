@@ -10,6 +10,7 @@ import android.provider.Settings;
 import android.webkit.JavascriptInterface;
 
 import com.eventpix.app.print.NativePrintPlugin;
+import com.eventpix.app.screen.KioskScreenPlugin;
 import com.eventpix.app.storage.KioskStoragePlugin;
 import com.getcapacitor.BridgeActivity;
 
@@ -28,7 +29,12 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(NativePrintPlugin.class);
         registerPlugin(KioskStoragePlugin.class);
+        registerPlugin(KioskScreenPlugin.class);
         super.onCreate(savedInstanceState);
+        // Tele colgada en vertical: se gira desde el arranque, sin esperar a la página
+        if (getBridge() != null) {
+            KioskScreenPlugin.apply(getBridge().getWebView(), KioskScreenPlugin.savedRotation(this));
+        }
         bluetoothServer = new BluetoothServer(this);
         // BluetoothClient se inicializa después del Bridge (webview disponible)
     }

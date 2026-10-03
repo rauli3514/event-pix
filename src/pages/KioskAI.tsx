@@ -7,10 +7,13 @@ import { isNativePrintAvailable, printImageNative, printErrorMessage } from '@/l
 import { StickerEditor } from '@/components/stickers/StickerEditor';
 import { useRemoteFocus } from '@/hooks/use-remote-focus';
 import { openCameraStream, stopStream } from '@/lib/kioskCamera';
-import { getSectionLock, setSectionLock, splashVideoSrc } from '@/lib/kioskSettings';
+import { getSectionLock, setSectionLock } from '@/lib/kioskSettings';
 import PinDialog from '@/components/kiosk/PinDialog';
 import { backupPhoto } from '@/lib/kioskStorage';
 import { glassStyleOf, isGlassFrame, renderGlassFrame } from '@/lib/glassFrame';
+import AttractScreen from '@/components/kiosk/AttractScreen';
+import FrameChooser from '@/components/kiosk/FrameChooser';
+import { guestFrameOptions, type FrameOption } from '@/lib/frameOptions';
 import { motion } from 'framer-motion';
 import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
 import { AIProcessing, CameraFlash, CountdownRing } from '@/components/kiosk/KioskAnimations';
@@ -24,6 +27,7 @@ type Step =
   | 'lookCamera'
   | 'countdown'
   | 'photoPreview'
+  | 'frameSelect'
   | 'flashResult'
   | 'themeSelect'
   | 'mundialCountry'
@@ -170,6 +174,8 @@ export default function KioskAI() {
   const [showKeyboard, setShowKeyboard] = useState(false);
   const [themes, setThemes] = useState<any[]>([]);
   const [frameUrl, setFrameUrl] = useState<string | null>(null);
+  // Marcos para que elija el invitado (se fijan al entrar a la pantalla)
+  const [frameChoices, setFrameChoices] = useState<FrameOption[]>([]);
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [selectedAITheme, setSelectedAITheme] = useState<any>(null);
@@ -318,7 +324,7 @@ export default function KioskAI() {
   // imprimir (Ajustes → Resultado y tiempos; 30 s si no se configuró)
   const resultTimeout = generalSettings.resultTimeout === undefined ? 30 : Number(generalSettings.resultTimeout) || 0;
   useEffect(() => {
-    const photoSteps: Step[] = ['photoPreview', 'flashResult', 'result'];
+    const photoSteps: Step[] = ['photoPreview', 'frameSelect', 'flashResult', 'result'];
     if (resultTimeout <= 0 || !photoSteps.includes(step)) return;
     let t = setTimeout(() => resetKiosk(), resultTimeout * 1000);
     const restart = () => {
@@ -903,27 +909,13 @@ The subject must perfectly match the facial features and gender of the reference
       style={{ cursor: 'pointer' }}
     >
       {homeButton}
-      {splashVideoSrc(generalSettings.splashVideo) && (
-        <video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover opacity-80">
-          <source src={splashVideoSrc(generalSettings.splashVideo)} type="video/mp4" />
-        </video>
-      )}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/50" />
-      <Corners />
-      <div className="relative z-10 flex flex-col items-center justify-center h-full">
-        <h1 className="carlmarx-bold text-[clamp(4rem,12vw,9rem)] text-white drop-shadow-2xl text-center leading-tight animate-pulse-slow">
-          {generalSettings.welcomeTitle || <>Toca para<br />empezar</>}
-        </h1>
-        {generalSettings.eventTitle && (
-          <p className="carlmarx-bold mt-6 text-[clamp(2.5rem,5vw,4.5rem)] text-center px-8 bg-gradient-to-r from-[#ff2e93] via-[#ffd23f] to-[#00d4ff] bg-clip-text text-transparent drop-shadow-2xl">{generalSettings.eventTitle}</p>
-        )}
-        {generalSettings.welcomeSubtitle && (
-          <p className="mt-6 text-white/90 text-[clamp(1.5rem,3vw,2.5rem)] text-center drop-shadow-xl px-8">{generalSettings.welcomeSubtitle}</p>
-        )}
-        <div className="mt-8 w-20 h-20 border-4 border-white/60 rounded-full flex items-center justify-center animate-bounce">
-          <div className="w-10 h-10 border-4 border-white rounded-full" />
-        </div>
-      </div>
+      <AttractScreen
+        splash={generalSettings.splashVideo}
+        eventTitle={generalSettings.eventTitle}
+        welcomeTitle={generalSettings.welcomeTitle}
+        subtitle={generalSettings.welcomeSubtitle}
+        nameStyle={generalSettings.nameStyle}
+      />
     </div>
   );
 
@@ -1070,6 +1062,12 @@ The subject must perfectly match the facial features and gender of the reference
       }
 
       if (mode === 'selfie') {
+        const choices = guestFrameOptions();
+        if (choices.length > 1) {
+          setFrameChoices(choices);
+          setStep('frameSelect');
+          return;
+        }
         setStep('processing'); // Show a brief processing state while merging
         const phrase = SELFIE_PHRASES[Math.floor(Math.random() * SELFIE_PHRASES.length)];
         setResultPhrase(phrase);
@@ -1125,6 +1123,23 @@ The subject must perfectly match the facial features and gender of the reference
       </div>
     );
   }
+
+  if (step === 'frameSelect' && capturedImage) return (
+    <FrameChooser
+      photo={capturedImage}
+      options={frameChoices}
+      merge={mergeImages}
+      title={generalSettings.eventTitle || undefined}
+      subtitle={generalSettings.frameSubtitle || undefined}
+      onConfirm={async (finalImage) => {
+        setResultPhrase(SELFIE_PHRASES[Math.floor(Math.random() * SELFIE_PHRASES.length)]);
+        setCapturedImage(finalImage);
+        setStep('processing');
+        await savePhotoToAlbum(finalImage);
+        setStep('flashResult');
+      }}
+    />
+  );
 
   if (step === 'flashResult') return (
     <div className="kiosk-root" onClick={() => setStep('result')}>

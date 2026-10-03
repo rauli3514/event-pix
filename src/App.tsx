@@ -12,6 +12,7 @@ import KioskAI from "./pages/KioskAI";
 import KioskBox from "./pages/kiosk-box/KioskBox";
 import KioskBoxSettings from "./pages/kiosk-box/KioskBoxSettings";
 import KioskGallery from "./pages/kiosk-box/KioskGallery";
+import RotatedScreen from "./components/kiosk/RotatedScreen";
 import Display from "./pages/Display";
 import Login from "./pages/Login";
 import DisplayUserLogin from "./pages/DisplayUserLogin";
@@ -52,6 +53,7 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <BrowserRouter>
+          <RotatedScreen>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/usuarios" element={<DisplayUserLogin />} />
@@ -125,6 +127,7 @@ const App = () => (
 
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </RotatedScreen>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>

@@ -305,3 +305,76 @@ body {
   backdrop-filter: blur(18px) saturate(160%);
   -webkit-backdrop-filter: blur(18px) saturate(160%);
 }
+
+/* ── Pantallas de bienvenida del kiosco (AttractScreen) ─────────────────── */
+@keyframes attract-float-up {
+  0%   { transform: translate3d(0, 0, 0) rotate(var(--r0)); opacity: 0; }
+  8%   { opacity: 1; }
+  50%  { transform: translate3d(var(--dx), -65vmax, 0) rotate(var(--r1)); }
+  92%  { opacity: 1; }
+  100% { transform: translate3d(0, -130vmax, 0) rotate(var(--r0)); opacity: 0; }
+}
+.attract-polaroid {
+  position: absolute; bottom: -30vmin; left: var(--x);
+  width: var(--w); padding: 0.7vmin 0.7vmin 3.2vmin; background: #fff; border-radius: 0.6vmin;
+  box-shadow: 0 2vmin 5vmin rgba(0,0,0,0.55);
+  animation: attract-float-up var(--dur) linear var(--delay) infinite;
+  will-change: transform, opacity;
+}
+.attract-polaroid img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 0.3vmin; }
+
+@keyframes attract-neon-flicker {
+  0%, 18%, 22%, 25%, 53%, 57%, 100% { opacity: 1; }
+  20%, 24%, 55% { opacity: 0.35; }
+}
+.attract-neon { animation: attract-neon-flicker 5s linear infinite; }
+@keyframes attract-neon-hue { 0%, 100% { filter: hue-rotate(0deg); } 50% { filter: hue-rotate(-45deg); } }
+.attract-neon-frame { animation: attract-neon-hue 6s ease-in-out infinite; }
+
+@keyframes attract-spin { to { transform: rotate(360deg); } }
+.attract-iris { animation: attract-spin 24s linear infinite; }
+@keyframes attract-flash {
+  0%, 86%, 100% { opacity: 0; }
+  88% { opacity: 0.85; }
+  93% { opacity: 0; }
+}
+.attract-flash { animation: attract-flash 6s ease-out infinite; }
+@keyframes attract-shutter {
+  0%, 85%, 100% { transform: scale(1); }
+  88% { transform: scale(0.82); }
+  93% { transform: scale(1.04); }
+}
+.attract-shutter { animation: attract-shutter 6s ease-out infinite; }
+
+@keyframes attract-confetti {
+  0%   { transform: translate3d(0, -10vh, 0) rotate(0deg); }
+  100% { transform: translate3d(var(--dx), 110vh, 0) rotate(var(--spin)); }
+}
+.attract-confetti {
+  position: absolute; top: 0; left: var(--x); width: var(--s); height: calc(var(--s) * 0.45);
+  background: var(--c); border-radius: 0.2vmin;
+  animation: attract-confetti var(--dur) linear var(--delay) infinite;
+  will-change: transform;
+}
+@keyframes attract-beam { 0%, 100% { transform: rotate(-22deg); } 50% { transform: rotate(22deg); } }
+.attract-beam {
+  position: absolute; bottom: -10%; width: 60vmax; height: 140vmax; transform-origin: 50% 100%;
+  background: linear-gradient(to top, var(--c), transparent 75%);
+  clip-path: polygon(46% 100%, 54% 100%, 100% 0, 0 0);
+  mix-blend-mode: screen; opacity: 0.35;
+  animation: attract-beam var(--dur) ease-in-out infinite;
+}
+
+@keyframes attract-cta-ring { 0% { transform: scale(1); opacity: 0.7; } 100% { transform: scale(1.35); opacity: 0; } }
+.attract-cta-ring { animation: attract-cta-ring 1.8s ease-out infinite; }
+@keyframes attract-shine { 0% { background-position: -150% 0; } 60%, 100% { background-position: 250% 0; } }
+.attract-shine {
+  background-image: linear-gradient(110deg, transparent 35%, rgba(255,255,255,0.55) 50%, transparent 65%);
+  background-size: 200% 100%; background-repeat: no-repeat;
+  animation: attract-shine 4.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .attract-polaroid, .attract-neon, .attract-iris, .attract-flash, .attract-shutter,
+  .attract-confetti, .attract-beam, .attract-cta-ring, .attract-shine { animation: none; }
+}

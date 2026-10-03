@@ -10,8 +10,16 @@ export interface KioskGeneralSettings {
   eventTitle?: string;
   welcomeTitle?: string;
   welcomeSubtitle?: string;
-  /** Animación de la pantalla "Toca para empezar": '1' | '2' | '3' | 'none' */
+  /** Animación de la pantalla "Toca para empezar": una de SPLASH_STYLES o un video '1' | '2' | '3' | 'none' */
   splashVideo?: string;
+  /** Color del nombre del evento en la bienvenida (ver NAME_STYLES) */
+  nameStyle?: 'white' | 'gold' | 'gradient' | 'neon';
+  /** Rotación de la pantalla en grados (tele colgada en vertical) */
+  screenRotation?: number;
+  /** El invitado elige el marco después de la foto */
+  guestFrameChoice?: boolean;
+  /** Marcos que puede elegir el invitado (valores como en kiosk_frame_url) */
+  guestFrames?: string[];
   enableSelfie?: boolean;
   enableAI?: boolean;
   enableMundial?: boolean;
@@ -96,15 +104,27 @@ export const saveFrameUrl = (url: string | null) => {
   }
 };
 
+// Bienvenida: animaciones propias (hechas en código, livianas para la TV box) y los videos de antes
+export const SPLASH_STYLES = [
+  { value: 'polaroids', label: 'Lluvia de fotos' },
+  { value: 'flash', label: 'Flash de cámara' },
+  { value: 'neon', label: 'Neón' },
+  { value: 'fiesta', label: 'Fiesta' },
+] as const;
+
 export const SPLASH_VIDEOS = [
-  { value: '1', label: 'Animación 1', src: '/kiosk-animacion1.mp4' },
-  { value: '2', label: 'Animación 2', src: '/kiosk-animacion2.mp4' },
-  { value: '3', label: 'Animación 3', src: '/kiosk-animacion3.mp4' },
+  { value: '1', label: 'Video 1', src: '/kiosk-animacion1.mp4' },
+  { value: '2', label: 'Video 2', src: '/kiosk-animacion2.mp4' },
+  { value: '3', label: 'Video 3', src: '/kiosk-animacion3.mp4' },
   { value: 'none', label: 'Sin animación', src: '' },
 ];
 
+export const DEFAULT_SPLASH = 'polaroids';
+export const splashStyleOf = (value?: string) => value || DEFAULT_SPLASH;
+export const isAnimatedSplash = (value?: string) => SPLASH_STYLES.some(s => s.value === splashStyleOf(value));
+
 export const splashVideoSrc = (value?: string) =>
-  value === 'none' ? '' : (SPLASH_VIDEOS.find(v => v.value === value) ?? SPLASH_VIDEOS[0]).src;
+  SPLASH_VIDEOS.find(v => v.value === splashStyleOf(value))?.src ?? '';
 
 export const BUILT_IN_FRAMES = [
   { label: 'Marco 1', url: '/kiosk-marco-1.png' },
