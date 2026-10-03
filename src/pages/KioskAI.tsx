@@ -666,6 +666,12 @@ The subject must perfectly match the facial features and gender of the reference
       setStep('result');
     } catch (e: any) {
       console.error(e);
+      // Sin saldo o sin servicio de IA: mensaje para el invitado y vuelta al menú
+      if (/credit|billing|payment|insufficient|quota|402|429/i.test(String(e?.message || ''))) {
+        toast.error('La magia con IA no está disponible en este momento. ¡Probá con Fotos!', { duration: 6000 });
+        setStep('modeSelect');
+        return;
+      }
       toast.error(e.message || 'Error al procesar la foto');
       if (mode === 'figuritas') {
         setStep('modeSelect'); // Volver al inicio si falla la figurita
