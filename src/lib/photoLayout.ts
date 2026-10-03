@@ -166,10 +166,31 @@ export async function composePhotos(photoSrcs: string[], options: LayoutOptions)
   // Dónde va la firma: con una foto a sangre, dentro de la parte libre del marco
   let signArea: Rect[] = [{ x: W * 0.08, y: H * 0.08, w: W * 0.84, h: H * 0.76 }];
   if (n === 1 && !strips) {
-    // Una foto: a sangre (el PNG la recorta con su ventana)
+    const photo = imgs[0];
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, W, H);
-    drawCover(ctx, imgs[0], 0, 0, W, H);
+    if (isLandscape(photo) === (orientation === 'landscape')) {
+      // Misma orientación: a sangre (el PNG la recorta con su ventana)
+      drawCover(ctx, photo, 0, 0, W, H);
+    } else {
+      // Orientación distinta (p. ej. foto apaisada en marco vertical): la foto entra
+      // entera y el resto se rellena con la misma foto desenfocada, sin recortar a nadie
+      ctx.save();
+      ctx.filter = 'blur(40px) saturate(140%) brightness(0.85)';
+      drawCover(ctx, photo, -60, -60, W + 120, H + 120);
+      ctx.restore();
+      const scale = Math.min(W / photo.width, H / photo.height);
+      const pw = photo.width * scale;
+      const ph = photo.height * scale;
+      const px = (W - pw) / 2;
+      const py = (H - ph) / 2;
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,0.45)';
+      ctx.shadowBlur = 40;
+      ctx.drawImage(photo, px, py, pw, ph);
+      ctx.restore();
+      signArea = [{ x: px, y: py, w: pw, h: ph }];
+    }
   } else {
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, W, H);
