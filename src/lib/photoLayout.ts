@@ -1,4 +1,4 @@
-import { drawCover, drawGlassPage, drawSignature, glassStyleOf, isGlassFrame, loadPhoto, type Rect } from '@/lib/glassFrame';
+import { drawCover, drawGlassPage, drawSignature, glassStyleOf, isGlassFrame, loadPhoto, loadSignatureFont, type Rect } from '@/lib/glassFrame';
 
 // Arma la hoja final del kiosco (10×15 a 300 dpi aprox.: 1200×1800 o 1800×1200)
 // con una o varias fotos:
@@ -108,6 +108,7 @@ export async function composePhotos(photoSrcs: string[], options: LayoutOptions)
   const subtitle = options.subtitle;
   // El nombre del invitado va como firma sobre la foto, igual con cualquier marco
   const guest = options.guestName?.trim();
+  if (guest) await loadSignatureFont();
 
   // ─── Marco de vidrio ────────────────────────────────────────────
   if (isGlassFrame(options.frame)) {

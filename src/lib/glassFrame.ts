@@ -109,6 +109,14 @@ function fitFont(ctx: CanvasRenderingContext2D, text: string, weight: string, ma
 
 export interface Rect { x: number; y: number; w: number; h: number }
 
+// Letra manuscrita incluida en la app (@fontsource/great-vibes en index.css)
+export const SIGNATURE_FONT = "'Great Vibes', 'Segoe Script', 'Brush Script MT', cursive";
+
+/** Espera a que la letra de la firma esté cargada (si no, el canvas usa otra). */
+export async function loadSignatureFont() {
+  try { await document.fonts?.load(`400 80px ${SIGNATURE_FONT}`); } catch { /* sigue con la de respaldo */ }
+}
+
 /**
  * Nombre del invitado como firma, abajo a la derecha dentro de la foto,
  * con letra manuscrita y sombra para que se lea sobre cualquier imagen.
@@ -121,7 +129,7 @@ export function drawSignature(ctx: CanvasRenderingContext2D, name: string, area:
   ctx.rotate(-0.07);
   ctx.textAlign = 'right';
   ctx.textBaseline = 'alphabetic';
-  ctx.font = `700 ${Math.round(size)}px 'Dancing Script', 'Segoe Script', 'Brush Script MT', 'Apple Chancery', cursive`;
+  ctx.font = `400 ${Math.round(size * 1.15)}px ${SIGNATURE_FONT}`;
   ctx.shadowColor = 'rgba(0,0,0,0.75)';
   ctx.shadowBlur = size * 0.18;
   ctx.shadowOffsetY = size * 0.04;
