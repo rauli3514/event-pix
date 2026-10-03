@@ -3,14 +3,17 @@ import { getGeneralSettings } from '@/lib/kioskSettings';
 // A dónde lleva el QR del kiosco: a la página /foto del sitio (con botones para
 // bajar y compartir) o, si no hay una dirección pública, directo a la imagen.
 
-/** Dirección pública del sitio (Ajustes → Compartir y nube, o la de esta página si es pública). */
+/**
+ * Dirección pública del sitio para la página del invitado: la de Ajustes → Compartir
+ * y nube, o VITE_PUBLIC_SITE_URL al compilar. No se usa la de la página actual porque
+ * los links de prueba de Vercel piden iniciar sesión. Sin dirección, el QR abre la
+ * foto directo en Drive (que es público).
+ */
 export const publicSiteUrl = () => {
-  const configured = ((getGeneralSettings().publicSiteUrl as string) || '').trim().replace(/\/+$/, '');
-  if (configured) return /^https?:\/\//.test(configured) ? configured : `https://${configured}`;
-  const { protocol, hostname, origin } = window.location;
-  // En la app (https://localhost) o en desarrollo no hay una dirección que sirva desde un celular
-  if (protocol !== 'https:' || hostname === 'localhost' || hostname.endsWith('.local')) return '';
-  return origin;
+  const configured = (((getGeneralSettings().publicSiteUrl as string) || '').trim()
+    || ((import.meta.env.VITE_PUBLIC_SITE_URL as string | undefined) || '').trim()).replace(/\/+$/, '');
+  if (!configured) return '';
+  return /^https?:\/\//.test(configured) ? configured : `https://${configured}`;
 };
 
 /** Foto en Drive: 'drive:<id>' (lo que devuelve la subida para el QR). */

@@ -63,7 +63,7 @@ export default function ShareSection() {
           El QR abre una página con la foto y botones para <b>descargarla</b>, <b>compartirla</b> (Instagram, WhatsApp y lo que tenga el celular)
           o <b>mandarla por WhatsApp</b>. {publicSiteUrl()
             ? <>Se usa: <b className="text-white/80">{publicSiteUrl()}</b></>
-            : 'Sin una dirección pública, el QR lleva directo a la imagen.'}
+            : 'Sin una dirección pública, el QR abre la foto directo en Google Drive (desde ahí se puede descargar y compartir).'}
         </p>
         {settings.cloudSupabase && (
           <p className="text-white/55 text-sm">
