@@ -12,6 +12,7 @@ import PinDialog from '@/components/kiosk/PinDialog';
 import { backupPhoto, type SavedPhoto } from '@/lib/kioskStorage';
 import { composePhotos, type PageOrientation } from '@/lib/photoLayout';
 import { coverOptionsFrom, renderMagazineCover } from '@/lib/magazineCover';
+import { applyFx, BUILT_IN_ACCESSORIES, COLOR_FILTERS, type FxChoice } from '@/lib/faceFx';
 import AttractScreen from '@/components/kiosk/AttractScreen';
 import FrameChooser from '@/components/kiosk/FrameChooser';
 import NextShot from '@/components/kiosk/NextShot';
@@ -174,6 +175,7 @@ export default function KioskAI() {
   const [mode, setMode] = useState<Mode>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const capturedImageState = capturedImage;
   const [lastPublicUrl, setLastPublicUrl] = useState<string | null>(null);
   const [resultPhrase, setResultPhrase] = useState('');
   const [isAIGenerating, setIsAIGenerating] = useState(false);
@@ -327,6 +329,7 @@ export default function KioskAI() {
       // Toma nueva (o "Repetir"): se descartan las fotos anteriores
       shotsRef.current = [];
       setShotCount(0);
+      setFx({});
       const t = setTimeout(() => startCountdown(), 2500);
       return () => clearTimeout(t);
     }
@@ -472,6 +475,12 @@ export default function KioskAI() {
     }, 1000);
   };
 
+  // Filtro de color y accesorio que elige el invitado después de la foto (Fotos y Portada)
+  const [fx, setFx] = useState<FxChoice>({});
+  const [fxPreviews, setFxPreviews] = useState<string[] | null>(null);
+  const [fxBusy, setFxBusy] = useState(false);
+  const fxActive = (!!fx.filter && fx.filter !== 'none') || (!!fx.accessory && fx.accessory !== 'none');
+
   // Varias fotos por toma (solo Fotos/selfie): Ajustes → Experiencias y marco → Diseño de la foto
   const shotsRef = useRef<string[]>([]);
   const [shotCount, setShotCount] = useState(0);
@@ -557,6 +566,22 @@ export default function KioskAI() {
     }
   };
 
+
+  // Vista previa del filtro/accesorio (en chico, para que sea rápida en la TV box)
+  useEffect(() => {
+    if (step !== 'photoPreview' || !fxActive || !capturedImage) {
+      setFxPreviews(null);
+      return;
+    }
+    let alive = true;
+    const shots = shotsRef.current.length ? shotsRef.current : [capturedImage];
+    setFxBusy(true);
+    Promise.all(shots.map(src => applyFx(src, fx, 900)))
+      .then(previews => alive && setFxPreviews(previews))
+      .catch(() => alive && setFxPreviews(null))
+      .finally(() => alive && setFxBusy(false));
+    return () => { alive = false; };
+  }, [step, fx, fxActive, capturedImage]);
 
   // Guarda y sube la foto final en segundo plano: el invitado ve su foto enseguida
   // y el QR aparece cuando termina la subida
@@ -811,7 +836,8 @@ The subject must perfectly match the facial features and gender of the reference
   const guestNameRef = useRef('');
 
   // Fotos (selfie): elegir marco si está habilitado, o armar la hoja directamente
-  const continueSelfie = async () => {
+  const continueSelfie = async (photo?: string) => {
+    const capturedImage = photo ?? capturedImageState;
     if (!capturedImage) return;
     if (mode === 'portada') {
       // Portada Fashion: la foto como tapa de revista con los textos de Ajustes
@@ -1074,6 +1100,20 @@ The subject must perfectly match the facial features and gender of the reference
   if (step === 'photoPreview') {
     const goNext = async () => {
       if (!capturedImage) return;
+      // Filtro y accesorio elegidos: se aplican a resolución completa (a todas las tomas)
+      let photo = capturedImage;
+      if (fxActive && (mode === 'selfie' || mode === 'portada')) {
+        setFxBusy(true);
+        try {
+          const shots = shotsRef.current.length ? shotsRef.current : [capturedImage];
+          const processed = await Promise.all(shots.map(src => applyFx(src, fx)));
+          if (shotsRef.current.length) shotsRef.current = processed;
+          photo = processed[0];
+          setCapturedImage(photo);
+        } finally {
+          setFxBusy(false);
+        }
+      }
       
       // Si es caricatura mundialista, lanzamos la IA directamente con el prompt especial
       if (mode === 'caricatura') {
@@ -1098,7 +1138,7 @@ The subject must perfectly match the facial features and gender of the reference
           setStep('guestName');
           return;
         }
-        await continueSelfie();
+        await continueSelfie(photo);
       } else if (mode === 'retrato') {
         setStep('themeSelect');
       } else if (mode === 'mundial') {
@@ -1114,13 +1154,13 @@ The subject must perfectly match the facial features and gender of the reference
         {/* La foto tal cual se guarda (el espejo ya está aplicado al sacarla) */}
         {capturedImage && shotsRef.current.length <= 1 && (
           <motion.div className="absolute inset-0" initial={{ scale: 1.08 }} animate={{ scale: 1 }} transition={{ duration: 0.7, ease: 'easeOut' }}>
-            <img src={capturedImage} alt="preview" className="absolute inset-0 w-full h-full object-contain" />
+            <img src={fxPreviews?.[0] ?? capturedImage} alt="preview" className="absolute inset-0 w-full h-full object-contain" />
           </motion.div>
         )}
         {shotsRef.current.length > 1 && (
           <div className="absolute inset-0 pb-40 pt-10 px-10 flex items-center justify-center gap-6">
             {shotsRef.current.map((src, i) => (
-              <motion.img key={i} src={src} alt={`Foto ${i + 1}`}
+              <motion.img key={i} src={fxPreviews?.[i] ?? src} alt={`Foto ${i + 1}`}
                 className="min-w-0 max-h-full rounded-2xl shadow-2xl object-contain"
                 style={{ maxWidth: `${92 / shotsRef.current.length}%` }}
                 initial={{ opacity: 0, y: 40, rotate: (i - 1) * 3 }} animate={{ opacity: 1, y: 0, rotate: 0 }}
@@ -1129,6 +1169,36 @@ The subject must perfectly match the facial features and gender of the reference
           </div>
         )}
         <CameraFlash key={capturedImage ?? 'flash'} />
+        {/* Filtros y accesorios (Ajustes → Filtros y accesorios) */}
+        {(mode === 'selfie' || mode === 'portada') && (generalSettings.enableFilters || generalSettings.enableAccessories) && (() => {
+          const filters = COLOR_FILTERS.filter(f => f.value === 'none' || (generalSettings.filters ?? COLOR_FILTERS.map(x => x.value)).includes(f.value));
+          const customs = (generalSettings.customAccessories ?? []) as { id: string; name: string }[];
+          const accs = [
+            { value: 'none', label: 'Sin accesorio' },
+            ...BUILT_IN_ACCESSORIES.filter(a => (generalSettings.accessories ?? BUILT_IN_ACCESSORIES.map(x => x.value)).includes(a.value)),
+            ...customs.filter(c => (generalSettings.accessories ?? [`custom:${c.id}`]).includes(`custom:${c.id}`)).map(c => ({ value: `custom:${c.id}`, label: c.name })),
+          ];
+          const chip = (on: boolean) => `shrink-0 px-5 py-2.5 rounded-full text-lg font-semibold border focus:outline-none focus:ring-4 focus:ring-white/80 ${on ? 'bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7] border-transparent' : 'bg-black/55 border-white/25 text-white/85 backdrop-blur'}`;
+          return (
+            <div className="absolute bottom-36 inset-x-0 z-20 flex flex-col items-center gap-3 px-6">
+              {generalSettings.enableFilters && (
+                <div className="flex gap-2 overflow-x-auto max-w-full pb-1">
+                  {filters.map(f => (
+                    <button key={f.value} onClick={() => setFx(v => ({ ...v, filter: f.value }))} className={chip((fx.filter ?? 'none') === f.value)}>{f.label}</button>
+                  ))}
+                </div>
+              )}
+              {generalSettings.enableAccessories && (
+                <div className="flex gap-2 overflow-x-auto max-w-full pb-1">
+                  {accs.map(a => (
+                    <button key={a.value} onClick={() => setFx(v => ({ ...v, accessory: a.value }))} className={chip((fx.accessory ?? 'none') === a.value)}>{a.label}</button>
+                  ))}
+                </div>
+              )}
+              {fxBusy && <p className="text-white/80 text-sm flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Aplicando…</p>}
+            </div>
+          );
+        })()}
         {/* Gradient bottom overlay for buttons */}
         <div className="absolute bottom-0 inset-x-0 h-48 bg-gradient-to-t from-black to-transparent" />
         <div className="absolute bottom-0 inset-x-0 flex items-end justify-center gap-6 p-8 z-10">
@@ -1138,8 +1208,8 @@ The subject must perfectly match the facial features and gender of the reference
             ↩ Repetir foto
           </button>
           )}
-          <button data-autofocus onClick={goNext}
-            className="flex-1 max-w-xs py-5 rounded-2xl carlmarx-bold text-white text-2xl transition-all focus:outline-none focus:ring-4 focus:ring-white/80"
+          <button data-autofocus onClick={goNext} disabled={fxBusy}
+            className="flex-1 max-w-xs py-5 rounded-2xl carlmarx-bold text-white text-2xl transition-all focus:outline-none focus:ring-4 focus:ring-white/80 disabled:opacity-60"
             style={{ background: 'linear-gradient(135deg,#ff2e93,#7b2ff7)', boxShadow: '0 0 40px rgba(255,46,147,0.5)' }}>
             ¡Me gusta! →
           </button>

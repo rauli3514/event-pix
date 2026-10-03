@@ -27,6 +27,7 @@
     "@fontsource/playfair-display": "^5.2.8",
     "@fontsource/roboto-mono": "^5.2.8",
     "@hookform/resolvers": "^5.2.2",
+    "@mediapipe/tasks-vision": "^1.0.1",
     "@radix-ui/react-aspect-ratio": "^1.1.8",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-dialog": "^1.1.15",

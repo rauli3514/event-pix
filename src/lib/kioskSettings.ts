@@ -28,6 +28,16 @@ export interface KioskGeneralSettings {
   cloudSupabase?: boolean;
   /** Pedir el nombre del invitado para ponerlo en la foto */
   askGuestName?: boolean;
+  /** Filtros de color para elegir después de la foto */
+  enableFilters?: boolean;
+  /** Filtros habilitados (valores de COLOR_FILTERS) */
+  filters?: string[];
+  /** Accesorios que siguen la cara */
+  enableAccessories?: boolean;
+  /** Accesorios habilitados (incluidos o 'custom:<id>') */
+  accessories?: string[];
+  /** Accesorios PNG subidos (la imagen queda en el equipo) */
+  customAccessories?: { id: string; name: string; anchor: 'eyes' | 'head' | 'mouth'; scale: number }[];
   /** Fondo de cada pantalla (ver kioskMedia.ts) */
   screenBackgrounds?: Record<string, string>;
   /** Rotación de la pantalla en grados (tele colgada en vertical) */
