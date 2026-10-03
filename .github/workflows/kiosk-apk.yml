@@ -2,15 +2,9 @@ name: APK del kiosco
 
 # Genera el APK de prueba del kiosco (VITE_APP_FLAVOR=kiosk) y lo publica en la
 # release "kiosco-prueba", con un link fijo para bajarlo desde la TV box.
+# Solo a mano (Actions → "APK del kiosco" → Run workflow): para probar cambios
+# alcanza con la versión web de Vercel; el APK hace falta para la impresión nativa.
 on:
-  push:
-    branches: [claude/apk-reverse-engineering-ulzqm9]
-    paths:
-      - 'android/**'
-      - 'src/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/kiosk-apk.yml'
   workflow_dispatch:
 
 permissions:

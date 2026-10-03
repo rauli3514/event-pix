@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabase';
 import { isNativePrintAvailable, printImageNative, printErrorMessage } from '@/lib/nativePrint';
 import { StickerEditor } from '@/components/stickers/StickerEditor';
 import { useRemoteFocus } from '@/hooks/use-remote-focus';
+import { openCameraStream, stopStream } from '@/lib/kioskCamera';
+import { splashVideoSrc } from '@/lib/kioskSettings';
 
 // ---- Types ----
 type Step =
@@ -159,6 +161,8 @@ export default function KioskAI() {
   const [showKeyboard, setShowKeyboard] = useState(false);
   const [themes, setThemes] = useState<any[]>([]);
   const [frameUrl, setFrameUrl] = useState<string | null>(null);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
   const [selectedAITheme, setSelectedAITheme] = useState<any>(null);
 
 
@@ -241,20 +245,9 @@ export default function KioskAI() {
 
   // Camera management
   const startCamera = async () => {
+    setCameraError(null);
     try {
-      const constraints: MediaStreamConstraints = {
-        video: {
-          deviceId: cameraSettings.deviceId && cameraSettings.deviceId !== 'default'
-            ? { exact: cameraSettings.deviceId }
-            : undefined,
-          width: { ideal: 1920, min: 1280 },
-          height: { ideal: 1080, min: 720 },
-          aspectRatio: { ideal: 1.7777777778 }, // Forzamos 16:9 si es posible para mejor calidad
-          frameRate: { ideal: 30 }
-        },
-        audio: false,
-      };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      const stream = await openCameraStream(cameraSettings.deviceId);
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -265,29 +258,68 @@ export default function KioskAI() {
           });
         };
       }
-    } catch {
-      console.error('Camera access failed');
+      setCameraReady(true);
+    } catch (err) {
+      setCameraError(err instanceof Error ? err.message : String(err));
     }
   };
 
   const stopCamera = () => {
-    streamRef.current?.getTracks().forEach(t => t.stop());
+    stopStream(streamRef.current);
     streamRef.current = null;
+    setCameraReady(false);
   };
 
+  // La cámara queda prendida entre "Mirá a la cámara" y la cuenta regresiva
+  const cameraActive = step === 'lookCamera' || step === 'countdown';
   useEffect(() => {
-    if (step === 'lookCamera' || step === 'countdown') startCamera();
+    if (cameraActive) startCamera();
     else stopCamera();
     return () => stopCamera();
-  }, [step]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cameraActive]);
 
-  // Temporizador automático para pasar de "Mirá a la cámara" a "Cuenta regresiva"
+  // El video se monta de nuevo en cada pantalla: se le vuelve a conectar la cámara
   useEffect(() => {
-    if (step === 'lookCamera') {
+    if (cameraActive && streamRef.current && videoRef.current && videoRef.current.srcObject !== streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+    }
+  }, [step, cameraActive]);
+
+  // "Mirá a la cámara" pasa a la cuenta regresiva recién cuando la cámara anda
+  useEffect(() => {
+    if (step === 'lookCamera' && cameraReady) {
       const t = setTimeout(() => startCountdown(), 2500);
       return () => clearTimeout(t);
     }
-  }, [step]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, cameraReady]);
+
+  // Vuelve solo al inicio después del resultado (Ajustes → Resultado y tiempos)
+  const resultTimeout = Number(generalSettings.resultTimeout) || 0;
+  useEffect(() => {
+    if (step !== 'result' || resultTimeout <= 0) return;
+    const t = setTimeout(() => resetKiosk(), resultTimeout * 1000);
+    return () => clearTimeout(t);
+  }, [step, resultTimeout]);
+
+  // Sin actividad en las pantallas de elección, vuelve al inicio
+  const idleTimeout = Number(generalSettings.idleTimeout) || 0;
+  useEffect(() => {
+    const idleSteps: Step[] = ['modeSelect', 'themeSelect', 'mundialCountry', 'mundialInfo'];
+    if (idleTimeout <= 0 || !idleSteps.includes(step)) return;
+    let t = setTimeout(() => resetKiosk(), idleTimeout * 1000);
+    const restart = () => {
+      clearTimeout(t);
+      t = setTimeout(() => resetKiosk(), idleTimeout * 1000);
+    };
+    const events = ['pointerdown', 'keydown', 'touchstart'] as const;
+    events.forEach(e => window.addEventListener(e, restart));
+    return () => {
+      clearTimeout(t);
+      events.forEach(e => window.removeEventListener(e, restart));
+    };
+  }, [step, idleTimeout]);
 
   // Go to mode after splash
   const handleSplashTap = () => {
@@ -780,15 +812,20 @@ The subject must perfectly match the facial features and gender of the reference
       style={{ cursor: 'pointer' }}
     >
       {homeButton}
-      <video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover opacity-80">
-        <source src="/kiosk-animacion1.mp4" type="video/mp4" />
-      </video>
+      {splashVideoSrc(generalSettings.splashVideo) && (
+        <video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover opacity-80">
+          <source src={splashVideoSrc(generalSettings.splashVideo)} type="video/mp4" />
+        </video>
+      )}
       <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/50" />
       <Corners />
       <div className="relative z-10 flex flex-col items-center justify-center h-full">
         <h1 className="carlmarx-bold text-[clamp(4rem,12vw,9rem)] text-white drop-shadow-2xl text-center leading-tight animate-pulse-slow">
-          Toca para<br />empezar
+          {generalSettings.welcomeTitle || <>Toca para<br />empezar</>}
         </h1>
+        {generalSettings.welcomeSubtitle && (
+          <p className="mt-6 text-white/90 text-[clamp(1.5rem,3vw,2.5rem)] text-center drop-shadow-xl px-8">{generalSettings.welcomeSubtitle}</p>
+        )}
         <div className="mt-8 w-20 h-20 border-4 border-white/60 rounded-full flex items-center justify-center animate-bounce">
           <div className="w-10 h-10 border-4 border-white rounded-full" />
         </div>
@@ -845,7 +882,7 @@ The subject must perfectly match the facial features and gender of the reference
           )}
 
           {/* FIGURITAS */}
-          {isModeAllowed('figuritas') && (
+          {generalSettings.enableFiguritas !== false && isModeAllowed('figuritas') && (
           <button onClick={() => handleModeSelect('figuritas')}
             className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-teal-400 bg-black/40 backdrop-blur hover:bg-teal-400/10 transition-all">
             <Sticker className="w-16 h-16 text-teal-400" />
@@ -866,6 +903,27 @@ The subject must perfectly match the facial features and gender of the reference
         <h1 className="carlmarx-bold text-[clamp(4rem,10vw,8rem)] text-white text-center animate-fade-in">
           Vamos a<br /><span className="text-violet-400">Empezar</span>
         </h1>
+      </div>
+    </div>
+  );
+
+  if (cameraActive && cameraError) return (
+    <div className="kiosk-root">
+      <div className="absolute inset-0 bg-[#0a0a1a]" />
+      <Corners />
+      <div className="relative z-10 flex flex-col items-center justify-center h-full gap-8 px-10 text-center">
+        <h2 className="carlmarx-bold text-white text-5xl">No encontramos la cámara</h2>
+        <p className="text-white/70 text-2xl max-w-3xl">{cameraError}</p>
+        <div className="flex gap-6">
+          <button data-autofocus onClick={() => startCamera()}
+            className="px-10 py-5 rounded-3xl bg-violet-600 hover:bg-violet-500 text-white text-2xl font-bold focus:outline-none focus:ring-8 focus:ring-white/70">
+            Reintentar
+          </button>
+          <button onClick={() => (showHomeButton ? navigate('/box') : resetKiosk())}
+            className="px-10 py-5 rounded-3xl bg-white/10 hover:bg-white/20 text-white text-2xl font-bold focus:outline-none focus:ring-8 focus:ring-white/70">
+            Volver
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -1219,7 +1277,8 @@ The subject must perfectly match the facial features and gender of the reference
   if (step === 'result') {
     const printerCfg = (() => { try { return JSON.parse(localStorage.getItem('kiosk_print_settings') || '{}'); } catch { return {}; } })();
     const igCfg = (() => { try { return JSON.parse(localStorage.getItem('kiosk_ig_settings') || '{}'); } catch { return {}; } })();
-    const showPrint = printerCfg.autoPrint !== false;
+    const showPrint = generalSettings.showPrintButton !== false && printerCfg.autoPrint !== false;
+    const showQr = generalSettings.showQr !== false;
     // The QR points directly to the photo for downloading
     const qrUrl = lastPublicUrl 
       ? `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(lastPublicUrl)}&bgcolor=ffffff&color=000000`
@@ -1256,10 +1315,12 @@ The subject must perfectly match the facial features and gender of the reference
               </button>
             )}
 
+            {showQr && (
             <button onClick={() => setShowQrModal(true)}
               className="py-6 px-8 bg-slate-800/80 hover:bg-slate-700 text-white rounded-3xl carlmarx-bold text-2xl flex items-center justify-center gap-4 border border-white/10 transition-all hover:scale-[1.02]">
               <QrCode className="w-7 h-7 text-pink-400" /> Obtener QR
             </button>
+            )}
 
             <button onClick={async () => {
               if (!navigator.share) { toast.info("Guardá la foto con un toque largo"); return; }
