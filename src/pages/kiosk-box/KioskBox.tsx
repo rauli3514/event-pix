@@ -13,6 +13,7 @@ import {
   openAndroidApp, openWifiSettings, type KioskDeviceState,
 } from '@/lib/kioskDevice';
 import { getGeneralSettings, getSectionLock } from '@/lib/kioskSettings';
+import { isSupabaseConfigured, supabaseProjectRef } from '@/lib/supabase';
 
 // Inicio de la app "EventPix Kiosco" en la TV box: sin login. Si el equipo no
 // está vinculado muestra su código para registrarlo en el panel; si lo está,
@@ -45,6 +46,8 @@ export default function KioskBox() {
   const navigate = useNavigate();
   const [device, setDevice] = useState<KioskDeviceState | null>(() => getCachedDeviceState());
   const [offline, setOffline] = useState(false);
+  // Motivo real de la falla (sin internet, sin configurar o error del servidor)
+  const [problem, setProblem] = useState<string | null>(null);
   const [pinOpen, setPinOpen] = useState(false);
   const [vipError, setVipError] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -54,8 +57,12 @@ export default function KioskBox() {
     try {
       setDevice(await checkinDevice(await appVersion()));
       setOffline(false);
-    } catch {
+      setProblem(null);
+    } catch (e) {
       setOffline(true);
+      if (!isSupabaseConfigured) setProblem('Esta versión de la app no tiene configurado el servidor de EventPix.');
+      else if (typeof navigator !== 'undefined' && navigator.onLine === false) setProblem(null);
+      else setProblem(`No responde el servidor: ${e instanceof Error ? e.message : String(e)}`);
     }
   }, []);
 
@@ -117,8 +124,8 @@ export default function KioskBox() {
           <div className="flex items-center gap-3 text-white/70 text-lg">
             {offline ? (
               <>
-                <AlertTriangle className="w-6 h-6 text-amber-400" />
-                <span>Sin conexión a internet.</span>
+                <AlertTriangle className="w-6 h-6 text-amber-400 shrink-0" />
+                <span className="max-w-3xl">{problem ?? 'Sin conexión a internet.'}</span>
                 <button onClick={openWifiSettings} className="ml-2 kiosk-glass px-5 py-3 rounded-2xl font-semibold focus:outline-none focus:ring-4 focus:ring-[#00d4ff]">
                   Configurar WiFi
                 </button>
@@ -130,6 +137,7 @@ export default function KioskBox() {
               </>
             )}
           </div>
+          <p className="text-white/35 text-sm">Servidor: {supabaseProjectRef ?? 'sin configurar'}</p>
         </div>
       </div>
     );
