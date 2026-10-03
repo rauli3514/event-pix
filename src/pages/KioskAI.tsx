@@ -9,14 +9,14 @@ import { useRemoteFocus } from '@/hooks/use-remote-focus';
 import { openCameraStream, stopStream } from '@/lib/kioskCamera';
 import { getSectionLock, setSectionLock } from '@/lib/kioskSettings';
 import PinDialog from '@/components/kiosk/PinDialog';
-import { backupPhoto } from '@/lib/kioskStorage';
+import { backupPhoto, type SavedPhoto } from '@/lib/kioskStorage';
 import { composePhotos, type PageOrientation } from '@/lib/photoLayout';
 import AttractScreen from '@/components/kiosk/AttractScreen';
 import FrameChooser from '@/components/kiosk/FrameChooser';
 import NextShot from '@/components/kiosk/NextShot';
 import CameraVideo from '@/components/kiosk/CameraVideo';
 import GuestNameScreen from '@/components/kiosk/GuestNameScreen';
-import { queueForDrive, startDriveSync } from '@/lib/driveBackup';
+import { isDriveConfigured, queueForDrive, startDriveSync, uploadForShare } from '@/lib/driveBackup';
 import { guestPhotoUrl } from '@/lib/kioskShare';
 import { guestFrameOptions, type FrameOption } from '@/lib/frameOptions';
 import { motion } from 'framer-motion';
@@ -515,15 +515,30 @@ export default function KioskAI() {
 
   const savePhotoToAlbum = async (dataUrl: string): Promise<string | null> => {
     // Respaldo en el equipo (original + final), siempre: con o sin evento e internet
+    let saved: SavedPhoto[] = [];
     try {
-      const saved = await backupPhoto(dataUrl, shotsRef.current.length ? shotsRef.current : originalShotRef.current, mode || 'foto');
-      queueForDrive(saved); // respaldo en Drive si está configurado (se sube cuando hay internet)
+      saved = await backupPhoto(dataUrl, shotsRef.current.length ? shotsRef.current : originalShotRef.current, mode || 'foto');
     } catch (e) {
       console.error('No se pudo guardar la foto en el equipo', e);
       toast.error('No se pudo guardar la foto en el equipo');
     }
-    // A la nube (Supabase) solo si el QR está activado: sin QR la foto queda solo en el equipo
-    if (!kioskEventId || offlineMode || generalSettings.showQr === false) return null;
+    const wantsQr = !offlineMode && generalSettings.showQr !== false;
+
+    // QR con Drive (destino único): se sube ya la foto final y queda visible con el link
+    let driveRef: string | null = null;
+    if (wantsQr && !generalSettings.cloudSupabase && isDriveConfigured() && saved[0]) {
+      try {
+        driveRef = `drive:${await uploadForShare(dataUrl, saved[0].name, saved[0].folder)}`;
+      } catch (e) {
+        console.error(e);
+        toast.error('No se pudo subir la foto a Drive: el QR no va a estar disponible');
+      }
+    }
+    queueForDrive(saved); // el resto (originales, o la final si falló) se sube a Drive cuando hay internet
+    if (driveRef || !wantsQr) return driveRef;
+
+    // Supabase: solo si está activado en Compartir y nube (y el equipo tiene evento)
+    if (!generalSettings.cloudSupabase || !kioskEventId) return null;
     try {
       const blob = await (await fetch(dataUrl)).blob();
       const fileName = `kiosk_sessions/${kioskEventId}/${Date.now()}.jpg`;
@@ -538,6 +553,7 @@ export default function KioskAI() {
       return null;
     }
   };
+
 
   // Guarda y sube la foto final en segundo plano: el invitado ve su foto enseguida
   // y el QR aparece cuando termina la subida
@@ -1350,7 +1366,7 @@ The subject must perfectly match the facial features and gender of the reference
     const igCfg = (() => { try { return JSON.parse(localStorage.getItem('kiosk_ig_settings') || '{}'); } catch { return {}; } })();
     const showPrint = generalSettings.showPrintButton !== false && printerCfg.autoPrint !== false;
     // QR solo con internet y con el equipo asignado a un evento (las fotos se suben ahí)
-    const showQrBlock = generalSettings.showQr !== false && !offlineMode && !!kioskEventId;
+    const showQrBlock = generalSettings.showQr !== false && !offlineMode && (generalSettings.cloudSupabase ? !!kioskEventId : isDriveConfigured());
     // The QR points directly to the photo for downloading
     // El QR abre la página del invitado (bajar / compartir por WhatsApp o Instagram)
     const qrUrl = lastPublicUrl

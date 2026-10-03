@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Download, MessageCircle, Share2 } from 'lucide-react';
 import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
 import { EventPixLogo } from '@/components/kiosk/brand/EventPixLogo';
+import { driveImageUrl } from '@/lib/kioskShare';
 
 // Página que abre el invitado en el celular al escanear el QR del kiosco:
 // ve su foto y la baja o la comparte (WhatsApp, Instagram y lo que tenga el teléfono).
@@ -11,10 +12,13 @@ const isPhotoUrl = (u: string) => /^https:\/\/[\w.-]+\/storage\/v1\/object\/publ
 
 export default function GuestPhoto() {
   const [params] = useSearchParams();
-  const url = params.get('u') || '';
+  // La foto viene de Drive (?d=<id>) o de Supabase (?u=<url>)
+  const driveId = /^[\w-]{20,}$/.test(params.get('d') || '') ? params.get('d')! : '';
+  const url = driveId ? driveImageUrl(driveId) : params.get('u') || '';
+  const downloadUrl = driveId ? `https://drive.google.com/uc?export=download&id=${driveId}` : url;
   const title = params.get('t') || '';
   const [busy, setBusy] = useState(false);
-  const valid = isPhotoUrl(url);
+  const valid = !!driveId || isPhotoUrl(url);
 
   const fileOf = async () => {
     const blob = await (await fetch(url)).blob();
@@ -33,7 +37,8 @@ export default function GuestPhoto() {
       a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 5000);
     } catch {
-      window.open(url, '_blank');
+      // Drive no deja bajar la imagen desde la página: se abre su descarga
+      window.open(downloadUrl, '_blank');
     } finally {
       setBusy(false);
     }
@@ -43,11 +48,12 @@ export default function GuestPhoto() {
   const share = async () => {
     setBusy(true);
     try {
-      const file = await fileOf();
-      if (navigator.canShare?.({ files: [file] })) {
+      // Si la imagen no se puede bajar desde la página (p. ej. Drive), se comparte el link
+      const file = await fileOf().catch(() => null);
+      if (file && navigator.canShare?.({ files: [file] })) {
         await navigator.share({ files: [file], title: title || 'Mi foto' });
       } else {
-        await navigator.share({ url, title: title || 'Mi foto' });
+        await navigator.share({ url: window.location.href, title: title || 'Mi foto' });
       }
     } catch {
       // cancelado por el usuario o sin soporte
@@ -56,7 +62,7 @@ export default function GuestPhoto() {
     }
   };
 
-  const whatsapp = `https://wa.me/?text=${encodeURIComponent(`${title ? `Mi foto de ${title} 📸 ` : 'Mi foto 📸 '}${url}`)}`;
+  const whatsapp = `https://wa.me/?text=${encodeURIComponent(`${title ? `Mi foto de ${title} 📸 ` : 'Mi foto 📸 '}${window.location.href}`)}`;
   const button = 'w-full flex items-center justify-center gap-3 rounded-2xl py-4 text-lg font-bold disabled:opacity-50';
 
   return (

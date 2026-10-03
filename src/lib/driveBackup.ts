@@ -63,7 +63,7 @@ async function post(body: Record<string, unknown>) {
   const { scriptUrl } = driveConfig();
   // text/plain: pedido "simple", sin consulta previa de CORS (Apps Script no la responde)
   const res = await fetch(scriptUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) });
-  const json = await res.json().catch(() => null) as ({ ok?: boolean; error?: string } & Partial<DriveInfo>) | null;
+  const json = await res.json().catch(() => null) as ({ ok?: boolean; error?: string; id?: string } & Partial<DriveInfo>) | null;
   if (!json?.ok) throw new Error(json?.error || `Drive respondió ${res.status}`);
   return json;
 }
@@ -78,6 +78,21 @@ export async function testDrive() {
   write(LINKS_KEY, { ...read<Record<string, DriveInfo>>(LINKS_KEY, {}), [folder]: info });
   notify();
   return info;
+}
+
+/**
+ * Sube ya mismo la foto final para el QR: queda visible con el link (solo esa
+ * foto) y devuelve su ID de Drive. Si falla, la foto sigue en la cola normal.
+ */
+export async function uploadForShare(dataUrl: string, name: string, folder: string): Promise<string> {
+  const { folderId } = driveConfig();
+  const res = await post({ folderId, folder, name, type: 'image/jpeg', share: true, data: dataUrl.slice(dataUrl.indexOf(',') + 1) });
+  if (!res.id) throw new Error('Drive no devolvió la foto (actualizá el script)');
+  const done = doneSet();
+  done.add(`${folder}/${name}`);
+  write(DONE_KEY, [...done].slice(-5000));
+  notify();
+  return res.id;
 }
 
 /** Agrega fotos recién guardadas a la cola de Drive. */

@@ -43,11 +43,17 @@ function doPost(e) {
       return json({ ok: true, folder: root.getName(), url: root.getUrl(), eventFolder: folder.getName(), eventUrl: folder.getUrl() });
     }
     // Si ya está (reintento), no se duplica
-    if (!folder.getFilesByName(body.name).hasNext()) {
+    var existing = folder.getFilesByName(body.name);
+    var file;
+    if (existing.hasNext()) {
+      file = existing.next();
+    } else {
       var blob = Utilities.newBlob(Utilities.base64Decode(body.data), body.type || 'image/jpeg', body.name);
-      folder.createFile(blob);
+      file = folder.createFile(blob);
     }
-    return json({ ok: true });
+    // Para el QR: la foto se puede ver con el link (solo esa foto, no la carpeta)
+    if (body.share) file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    return json({ ok: true, id: file.getId() });
   } catch (err) {
     return json({ ok: false, error: String(err) });
   }

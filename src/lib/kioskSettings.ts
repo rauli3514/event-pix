@@ -24,6 +24,8 @@ export interface KioskGeneralSettings {
   photoStrips?: boolean;
   /** Hay una imagen de fondo para la hoja impresa (guardada en el equipo) */
   pageBackground?: boolean;
+  /** Subir también a Supabase para el QR (si no, el QR usa Drive) */
+  cloudSupabase?: boolean;
   /** Pedir el nombre del invitado para ponerlo en la foto */
   askGuestName?: boolean;
   /** Fondo de cada pantalla (ver kioskMedia.ts) */

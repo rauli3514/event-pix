@@ -13,10 +13,16 @@ export const publicSiteUrl = () => {
   return origin;
 };
 
-export const guestPhotoUrl = (photoUrl: string, title?: string) => {
+/** Foto en Drive: 'drive:<id>' (lo que devuelve la subida para el QR). */
+export const driveIdOf = (ref: string) => (ref.startsWith('drive:') ? ref.slice(6) : null);
+/** Imagen de Drive que se puede mostrar directo (archivo compartido con link). */
+export const driveImageUrl = (id: string, width = 2000) => `https://lh3.googleusercontent.com/d/${id}=w${width}`;
+
+export const guestPhotoUrl = (photoRef: string, title?: string) => {
+  const driveId = driveIdOf(photoRef);
   const base = publicSiteUrl();
-  if (!base) return photoUrl;
-  const params = new URLSearchParams({ u: photoUrl });
+  if (!base) return driveId ? `https://drive.google.com/file/d/${driveId}/view` : photoRef;
+  const params = new URLSearchParams(driveId ? { d: driveId } : { u: photoRef });
   if (title) params.set('t', title);
   return `${base}/foto?${params.toString()}`;
 };
