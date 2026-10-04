@@ -74,9 +74,17 @@ export default function PrinterSection() {
       scaleMode: settings.imageAdjust || 'cover',
       copies: 1,
       borderless: !!settings.borderless,
+      bleed: Number(settings.bleed) || 0,
+      format: settings.printFormat || 'auto',
       jobName: 'EventPix - prueba',
     });
-    if (res.mode === 'silent') toast.success('Prueba enviada a la impresora');
+    if (res.mode === 'silent') {
+      const fmt = res.format === 'image/pwg-raster' ? 'PWG raster' : res.format === 'image/jpeg' ? 'JPEG' : res.format;
+      toast.success(`Prueba enviada (${fmt}${res.dpi ? ` · ${res.dpi} dpi` : ''}${res.mediaType ? ` · ${res.mediaType}` : ''})`);
+      if (settings.borderless && res.borderlessSupported === false) {
+        toast.warning('La impresora no anuncia impresión sin bordes con este papel: usá "Agrandar para tapar bordes".');
+      }
+    }
   });
 
   return (
@@ -144,6 +152,19 @@ export default function PrinterSection() {
           onChange={(paper: PaperSize) => update({ paper })} />
         <Toggle label="Sin bordes" hint="La foto ocupa toda la hoja (papel fotográfico 10×15)."
           checked={!!settings.borderless} onChange={borderless => update({ borderless })} />
+        {settings.borderless && (
+          <>
+            <Choice label="Agrandar para tapar bordes" value={Number(settings.bleed) || 0}
+              options={[0, 1, 2, 3, 4].map(n => ({ value: n, label: n ? `${n}%` : 'Nada' }))}
+              onChange={bleed => update({ bleed })} />
+            <p className="text-white/55 text-sm -mt-2">
+              Si queda una franja blanca en algún borde, subí de a 1% e imprimí la prueba. Se recorta un poquito de cada lado de la foto.
+            </p>
+          </>
+        )}
+        <Choice label="Formato de envío" value={settings.printFormat || 'auto'}
+          options={[{ value: 'auto', label: 'Automático' }, { value: 'pwg', label: 'PWG raster' }, { value: 'jpeg', label: 'JPEG' }]}
+          onChange={printFormat => update({ printFormat })} />
         <Choice label="Copias por foto" value={settings.copies || 1}
           options={[1, 2, 3, 4].map(n => ({ value: n, label: String(n) }))}
           onChange={copies => update({ copies })} />

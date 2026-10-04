@@ -181,6 +181,9 @@ export interface KioskPrintSettings {
   selectedPrinter?: string;
   paper?: import('@/lib/nativePrint').PaperSize;
   borderless?: boolean;
+  /** % de agrandado para tapar la franja blanca sin bordes */
+  bleed?: number;
+  printFormat?: 'auto' | 'jpeg' | 'pwg';
   copies?: number;
   autoPrint?: boolean;
   imageAdjust?: 'cover' | 'contain' | 'fill';

@@ -61,6 +61,10 @@ export interface NativePrintOptions {
   scaleMode?: 'cover' | 'contain' | 'fill';
   copies?: number;
   borderless?: boolean;
+  /** % que se agranda la imagen para tapar la franja blanca sin bordes (0-8) */
+  bleed?: number;
+  /** Formato de envío: auto (PWG raster sin bordes si se puede), jpeg o pwg */
+  format?: 'auto' | 'jpeg' | 'pwg';
   jobName?: string;
 }
 
@@ -68,6 +72,10 @@ export interface NativePrintResult {
   mode: 'silent' | 'dialog';
   jobId?: number;
   format?: string;
+  dpi?: number;
+  mediaType?: string;
+  /** false = la impresora no anuncia márgenes en 0 (no hace sin bordes) */
+  borderlessSupported?: boolean;
 }
 
 interface NativePrintPlugin {

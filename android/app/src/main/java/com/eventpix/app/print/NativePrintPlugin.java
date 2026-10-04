@@ -39,6 +39,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -291,6 +292,9 @@ public class NativePrintPlugin extends Plugin {
         String scaleMode = call.getString("scaleMode", "cover");
         int copies = Math.max(1, call.getInt("copies", 1));
         boolean borderless = Boolean.TRUE.equals(call.getBoolean("borderless", false));
+        // Agranda la imagen unos % para tapar la franja blanca que dejan algunas impresoras sin bordes
+        float bleed = Math.max(0f, Math.min(8f, call.getFloat("bleed", 0f))) / 100f;
+        String preferredFormat = call.getString("format", "auto");
         String jobName = call.getString("jobName", "EventPix");
 
         executor.execute(() -> {
@@ -306,8 +310,8 @@ public class NativePrintPlugin extends Plugin {
                     target.name = printer.getString("name", "");
                     target.usb = UsbPrinterLink.open(getContext(), printer.getString("usb"));
                     try {
-                        Capabilities caps = capabilitiesFor(target, paper);
-                        page = composePage(source, paper, totalRotation, scaleMode, caps.dpi);
+                        Capabilities caps = capabilitiesFor(target, paper, preferredFormat, borderless);
+                        page = composePage(source, paper, totalRotation, scaleMode, caps.dpi, bleed);
                         source.recycle();
                         printSilently(call, target, page, paper, caps, copies, borderless, jobName);
                         page.recycle();
@@ -317,13 +321,13 @@ public class NativePrintPlugin extends Plugin {
                 } else if (printer != null && (printer.has("host") || printer.has("wifiDirect"))) {
                     session = openWifiDirect(printer);
                     Target target = targetFor(printer, session);
-                    Capabilities caps = capabilitiesFor(target, paper);
-                    page = composePage(source, paper, totalRotation, scaleMode, caps.dpi);
+                    Capabilities caps = capabilitiesFor(target, paper, preferredFormat, borderless);
+                    page = composePage(source, paper, totalRotation, scaleMode, caps.dpi, bleed);
                     source.recycle();
                     printSilently(call, target, page, paper, caps, copies, borderless, jobName);
                     page.recycle();
                 } else {
-                    page = composePage(source, paper, totalRotation, scaleMode, DPI);
+                    page = composePage(source, paper, totalRotation, scaleMode, DPI, bleed);
                     source.recycle();
                     printWithDialog(call, page, jobName);
                 }
@@ -494,9 +498,13 @@ public class NativePrintPlugin extends Plugin {
         int dpi = DPI;
         boolean color = true;
         String mediaType;
+        /** Formatos que acepta (para reintentar con otro si rechaza el elegido) */
+        String supported = "";
+        /** null = no se sabe; false = la impresora no anuncia márgenes en 0 */
+        Boolean borderlessSupported;
     }
 
-    private static Capabilities capabilitiesFor(Target target, Paper paper) throws IOException {
+    private static Capabilities capabilitiesFor(Target target, Paper paper, String preferred, boolean borderless) throws IOException {
         IppClient.Result attrs = null;
         IOException queryError = null;
         try {
@@ -504,7 +512,9 @@ public class NativePrintPlugin extends Plugin {
                     "document-format-supported",
                     "pwg-raster-document-resolution-supported",
                     "pwg-raster-document-type-supported",
-                    "media-type-supported");
+                    "media-type-supported",
+                    "media-left-margin-supported", "media-right-margin-supported",
+                    "media-top-margin-supported", "media-bottom-margin-supported");
         } catch (IOException e) {
             queryError = e;
         }
@@ -517,7 +527,17 @@ public class NativePrintPlugin extends Plugin {
         }
 
         Capabilities caps = new Capabilities();
-        if (pdl.isEmpty() || pdl.contains("image/jpeg")) {
+        caps.supported = pdl;
+        boolean pwgOk = pdl.contains("image/pwg-raster") && attrs != null;
+        if ("pwg".equals(preferred) && pwgOk) {
+            caps.format = "image/pwg-raster";
+        } else if ("jpeg".equals(preferred) && pdl.contains("image/jpeg")) {
+            caps.format = "image/jpeg";
+        } else if ("auto".equals(preferred) && borderless && pwgOk) {
+            // Sin bordes: el raster va al tamaño exacto del papel y la impresora no lo
+            // achica ni lo corre (con JPEG algunas Epson dejan una franja blanca)
+            caps.format = "image/pwg-raster";
+        } else if (pdl.isEmpty() || pdl.contains("image/jpeg")) {
             caps.format = "image/jpeg";
         } else if (pdl.contains("application/pdf")) {
             caps.format = "application/pdf";
@@ -543,11 +563,26 @@ public class NativePrintPlugin extends Plugin {
                 srgb |= v.asString().equals("srgb_8");
                 gray |= v.asString().equals("sgray_8");
             }
-            if (!srgb && gray) caps.color = false;
+            if (!srgb && !"pwg".equals(preferred) && pdl.contains("image/jpeg")) { // mejor JPEG en color
+                caps.format = "image/jpeg";
+                caps.dpi = DPI;
+            }
+            else if (!srgb && gray) caps.color = false;
             else if (!srgb) throw new IOException("La impresora no acepta PWG raster sRGB de 8 bits");
         }
 
         if (paper.isPhoto()) caps.mediaType = IppClient.pickPhotoMediaType(attrs.get("media-type-supported"));
+        boolean zero = true;
+        boolean any = false;
+        for (String side : new String[]{"left", "right", "top", "bottom"}) {
+            List<IppClient.Value> values = attrs.get("media-" + side + "-margin-supported");
+            if (values.isEmpty()) continue;
+            any = true;
+            boolean has0 = false;
+            for (IppClient.Value v : values) has0 |= v.asInt() == 0;
+            zero &= has0;
+        }
+        if (any) caps.borderlessSupported = zero;
         return caps;
     }
 
@@ -576,6 +611,12 @@ public class NativePrintPlugin extends Plugin {
 
         IppClient.Result result = IppClient.printJob(target.transport(), target.uri(), target.rp,
                 format, document, options);
+        if (!result.isSuccess() && format.equals("image/pwg-raster") && caps.supported.contains("image/jpeg")) {
+            // Rechazó el raster: se reintenta en JPEG
+            format = "image/jpeg";
+            options.printScaling = "fill";
+            result = IppClient.printJob(target.transport(), target.uri(), target.rp, format, toJpeg(page), options);
+        }
         if (!result.isSuccess()) {
             String msg = result.statusMessage != null ? result.statusMessage
                     : String.format(Locale.ROOT, "código IPP 0x%04x", result.statusCode);
@@ -585,6 +626,9 @@ public class NativePrintPlugin extends Plugin {
         ret.put("mode", "silent");
         ret.put("jobId", result.jobId);
         ret.put("format", format);
+        ret.put("dpi", caps.dpi);
+        if (caps.mediaType != null) ret.put("mediaType", caps.mediaType);
+        if (caps.borderlessSupported != null) ret.put("borderlessSupported", caps.borderlessSupported);
         call.resolve(ret);
     }
 
@@ -645,7 +689,7 @@ public class NativePrintPlugin extends Plugin {
     }
 
     /** Arma la página completa (vertical, 300 dpi) con fondo blanco. */
-    private static Bitmap composePage(Bitmap source, Paper paper, int rotation, String scaleMode, int dpi) {
+    private static Bitmap composePage(Bitmap source, Paper paper, int rotation, String scaleMode, int dpi, float bleed) {
         int pageW = paper.widthPx(dpi);
         int pageH = paper.heightPx(dpi);
         Bitmap page = Bitmap.createBitmap(pageW, pageH, Bitmap.Config.ARGB_8888);
@@ -664,6 +708,9 @@ public class NativePrintPlugin extends Plugin {
         } else if (!"fill".equals(scaleMode)) { // cover
             sx = sy = Math.max(sx, sy);
         }
+
+        sx *= 1f + bleed;
+        sy *= 1f + bleed;
 
         Matrix m = new Matrix();
         m.postTranslate(-source.getWidth() / 2f, -source.getHeight() / 2f);

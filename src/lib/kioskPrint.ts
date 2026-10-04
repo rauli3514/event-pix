@@ -24,6 +24,8 @@ export const printKioskPhoto = async (photo: string) => {
       scaleMode: cfg.imageAdjust || 'cover',
       copies: cfg.copies || 1,
       borderless: !!cfg.borderless,
+      bleed: Number(cfg.bleed) || 0,
+      format: cfg.printFormat || 'auto',
       jobName: 'EventPix',
     };
     try {
