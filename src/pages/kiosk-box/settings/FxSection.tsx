@@ -143,7 +143,7 @@ function LiveTest({ accessories, customs, filters }: { accessories: string[]; cu
             canvas.height = video.videoHeight;
             const ctx = canvas.getContext('2d')!;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            const faces = await detectFacesInVideo(video, performance.now());
+            const faces = await detectFacesInVideo(video);
             const custom = await loadCustomAccessory(accRef.current);
             for (const f of faces) drawAccessory(ctx, f, accRef.current, custom);
             frames++;

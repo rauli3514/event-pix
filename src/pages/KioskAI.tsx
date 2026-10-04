@@ -1038,7 +1038,7 @@ The subject must perfectly match the facial features and gender of the reference
       ...BUILT_IN_ACCESSORIES.filter(a => (generalSettings.accessories ?? BUILT_IN_ACCESSORIES.map(x => x.value)).includes(a.value)),
       ...customs.filter(c => (generalSettings.accessories ?? [`custom:${c.id}`]).includes(`custom:${c.id}`)).map(c => ({ value: `custom:${c.id}`, label: c.name })),
     ];
-    const chip = (on: boolean) => `shrink-0 px-5 py-2.5 rounded-full text-lg font-semibold border focus:outline-none focus:ring-4 focus:ring-white/80 ${on ? 'bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7] border-transparent text-white' : 'bg-black/55 border-white/25 text-white/85 backdrop-blur'}`;
+    const chip = (on: boolean) => `px-4 py-2 rounded-full text-[clamp(0.95rem,2.2vmin,1.15rem)] font-semibold border focus:outline-none focus:ring-4 focus:ring-white/80 ${on ? 'bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7] border-transparent text-white' : 'bg-black/55 border-white/25 text-white/85 backdrop-blur'}`;
     return (
       <div className="kiosk-root">
         <div className="absolute inset-0 bg-black" />
@@ -1049,23 +1049,23 @@ The subject must perfectly match the facial features and gender of the reference
         <p className="absolute top-8 inset-x-0 z-10 text-center carlmarx-bold text-white text-[clamp(1.8rem,4vmin,3rem)] drop-shadow-lg">
           Elegí tu efecto y tocá <span className="text-[#ff7ac0]">¡Sacar foto!</span>
         </p>
-        <div className="absolute bottom-8 inset-x-0 z-20 flex flex-col items-center gap-3 px-6">
+        <div className="absolute bottom-6 inset-x-0 z-20 flex flex-col items-center gap-2.5 px-4 max-h-[60%] overflow-y-auto">
           {generalSettings.enableFilters && (
-            <div className="flex gap-2 overflow-x-auto max-w-full pb-1">
+            <div className="flex flex-wrap justify-center gap-2 max-w-full">
               {filters.map(f => (
                 <button key={f.value} onClick={() => setFx(v => ({ ...v, filter: f.value }))} className={chip((fx.filter ?? 'none') === f.value)}>{f.label}</button>
               ))}
             </div>
           )}
           {generalSettings.enableAccessories && (
-            <div className="flex gap-2 overflow-x-auto max-w-full pb-1">
+            <div className="flex flex-wrap justify-center gap-2 max-w-full">
               {accs.map(a => (
                 <button key={a.value} onClick={() => setFx(v => ({ ...v, accessory: a.value }))} className={chip((fx.accessory ?? 'none') === a.value)}>{a.label}</button>
               ))}
             </div>
           )}
           <button data-autofocus onClick={startCountdown} disabled={!cameraReady}
-            className="mt-2 px-14 py-5 rounded-full carlmarx-bold text-white text-3xl disabled:opacity-50 focus:outline-none focus:ring-4 focus:ring-white/80"
+            className="mt-2 shrink-0 px-12 py-4 rounded-full carlmarx-bold text-white text-[clamp(1.6rem,3.5vmin,2rem)] disabled:opacity-50 focus:outline-none focus:ring-4 focus:ring-white/80"
             style={{ background: 'linear-gradient(135deg,#ff2e93,#7b2ff7)', boxShadow: '0 0 40px rgba(255,46,147,0.55)' }}>
             📸 ¡Sacar foto!
           </button>

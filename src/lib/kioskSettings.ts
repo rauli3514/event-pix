@@ -87,6 +87,8 @@ export interface KioskCameraSettings {
   deviceLabel?: string;
   mirror?: boolean;
   rotation?: number;
+  /** Resolución pedida a la webcam ('auto' = la más alta que dé) */
+  quality?: 'auto' | '1080' | '720' | '480';
   /** Segundos de cuenta regresiva */
   timer?: number;
   [key: string]: unknown;

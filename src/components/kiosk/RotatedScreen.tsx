@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useLocation } from 'react-router-dom';
 import { applyScreenRotation, getScreenRotation, ROTATION_EVENT } from '@/lib/screenRotation';
+import OnScreenKeyboard from './OnScreenKeyboard';
 
 // En la web (vista previa) la pantalla girada se simula con la misma página dentro
 // de un iframe girado: adentro la ventana es vertical, así que todo se acomoda
@@ -36,8 +37,11 @@ export default function RotatedScreen({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const simulate = !Capacitor.isNativePlatform() && !inFrame && rotation !== 0 && KIOSK_PATH.test(location.pathname);
-  if (!simulate) return <>{children}</>;
+  const kiosk = KIOSK_PATH.test(location.pathname);
+  const simulate = !Capacitor.isNativePlatform() && !inFrame && rotation !== 0 && kiosk;
+  // Girada, el teclado de Android sale de costado: se usa uno propio en pantalla
+  const ownKeyboard = rotation !== 0 && kiosk && (Capacitor.isNativePlatform() || inFrame);
+  if (!simulate) return <>{children}{ownKeyboard && <OnScreenKeyboard />}</>;
 
   const sideways = rotation === 90 || rotation === 270;
   return (

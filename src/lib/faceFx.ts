@@ -222,27 +222,34 @@ export function drawAccessory(ctx: CanvasRenderingContext2D, face: Face, accesso
 }
 
 // ─── Detector de caras ──────────────────────────────────────────────
-let imageDetector: Promise<MPFaceDetector> | null = null;
-let videoDetector: Promise<MPFaceDetector> | null = null;
+// Un solo detector en modo IMAGE para fotos y para el vivo: el modo VIDEO
+// (detectForVideo sobre el <video>) no anda en algunas TV box. Si la GPU falla
+// al detectar, se rehace el detector con la CPU.
+let detector: Promise<MPFaceDetector> | null = null;
+let forceCpu = false;
 
-async function createDetector(mode: 'IMAGE' | 'VIDEO') {
+async function createDetector() {
   const { FaceDetector, FilesetResolver } = await import('@mediapipe/tasks-vision');
   const fileset = await FilesetResolver.forVisionTasks('/mediapipe/wasm');
   const options = (delegate: 'GPU' | 'CPU') => ({
     baseOptions: { modelAssetPath: '/mediapipe/blaze_face_short_range.tflite', delegate },
-    runningMode: mode,
+    runningMode: 'IMAGE' as const,
     minDetectionConfidence: 0.5,
   });
-  try {
-    return await FaceDetector.createFromOptions(fileset, options('GPU'));
-  } catch {
-    return FaceDetector.createFromOptions(fileset, options('CPU')); // sin GPU compatible
+  if (!forceCpu) {
+    try {
+      return await FaceDetector.createFromOptions(fileset, options('GPU'));
+    } catch {
+      forceCpu = true; // sin GPU compatible
+    }
   }
+  return FaceDetector.createFromOptions(fileset, options('CPU'));
 }
 
-const getDetector = (mode: 'IMAGE' | 'VIDEO') => {
-  if (mode === 'IMAGE') return (imageDetector ??= createDetector('IMAGE'));
-  return (videoDetector ??= createDetector('VIDEO'));
+const getDetector = () => {
+  detector ??= createDetector();
+  detector.catch(() => { detector = null; });
+  return detector;
 };
 
 type Detection = { keypoints?: { x: number; y: number }[] };
@@ -252,9 +259,22 @@ const toFaces = (detections: Detection[], w: number, h: number): Face[] =>
     return { rightEye: k[0], leftEye: k[1], nose: k[2], mouth: k[3] };
   });
 
+/** Detecta en un canvas chico; si la GPU falla, pasa a CPU y reintenta una vez. */
+async function detectOn(small: HTMLCanvasElement): Promise<Detection[]> {
+  try {
+    return (await getDetector()).detect(small).detections as Detection[];
+  } catch (e) {
+    if (forceCpu) throw e;
+    forceCpu = true;
+    const old = detector;
+    detector = null;
+    old?.then(d => d.close()).catch(() => {});
+    return (await getDetector()).detect(small).detections as Detection[];
+  }
+}
+
 /** Caras en una imagen (se busca en una copia chica, para que sea rápido). */
 export async function detectFaces(img: HTMLImageElement | HTMLCanvasElement): Promise<Face[]> {
-  const detector = await getDetector('IMAGE');
   const w = img.width;
   const h = img.height;
   const scale = Math.min(1, 960 / Math.max(w, h));
@@ -262,13 +282,23 @@ export async function detectFaces(img: HTMLImageElement | HTMLCanvasElement): Pr
   small.width = Math.round(w * scale);
   small.height = Math.round(h * scale);
   small.getContext('2d')!.drawImage(img, 0, 0, small.width, small.height);
-  return toFaces(detector.detect(small).detections as Detection[], w, h);
+  return toFaces(await detectOn(small), w, h);
 }
 
-/** Caras en un cuadro de video (modo en vivo). */
-export async function detectFacesInVideo(video: HTMLVideoElement, timestamp: number): Promise<Face[]> {
-  const detector = await getDetector('VIDEO');
-  return toFaces(detector.detectForVideo(video, timestamp).detections as Detection[], video.videoWidth, video.videoHeight);
+/** Caras en el cuadro actual del video (vivo): se copia a un canvas chico reutilizado. */
+let liveCanvas: HTMLCanvasElement | null = null;
+export async function detectFacesInVideo(video: HTMLVideoElement): Promise<Face[]> {
+  const w = video.videoWidth;
+  const h = video.videoHeight;
+  if (!w || !h) return [];
+  const scale = Math.min(1, 480 / Math.max(w, h));
+  liveCanvas ??= document.createElement('canvas');
+  const sw = Math.round(w * scale);
+  const sh = Math.round(h * scale);
+  if (liveCanvas.width !== sw) liveCanvas.width = sw;
+  if (liveCanvas.height !== sh) liveCanvas.height = sh;
+  liveCanvas.getContext('2d')!.drawImage(video, 0, 0, sw, sh);
+  return toFaces(await detectOn(liveCanvas), w, h);
 }
 
 // ─── Aplicar a una foto ─────────────────────────────────────────────

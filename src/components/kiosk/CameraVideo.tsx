@@ -44,7 +44,7 @@ export default function CameraVideo({ videoRef, mirror, rotation, className = ''
       const canvas = canvasRef.current;
       if (video && canvas && video.videoWidth && video.readyState >= 2) {
         try {
-          const faces = await detectFacesInVideo(video, performance.now());
+          const faces = await detectFacesInVideo(video);
           const acc = accRef.current;
           if (canvas.width !== video.videoWidth) canvas.width = video.videoWidth;
           if (canvas.height !== video.videoHeight) canvas.height = video.videoHeight;
@@ -54,8 +54,10 @@ export default function CameraVideo({ videoRef, mirror, rotation, className = ''
             const custom = await loadCustomAccessory(acc);
             for (const f of faces) drawAccessory(ctx, f, acc, custom);
           }
-        } catch {
-          // el detector todavía no está listo
+        } catch (e) {
+          // el detector todavía no está listo o falló: se reintenta en un rato
+          console.warn('[fx] detección en vivo', e);
+          await new Promise(r => setTimeout(r, 500));
         }
       }
       if (alive) raf = requestAnimationFrame(() => void loop());
