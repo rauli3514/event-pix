@@ -32,16 +32,9 @@ export const printKioskPhoto = async (photo: string) => {
       const res = await printImageNative({ ...options, printer: cfg.nativePrinter || null });
       if (res.mode === 'silent') toast.success("Impresión enviada correctamente");
     } catch (err) {
-      if (!cfg.nativePrinter) {
-        toast.error(`No se pudo imprimir: ${printErrorMessage(err)}`);
-        return;
-      }
-      toast.error(`No se pudo imprimir directo (${printErrorMessage(err)}). Abriendo el diálogo de impresión.`);
-      try {
-        await printImageNative(options);
-      } catch (dialogErr) {
-        toast.error(`No se pudo imprimir: ${printErrorMessage(dialogErr)}`);
-      }
+      // Con impresora elegida no se abre el diálogo de Android: en la TV box no hay
+      // servicios de impresión y solo aparece "Todas las impresoras" vacío
+      toast.error(`No se pudo imprimir: ${printErrorMessage(err)}. Probá "Imprimir de nuevo".`);
     }
     return;
   }

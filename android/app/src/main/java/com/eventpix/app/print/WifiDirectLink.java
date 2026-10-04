@@ -1,12 +1,18 @@
 package com.eventpix.app.print;
 
 import android.content.Context;
+import android.content.SharedPreferences;
+import android.net.MacAddress;
 import android.net.ConnectivityManager;
 import android.net.LinkProperties;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
 import android.net.RouteInfo;
+import android.net.TransportInfo;
+import android.net.wifi.ScanResult;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
 import android.net.wifi.WifiNetworkSpecifier;
 import android.net.wifi.p2p.WifiP2pConfig;
 import android.net.wifi.p2p.WifiP2pGroup;
@@ -174,12 +180,82 @@ public final class WifiDirectLink {
     }
 
     // ─── Conexión temporal ───────────────────────────────────────────
+    // Android pide permiso ("Conectar a dispositivo") en cada pedido de red, salvo
+    // que el pedido sea para un punto de acceso exacto (nombre + BSSID) que el
+    // usuario ya aprobó: entonces conecta solo. Por eso se guarda el BSSID de la
+    // impresora y se usa desde la segunda vez.
+
+    private static final String PREFS = "eventpix_wifi_direct";
 
     private Session openTemporary(String ssid, String passphrase) throws IOException {
-        WifiNetworkSpecifier specifier = new WifiNetworkSpecifier.Builder()
+        String bssid = savedBssid(ssid);
+        if (bssid == null) bssid = scannedBssid(ssid);
+        if (bssid != null) {
+            try {
+                return requestTemporary(ssid, passphrase, bssid);
+            } catch (IOException e) {
+                // Por si el equipo no acepta el pedido con BSSID: se prueba solo con el nombre
+            }
+        }
+        return requestTemporary(ssid, passphrase, null);
+    }
+
+    private SharedPreferences prefs() {
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+    }
+
+    private String savedBssid(String ssid) {
+        return prefs().getString("bssid:" + ssid, null);
+    }
+
+    private static boolean validBssid(String b) {
+        return b != null && b.matches("(?i)([0-9a-f]{2}:){5}[0-9a-f]{2}") && !b.equals("02:00:00:00:00:00")
+                && !b.equals("00:00:00:00:00:00");
+    }
+
+    /** BSSID de la impresora en el último escaneo de WiFi (necesita ubicación; si no, null). */
+    private String scannedBssid(String ssid) {
+        try {
+            WifiManager wifi = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
+            if (wifi == null) return null;
+            for (ScanResult r : wifi.getScanResults()) {
+                if (ssid.equals(r.SSID) && validBssid(r.BSSID)) return r.BSSID;
+            }
+        } catch (SecurityException ignored) {
+            // sin permiso de ubicación
+        }
+        return null;
+    }
+
+    /** Guarda el BSSID de la red recién conectada para no volver a pedir permiso. */
+    private void rememberBssid(String ssid, Network n) {
+        String bssid = null;
+        try {
+            NetworkCapabilities caps = connectivity.getNetworkCapabilities(n);
+            TransportInfo info = caps != null ? caps.getTransportInfo() : null;
+            if (info instanceof WifiInfo) bssid = ((WifiInfo) info).getBSSID();
+            if (!validBssid(bssid)) {
+                WifiManager wifi = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
+                WifiInfo current = wifi != null ? wifi.getConnectionInfo() : null;
+                if (current != null && ssid.equals(stripQuotes(current.getSSID()))) bssid = current.getBSSID();
+            }
+        } catch (SecurityException ignored) {
+            // sin permiso
+        }
+        if (!validBssid(bssid)) bssid = scannedBssid(ssid);
+        if (validBssid(bssid)) prefs().edit().putString("bssid:" + ssid, bssid.toLowerCase()).apply();
+    }
+
+    private static String stripQuotes(String s) {
+        return s != null && s.length() >= 2 && s.startsWith("\"") && s.endsWith("\"") ? s.substring(1, s.length() - 1) : s;
+    }
+
+    private Session requestTemporary(String ssid, String passphrase, String bssid) throws IOException {
+        WifiNetworkSpecifier.Builder builder = new WifiNetworkSpecifier.Builder()
                 .setSsid(ssid)
-                .setWpa2Passphrase(passphrase)
-                .build();
+                .setWpa2Passphrase(passphrase);
+        if (bssid != null) builder.setBssid(MacAddress.fromString(bssid));
+        WifiNetworkSpecifier specifier = builder.build();
         NetworkRequest request = new NetworkRequest.Builder()
                 .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
                 .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
@@ -220,6 +296,8 @@ public final class WifiDirectLink {
             release.run();
             throw new IOException("conectado a " + ssid + " pero sin dirección de la impresora");
         }
+        if (bssid == null) rememberBssid(ssid, n);
+        else prefs().edit().putString("bssid:" + ssid, bssid.toLowerCase()).apply();
         return new Session(MODE_TEMPORARY, host, n, release);
     }
 
