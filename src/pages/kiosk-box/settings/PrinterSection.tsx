@@ -150,7 +150,7 @@ export default function PrinterSection() {
         <Choice label="Tamaño" value={settings.paper || '4x6'}
           options={PAPER_SIZES.map(p => ({ value: p.value, label: p.label }))}
           onChange={(paper: PaperSize) => update({ paper })} />
-        <Toggle label="Sin bordes" hint="La foto ocupa toda la hoja (papel fotográfico 10×15)."
+        <Toggle label="Sin bordes" hint="La foto ocupa toda la hoja, pero la impresora la agranda un poco y recorta los bordes. Apagado: queda un borde blanco fino y sale entera (logo y marco completos)."
           checked={!!settings.borderless} onChange={borderless => update({ borderless })} />
         {settings.borderless && (
           <>

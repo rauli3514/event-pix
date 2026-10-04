@@ -293,7 +293,8 @@ public class NativePrintPlugin extends Plugin {
         int copies = Math.max(1, call.getInt("copies", 1));
         boolean borderless = Boolean.TRUE.equals(call.getBoolean("borderless", false));
         // Agranda la imagen unos % para tapar la franja blanca que dejan algunas impresoras sin bordes
-        float bleed = Math.max(0f, Math.min(8f, call.getFloat("bleed", 0f))) / 100f;
+        // (solo sin bordes: con bordes la foto entra entera, sin recortar nada)
+        float bleed = borderless ? Math.max(0f, Math.min(8f, call.getFloat("bleed", 0f))) / 100f : 0f;
         String preferredFormat = call.getString("format", "auto");
         String jobName = call.getString("jobName", "EventPix");
 
@@ -311,7 +312,7 @@ public class NativePrintPlugin extends Plugin {
                     target.usb = UsbPrinterLink.open(getContext(), printer.getString("usb"));
                     try {
                         Capabilities caps = capabilitiesFor(target, paper, preferredFormat, borderless);
-                        page = composePage(source, paper, totalRotation, scaleMode, caps.dpi, bleed);
+                        page = composePage(source, paper, totalRotation, scaleMode, caps.dpi, bleed, borderless);
                         source.recycle();
                         printSilently(call, target, page, paper, caps, copies, borderless, jobName);
                         page.recycle();
@@ -322,12 +323,12 @@ public class NativePrintPlugin extends Plugin {
                     session = openWifiDirect(printer);
                     Target target = targetFor(printer, session);
                     Capabilities caps = capabilitiesFor(target, paper, preferredFormat, borderless);
-                    page = composePage(source, paper, totalRotation, scaleMode, caps.dpi, bleed);
+                    page = composePage(source, paper, totalRotation, scaleMode, caps.dpi, bleed, borderless);
                     source.recycle();
                     printSilently(call, target, page, paper, caps, copies, borderless, jobName);
                     page.recycle();
                 } else {
-                    page = composePage(source, paper, totalRotation, scaleMode, DPI, bleed);
+                    page = composePage(source, paper, totalRotation, scaleMode, DPI, bleed, borderless);
                     source.recycle();
                     printWithDialog(call, page, jobName);
                 }
@@ -607,14 +608,17 @@ public class NativePrintPlugin extends Plugin {
         options.mediaType = caps.mediaType;
         options.borderless = borderless;
         // En raster la página ya viene al tamaño exacto; print-scaling es para JPEG/PDF
-        options.printScaling = format.equals("image/pwg-raster") ? null : "fill";
+        // Sin bordes: llena el papel. Con bordes: "fit", la impresora la achica a su zona
+        // imprimible en vez de recortar el logo o el marco
+        String scaling = borderless ? "fill" : "fit";
+        options.printScaling = format.equals("image/pwg-raster") ? null : scaling;
 
         IppClient.Result result = IppClient.printJob(target.transport(), target.uri(), target.rp,
                 format, document, options);
         if (!result.isSuccess() && format.equals("image/pwg-raster") && caps.supported.contains("image/jpeg")) {
             // Rechazó el raster: se reintenta en JPEG
             format = "image/jpeg";
-            options.printScaling = "fill";
+            options.printScaling = scaling;
             result = IppClient.printJob(target.transport(), target.uri(), target.rp, format, toJpeg(page), options);
         }
         if (!result.isSuccess()) {
@@ -689,7 +693,11 @@ public class NativePrintPlugin extends Plugin {
     }
 
     /** Arma la página completa (vertical, 300 dpi) con fondo blanco. */
-    private static Bitmap composePage(Bitmap source, Paper paper, int rotation, String scaleMode, int dpi, float bleed) {
+    /** Margen blanco con bordes: un poco más que el de las impresoras (3 mm), así no se corta nada. */
+    private static final float SAFE_MARGIN_MM = 4f;
+
+    private static Bitmap composePage(Bitmap source, Paper paper, int rotation, String scaleMode, int dpi, float bleed,
+                                      boolean borderless) {
         int pageW = paper.widthPx(dpi);
         int pageH = paper.heightPx(dpi);
         Bitmap page = Bitmap.createBitmap(pageW, pageH, Bitmap.Config.ARGB_8888);
@@ -701,9 +709,11 @@ public class NativePrintPlugin extends Plugin {
         float srcW = swapped ? source.getHeight() : source.getWidth();
         float srcH = swapped ? source.getWidth() : source.getHeight();
 
-        float sx = pageW / srcW;
-        float sy = pageH / srcH;
-        if ("contain".equals(scaleMode)) {
+        // Con bordes la foto entra entera dentro del margen (nunca se recorta)
+        float margin = borderless ? 0f : SAFE_MARGIN_MM / 25.4f * dpi;
+        float sx = (pageW - 2 * margin) / srcW;
+        float sy = (pageH - 2 * margin) / srcH;
+        if (!borderless || "contain".equals(scaleMode)) {
             sx = sy = Math.min(sx, sy);
         } else if (!"fill".equals(scaleMode)) { // cover
             sx = sy = Math.max(sx, sy);
