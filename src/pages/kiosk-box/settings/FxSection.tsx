@@ -143,7 +143,7 @@ function LiveTest({ accessories, customs, filters }: { accessories: string[]; cu
             canvas.height = video.videoHeight;
             const ctx = canvas.getContext('2d')!;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            const faces = await detectFacesInVideo(video);
+            const faces = await detectFacesInVideo(video, Number(cam.rotation) || 0);
             const custom = await loadCustomAccessory(accRef.current);
             for (const f of faces) drawAccessory(ctx, f, accRef.current, custom);
             frames++;
@@ -171,6 +171,8 @@ function LiveTest({ accessories, customs, filters }: { accessories: string[]; cu
 
   const options = [...BUILT_IN_ACCESSORIES.filter(a => accessories.includes(a.value)), ...customs.filter(c => accessories.includes(`custom:${c.id}`)).map(c => ({ value: `custom:${c.id}`, label: c.name }))];
   const cam = getCameraSettings();
+  const rot = (((Number(cam.rotation) || 0) % 360) + 360) % 360;
+  const sideways = rot === 90 || rot === 270;
 
   return (
     <Panel title="Probar en vivo" description="Muestra la cámara con el accesorio encima y cuántos cuadros por segundo da el equipo. Con 10 o más se ve bien; en la foto final siempre queda bien ubicado.">
@@ -185,7 +187,11 @@ function LiveTest({ accessories, customs, filters }: { accessories: string[]; cu
       )}
       {running && (
         <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black">
-          <div className="absolute inset-0" style={{ transform: `scaleX(${cam.mirror ? -1 : 1})`, filter: filterCss(filter) }}>
+          {/* Con la rotación de la cámara, igual que en el kiosco */}
+          <div className="absolute" style={{
+            left: '50%', top: '50%', width: sideways ? '56.25%' : '100%', height: sideways ? '177.78%' : '100%',
+            transform: `translate(-50%, -50%) scaleX(${cam.mirror ? -1 : 1}) rotate(${rot}deg)`, filter: filterCss(filter),
+          }}>
             <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-contain" />
             <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-contain" />
           </div>

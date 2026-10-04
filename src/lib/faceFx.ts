@@ -285,20 +285,41 @@ export async function detectFaces(img: HTMLImageElement | HTMLCanvasElement): Pr
   return toFaces(await detectOn(small), w, h);
 }
 
-/** Caras en el cuadro actual del video (vivo): se copia a un canvas chico reutilizado. */
+/**
+ * Caras en el cuadro actual del video (vivo): se copia a un canvas chico reutilizado.
+ * Con la cámara girada (`rotation`) el cuadro se endereza antes de buscar (el
+ * detector solo encuentra caras derechas) y las posiciones vuelven a las del
+ * video sin girar, que es donde se dibuja el accesorio.
+ */
 let liveCanvas: HTMLCanvasElement | null = null;
-export async function detectFacesInVideo(video: HTMLVideoElement): Promise<Face[]> {
+export async function detectFacesInVideo(video: HTMLVideoElement, rotation = 0): Promise<Face[]> {
   const w = video.videoWidth;
   const h = video.videoHeight;
   if (!w || !h) return [];
-  const scale = Math.min(1, 480 / Math.max(w, h));
-  liveCanvas ??= document.createElement('canvas');
+  const rot = ((Math.round(rotation / 90) * 90) % 360 + 360) % 360;
+  const sideways = rot === 90 || rot === 270;
+  const scale = Math.min(1, 384 / Math.max(w, h));
   const sw = Math.round(w * scale);
   const sh = Math.round(h * scale);
-  if (liveCanvas.width !== sw) liveCanvas.width = sw;
-  if (liveCanvas.height !== sh) liveCanvas.height = sh;
-  liveCanvas.getContext('2d')!.drawImage(video, 0, 0, sw, sh);
-  return toFaces(await detectOn(liveCanvas), w, h);
+  const cw = sideways ? sh : sw;
+  const ch = sideways ? sw : sh;
+  liveCanvas ??= document.createElement('canvas');
+  if (liveCanvas.width !== cw) liveCanvas.width = cw;
+  if (liveCanvas.height !== ch) liveCanvas.height = ch;
+  const ctx = liveCanvas.getContext('2d')!;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  if (rot === 90) { ctx.translate(sh, 0); ctx.rotate(Math.PI / 2); }
+  else if (rot === 180) { ctx.translate(sw, sh); ctx.rotate(Math.PI); }
+  else if (rot === 270) { ctx.translate(0, sw); ctx.rotate(-Math.PI / 2); }
+  ctx.drawImage(video, 0, 0, sw, sh);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  // Caras en el cuadro derecho (tamaño del video girado) → de vuelta al video sin girar
+  const faces = toFaces(await detectOn(liveCanvas), sideways ? h : w, sideways ? w : h);
+  if (!rot) return faces;
+  const back = (p: { x: number; y: number }) =>
+    rot === 90 ? { x: p.y, y: h - p.x } : rot === 180 ? { x: w - p.x, y: h - p.y } : { x: w - p.y, y: p.x };
+  return faces.map(f => ({ rightEye: back(f.rightEye), leftEye: back(f.leftEye), nose: back(f.nose), mouth: back(f.mouth) }));
 }
 
 // ─── Aplicar a una foto ─────────────────────────────────────────────
