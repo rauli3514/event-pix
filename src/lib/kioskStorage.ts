@@ -35,10 +35,12 @@ const KioskStorage = registerPlugin<KioskStoragePlugin>('KioskStorage');
 const isNative = () => Capacitor.isNativePlatform() && Capacitor.isPluginAvailable('KioskStorage');
 
 /** Carpeta del evento: la configurada en Ajustes, o el nombre del evento. */
+export const folderNameFor = (name: string) =>
+  name.trim().replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').slice(0, 60) || 'EventPix';
+
 export const eventFolder = () => {
   const s = getGeneralSettings();
-  const name = (s.localFolder || s.eventTitle || 'EventPix').trim();
-  return name.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').slice(0, 60) || 'EventPix';
+  return folderNameFor(s.localFolder || s.eventTitle || 'EventPix');
 };
 
 // ─── IndexedDB (navegador) ─────────────────────────────────────────

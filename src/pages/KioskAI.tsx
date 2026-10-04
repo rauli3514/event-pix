@@ -20,6 +20,8 @@ import CameraVideo from '@/components/kiosk/CameraVideo';
 import GuestNameScreen from '@/components/kiosk/GuestNameScreen';
 import { isDriveConfigured, queueForDrive, startDriveSync, uploadForShare } from '@/lib/driveBackup';
 import { guestPhotoUrl } from '@/lib/kioskShare';
+import { startDeviceSync } from '@/lib/kioskDevice';
+import { REMOTE_APPLIED_EVENT } from '@/lib/kioskRemote';
 import { guestFrameOptions, type FrameOption } from '@/lib/frameOptions';
 import { motion } from 'framer-motion';
 import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
@@ -246,6 +248,19 @@ export default function KioskAI() {
       triggerPrint(capturedImage);
     }
   }, [step]);
+
+  // Checkin cada minuto (el panel lo ve en línea) y cambios mandados desde el panel:
+  // los ajustes se leen en cada render, así que alcanza con volver a dibujar
+  const [, setRemoteTick] = useState(0);
+  useEffect(() => {
+    const stop = startDeviceSync();
+    const onApplied = () => setRemoteTick(t => t + 1);
+    window.addEventListener(REMOTE_APPLIED_EVENT, onApplied);
+    return () => {
+      stop();
+      window.removeEventListener(REMOTE_APPLIED_EVENT, onApplied);
+    };
+  }, []);
 
   // Load themes + frame
   useEffect(() => {

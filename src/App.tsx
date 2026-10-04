@@ -12,6 +12,7 @@ import KioskAI from "./pages/KioskAI";
 import KioskBox from "./pages/kiosk-box/KioskBox";
 import KioskBoxSettings from "./pages/kiosk-box/KioskBoxSettings";
 import KioskGallery from "./pages/kiosk-box/KioskGallery";
+import KioskAdmin from "./pages/admin/KioskAdmin";
 import RotatedScreen from "./components/kiosk/RotatedScreen";
 import GuestPhoto from "./pages/GuestPhoto";
 import Display from "./pages/Display";
@@ -75,6 +76,7 @@ const App = () => (
                 <Route path="/admin" element={<AdminDashboard />} />
                 <Route path="/admin/providers" element={<ProvidersList />} />
                 <Route path="/admin/kiosco-manager" element={<KioskManager />} />
+                <Route path="/admin/kioscos" element={<KioskAdmin />} />
                 <Route path="/admin/display" element={<DisplayHubMain />} />
                 <Route path="/intelligence" element={<ErrorBoundary><IntelligenceCanvasPage /></ErrorBoundary>} />
                 <Route path="/admin/intelligence" element={<ErrorBoundary><IntelligenceCanvasPage /></ErrorBoundary>} />

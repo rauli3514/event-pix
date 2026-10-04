@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { App as CapacitorApp } from '@capacitor/app';
-import { Capacitor } from '@capacitor/core';
 import { Camera, Sparkles, Ticket, Wifi, Settings, Loader2, AlertTriangle, Images, WifiOff, type LucideIcon } from 'lucide-react';
 import { useRemoteFocus } from '@/hooks/use-remote-focus';
 import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
@@ -10,7 +8,7 @@ import ScreenBackground from '@/components/kiosk/ScreenBackground';
 import { EventPixLogo } from '@/components/kiosk/brand/EventPixLogo';
 import PinDialog from '@/components/kiosk/PinDialog';
 import {
-  checkinDevice, getCachedDeviceState, getDeviceCode, getVipAppPackage,
+  checkinDevice, getAppVersion, getCachedDeviceState, getDeviceCode, getVipAppPackage,
   openAndroidApp, openWifiSettings, type KioskDeviceState,
 } from '@/lib/kioskDevice';
 import { getGeneralSettings, getSectionLock } from '@/lib/kioskSettings';
@@ -24,14 +22,7 @@ import { startDriveSync } from '@/lib/driveBackup';
 const PENDING_POLL_MS = 8000;
 const LINKED_POLL_MS = 60000;
 
-const appVersion = async () => {
-  if (!Capacitor.isNativePlatform()) return undefined;
-  try {
-    return (await CapacitorApp.getInfo()).version;
-  } catch {
-    return undefined;
-  }
-};
+const appVersion = getAppVersion;
 
 const roundButton = 'kiosk-glass w-16 h-16 rounded-full flex items-center justify-center text-white/90 hover:text-white focus:outline-none focus:ring-4 focus:ring-[#00d4ff] transition-transform focus:scale-110';
 
@@ -123,7 +114,7 @@ export default function KioskBox() {
               {code}
             </p>
             <p className="text-lg text-white/75 mt-6">
-              En el panel de EventPix entrá a <b className="text-white">Kiosco IA → Equipos</b>,<br />cargá este código y elegí el evento.
+              En el panel de EventPix entrá a <b className="text-white">Kioscos → Vincular</b>,<br />cargá este código y elegí el evento.
             </p>
           </motion.div>
           <div className="flex items-center gap-3 text-white/70 text-lg">
@@ -185,7 +176,7 @@ export default function KioskBox() {
           <div className="mx-12 mt-6 kiosk-glass rounded-2xl px-6 py-3 flex items-center gap-3 text-amber-100">
             <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
             {!device.kioskEventId
-              ? 'Asigná un evento a este equipo desde el panel (Kiosco IA → Equipos) para que las fotos se guarden.'
+              ? 'Asigná un evento a este equipo desde el panel (app.eventpix.com.ar → Kioscos) para que las fotos se guarden.'
               : 'Sin conexión: usando la última configuración guardada.'}
           </div>
         )}

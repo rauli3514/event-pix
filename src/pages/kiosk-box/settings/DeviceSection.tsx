@@ -35,7 +35,7 @@ export default function DeviceSection() {
 
   return (
     <div className="space-y-6">
-      <Panel title="Este equipo" description="El nombre y el evento se cambian desde el panel: Kiosco IA → Equipos.">
+      <Panel title="Este equipo" description="El nombre y el evento se cambian desde el panel: app.eventpix.com.ar → Kioscos.">
         <div className="grid grid-cols-3 gap-4">
           <Info label="Código" value={device?.deviceCode || '—'} mono />
           <Info label="Nombre" value={device?.name || '—'} />

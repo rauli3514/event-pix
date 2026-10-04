@@ -1,8 +1,11 @@
+import { Capacitor } from '@capacitor/core';
+import { App as CapacitorApp } from '@capacitor/app';
 import { supabase } from '@/lib/supabase';
+import { applyRemoteSettings, buildReport, getAppliedRev, type RemoteSettings } from '@/lib/kioskRemote';
 
 // Identidad del equipo del kiosco (TV box). Como en Display Digital: el equipo
 // genera un código de 6 caracteres, se registra solo con kiosk_device_checkin y
-// desde el panel (Kiosco IA → Equipos) se vincula y se le asigna el evento.
+// desde el panel (/admin/kioscos) se vincula y se le asigna el evento.
 
 const CODE_KEY = 'kiosk_device_code';
 const STATE_KEY = 'kiosk_device_state';
@@ -46,15 +49,37 @@ export const getCachedDeviceState = (): KioskDeviceState | null => {
   }
 };
 
+const rpcCheckin = async (deviceCode: string, appVersion: string | null, linked: boolean) => {
+  // Vinculado: informa sus ajustes y la última configuración del panel que aplicó
+  const params: Record<string, unknown> = { p_code: deviceCode, p_app_version: appVersion };
+  if (linked) {
+    params.p_applied_rev = getAppliedRev();
+    params.p_report = buildReport();
+  }
+  let { data, error } = await supabase.rpc('kiosk_device_checkin', params);
+  // Base sin la migración de configuración remota: checkin simple
+  if (error && linked && /p_applied_rev|p_report|function/i.test(error.message)) {
+    ({ data, error } = await supabase.rpc('kiosk_device_checkin', { p_code: deviceCode, p_app_version: appVersion }));
+  }
+  if (error) throw new Error(error.message);
+  return Array.isArray(data) ? data[0] : data;
+};
+
 /** Registra el equipo si es nuevo, avisa que está vivo y devuelve su vinculación y evento. */
 export const checkinDevice = async (appVersion?: string): Promise<KioskDeviceState> => {
   const deviceCode = getDeviceCode();
-  const { data, error } = await supabase.rpc('kiosk_device_checkin', {
-    p_code: deviceCode,
-    p_app_version: appVersion ?? null,
-  });
-  if (error) throw new Error(error.message);
-  const row = Array.isArray(data) ? data[0] : data;
+  const linked = getCachedDeviceState()?.pairingStatus === 'linked';
+  let row = await rpcCheckin(deviceCode, appVersion ?? null, linked);
+  // Cambios mandados desde el panel: se aplican y se informa enseguida
+  if (row?.pairing_status === 'linked' && row.settings_rev) {
+    try {
+      if (await applyRemoteSettings(row.settings as RemoteSettings, Number(row.settings_rev))) {
+        row = (await rpcCheckin(deviceCode, appVersion ?? null, true)) ?? row;
+      }
+    } catch (e) {
+      console.warn('[kiosco] no se pudo aplicar la configuración del panel', e);
+    }
+  }
   const state: KioskDeviceState = {
     deviceCode,
     name: row?.name ?? null,
@@ -64,6 +89,34 @@ export const checkinDevice = async (appVersion?: string): Promise<KioskDeviceSta
   };
   write(STATE_KEY, JSON.stringify(state));
   return state;
+};
+
+/**
+ * Checkin cada minuto mientras el kiosco está abierto (el inicio /box ya lo hace
+ * por su cuenta): así el panel lo ve en línea y le llegan los cambios.
+ */
+export const getAppVersion = async () => {
+  if (!Capacitor.isNativePlatform()) return undefined;
+  try {
+    return (await CapacitorApp.getInfo()).version;
+  } catch {
+    return undefined;
+  }
+};
+
+let syncTimer = 0;
+export const startDeviceSync = (appVersion: () => Promise<string | undefined> = getAppVersion) => {
+  if (syncTimer) return () => {};
+  const tick = async () => {
+    if (getCachedDeviceState()?.pairingStatus !== 'linked') return;
+    try { await checkinDevice(await appVersion()); } catch { /* sin internet: se reintenta */ }
+  };
+  syncTimer = window.setInterval(tick, 60000);
+  void tick();
+  return () => {
+    window.clearInterval(syncTimer);
+    syncTimer = 0;
+  };
 };
 
 export const getBoxPin = () => read(PIN_KEY) || DEFAULT_PIN;

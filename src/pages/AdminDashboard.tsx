@@ -238,6 +238,11 @@ const AdminDashboard = () => {
                                     <Users className="w-4 h-4 mr-2" /> Gestión de Usuarios
                                 </Link>
                             </Button>
+                            <Button asChild className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white border border-fuchsia-500/50">
+                                <Link to="/admin/kioscos">
+                                    <Monitor className="w-4 h-4 mr-2" /> Kioscos (equipos y fotos)
+                                </Link>
+                            </Button>
                             <Button asChild className="bg-violet-600 hover:bg-violet-700 text-white shadow-[0_0_20px_rgba(139,92,246,0.3)] border border-violet-500/50">
                                 <Link to="/admin/kiosco-manager">
                                     <Sparkles className="w-4 h-4 mr-2" /> Kiosco IA Global
