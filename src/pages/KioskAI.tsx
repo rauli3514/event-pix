@@ -50,7 +50,10 @@ type Step =
   | 'stickerEditor'
   | 'result';
 
-type Mode = 'selfie' | 'portada' | 'retrato' | 'mundial' | 'caricatura' | 'figuritas' | null;
+type Mode = 'selfie' | 'portada' | 'portadaIA' | 'retrato' | 'mundial' | 'caricatura' | 'figuritas' | null;
+
+// Portada Fashion con IA: si la temática 'cover' no está en la base, se usa este prompt
+const PORTADA_IA_PROMPT = 'Edit this photo. Keep every person exactly as they are: same face, facial features, skin tone, age, body shape, hairstyle and expression, so each one is instantly recognizable. Do not add, remove or merge people, and keep their poses. Dress them for a high fashion magazine shoot: sophisticated designer outfits, styled hair, subtle glam makeup. Replace the background with a clean seamless studio backdrop in a soft neutral tone, professional beauty lighting, framed from the waist up with empty space above the heads. Relight the people to match the new scene (same light direction, color and warmth) and use a shallow depth of field with a softly blurred background, so the result looks like one real professional photo taken there, not a collage. Photorealistic, high detail. No text, no logos, no watermark.';
 
 // ---- Mundial Data ----
 const COUNTRIES = [
@@ -709,7 +712,7 @@ The subject must perfectly match the facial features and gender of the reference
         finalImage = await buildMundialCard(outputUrl);
       } else if (theme?.result_style === 'cover') {
         // Portada Fashion IA: la foto de la IA va dentro de la tapa de revista
-        finalImage = await renderMagazineCover(outputUrl, coverOptionsFrom(generalSettings));
+        finalImage = await renderMagazineCover(outputUrl, coverOptionsFrom(generalSettings, guestNameRef.current || undefined));
       } else {
         finalImage = await mergeImages(outputUrl, frameUrl);
       }
@@ -730,7 +733,7 @@ The subject must perfectly match the facial features and gender of the reference
       if (mode === 'figuritas') {
         setStep('modeSelect'); // Volver al inicio si falla la figurita
       } else {
-        setStep(mode === 'mundial' ? 'mundialInfo' : 'themeSelect');
+        setStep(mode === 'mundial' ? 'mundialInfo' : mode === 'portadaIA' ? 'modeSelect' : 'themeSelect');
       }
     } finally {
       setIsAIGenerating(false);
@@ -985,6 +988,16 @@ The subject must perfectly match the facial features and gender of the reference
             </button>
           )}
 
+          {/* PORTADA FASHION CON IA: la IA viste de modelo y sale la tapa con el nombre */}
+          {(generalSettings.enablePortadaAI !== false && isModeAllowed('portadaIA')) && (
+            <button data-autofocus onClick={() => handleModeSelect('portadaIA')}
+              className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-fuchsia-400 kiosk-glass hover:scale-[1.03] focus:scale-[1.03] focus:outline-none focus:ring-4 focus:ring-white/80 hover:bg-fuchsia-400/10 transition-all">
+              <Crown className="w-16 h-16 text-fuchsia-400" />
+              <span className="carlmarx-bold text-fuchsia-400 text-2xl uppercase tracking-wider">Portada Fashion IA</span>
+              <p className="text-white/70 text-sm text-center">La IA te viste de modelo<br />y salís en la tapa con tu nombre.</p>
+            </button>
+          )}
+
           {/* RETRATO MÁGICO */}
           {(generalSettings.enableAI !== false && isModeAllowed('retrato')) && (
             <button data-autofocus onClick={() => handleModeSelect('retrato')}
@@ -1095,7 +1108,7 @@ The subject must perfectly match the facial features and gender of the reference
         <div className="absolute inset-0 bg-black/40 z-0" />
         <div className="relative z-10 flex flex-col items-center justify-center h-full gap-8">
           <p className="carlmarx-regular text-white/60 text-2xl uppercase tracking-widest">
-            {mode === 'selfie' ? '📸 Selfie Grupal' : mode === 'portada' ? '👑 Portada Fashion' : mode === 'retrato' ? '✨ Retrato Mágico' : '⚽ Mundial 2026'}
+            {mode === 'selfie' ? '📸 Selfie Grupal' : mode === 'portada' ? '👑 Portada Fashion' : mode === 'portadaIA' ? '👑 Portada Fashion IA' : mode === 'retrato' ? '✨ Retrato Mágico' : '⚽ Mundial 2026'}
           </p>
           <h1 className="carlmarx-bold text-7xl text-white text-center uppercase tracking-widest">
             ¡Mirá a la<br /><span className="text-violet-400">Cámara! 📸</span>
@@ -1132,6 +1145,13 @@ The subject must perfectly match the facial features and gender of the reference
       photo={capturedImage}
       onDone={(name) => {
         guestNameRef.current = name;
+        if (mode === 'portadaIA') {
+          // La temática de tapa de la base (editable en el panel) o el prompt de respaldo
+          const coverTheme = themes.find((t: any) => t.result_style === 'cover')
+            ?? { name: 'Portada Fashion IA', prompt: PORTADA_IA_PROMPT, result_style: 'cover' };
+          if (capturedImage) runAI(capturedImage, coverTheme);
+          return;
+        }
         void continueSelfie();
       }}
     />
@@ -1155,8 +1175,8 @@ The subject must perfectly match the facial features and gender of the reference
       const photo = capturedImage;
       // Si es caricatura mundialista, lanzamos la IA directamente con el prompt especial
       if (mode === 'caricatura') {
-        // Prompt de edición (fal.ai kontext): conserva las caras de la foto y suma a Messi
-        const specialTheme = {
+        // Prompt de la base (editable en el panel → Temáticas IA) o el de respaldo
+        const specialTheme = themes.find((t: any) => t.result_style === 'caricatura') ?? {
           name: 'Caricatura con Messi',
           prompt: 'Restyle this photo as a vibrant, fun 3D caricature illustration. Keep the exact likeness of every person in the photo: same face shape, facial features, skin tone, hairstyle and expression, slightly exaggerated in a friendly caricature way but clearly recognizable. Do not remove anyone. Add Lionel Messi next to them as a caricature too. Everyone wears the Argentina national team jersey with white and sky-blue vertical stripes, celebrating a goal together inside a packed stadium with golden confetti in the air. Joyful, colorful. No text, no logos, no watermark.'
         };
@@ -1164,7 +1184,7 @@ The subject must perfectly match the facial features and gender of the reference
         return;
       }
 
-      if (mode === 'portada') {
+      if (mode === 'portada' || mode === 'portadaIA') {
         // La tapa siempre pide el nombre de la estrella (se puede saltear)
         guestNameRef.current = '';
         setStep('guestName');
@@ -1389,7 +1409,8 @@ The subject must perfectly match the facial features and gender of the reference
       deportes: '⚽ Deportes', fantasia: '🏰 Fantasía', epocas: '🕰️ Épocas',
       arte: '🎨 Arte y animación', animacion: '🎬 Animación', moda: '👗 Moda', scifi: '🤖 Sci-Fi', aventura: '🌿 Aventura',
     };
-    const grouped = themes.reduce((acc: Record<string, any[]>, t: any) => {
+    // Las experiencias especiales (tapa, caricatura, figurita) tienen su propio botón
+    const grouped = themes.filter((t: any) => !t.result_style).reduce((acc: Record<string, any[]>, t: any) => {
       const cat = t.category || 'otros';
       if (!acc[cat]) acc[cat] = [];
       acc[cat].push(t);
