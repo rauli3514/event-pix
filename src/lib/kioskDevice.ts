@@ -8,6 +8,7 @@ import { applyRemoteSettings, buildReport, getAppliedRev, type RemoteSettings } 
 // desde el panel (/admin/kioscos) se vincula y se le asigna el evento.
 
 const CODE_KEY = 'kiosk_device_code';
+const SECRET_KEY = 'kiosk_device_secret';
 const STATE_KEY = 'kiosk_device_state';
 const PIN_KEY = 'kiosk_box_pin';
 const VIP_APP_KEY = 'kiosk_box_vip_app';
@@ -21,6 +22,9 @@ export interface KioskDeviceState {
   pairingStatus: 'pending' | 'linked';
   kioskEventId: string | null;
   eventName: string | null;
+  /** Cliente dueño del equipo y sus créditos de IA (null = sin datos) */
+  accountName?: string | null;
+  aiCredits?: number | null;
 }
 
 const read = (key: string) => {
@@ -49,20 +53,40 @@ export const getCachedDeviceState = (): KioskDeviceState | null => {
   }
 };
 
+/**
+ * Clave secreta del equipo: la genera él mismo, la registra en su primer checkin y
+ * la manda en cada pedido de IA (así nadie puede gastar sus créditos con solo el código).
+ */
+export const getDeviceSecret = () => {
+  let secret = read(SECRET_KEY);
+  if (!secret || secret.length < 32) {
+    const bytes = new Uint8Array(24);
+    crypto.getRandomValues(bytes);
+    secret = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+    write(SECRET_KEY, secret);
+  }
+  return secret;
+};
+
 const rpcCheckin = async (deviceCode: string, appVersion: string | null, linked: boolean) => {
+  const base = { p_code: deviceCode, p_app_version: appVersion };
   // Vinculado: informa sus ajustes y la última configuración del panel que aplicó
-  const params: Record<string, unknown> = { p_code: deviceCode, p_app_version: appVersion };
-  if (linked) {
-    params.p_applied_rev = getAppliedRev();
-    params.p_report = buildReport();
+  const remote = linked ? { p_applied_rev: getAppliedRev(), p_report: buildReport() } : {};
+  // De la más nueva a la más vieja, según las migraciones que tenga la base
+  const attempts: Record<string, unknown>[] = [
+    { ...base, ...remote, p_secret: getDeviceSecret() },
+    ...(linked ? [{ ...base, ...remote }] : []),
+    base,
+  ];
+  let last: Error | null = null;
+  for (const params of attempts) {
+    const { data, error } = await supabase.rpc('kiosk_device_checkin', params);
+    if (!error) return Array.isArray(data) ? data[0] : data;
+    last = new Error(error.message);
+    // Solo se prueba la versión anterior si el error es de parámetros de la función
+    if (!/p_secret|p_applied_rev|p_report|function|schema cache/i.test(error.message)) break;
   }
-  let { data, error } = await supabase.rpc('kiosk_device_checkin', params);
-  // Base sin la migración de configuración remota: checkin simple
-  if (error && linked && /p_applied_rev|p_report|function/i.test(error.message)) {
-    ({ data, error } = await supabase.rpc('kiosk_device_checkin', { p_code: deviceCode, p_app_version: appVersion }));
-  }
-  if (error) throw new Error(error.message);
-  return Array.isArray(data) ? data[0] : data;
+  throw last ?? new Error('Sin respuesta del servidor');
 };
 
 /** Registra el equipo si es nuevo, avisa que está vivo y devuelve su vinculación y evento. */
@@ -86,6 +110,8 @@ export const checkinDevice = async (appVersion?: string): Promise<KioskDeviceSta
     pairingStatus: row?.pairing_status === 'linked' ? 'linked' : 'pending',
     kioskEventId: row?.kiosk_event_id ?? null,
     eventName: row?.event_name ?? null,
+    accountName: row?.account_name ?? null,
+    aiCredits: typeof row?.ai_credits === 'number' ? row.ai_credits : null,
   };
   write(STATE_KEY, JSON.stringify(state));
   return state;

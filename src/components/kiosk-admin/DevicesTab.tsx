@@ -4,7 +4,7 @@ import { Link2, Settings2, Trash2, Unlink } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { RemoteSettings } from '@/lib/kioskRemote';
 import { btnDanger, btnGhost, btnPrimary, card, Field, input, Select } from './ui';
-import { ONLINE_WINDOW_MS, type KioskDeviceRow, type KioskEventRow } from './types';
+import { ONLINE_WINDOW_MS, type KioskAccountRow, type KioskDeviceRow, type KioskEventRow } from './types';
 
 // Equipos: vincular con el código que muestra la TV, nombre, evento y estado.
 
@@ -18,9 +18,11 @@ const relative = (iso: string | null, now: number) => {
   return new Date(iso).toLocaleDateString('es-AR');
 };
 
-export default function DevicesTab({ devices, events, loadedAt, onChange, onConfigure }: {
+export default function DevicesTab({ devices, events, accounts, loadedAt, onChange, onConfigure }: {
   devices: KioskDeviceRow[];
   events: KioskEventRow[];
+  /** null = base sin la migración de créditos */
+  accounts: KioskAccountRow[] | null;
   loadedAt: number;
   onChange: () => void;
   onConfigure: (device: KioskDeviceRow) => void;
@@ -31,6 +33,7 @@ export default function DevicesTab({ devices, events, loadedAt, onChange, onConf
   const [busy, setBusy] = useState<string | null>(null);
 
   const eventOptions = [{ value: '', label: 'Sin evento' }, ...events.map(e => ({ value: e.id, label: e.name }))];
+  const accountOptions = [{ value: '', label: 'Sin cliente (sin IA)' }, ...(accounts ?? []).map(a => ({ value: a.id, label: `${a.name} · ${a.credits} créditos` }))];
 
   // Al asignar un evento, el nombre del evento va al equipo: es la carpeta de las fotos en Drive
   const withEventTitle = (device: Pick<KioskDeviceRow, 'settings' | 'settings_rev'>, evId: string) => {
@@ -149,6 +152,14 @@ export default function DevicesTab({ devices, events, loadedAt, onChange, onConf
                   <Select value={d.kiosk_event_id ?? ''} options={eventOptions}
                     onChange={v => update(d, { kiosk_event_id: v || null, ...withEventTitle(d, v) }, v ? 'Evento asignado: el equipo usa su nombre y carpeta.' : undefined)} />
                 </Field>
+                {accounts && (
+                  <div className="col-span-2">
+                    <Field label="Cliente (créditos de IA)">
+                      <Select value={d.account_id ?? ''} options={accountOptions}
+                        onChange={v => update(d, { account_id: v || null }, v ? 'Cliente asignado: la IA de este equipo usa sus créditos.' : undefined)} />
+                    </Field>
+                  </div>
+                )}
               </div>
               <p className={`text-sm ${pendingConfig ? 'text-amber-300' : 'text-slate-400'}`}>
                 {pendingConfig
