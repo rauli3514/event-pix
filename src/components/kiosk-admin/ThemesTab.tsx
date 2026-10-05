@@ -21,7 +21,15 @@ interface ThemeRow {
   sort_order?: number | null;
 }
 
+// Experiencias con botón propio en el kiosco (no aparecen en Retrato Mágico)
+const SPECIAL: Record<string, string> = {
+  cover: 'Experiencia "Portada Fashion IA": el resultado va dentro de la tapa de revista con el nombre del invitado.',
+  caricatura: 'Experiencia "Caricatura con Messi" (botón propio en Fotos IA).',
+  figurita: 'Experiencia "Hacer figurita": solo quita el fondo de la foto (no usa prompt) y después el invitado arma su figurita.',
+};
+
 const CATEGORIES = [
+  { value: 'especial', label: '⭐ Experiencias especiales' },
   { value: 'deportes', label: '⚽ Deportes' },
   { value: 'fantasia', label: '🏰 Fantasía' },
   { value: 'epocas', label: '🕰️ Épocas' },
@@ -34,8 +42,9 @@ const CATEGORIES = [
 const EDIT_TEMPLATE = 'Edit this photo. Keep every person exactly as they are: same face, facial features, skin tone, age, body shape, hairstyle and expression, so each one is instantly recognizable. Do not add, remove or merge people, and keep their poses. Dress them as ... Replace the background with ... Photorealistic, high detail, lighting consistent across the whole image. No text, no logos, no watermark.';
 
 /** Corre la IA con la sesión del panel (sin equipo) y espera el resultado. */
-async function runTest(imageUrl: string, prompt: string): Promise<string> {
-  const { data, error } = await supabase.functions.invoke('generate-ai-photo', { body: { imageUrl, prompt } });
+async function runTest(imageUrl: string, prompt: string, removeBg = false): Promise<string> {
+  const body = removeBg ? { imageUrl, action: 'remove_bg' } : { imageUrl, prompt };
+  const { data, error } = await supabase.functions.invoke('generate-ai-photo', { body });
   if (error || !data?.success) throw new Error(error?.message || data?.error || 'No se pudo iniciar la IA');
   let prediction = data.prediction;
   for (let i = 0; i < 60 && prediction.status !== 'succeeded' && prediction.status !== 'failed'; i++) {
@@ -154,7 +163,7 @@ function ThemeEditor({ theme, onSaved }: { theme: ThemeRow; onSaved: () => void 
     setRunning(true);
     setResult(null);
     try {
-      setResult(await runTest(photo, form.prompt));
+      setResult(await runTest(photo, form.prompt, form.result_style === 'figurita'));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e));
     } finally {
@@ -202,9 +211,9 @@ function ThemeEditor({ theme, onSaved }: { theme: ThemeRow; onSaved: () => void 
           </Field>
         </div>
         <Field label="Prompt (en inglés)" hint='Formato de edición: "Edit this photo. Keep every person exactly as they are… Dress them as… Replace the background with…". Así la IA conserva las caras.'>
-          <textarea className={`${input} min-h-[180px] font-mono text-sm`} value={form.prompt} onChange={e => set('prompt', e.target.value)} />
+          <textarea className={`${input} min-h-[180px] font-mono text-sm disabled:opacity-50`} value={form.prompt} disabled={form.result_style === 'figurita'} onChange={e => set('prompt', e.target.value)} />
         </Field>
-        {form.result_style === 'cover' && <p className="text-sm text-violet-300">Esta temática pone el resultado dentro de la tapa de revista (Portada Fashion) del equipo.</p>}
+        {form.result_style && SPECIAL[form.result_style] && <p className="text-sm text-violet-300">{SPECIAL[form.result_style]}</p>}
         <Check label="Activa (aparece en los equipos)" checked={form.is_active} onChange={v => set('is_active', v)} />
       </div>
 

@@ -1175,8 +1175,8 @@ The subject must perfectly match the facial features and gender of the reference
       const photo = capturedImage;
       // Si es caricatura mundialista, lanzamos la IA directamente con el prompt especial
       if (mode === 'caricatura') {
-        // Prompt de edición (fal.ai kontext): conserva las caras de la foto y suma a Messi
-        const specialTheme = {
+        // Prompt de la base (editable en el panel → Temáticas IA) o el de respaldo
+        const specialTheme = themes.find((t: any) => t.result_style === 'caricatura') ?? {
           name: 'Caricatura con Messi',
           prompt: 'Restyle this photo as a vibrant, fun 3D caricature illustration. Keep the exact likeness of every person in the photo: same face shape, facial features, skin tone, hairstyle and expression, slightly exaggerated in a friendly caricature way but clearly recognizable. Do not remove anyone. Add Lionel Messi next to them as a caricature too. Everyone wears the Argentina national team jersey with white and sky-blue vertical stripes, celebrating a goal together inside a packed stadium with golden confetti in the air. Joyful, colorful. No text, no logos, no watermark.'
         };
@@ -1409,8 +1409,8 @@ The subject must perfectly match the facial features and gender of the reference
       deportes: '⚽ Deportes', fantasia: '🏰 Fantasía', epocas: '🕰️ Épocas',
       arte: '🎨 Arte y animación', animacion: '🎬 Animación', moda: '👗 Moda', scifi: '🤖 Sci-Fi', aventura: '🌿 Aventura',
     };
-    // La temática de tapa de revista va en su propia experiencia (Portada Fashion IA)
-    const grouped = themes.filter((t: any) => t.result_style !== 'cover').reduce((acc: Record<string, any[]>, t: any) => {
+    // Las experiencias especiales (tapa, caricatura, figurita) tienen su propio botón
+    const grouped = themes.filter((t: any) => !t.result_style).reduce((acc: Record<string, any[]>, t: any) => {
       const cat = t.category || 'otros';
       if (!acc[cat]) acc[cat] = [];
       acc[cat].push(t);
