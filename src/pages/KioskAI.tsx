@@ -28,6 +28,7 @@ import { motion } from 'framer-motion';
 import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
 import ScreenBackground from '@/components/kiosk/ScreenBackground';
 import WaitingGames from '@/components/kiosk/WaitingGames';
+import { useShutter } from '@/lib/kioskShutter';
 import { getPageBackground, getScreenBackground } from '@/lib/kioskMedia';
 import { AIProcessing, CameraFlash, CountdownRing } from '@/components/kiosk/KioskAnimations';
 import { revealPhoto, useConfettiBurst } from '@/components/kiosk/kioskEffects';
@@ -345,8 +346,9 @@ export default function KioskAI() {
       shotsRef.current = [];
       rawShotsRef.current = [];
       setShotCount(0);
-      // Con efectos, el invitado los prueba en vivo y toca "¡Sacar foto!"
-      if (fxEnabled) return;
+      // Con efectos, el invitado los prueba en vivo y toca "¡Sacar foto!"; con el
+      // disparador Bluetooth se espera el botón (o un toque)
+      if (fxEnabled || shutterMode) return;
       const t = setTimeout(() => startCountdown(), 2500);
       return () => clearTimeout(t);
     }
@@ -501,6 +503,9 @@ export default function KioskAI() {
   const isFxActive = (c: FxChoice) => (!!c.filter && c.filter !== 'none') || (!!c.accessory && c.accessory !== 'none');
   // Efectos en vivo: solo filtros de color (los accesorios que siguen la cara no se usan)
   const fxEnabled = (mode === 'selfie' || mode === 'portada') && !!generalSettings.enableFilters;
+  // Disparador Bluetooth: en "Mirá a la cámara" la foto arranca con el botón (o tocando la pantalla)
+  const shutterMode = !!generalSettings.bluetoothShutter;
+  useShutter(() => { if (cameraReady) startCountdown(); }, step === 'lookCamera' && (shutterMode || fxEnabled));
   // Tomas sin efecto, para el respaldo de originales
   const rawShotsRef = useRef<string[]>([]);
 
@@ -1118,7 +1123,7 @@ The subject must perfectly match the facial features and gender of the reference
 
   if (step === 'lookCamera') {
     return (
-      <div className="kiosk-root">
+      <div className="kiosk-root" onClick={shutterMode && cameraReady ? startCountdown : undefined}>
         <AuroraBackground />
         <Corners />
         <CameraVideo videoRef={videoRef} mirror={!!cameraSettings.mirror} rotation={Number(cameraSettings.rotation) || 0} />
@@ -1130,6 +1135,11 @@ The subject must perfectly match the facial features and gender of the reference
           <h1 className="carlmarx-bold text-7xl text-white text-center uppercase tracking-widest">
             ¡Mirá a la<br /><span className="text-violet-400">Cámara! 📸</span>
           </h1>
+          {shutterMode && (
+            <p className="carlmarx-bold text-white text-[clamp(1.4rem,4vmin,3rem)] text-center animate-pulse">
+              {cameraReady ? 'Cuando estén listos, apretá el disparador 📲 (o tocá la pantalla)' : 'Preparando la cámara…'}
+            </p>
+          )}
         </div>
       </div>
     );

@@ -8,8 +8,8 @@ import ScreenBackground from '@/components/kiosk/ScreenBackground';
 import { EventPixLogo } from '@/components/kiosk/brand/EventPixLogo';
 import PinDialog from '@/components/kiosk/PinDialog';
 import {
-  checkinDevice, getAppVersion, getCachedDeviceState, getDeviceCode, getVipAppPackage,
-  openAndroidApp, openWifiSettings, type KioskDeviceState,
+  checkinDevice, getAppVersion, getCachedDeviceState, getDeviceCode,
+  openWifiSettings, type KioskDeviceState,
 } from '@/lib/kioskDevice';
 import { getGeneralSettings, getSectionLock } from '@/lib/kioskSettings';
 import { isSupabaseConfigured, supabaseProjectRef } from '@/lib/supabase';
@@ -42,7 +42,6 @@ export default function KioskBox() {
   // Motivo real de la falla (sin internet, sin configurar o error del servidor)
   const [problem, setProblem] = useState<string | null>(null);
   const [pinOpen, setPinOpen] = useState(false);
-  const [vipError, setVipError] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const clock = useClock();
 
@@ -73,6 +72,7 @@ export default function KioskBox() {
   useEffect(() => {
     const lock = getSectionLock();
     if (!lock || device?.pairingStatus !== 'linked') return;
+    if (lock === 'vip') { navigate('/box/vip', { replace: true }); return; }
     const params = new URLSearchParams({ modes: lock, home: '1' });
     if (device.kioskEventId) params.set('event', device.kioskEventId);
     navigate(`/kiosco?${params.toString()}`, { replace: true });
@@ -90,10 +90,6 @@ export default function KioskBox() {
     navigate(`/kiosco?${params.toString()}`);
   };
 
-  const vipPackage = getVipAppPackage();
-  const openVip = () => {
-    if (!openAndroidApp(vipPackage)) setVipError(true);
-  };
 
   // ─── Equipo sin vincular ─────────────────────────────────────────
   if (!device || device.pairingStatus !== 'linked') {
@@ -147,7 +143,7 @@ export default function KioskBox() {
     ...(general.enableSelfie !== false ? [{ key: 'fotos', label: 'Fotos', hint: general.enablePortada ? 'Selfie y Portada Fashion' : 'Selfie con marco', icon: Camera, gradient: 'from-[#00d4ff] via-[#2b8cff] to-[#5b3bff]', glow: 'rgba(0,212,255,0.55)', onClick: () => openExperience('selfie') }] : []),
     ...(aiEnabled ? [{ key: 'ia', label: 'Fotos IA', hint: 'Retratos, caricaturas y más', icon: Sparkles, gradient: 'from-[#ff2e93] via-[#c03bff] to-[#7b2ff7]', glow: 'rgba(255,46,147,0.55)', onClick: () => openExperience('ai') }] : []),
     ...(general.enableGallery ? [{ key: 'galeria', label: 'Galería', hint: 'Las fotos del evento', icon: Images, gradient: 'from-[#2ee6a6] via-[#00b3c7] to-[#2b6cff]', glow: 'rgba(46,230,166,0.5)', onClick: () => navigate('/box/galeria') }] : []),
-    ...(vipPackage ? [{ key: 'vip', label: 'Ingreso VIP', hint: 'Acceso de invitados', icon: Ticket, gradient: 'from-[#ffd23f] via-[#ff9f1c] to-[#ff4d6d]', glow: 'rgba(255,159,28,0.55)', onClick: openVip }] : []),
+    ...(general.enableVip ? [{ key: 'vip', label: 'Ingreso VIP', hint: 'Buscá tu mesa', icon: Ticket, gradient: 'from-[#ffd23f] via-[#ff9f1c] to-[#ff4d6d]', glow: 'rgba(255,159,28,0.55)', onClick: () => navigate('/box/vip') }] : []),
   ];
 
   return (
@@ -212,9 +208,6 @@ export default function KioskBox() {
           </div>
         </main>
 
-        {vipError && (
-          <p className="text-center text-amber-300 pb-6">No se pudo abrir Ingreso VIP. Revisá en Ajustes que esté instalada y elegida.</p>
-        )}
       </div>
 
       {pinOpen && (

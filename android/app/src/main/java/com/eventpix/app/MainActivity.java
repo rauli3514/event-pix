@@ -5,8 +5,11 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.media.AudioManager;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.view.KeyEvent;
 import android.webkit.JavascriptInterface;
 
 import com.eventpix.app.print.NativePrintPlugin;
@@ -24,6 +27,23 @@ import java.util.Set;
 public class MainActivity extends BridgeActivity {
     private BluetoothServer bluetoothServer;
     private BluetoothClient bluetoothClient;
+    // Disparador Bluetooth: mientras el kiosco lo pide, Volumen +/- y Cámara sacan la foto
+    private volatile boolean captureShutter = false;
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        int code = event.getKeyCode();
+        boolean shutterKey = code == KeyEvent.KEYCODE_VOLUME_UP || code == KeyEvent.KEYCODE_VOLUME_DOWN
+                || code == KeyEvent.KEYCODE_CAMERA;
+        if (captureShutter && shutterKey && getBridge() != null && getBridge().getWebView() != null) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+                getBridge().getWebView().post(() -> getBridge().getWebView()
+                        .evaluateJavascript("window.dispatchEvent(new Event('kiosk-shutter'))", null));
+            }
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
+    }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -106,6 +126,47 @@ public class MainActivity extends BridgeActivity {
                 context.startActivity(intent);
             } catch (Exception e) {
                 openSettings();
+            }
+        }
+
+        /** El kiosco pide (o suelta) las teclas del disparador Bluetooth. */
+        @JavascriptInterface
+        public void setShutterCapture(boolean on) {
+            captureShutter = on;
+        }
+
+        /** Si esta app es la pantalla de inicio (lanzador) elegida del equipo. */
+        @JavascriptInterface
+        public boolean isDefaultHome() {
+            Intent home = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
+            ResolveInfo info = context.getPackageManager().resolveActivity(home, PackageManager.MATCH_DEFAULT_ONLY);
+            return info != null && info.activityInfo != null
+                    && context.getPackageName().equals(info.activityInfo.packageName);
+        }
+
+        /** Permiso "Mostrar sobre otras apps": deja abrir la app sola al prender. */
+        @JavascriptInterface
+        public boolean canStartOnBoot() {
+            return Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(context);
+        }
+
+        @JavascriptInterface
+        public void openOverlaySettings() {
+            try {
+                Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:" + context.getPackageName()));
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(intent);
+            } catch (Exception e) {
+                // Algunas TV box no tienen esa pantalla: la lista general de permisos
+                try {
+                    Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.parse("package:" + context.getPackageName()));
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    context.startActivity(intent);
+                } catch (Exception ignored) {
+                    openSettings();
+                }
             }
         }
 

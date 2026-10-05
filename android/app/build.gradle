@@ -5,15 +5,16 @@ android {
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
         // -PeventpixAppId / -PeventpixAppLabel permiten instalar otra variante (p. ej. el
-        // kiosco) al lado de la app de TV sin pisarla. Solo la app de TV es lanzador y
-        // arranca sola al prender el equipo.
+        // kiosco) al lado de la app de TV sin pisarla. La app de TV y la del kiosco son
+        // apps dedicadas del equipo: pueden ser la pantalla de inicio (lanzador) y
+        // arrancan solas al prender. -PeventpixDedicated=false lo desactiva.
         def eventpixAppId = project.findProperty('eventpixAppId') ?: "com.eventpix.app"
-        def isTvApp = eventpixAppId == "com.eventpix.app"
+        def dedicated = (project.findProperty('eventpixDedicated') ?: "true") == "true"
         applicationId eventpixAppId
         manifestPlaceholders = [
                 appLabel    : project.findProperty('eventpixAppLabel') ?: "@string/app_name",
-                homeCategory: isTvApp ? "android.intent.category.HOME" : "android.intent.category.DEFAULT",
-                launchOnBoot: isTvApp ? "true" : "false",
+                homeCategory: dedicated ? "android.intent.category.HOME" : "android.intent.category.DEFAULT",
+                launchOnBoot: dedicated ? "true" : "false",
         ]
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion

@@ -9,8 +9,8 @@ import { SCREENSAVER_PREVIEW_EVENT, screensaverMinutes } from '@/lib/kioskScreen
 // paseando por la pantalla. Cualquier toque o tecla lo cierra sin activar nada debajo.
 // Solo anima transform y opacity, para que la GPU de la TV box no se trabe.
 
-/** El protector cuenta solo en el inicio, el kiosco y la galería (no en Ajustes). */
-const IDLE_PATH = /^\/(box|box\/galeria|kiosco)\/?$/;
+/** El protector cuenta solo en el inicio, el kiosco, la galería e Ingreso VIP (no en Ajustes). */
+const IDLE_PATH = /^\/(box|box\/galeria|box\/vip|kiosco)\/?$/;
 const KIOSK_PATH = /^\/(box|kiosco)(\/|$)/;
 const ACTIVITY_EVENTS = ['pointerdown', 'pointermove', 'keydown', 'touchstart', 'wheel'] as const;
 /** Lo que sigue al toque que despierta (soltar, click) tampoco llega a la pantalla de abajo. */

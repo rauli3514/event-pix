@@ -90,6 +90,18 @@ export interface KioskGeneralSettings {
   photoGame?: boolean;
   /** Preguntas de la trivia de la fiesta (sobre los novios, la quinceañera…) */
   triviaQuestions?: TriviaQuestion[];
+  /** Ingreso VIP: ícono en el inicio y pantalla "Buscá tu mesa" (Ajustes → Ingreso VIP) */
+  enableVip?: boolean;
+  vipTitle?: string;
+  vipSubtitle?: string;
+  /** Mostrar el video de bienvenida antes de la mesa (si hay uno cargado; por defecto sí) */
+  vipVideo?: boolean;
+  /** Segundos que se muestra la mesa antes de volver (por defecto 15) */
+  vipResultSeconds?: number;
+  /** Hora de ingreso de la trasnoche (ej. "02:00") */
+  vipAfterPartyTime?: string;
+  /** Disparador Bluetooth: la foto espera el botón (o un toque) en vez de arrancar sola */
+  bluetoothShutter?: boolean;
   /** Protector de pantalla con el logo animado (por defecto sí) */
   screensaver?: boolean;
   /** Minutos sin tocar nada para que aparezca el protector (por defecto 5) */

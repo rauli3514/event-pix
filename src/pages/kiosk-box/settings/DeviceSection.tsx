@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { RefreshCw, Sparkles, Wifi } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Power, RefreshCw, Sparkles, Wifi } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import {
-  checkinDevice, getCachedDeviceState, getVipAppPackage, listInstalledApps, openWifiSettings,
-  renameDevice, setBoxPin, setVipAppPackage, type KioskDeviceState,
+  checkinDevice, getAutostartStatus, getCachedDeviceState, openHomeAppSettings, openStartOnBootSettings, openWifiSettings,
+  renameDevice, setBoxPin, type KioskDeviceState,
 } from '@/lib/kioskDevice';
 import { eventFolder } from '@/lib/kioskStorage';
 import { formatArs, getCachedStore, loadStore, whatsappLink } from '@/lib/kioskStore';
@@ -14,8 +14,6 @@ import { buttonClass, inputClass, Panel, primaryClass } from './ui';
 
 export default function DeviceSection() {
   const [device, setDevice] = useState<KioskDeviceState | null>(getCachedDeviceState);
-  const [apps] = useState(listInstalledApps);
-  const [vipPackage, setVip] = useState(getVipAppPackage);
   const [newPin, setNewPin] = useState('');
   const [version, setVersion] = useState('');
   const [store, setStore] = useState(getCachedStore);
@@ -84,21 +82,12 @@ export default function DeviceSection() {
         {version && <p className="text-white/40">Versión de la app: {version}</p>}
       </Panel>
 
+      <AutostartPanel />
+
       <Panel title="Internet">
         <button data-autofocus onClick={openWifiSettings} className={buttonClass}>
           <Wifi className="w-5 h-5" /> Configurar WiFi del equipo
         </button>
-      </Panel>
-
-      <Panel title="Ingreso VIP" description='Elegí la app que abre el ícono "Ingreso VIP" del inicio. Si no elegís ninguna, el ícono no aparece.'>
-        <div className="grid grid-cols-2 gap-3 max-h-80 overflow-y-auto p-1">
-          {[{ label: 'Ninguna', packageName: '' }, ...apps].map(a => (
-            <button key={a.packageName || 'none'} onClick={() => { setVip(a.packageName); setVipAppPackage(a.packageName); }}
-              className={`text-left rounded-2xl px-5 py-3 text-lg focus:outline-none focus:ring-4 focus:ring-[#00d4ff] ${vipPackage === a.packageName ? 'bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7]' : 'bg-white/10 hover:bg-white/20'}`}>
-              {a.label}
-            </button>
-          ))}
-        </div>
       </Panel>
 
       <Panel title="Clave de ajustes" description="La que se pide al tocar Ajustes en el inicio.">
@@ -175,5 +164,57 @@ function Info({ label, value, mono }: { label: string; value: string; mono?: boo
       <p className="text-white/50 text-sm">{label}</p>
       <p className={`text-2xl ${mono ? 'font-mono tracking-widest' : 'font-semibold'}`}>{value}</p>
     </div>
+  );
+}
+
+/** Que el kiosco se abra solo al prender el equipo (cortes de luz, reinicios). */
+function AutostartPanel() {
+  const [status, setStatus] = useState(getAutostartStatus);
+  // Al volver de los ajustes de Android se revisa de nuevo
+  useEffect(() => {
+    const update = () => { if (document.visibilityState === 'visible') setStatus(getAutostartStatus()); };
+    document.addEventListener('visibilitychange', update);
+    window.addEventListener('focus', update);
+    return () => {
+      document.removeEventListener('visibilitychange', update);
+      window.removeEventListener('focus', update);
+    };
+  }, []);
+
+  if (!status) {
+    return (
+      <Panel title="Arranque automático" description="Que el kiosco se abra solo al prender el equipo.">
+        <p className="text-white/60">Se configura en la app del equipo (versión 2 o más nueva).</p>
+      </Panel>
+    );
+  }
+  const ok = status.isHome || status.canStartOnBoot;
+  return (
+    <Panel title="Arranque automático" description="Si se corta la luz o se reinicia el equipo, el kiosco vuelve a aparecer solo, sin tocar nada.">
+      <div className={`flex items-center gap-3 rounded-2xl px-5 py-4 ${ok ? 'bg-emerald-500/15 text-emerald-200' : 'bg-amber-500/15 text-amber-200'}`}>
+        {ok ? <CheckCircle2 className="w-6 h-6 shrink-0" /> : <AlertTriangle className="w-6 h-6 shrink-0" />}
+        <p className="text-lg font-semibold">
+          {status.isHome ? 'Listo: el kiosco es la pantalla de inicio del equipo y arranca solo.'
+            : status.canStartOnBoot ? 'Listo: el kiosco se abre solo al prender el equipo.'
+            : 'Todavía no: al prender el equipo puede quedar en la pantalla de Android.'}
+        </p>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <button onClick={openHomeAppSettings} className={status.isHome ? buttonClass : primaryClass}>
+          <Power className="w-5 h-5" /> {status.isHome ? 'Cambiar pantalla de inicio' : 'Usar como pantalla de inicio (recomendado)'}
+        </button>
+        {!status.canStartOnBoot && (
+          <button onClick={openStartOnBootSettings} className={buttonClass}>
+            Permitir abrir al prender
+          </button>
+        )}
+      </div>
+      {!status.isHome && (
+        <p className="text-white/50">
+          En "Pantalla de inicio" elegí <b className="text-white/80">EventPix Kiosco</b> (si pregunta, "Siempre"). La otra opción es activar
+          "Mostrar sobre otras apps" para EventPix Kiosco.
+        </p>
+      )}
+    </Panel>
   );
 }
