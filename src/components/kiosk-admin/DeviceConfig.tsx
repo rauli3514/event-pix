@@ -148,7 +148,6 @@ export default function DeviceConfig({ device, onClose, onSaved }: {
             <Check label="Mundial (carta)" checked={bool('general', 'enableMundial', false)} onChange={v => set('general', 'enableMundial', v)} />
             <Check label="Figuritas" checked={bool('general', 'enableFiguritas', true)} onChange={v => set('general', 'enableFiguritas', v)} />
             <Check label="Filtros de color" checked={bool('general', 'enableFilters', false)} onChange={v => set('general', 'enableFilters', v)} />
-            <Check label="Accesorios" checked={bool('general', 'enableAccessories', false)} onChange={v => set('general', 'enableAccessories', v)} />
           </div>
           <Check label="Sin conexión (solo foto, marco e impresión)" checked={bool('general', 'offline', false)} onChange={v => set('general', 'offline', v)} />
         </Section>

@@ -23,7 +23,7 @@ const SECTIONS = [
   { key: 'backgrounds', label: 'Fondos animados', icon: Film, Component: BackgroundsSection },
   { key: 'camera', label: 'Cámara', icon: Camera, Component: CameraSection },
   { key: 'experiences', label: 'Experiencias y marco', icon: LayoutGrid, Component: ExperiencesSection },
-  { key: 'fx', label: 'Filtros y accesorios', icon: Wand2, Component: FxSection },
+  { key: 'fx', label: 'Filtros de color', icon: Wand2, Component: FxSection },
   { key: 'result', label: 'Resultado y tiempos', icon: Timer, Component: ResultSection },
   { key: 'photos', label: 'Fotos y respaldo', icon: FolderOpen, Component: PhotosSection },
   { key: 'share', label: 'Compartir y nube', icon: Share2, Component: ShareSection },

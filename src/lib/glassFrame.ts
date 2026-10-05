@@ -3,7 +3,7 @@
 // gotas de luz y una píldora de vidrio con el nombre del evento.
 // La hoja la arma photoLayout.ts (vertical u horizontal, una o varias fotos).
 
-export type GlassStyle = 'clear' | 'dark' | 'aurora' | 'sunset';
+export type GlassStyle = 'clear' | 'dark' | 'aurora' | 'sunset' | 'contrastDark' | 'contrastLight';
 
 export interface GlassFrameOptions {
   style: GlassStyle;
@@ -18,7 +18,16 @@ export const GLASS_STYLES: { value: GlassStyle; label: string }[] = [
   { value: 'dark', label: 'Vidrio oscuro' },
   { value: 'aurora', label: 'Vidrio aurora' },
   { value: 'sunset', label: 'Vidrio atardecer' },
+  // Píldora casi sólida: el nombre se lee sobre cualquier fondo propio
+  { value: 'contrastDark', label: 'Alto contraste oscuro' },
+  { value: 'contrastLight', label: 'Alto contraste claro' },
 ];
+
+/** Colores de la píldora con el nombre del evento según el estilo. */
+const PILLS: Partial<Record<GlassStyle, { fill: string; text: string; sub: string; shadow: string; edge: [string, string] }>> = {
+  contrastDark: { fill: 'rgba(10,8,22,0.86)', text: '#ffffff', sub: 'rgba(255,255,255,0.88)', shadow: 'rgba(0,0,0,0.5)', edge: ['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.35)'] },
+  contrastLight: { fill: 'rgba(255,255,255,0.92)', text: '#15102b', sub: 'rgba(21,16,43,0.78)', shadow: 'rgba(255,255,255,0)', edge: ['rgba(255,255,255,1)', 'rgba(21,16,43,0.25)'] },
+};
 
 /** El marco se guarda como 'glass:<estilo>' en kiosk_frame_url. */
 export const GLASS_PREFIX = 'glass:';
@@ -69,6 +78,14 @@ const TINTS: Record<GlassStyle, (ctx: CanvasRenderingContext2D, w: number, h: nu
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, w, h);
     ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.fillRect(0, 0, w, h);
+  },
+  contrastDark: (ctx, w, h) => {
+    ctx.fillStyle = 'rgba(8,6,28,0.55)';
+    ctx.fillRect(0, 0, w, h);
+  },
+  contrastLight: (ctx, w, h) => {
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
     ctx.fillRect(0, 0, w, h);
   },
   sunset: (ctx, w, h) => {
@@ -267,13 +284,21 @@ export async function drawGlassPage(imgs: HTMLImageElement[], page: GlassPage, o
       const pillY = cap.y + (cap.h - pillH) / 2;
       const kk = pillH / (200 * k) * k; // texto proporcional a la píldora
 
+      const solid = PILLS[options.style];
       ctx.save();
       roundRect(ctx, pillX, pillY, pillW, pillH, pillH / 2);
-      ctx.fillStyle = options.style === 'dark' ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.20)';
+      ctx.fillStyle = solid?.fill ?? (options.style === 'dark' ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.20)');
+      if (solid) {
+        // Sombra para despegar la píldora de cualquier fondo
+        ctx.shadowColor = 'rgba(0,0,0,0.35)';
+        ctx.shadowBlur = 30 * k;
+        ctx.shadowOffsetY = 8 * k;
+      }
       ctx.fill();
+      ctx.shadowColor = 'transparent';
       const pillEdge = ctx.createLinearGradient(0, pillY, 0, pillY + pillH);
-      pillEdge.addColorStop(0, 'rgba(255,255,255,0.85)');
-      pillEdge.addColorStop(1, 'rgba(255,255,255,0.2)');
+      pillEdge.addColorStop(0, solid?.edge[0] ?? 'rgba(255,255,255,0.85)');
+      pillEdge.addColorStop(1, solid?.edge[1] ?? 'rgba(255,255,255,0.2)');
       ctx.strokeStyle = pillEdge;
       ctx.lineWidth = 3 * k;
       ctx.stroke();
@@ -282,14 +307,14 @@ export async function drawGlassPage(imgs: HTMLImageElement[], page: GlassPage, o
       pillShine.addColorStop(0, 'rgba(255,255,255,0.35)');
       pillShine.addColorStop(1, 'rgba(255,255,255,0)');
       ctx.fillStyle = pillShine;
-      ctx.fill();
+      if (!solid || options.style === 'contrastDark') ctx.fill();
       ctx.restore();
 
       ctx.save();
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillStyle = '#fff';
-      ctx.shadowColor = 'rgba(0,0,0,0.35)';
+      ctx.fillStyle = solid?.text ?? '#fff';
+      ctx.shadowColor = solid?.shadow ?? 'rgba(0,0,0,0.35)';
       ctx.shadowBlur = 12 * k;
       const cx = pillX + pillW / 2;
       const maxTextW = pillW - 120 * kk;
@@ -297,7 +322,7 @@ export async function drawGlassPage(imgs: HTMLImageElement[], page: GlassPage, o
         fitFont(ctx, options.title, '700', 76 * kk, maxTextW, titleFamily);
         ctx.fillText(options.title, cx, pillY + pillH * 0.4);
         fitFont(ctx, options.subtitle, '600', 36 * kk, maxTextW, textFamily);
-        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        ctx.fillStyle = solid?.sub ?? 'rgba(255,255,255,0.85)';
         ctx.fillText(options.subtitle, cx, pillY + pillH * 0.75);
       } else {
         const text = (options.title || options.subtitle)!;
