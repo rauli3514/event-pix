@@ -29,6 +29,7 @@ import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
 import ScreenBackground from '@/components/kiosk/ScreenBackground';
 import WaitingGames from '@/components/kiosk/WaitingGames';
 import { useShutter } from '@/lib/kioskShutter';
+import { useCoverPreview } from '@/hooks/use-cover-preview';
 import { getPageBackground, getScreenBackground } from '@/lib/kioskMedia';
 import { AIProcessing, CameraFlash, CountdownRing } from '@/components/kiosk/KioskAnimations';
 import { revealPhoto, useConfettiBurst } from '@/components/kiosk/kioskEffects';
@@ -503,6 +504,12 @@ export default function KioskAI() {
   const isFxActive = (c: FxChoice) => (!!c.filter && c.filter !== 'none') || (!!c.accessory && c.accessory !== 'none');
   // Efectos en vivo: solo filtros de color (los accesorios que siguen la cara no se usan)
   const fxEnabled = (mode === 'selfie' || mode === 'portada') && !!generalSettings.enableFilters;
+  // Tarjetas de Portada Fashion: la tapa armada con los textos de portada cargados (como sale de verdad);
+  // la de IA usa la muestra del panel (Temáticas IA) si hay una
+  const coverCardOptions = coverOptionsFrom(generalSettings);
+  const portadaCard = useCoverPreview('/modes/portada-foto.jpg', coverCardOptions);
+  const portadaIACard = useCoverPreview(themes.find((t: any) => t.result_style === 'cover')?.preview_url || '/modes/portada-ia-foto.jpg', coverCardOptions);
+
   // Disparador Bluetooth: en "Mirá a la cámara" la foto arranca con el botón (o tocando la pantalla)
   const shutterMode = !!generalSettings.bluetoothShutter;
   useShutter(() => { if (cameraReady) startCountdown(); }, step === 'lookCamera' && (shutterMode || fxEnabled));
@@ -992,8 +999,8 @@ The subject must perfectly match the facial features and gender of the reference
 
           {[
             { mode: 'selfie' as Exclude<Mode, null>, on: generalSettings.enableSelfie !== false, title: 'Selfie Grupal', text: 'Una foto con amigos o familia, con marco decorativo.', img: '/modes/selfie.jpg', icon: Users, color: '#22d3ee', ai: false },
-            { mode: 'portada' as Exclude<Mode, null>, on: generalSettings.enablePortada === true, title: 'Portada Fashion', text: '¡Sé la tapa de la revista! Tu foto real con tu nombre y titulares.', img: '/modes/portada.jpg', icon: Crown, color: '#f472b6', ai: false, cover: true },
-            { mode: 'portadaIA' as Exclude<Mode, null>, on: generalSettings.enablePortadaAI !== false, title: 'Portada Fashion IA', text: 'La IA te viste de modelo y salís en la tapa de revista con tu nombre.', img: '/modes/portada-ia.jpg', icon: Crown, color: '#e879f9', ai: true, cover: true },
+            { mode: 'portada' as Exclude<Mode, null>, on: generalSettings.enablePortada === true, title: 'Portada Fashion', text: '¡Sé la tapa de la revista! Tu foto real con tu nombre y titulares.', img: portadaCard || '/modes/portada.jpg', icon: Crown, color: '#f472b6', ai: false, cover: true },
+            { mode: 'portadaIA' as Exclude<Mode, null>, on: generalSettings.enablePortadaAI !== false, title: 'Portada Fashion IA', text: 'La IA te viste de modelo y salís en la tapa de revista con tu nombre.', img: portadaIACard || '/modes/portada-ia.jpg', icon: Crown, color: '#e879f9', ai: true, cover: true },
             { mode: 'retrato' as Exclude<Mode, null>, on: generalSettings.enableAI !== false, title: 'Retrato Mágico', text: 'Elegí un estilo (realeza, pirata, vikingo…) y la IA te transforma.', img: '/modes/retrato.jpg', icon: Sparkles, color: '#a78bfa', ai: true },
             { mode: 'mundial' as Exclude<Mode, null>, on: generalSettings.enableMundial === true, title: 'Mundial 2026', text: 'Tu carta de jugador con nombre y posición.', img: '/modes/mundial.jpg', icon: Trophy, color: '#4ade80', ai: true },
             { mode: 'caricatura' as Exclude<Mode, null>, on: generalSettings.enableCaricatura !== false, title: 'Caricatura con Messi', text: '¡Festejá con Messi! Tu caricatura con la camiseta argentina.', img: themes.find((t: any) => t.result_style === 'caricatura')?.preview_url || '/modes/caricatura.jpg', icon: Palette, color: '#fb923c', ai: true },
@@ -1005,7 +1012,7 @@ The subject must perfectly match the facial features and gender of the reference
               <div className="relative w-full aspect-[16/10] bg-black/40 overflow-hidden">
                 <img src={m.img} alt="" loading="lazy" className={`absolute inset-0 w-full h-full object-cover ${m.cover ? 'object-top' : 'object-center'}`} />
                 <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/70 to-transparent" />
-                <span className={`absolute top-2 left-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider shadow-lg ${m.ai ? 'bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7] text-white' : 'bg-white/90 text-black'}`}>
+                <span className={`absolute bottom-2 right-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider shadow-lg ${m.ai ? 'bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7] text-white' : 'bg-white/90 text-black'}`}>
                   {m.ai ? '✨ Con IA' : 'Foto real'}
                 </span>
                 <m.icon className="absolute bottom-2 left-3 w-9 h-9 drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)]" style={{ color: m.color }} />
