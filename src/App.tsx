@@ -13,6 +13,7 @@ import KioskBox from "./pages/kiosk-box/KioskBox";
 import KioskBoxSettings from "./pages/kiosk-box/KioskBoxSettings";
 import KioskGallery from "./pages/kiosk-box/KioskGallery";
 import KioskAdmin from "./pages/admin/KioskAdmin";
+import KioskScreensaver from "./components/kiosk/KioskScreensaver";
 import RotatedScreen from "./components/kiosk/RotatedScreen";
 import GuestPhoto from "./pages/GuestPhoto";
 import Display from "./pages/Display";
@@ -56,6 +57,7 @@ const App = () => (
         <Toaster />
         <BrowserRouter>
           <RotatedScreen>
+          <KioskScreensaver />
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/usuarios" element={<DisplayUserLogin />} />

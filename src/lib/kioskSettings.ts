@@ -79,6 +79,10 @@ export interface KioskGeneralSettings {
   enableGallery?: boolean;
   /** Carpeta del equipo donde se guardan las fotos (vacío = nombre del evento) */
   localFolder?: string;
+  /** Protector de pantalla con el logo animado (por defecto sí) */
+  screensaver?: boolean;
+  /** Minutos sin tocar nada para que aparezca el protector (por defecto 5) */
+  screensaverMinutes?: number;
   /** Texto chico del marco de vidrio (el grande es siempre eventTitle) */
   frameSubtitle?: string;
   [key: string]: unknown;
