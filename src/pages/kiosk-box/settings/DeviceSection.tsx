@@ -6,7 +6,7 @@ import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import {
   checkinDevice, getCachedDeviceState, getVipAppPackage, listInstalledApps, openWifiSettings,
-  setBoxPin, setVipAppPackage, type KioskDeviceState,
+  renameDevice, setBoxPin, setVipAppPackage, type KioskDeviceState,
 } from '@/lib/kioskDevice';
 import { eventFolder } from '@/lib/kioskStorage';
 import { formatArs, getCachedStore, loadStore, whatsappLink } from '@/lib/kioskStore';
@@ -20,6 +20,8 @@ export default function DeviceSection() {
   const [version, setVersion] = useState('');
   const [store, setStore] = useState(getCachedStore);
   const [refreshing, setRefreshing] = useState(false);
+  const [newName, setNewName] = useState(getCachedDeviceState()?.name || '');
+  const [savingName, setSavingName] = useState(false);
   const refresh = async () => {
     setRefreshing(true);
     try { setDevice(await checkinDevice()); } catch { toast.error('Sin conexión: se muestra el último saldo conocido'); }
@@ -27,12 +29,29 @@ export default function DeviceSection() {
   };
 
   useEffect(() => {
-    checkinDevice().then(setDevice).catch(() => { /* sin conexión: queda el último estado */ });
+    checkinDevice().then(d => { setDevice(d); setNewName(d.name || ''); }).catch(() => { /* sin conexión: queda el último estado */ });
     loadStore().then(setStore).catch(() => { /* sin conexión: precios guardados */ });
     if (Capacitor.isNativePlatform()) {
       CapacitorApp.getInfo().then(info => setVersion(`${info.version} (${info.build})`)).catch(() => {});
     }
   }, []);
+
+  const saveName = async () => {
+    const name = newName.trim().replace(/\s+/g, ' ');
+    if (name.length > 60) { toast.error('El nombre puede tener hasta 60 caracteres'); return; }
+    setSavingName(true);
+    try {
+      const saved = await renameDevice(name);
+      setDevice(d => d ? { ...d, name: saved } : d);
+      setNewName(saved || '');
+      toast.success(saved ? `Equipo renombrado: ${saved}` : 'Se quitó el nombre del equipo');
+    } catch (e) {
+      toast.error(e instanceof Error && /no autorizado/i.test(e.message)
+        ? 'El equipo todavía no está registrado: conectalo a internet y probá de nuevo'
+        : `No se pudo cambiar el nombre${navigator.onLine ? `: ${e instanceof Error ? e.message : ''}` : ' (sin internet)'}`);
+    }
+    setSavingName(false);
+  };
 
   const savePin = () => {
     if (!/^\d{4,8}$/.test(newPin)) {
@@ -49,11 +68,18 @@ export default function DeviceSection() {
       <CreditsPanel credits={device?.aiCredits ?? null} account={device?.accountName ?? null} deviceCode={device?.deviceCode || ''}
         store={store} refreshing={refreshing} onRefresh={refresh} />
 
-      <Panel title="Este equipo" description="El nombre del evento se cambia en Pantalla de inicio: es también la carpeta de las fotos (en el equipo y en Drive).">
+      <Panel title="Este equipo" description="El nombre del equipo es para reconocerlo en el panel (por ejemplo, el local o el dueño). El nombre del evento se cambia en Pantalla de inicio: es también la carpeta de las fotos (en el equipo y en Drive).">
         <div className="grid grid-cols-3 gap-4">
           <Info label="Código" value={device?.deviceCode || '—'} mono />
           <Info label="Nombre" value={device?.name || '—'} />
           <Info label="Carpeta del evento" value={eventFolder()} />
+        </div>
+        <div className="flex gap-3">
+          <input className={inputClass} maxLength={60} placeholder="Nombre del equipo (ej. Salón Los Robles)" value={newName}
+            onChange={e => setNewName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveName(); }} />
+          <button onClick={saveName} disabled={savingName || newName.trim() === (device?.name || '')} className={`${primaryClass} disabled:opacity-40`}>
+            {savingName ? 'Guardando…' : 'Renombrar'}
+          </button>
         </div>
         {version && <p className="text-white/40">Versión de la app: {version}</p>}
       </Panel>

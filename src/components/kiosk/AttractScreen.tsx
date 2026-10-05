@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { Camera, Hand } from 'lucide-react';
 import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
+import { EventPixMark } from '@/components/kiosk/brand/EventPixLogo';
 import { nameStyleProps, type NameStyle } from '@/components/kiosk/attractStyles';
 import { listEventPhotos, readStoredPhoto } from '@/lib/kioskStorage';
 import { isAnimatedSplash, splashStyleOf, splashVideoSrc } from '@/lib/kioskSettings';
@@ -208,13 +209,19 @@ export default function AttractScreen({ splash, eventTitle, welcomeTitle, subtit
       <div className="relative z-10 h-full flex flex-col items-center justify-center gap-[4vmin] px-[6vmin] text-center">
         {eventTitle ? (
           <>
-            <p className="text-white/80 uppercase tracking-[0.5em] text-[2.2vmin] font-semibold">Photobooth</p>
+            <div className="flex items-center gap-[1.6vmin]">
+              <EventPixMark size={0} className="w-[6vmin] h-[6vmin] min-w-9 min-h-9 drop-shadow-[0_0.8vmin_2.4vmin_rgba(123,47,247,0.6)]" />
+              <p className="text-white/80 uppercase tracking-[0.5em] text-[2.2vmin] font-semibold">Photobooth</p>
+            </div>
             <h1 className={`carlmarx-bold leading-[0.95] text-[clamp(3rem,14vmin,11rem)] ${name.className} ${neonScene ? 'attract-neon' : ''}`} style={name.style}>
               {eventTitle}
             </h1>
           </>
         ) : (
-          <h1 className={`carlmarx-bold leading-[0.95] text-[clamp(3rem,13vmin,10rem)] ${name.className}`} style={name.style}>{cta}</h1>
+          <>
+            <EventPixMark size={0} className="w-[11vmin] h-[11vmin] min-w-14 min-h-14 drop-shadow-[0_1vmin_3vmin_rgba(123,47,247,0.6)]" />
+            <h1 className={`carlmarx-bold leading-[0.95] text-[clamp(3rem,13vmin,10rem)] ${name.className}`} style={name.style}>{cta}</h1>
+          </>
         )}
         {subtitle && <p className="text-white/90 text-[clamp(1.2rem,3.6vmin,2.6rem)] max-w-[80vmin]" style={{ textShadow: '0 0.4vmin 2vmin rgba(0,0,0,0.7)' }}>{subtitle}</p>}
 
