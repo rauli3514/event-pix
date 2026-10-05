@@ -72,7 +72,7 @@ RETURNS INTEGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $$
+AS $fn$
 DECLARE
     v_balance INTEGER;
 BEGIN
@@ -89,7 +89,7 @@ BEGIN
     VALUES (p_account, p_delta, p_reason, p_note, auth.uid());
     RETURN v_balance;
 END;
-$$;
+$fn$;
 REVOKE ALL ON FUNCTION public.kiosk_credits_add(UUID, INTEGER, TEXT, TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.kiosk_credits_add(UUID, INTEGER, TEXT, TEXT) TO authenticated;
 
@@ -101,7 +101,7 @@ RETURNS TABLE (ledger_id UUID, credits INTEGER)
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $$
+AS $fn$
 #variable_conflict use_column
 DECLARE
     v_device public.kiosk_devices%ROWTYPE;
@@ -126,7 +126,7 @@ BEGIN
     RETURNING id INTO v_ledger;
     RETURN QUERY SELECT v_ledger, v_balance;
 END;
-$$;
+$fn$;
 REVOKE ALL ON FUNCTION public.kiosk_ai_charge(TEXT, TEXT) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.kiosk_ai_charge(TEXT, TEXT) TO service_role;
 
@@ -136,9 +136,9 @@ RETURNS VOID
 LANGUAGE sql
 SECURITY DEFINER
 SET search_path = public
-AS $$
+AS $fn$
     UPDATE public.kiosk_credit_ledger SET job_id = p_job WHERE id = p_ledger AND reason = 'generation';
-$$;
+$fn$;
 REVOKE ALL ON FUNCTION public.kiosk_ai_set_job(UUID, TEXT) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.kiosk_ai_set_job(UUID, TEXT) TO service_role;
 
@@ -148,7 +148,7 @@ RETURNS BOOLEAN
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $$
+AS $fn$
 DECLARE
     v_gen public.kiosk_credit_ledger%ROWTYPE;
 BEGIN
@@ -165,7 +165,7 @@ BEGIN
     UPDATE public.kiosk_accounts SET credits = credits + 1 WHERE id = v_gen.account_id;
     RETURN TRUE;
 END;
-$$;
+$fn$;
 REVOKE ALL ON FUNCTION public.kiosk_ai_refund(UUID, TEXT) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.kiosk_ai_refund(UUID, TEXT) TO service_role;
 
@@ -195,7 +195,7 @@ RETURNS TABLE (
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $$
+AS $fn$
 #variable_conflict use_column
 BEGIN
     IF p_code IS NULL OR p_code !~ '^[A-Z0-9]{6}$' THEN
@@ -236,7 +236,7 @@ BEGIN
         LEFT JOIN public.kiosk_accounts a ON a.id = d.account_id
         WHERE d.device_code = p_code;
 END;
-$$;
+$fn$;
 
 REVOKE ALL ON FUNCTION public.kiosk_device_checkin(TEXT, TEXT, INTEGER, JSONB, TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.kiosk_device_checkin(TEXT, TEXT, INTEGER, JSONB, TEXT) TO anon, authenticated;

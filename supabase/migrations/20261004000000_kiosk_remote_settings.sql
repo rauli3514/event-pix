@@ -35,7 +35,7 @@ RETURNS TABLE (
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $$
+AS $fn$
 #variable_conflict use_column
 BEGIN
     IF p_code IS NULL OR p_code !~ '^[A-Z0-9]{6}$' THEN
@@ -68,7 +68,7 @@ BEGIN
         LEFT JOIN public.kiosk_events e ON e.id = d.kiosk_event_id
         WHERE d.device_code = p_code;
 END;
-$$;
+$fn$;
 
 REVOKE ALL ON FUNCTION public.kiosk_device_checkin(TEXT, TEXT, INTEGER, JSONB) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.kiosk_device_checkin(TEXT, TEXT, INTEGER, JSONB) TO anon, authenticated;
