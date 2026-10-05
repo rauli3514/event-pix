@@ -16,8 +16,6 @@ const ACTIVITY_EVENTS = ['pointerdown', 'pointermove', 'keydown', 'touchstart', 
 /** Lo que sigue al toque que despierta (soltar, click) tampoco llega a la pantalla de abajo. */
 const FOLLOW_UP_EVENTS = ['pointerup', 'mousedown', 'mouseup', 'touchend', 'click'] as const;
 
-const inFrame = (() => { try { return window.self !== window.top; } catch { return true; } })();
-
 export default function KioskScreensaver() {
   const { pathname } = useLocation();
   const [visible, setVisible] = useState(false);
@@ -26,7 +24,9 @@ export default function KioskScreensaver() {
   const lastArm = useRef(0);
   const swallowKeyUp = useRef(false);
   const wokeAt = useRef(0);
-  const counts = IDLE_PATH.test(pathname) && !inFrame;
+  // Con la pantalla girada en la web, el kiosco corre dentro del iframe girado de
+  // RotatedScreen: el protector cuenta ahí adentro (afuera no se monta)
+  const counts = IDLE_PATH.test(pathname);
 
   const show = useCallback((value: boolean) => {
     visibleRef.current = value;
@@ -45,7 +45,7 @@ export default function KioskScreensaver() {
   }, [counts, show]);
 
   useEffect(() => {
-    if (!KIOSK_PATH.test(pathname) || inFrame) return;
+    if (!KIOSK_PATH.test(pathname)) return;
     const onActivity = (e: Event) => {
       if (visibleRef.current) {
         // El toque o la tecla que despierta no tiene que apretar nada de la pantalla de abajo
