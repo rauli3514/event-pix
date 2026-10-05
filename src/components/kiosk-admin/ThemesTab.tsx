@@ -18,6 +18,7 @@ interface ThemeRow {
   preview_url: string | null;
   is_active: boolean;
   result_style?: string | null;
+  ai_model?: string | null;
   sort_order?: number | null;
 }
 
@@ -31,11 +32,20 @@ const CATEGORIES = [
   { value: 'scifi', label: '🤖 Sci-Fi' },
 ];
 
+// Modelos de fal.ai que se pueden elegir por temática (la función solo acepta estos)
+const MODELS = [
+  { value: '', label: 'Por defecto (Nano Banana · ~US$0,04)' },
+  { value: 'fal-ai/nano-banana/edit', label: 'Nano Banana · ~US$0,04' },
+  { value: 'fal-ai/nano-banana-2/edit', label: 'Nano Banana 2 · ~US$0,08' },
+  { value: 'fal-ai/flux-pro/kontext', label: 'FLUX Kontext Pro' },
+  { value: 'fal-ai/flux-pro/kontext/max', label: 'FLUX Kontext Max' },
+];
+
 const EDIT_TEMPLATE = 'Edit this photo. Keep every person exactly as they are: same face, facial features, skin tone, age, body shape, hairstyle and expression, so each one is instantly recognizable. Do not add, remove or merge people, and keep their poses. Dress them as ... Replace the background with ... Photorealistic, high detail, lighting consistent across the whole image. No text, no logos, no watermark.';
 
 /** Corre la IA con la sesión del panel (sin equipo) y espera el resultado. */
-async function runTest(imageUrl: string, prompt: string): Promise<string> {
-  const { data, error } = await supabase.functions.invoke('generate-ai-photo', { body: { imageUrl, prompt } });
+async function runTest(imageUrl: string, prompt: string, model?: string | null): Promise<string> {
+  const { data, error } = await supabase.functions.invoke('generate-ai-photo', { body: { imageUrl, prompt, ...(model ? { model } : {}) } });
   if (error || !data?.success) throw new Error(error?.message || data?.error || 'No se pudo iniciar la IA');
   let prediction = data.prediction;
   for (let i = 0; i < 60 && prediction.status !== 'succeeded' && prediction.status !== 'failed'; i++) {
@@ -127,6 +137,7 @@ function ThemeEditor({ theme, onSaved }: { theme: ThemeRow; onSaved: () => void 
     const { error } = await supabase.from('ai_themes').update({
       name: form.name.trim(), category: form.category, emoji: form.emoji, prompt: form.prompt,
       max_people: form.max_people, is_active: form.is_active,
+      ...('ai_model' in theme || form.ai_model ? { ai_model: form.ai_model || null } : {}),
     }).eq('id', theme.id);
     setSaving(false);
     if (error) toast.error(error.message);
@@ -154,7 +165,7 @@ function ThemeEditor({ theme, onSaved }: { theme: ThemeRow; onSaved: () => void 
     setRunning(true);
     setResult(null);
     try {
-      setResult(await runTest(photo, form.prompt));
+      setResult(await runTest(photo, form.prompt, form.ai_model));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e));
     } finally {
@@ -203,6 +214,9 @@ function ThemeEditor({ theme, onSaved }: { theme: ThemeRow; onSaved: () => void 
         </div>
         <Field label="Prompt (en inglés)" hint='Formato de edición: "Edit this photo. Keep every person exactly as they are… Dress them as… Replace the background with…". Así la IA conserva las caras.'>
           <textarea className={`${input} min-h-[180px] font-mono text-sm`} value={form.prompt} onChange={e => set('prompt', e.target.value)} />
+        </Field>
+        <Field label="Modelo de IA" hint="Probá la misma foto con distintos modelos y guardá el que mejor salga. Los estilos (anime, acuarela, plastilina) suelen salir mejor con FLUX Kontext.">
+          <Select value={form.ai_model ?? ''} options={MODELS} onChange={v => set('ai_model', v || null)} />
         </Field>
         {form.result_style === 'cover' && <p className="text-sm text-violet-300">Esta temática pone el resultado dentro de la tapa de revista (Portada Fashion) del equipo.</p>}
         <Check label="Activa (aparece en los equipos)" checked={form.is_active} onChange={v => set('is_active', v)} />

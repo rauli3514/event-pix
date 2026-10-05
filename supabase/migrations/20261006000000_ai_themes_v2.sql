@@ -8,6 +8,8 @@
 
 ALTER TABLE public.ai_themes ADD COLUMN IF NOT EXISTS result_style TEXT;
 ALTER TABLE public.ai_themes ADD COLUMN IF NOT EXISTS sort_order INTEGER;
+-- Modelo de fal.ai elegido para la temática (vacío = el de la función)
+ALTER TABLE public.ai_themes ADD COLUMN IF NOT EXISTS ai_model TEXT;
 ALTER TABLE public.ai_themes ADD COLUMN IF NOT EXISTS max_people INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE public.ai_themes ADD COLUMN IF NOT EXISTS emoji TEXT;
 ALTER TABLE public.ai_themes ADD COLUMN IF NOT EXISTS is_default BOOLEAN NOT NULL DEFAULT false;
