@@ -5,6 +5,36 @@ import legacy from '@vitejs/plugin-legacy'
 import path from 'path'
 import fs from 'fs'
 
+// Motor de MediaPipe (detector de caras para los accesorios del kiosco): se sirve
+// desde /mediapipe/wasm sin internet, copiado de node_modules al compilar.
+const MEDIAPIPE_FILES = ['vision_wasm_internal.js', 'vision_wasm_internal.wasm', 'vision_wasm_nosimd_internal.js', 'vision_wasm_nosimd_internal.wasm'];
+const mediapipeWasm = () => {
+  const dir = path.resolve(__dirname, 'node_modules/@mediapipe/tasks-vision/wasm');
+  let emitted = false;
+  return {
+    name: 'mediapipe-wasm',
+    configureServer(server: { middlewares: { use: (fn: (req: { url?: string }, res: { setHeader: (k: string, v: string) => void; end: (b: Buffer) => void }, next: () => void) => void) => void } }) {
+      server.middlewares.use((req, res, next) => {
+        const m = req.url?.match(/^\/mediapipe\/wasm\/([\w.]+)$/);
+        if (m && MEDIAPIPE_FILES.includes(m[1])) {
+          res.setHeader('Content-Type', m[1].endsWith('.wasm') ? 'application/wasm' : 'text/javascript');
+          res.end(fs.readFileSync(path.join(dir, m[1])));
+          return;
+        }
+        next();
+      });
+    },
+    // Se copia al terminar (el plugin legacy descarta lo emitido en una de sus pasadas)
+    writeBundle(options: { dir?: string }) {
+      if (emitted || !options.dir) return;
+      emitted = true;
+      const out = path.join(options.dir, 'mediapipe/wasm');
+      fs.mkdirSync(out, { recursive: true });
+      for (const f of MEDIAPIPE_FILES) fs.copyFileSync(path.join(dir, f), path.join(out, f));
+    },
+  };
+};
+
 // https://vitejs.dev/config/
 export default defineConfig({
   server: {
@@ -18,6 +48,7 @@ export default defineConfig({
     }
   },
   plugins: [
+    mediapipeWasm(),
     react(),
     legacy({
       targets: ['chrome >= 49', 'android >= 5', 'safari >= 9'],

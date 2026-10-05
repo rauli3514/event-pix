@@ -9,6 +9,12 @@ import AdminDashboard from "./pages/AdminDashboard";
 import ProvidersList from "./pages/ProvidersList";
 import KioskManager from "./pages/KioskManager";
 import KioskAI from "./pages/KioskAI";
+import KioskBox from "./pages/kiosk-box/KioskBox";
+import KioskBoxSettings from "./pages/kiosk-box/KioskBoxSettings";
+import KioskGallery from "./pages/kiosk-box/KioskGallery";
+import KioskAdmin from "./pages/admin/KioskAdmin";
+import RotatedScreen from "./components/kiosk/RotatedScreen";
+import GuestPhoto from "./pages/GuestPhoto";
 import Display from "./pages/Display";
 import Login from "./pages/Login";
 import DisplayUserLogin from "./pages/DisplayUserLogin";
@@ -49,6 +55,7 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <BrowserRouter>
+          <RotatedScreen>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/usuarios" element={<DisplayUserLogin />} />
@@ -56,13 +63,24 @@ const App = () => (
             <Route path="/intelligence/login" element={<IntelligenceLogin />} />
 
             <Route path="/kiosco" element={<KioskAI />} />
+            {/* App dedicada de la TV box (sin login; ajustes con PIN en el equipo) */}
+            <Route path="/box" element={<KioskBox />} />
+            <Route path="/box/ajustes" element={<KioskBoxSettings />} />
+            <Route path="/box/galeria" element={<KioskGallery />} />
+            {/* Página pública del QR del kiosco: el invitado baja o comparte su foto */}
+            <Route path="/foto" element={<GuestPhoto />} />
+            {/* Atajo al panel de kioscos */}
+            <Route path="/kioscos" element={<Navigate to="/admin/kioscos" replace />} />
             <Route path="/sticker-test" element={<div className="min-h-screen bg-zinc-950 pt-10"><StickerEditor userPhotoUrl="/placeholder-user.jpg" onSave={(url) => console.log(url)} onCancel={() => console.log("cancel")} /></div>} />
 
             <Route element={<EventProvider><Outlet /></EventProvider>}>
               <Route element={<ProtectedRoute />}>
                 <Route path="/admin" element={<AdminDashboard />} />
                 <Route path="/admin/providers" element={<ProvidersList />} />
-                <Route path="/admin/kiosco-manager" element={<KioskManager />} />
+                {/* El kiosco viejo (Kiosco IA Global) se reemplazó por el panel de kioscos */}
+                <Route path="/admin/kiosco-manager" element={<Navigate to="/admin/kioscos" replace />} />
+                <Route path="/admin/kiosco-anterior" element={<KioskManager />} />
+                <Route path="/admin/kioscos" element={<KioskAdmin />} />
                 <Route path="/admin/display" element={<DisplayHubMain />} />
                 <Route path="/intelligence" element={<ErrorBoundary><IntelligenceCanvasPage /></ErrorBoundary>} />
                 <Route path="/admin/intelligence" element={<ErrorBoundary><IntelligenceCanvasPage /></ErrorBoundary>} />
@@ -103,11 +121,14 @@ const App = () => (
 
             {/* 
               VITE_APP_FLAVOR=mobile → celular (va a /usuarios)
+              VITE_APP_FLAVOR=kiosk → app dedicada del kiosco (va a /box)
               VITE_APP_FLAVOR=tv (default) → Tanix (va al /tv-boot)
             */}
             <Route path="/" element={<Navigate to={
               Capacitor.isNativePlatform() && import.meta.env.VITE_APP_FLAVOR === 'mobile'
                 ? "/usuarios"
+                : Capacitor.isNativePlatform() && import.meta.env.VITE_APP_FLAVOR === 'kiosk'
+                ? "/box"
                 : Capacitor.isNativePlatform()
                   ? "/tv-boot"
                   : "/usuarios"
@@ -115,6 +136,7 @@ const App = () => (
 
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </RotatedScreen>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>

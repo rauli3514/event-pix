@@ -27,3 +27,8 @@ const urlToUse = isConfigured ? supabaseUrl : 'https://placeholder.supabase.co';
 const keyToUse = isConfigured ? supabaseAnonKey : 'placeholder';
 
 export const supabase = createClient(urlToUse, keyToUse);
+
+/** Si esta versión se compiló con las claves de Supabase (en Vercel: variables de entorno). */
+export const isSupabaseConfigured = Boolean(isConfigured);
+/** Proyecto de Supabase al que apunta esta versión (para diagnosticar). */
+export const supabaseProjectRef = isConfigured ? new URL(urlToUse).hostname.split('.')[0] : null;

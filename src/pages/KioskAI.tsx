@@ -1,9 +1,34 @@
 import { useState, useRef, useEffect } from 'react'; // Kiosk AI Optimized Flow
-import { useSearchParams } from 'react-router-dom';
-import { Printer, Users, Sparkles, Trophy, QrCode, Instagram, Palette, Sticker } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Printer, Users, Sparkles, Trophy, QrCode, Loader2, Images, Crown, Instagram, Palette, Sticker, Home, Lock, LockOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
+import { printKioskPhoto } from '@/lib/kioskPrint';
 import { StickerEditor } from '@/components/stickers/StickerEditor';
+import { useRemoteFocus } from '@/hooks/use-remote-focus';
+import { openCameraStream, stopStream } from '@/lib/kioskCamera';
+import { getFrameUrl, getSectionLock, setSectionLock } from '@/lib/kioskSettings';
+import PinDialog from '@/components/kiosk/PinDialog';
+import { backupPhoto, type SavedPhoto } from '@/lib/kioskStorage';
+import { composePhotos, type PageOrientation } from '@/lib/photoLayout';
+import { coverOptionsFrom, renderMagazineCover } from '@/lib/magazineCover';
+import { applyFx, BUILT_IN_ACCESSORIES, COLOR_FILTERS, type FxChoice } from '@/lib/faceFx';
+import AttractScreen from '@/components/kiosk/AttractScreen';
+import FrameChooser from '@/components/kiosk/FrameChooser';
+import NextShot from '@/components/kiosk/NextShot';
+import CameraVideo from '@/components/kiosk/CameraVideo';
+import GuestNameScreen from '@/components/kiosk/GuestNameScreen';
+import { isDriveConfigured, queueForDrive, startDriveSync, uploadForShare } from '@/lib/driveBackup';
+import { guestPhotoUrl } from '@/lib/kioskShare';
+import { startDeviceSync } from '@/lib/kioskDevice';
+import { REMOTE_APPLIED_EVENT } from '@/lib/kioskRemote';
+import { guestFrameOptions, type FrameOption } from '@/lib/frameOptions';
+import { motion } from 'framer-motion';
+import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
+import ScreenBackground from '@/components/kiosk/ScreenBackground';
+import { getPageBackground, getScreenBackground } from '@/lib/kioskMedia';
+import { AIProcessing, CameraFlash, CountdownRing } from '@/components/kiosk/KioskAnimations';
+import { revealPhoto, useConfettiBurst } from '@/components/kiosk/kioskEffects';
 
 // ---- Types ----
 type Step =
@@ -12,7 +37,10 @@ type Step =
   | 'getReady'
   | 'lookCamera'
   | 'countdown'
+  | 'nextShot'
+  | 'guestName'
   | 'photoPreview'
+  | 'frameSelect'
   | 'flashResult'
   | 'themeSelect'
   | 'mundialCountry'
@@ -21,7 +49,7 @@ type Step =
   | 'stickerEditor'
   | 'result';
 
-type Mode = 'selfie' | 'retrato' | 'mundial' | 'caricatura' | 'figuritas' | null;
+type Mode = 'selfie' | 'portada' | 'retrato' | 'mundial' | 'caricatura' | 'figuritas' | null;
 
 // ---- Mundial Data ----
 const COUNTRIES = [
@@ -132,12 +160,24 @@ const Corners = () => (
 
 export default function KioskAI() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const kioskEventId = searchParams.get('event');
+  // Desde la app de la TV box: ?modes=selfie (Fotos) o ?modes=ai (Fotos IA), y ?home=1
+  // muestra el botón para volver al inicio de la app
+  const modesParam = searchParams.get('modes');
+  const showHomeButton = searchParams.get('home') === '1';
+  // "Fotos" = selfie y Portada Fashion (sin IA); "Fotos IA" = el resto
+  const isPhotoMode = (m: Exclude<Mode, null>) => m === 'selfie' || m === 'portada';
+  const isModeAllowed = (m: Exclude<Mode, null>) => {
+    if (offlineMode && !isPhotoMode(m)) return false; // las experiencias IA necesitan internet
+    return modesParam === 'selfie' ? isPhotoMode(m) : modesParam === 'ai' ? !isPhotoMode(m) : true;
+  };
 
   const [step, setStep] = useState<Step>('splash');
   const [mode, setMode] = useState<Mode>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const capturedImageState = capturedImage;
   const [lastPublicUrl, setLastPublicUrl] = useState<string | null>(null);
   const [resultPhrase, setResultPhrase] = useState('');
   const [isAIGenerating, setIsAIGenerating] = useState(false);
@@ -150,9 +190,23 @@ export default function KioskAI() {
   const [showKeyboard, setShowKeyboard] = useState(false);
   const [themes, setThemes] = useState<any[]>([]);
   const [frameUrl, setFrameUrl] = useState<string | null>(null);
+  // Marcos para que elija el invitado (se fijan al entrar a la pantalla)
+  const [frameChoices, setFrameChoices] = useState<FrameOption[]>([]);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
   const [selectedAITheme, setSelectedAITheme] = useState<any>(null);
 
 
+
+  // Control remoto de la TV box: las flechas recorren los botones de cada pantalla
+  const bodyRef = useRef<HTMLElement>(document.body);
+  const splashEnterRef = useRef(false);
+  // Candado: bloquea esta sección (no se puede volver al inicio); se abre con la clave
+  const [locked, setLocked] = useState(() => !!getSectionLock());
+  const [unlockOpen, setUnlockOpen] = useState(false);
+  // Toma original de la cámara, para respaldarla junto a la foto final
+  const originalShotRef = useRef<string | null>(null);
+  useRemoteFocus(bodyRef, [step], !unlockOpen);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -172,6 +226,8 @@ export default function KioskAI() {
     try { return JSON.parse(localStorage.getItem('kiosk_general_settings') || '{}'); }
     catch { return {}; }
   })();
+  // Sin conexión: solo foto, marco, impresión y respaldo en el equipo (sin IA, QR ni subidas)
+  const offlineMode = !!generalSettings.offline;
 
   // Fullscreen effect fallback
   useEffect(() => {
@@ -193,22 +249,24 @@ export default function KioskAI() {
     }
   }, [step]);
 
+  // Checkin cada minuto (el panel lo ve en línea) y cambios mandados desde el panel:
+  // los ajustes se leen en cada render, así que alcanza con volver a dibujar
+  const [, setRemoteTick] = useState(0);
+  useEffect(() => {
+    const stop = startDeviceSync();
+    const onApplied = () => setRemoteTick(t => t + 1);
+    window.addEventListener(REMOTE_APPLIED_EVENT, onApplied);
+    return () => {
+      stop();
+      window.removeEventListener(REMOTE_APPLIED_EVENT, onApplied);
+    };
+  }, []);
+
   // Load themes + frame
   useEffect(() => {
-    const loadFrame = () => {
-      const savedFrame = localStorage.getItem('kiosk_frame_url');
-      if (savedFrame === 'none') {
-        setFrameUrl(null);
-      } else if (savedFrame) {
-        setFrameUrl(savedFrame);
-      } else {
-        // Fallback to legacy Supabase frame if nothing in localStorage
-        (async () => {
-              const { data: fd } = supabase.storage.from('photos').getPublicUrl('kiosk_frame.png');
-          if (fd?.publicUrl) setFrameUrl(fd.publicUrl);
-        })();
-      }
-    };
+    // El marco es solo el elegido en Ajustes del equipo (sin elegir = sin marco).
+    // Antes, sin elección, se usaba un kiosk_frame.png viejo de Supabase que no se veía en Ajustes.
+    const loadFrame = () => setFrameUrl(getFrameUrl());
 
     loadFrame();
     window.addEventListener('kiosk-frame-changed', loadFrame);
@@ -228,20 +286,9 @@ export default function KioskAI() {
 
   // Camera management
   const startCamera = async () => {
+    setCameraError(null);
     try {
-      const constraints: MediaStreamConstraints = {
-        video: {
-          deviceId: cameraSettings.deviceId && cameraSettings.deviceId !== 'default'
-            ? { exact: cameraSettings.deviceId }
-            : undefined,
-          width: { ideal: 1920, min: 1280 },
-          height: { ideal: 1080, min: 720 },
-          aspectRatio: { ideal: 1.7777777778 }, // Forzamos 16:9 si es posible para mejor calidad
-          frameRate: { ideal: 30 }
-        },
-        audio: false,
-      };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      const stream = await openCameraStream(cameraSettings.deviceId);
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -252,40 +299,150 @@ export default function KioskAI() {
           });
         };
       }
-    } catch {
-      console.error('Camera access failed');
+      setCameraReady(true);
+    } catch (err) {
+      setCameraError(err instanceof Error ? err.message : String(err));
     }
   };
 
   const stopCamera = () => {
-    streamRef.current?.getTracks().forEach(t => t.stop());
+    stopStream(streamRef.current);
     streamRef.current = null;
+    setCameraReady(false);
   };
 
+  // La cámara queda prendida entre "Mirá a la cámara" y la cuenta regresiva
+  const cameraActive = step === 'lookCamera' || step === 'countdown' || step === 'nextShot';
   useEffect(() => {
-    if (step === 'lookCamera' || step === 'countdown') startCamera();
+    if (cameraActive) startCamera();
     else stopCamera();
     return () => stopCamera();
-  }, [step]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cameraActive]);
 
-  // Temporizador automático para pasar de "Mirá a la cámara" a "Cuenta regresiva"
+  // El video se monta de nuevo en cada pantalla: se le vuelve a conectar la cámara
   useEffect(() => {
-    if (step === 'lookCamera') {
+    if (cameraActive && streamRef.current && videoRef.current && videoRef.current.srcObject !== streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+    }
+  }, [step, cameraActive]);
+
+  // "Mirá a la cámara" pasa a la cuenta regresiva recién cuando la cámara anda
+  useEffect(() => {
+    if (step === 'lookCamera' && cameraReady) {
+      // Toma nueva (o "Repetir"): se descartan las fotos anteriores
+      shotsRef.current = [];
+      rawShotsRef.current = [];
+      setShotCount(0);
+      // Con efectos, el invitado los prueba en vivo y toca "¡Sacar foto!"
+      if (fxEnabled) return;
       const t = setTimeout(() => startCountdown(), 2500);
       return () => clearTimeout(t);
     }
-  }, [step]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, cameraReady]);
+
+  useConfettiBurst(step === 'result');
+  useEffect(() => { startDriveSync(); }, []);
+
+  // Vuelve solo al inicio si nadie toca nada mientras ve su foto o la pantalla de
+  // imprimir (Ajustes → Resultado y tiempos; 30 s si no se configuró)
+  const resultTimeout = generalSettings.resultTimeout === undefined ? 30 : Number(generalSettings.resultTimeout) || 0;
+  useEffect(() => {
+    const photoSteps: Step[] = ['photoPreview', 'frameSelect', 'flashResult', 'result'];
+    if (resultTimeout <= 0 || !photoSteps.includes(step)) return;
+    let t = setTimeout(() => resetKiosk(), resultTimeout * 1000);
+    const restart = () => {
+      clearTimeout(t);
+      t = setTimeout(() => resetKiosk(), resultTimeout * 1000);
+    };
+    const events = ['pointerdown', 'keydown', 'touchstart'] as const;
+    events.forEach(e => window.addEventListener(e, restart));
+    return () => {
+      clearTimeout(t);
+      events.forEach(e => window.removeEventListener(e, restart));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, resultTimeout]);
+
+  // Sin actividad en las pantallas de elección, vuelve al inicio
+  const idleTimeout = Number(generalSettings.idleTimeout) || 0;
+  useEffect(() => {
+    const idleSteps: Step[] = ['modeSelect', 'themeSelect', 'mundialCountry', 'mundialInfo', 'lookCamera'];
+    if (idleTimeout <= 0 || !idleSteps.includes(step)) return;
+    let t = setTimeout(() => resetKiosk(), idleTimeout * 1000);
+    const restart = () => {
+      clearTimeout(t);
+      t = setTimeout(() => resetKiosk(), idleTimeout * 1000);
+    };
+    const events = ['pointerdown', 'keydown', 'touchstart'] as const;
+    events.forEach(e => window.addEventListener(e, restart));
+    return () => {
+      clearTimeout(t);
+      events.forEach(e => window.removeEventListener(e, restart));
+    };
+  }, [step, idleTimeout]);
 
   // Go to mode after splash
   const handleSplashTap = () => {
     if (generalSettings.autoFullscreen && !document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(() => {});
     }
+    // Con un solo modo posible (p. ej. "Fotos" = selfie) se saltea la elección
+    if (modesParam === 'selfie' && generalSettings.enablePortada !== true) {
+      handleModeSelect('selfie');
+      return;
+    }
     setStep('modeSelect');
   };
 
+  const toggleLock = () => {
+    if (locked) {
+      setUnlockOpen(true);
+      return;
+    }
+    setSectionLock(modesParam || 'all');
+    setLocked(true);
+    toast.success('Sección bloqueada. Para salir tocá el candado y poné la clave.');
+  };
+
+  const unlockDialog = unlockOpen && (
+    <PinDialog
+      title="Clave para desbloquear"
+      onCancel={() => setUnlockOpen(false)}
+      onSuccess={() => {
+        setSectionLock(null);
+        setLocked(false);
+        setUnlockOpen(false);
+      }}
+    />
+  );
+
+  const homeButton = showHomeButton && (
+    <div className="absolute top-6 left-6 z-30 flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+      {!locked && (
+        <button
+          onClick={() => navigate('/box')}
+          className="flex items-center gap-2 px-5 py-3 rounded-full bg-black/50 border border-white/20 text-white/80 hover:text-white hover:bg-black/70 focus:outline-none focus:ring-4 focus:ring-white/70"
+        >
+          <Home className="w-5 h-5" /> Inicio
+        </button>
+      )}
+      <button
+        onClick={toggleLock}
+        aria-label={locked ? 'Desbloquear sección' : 'Bloquear sección'}
+        className={`w-12 h-12 rounded-full flex items-center justify-center border focus:outline-none focus:ring-4 focus:ring-white/70 ${locked ? 'bg-black/30 border-white/10 text-white/40' : 'bg-black/50 border-white/20 text-white/80 hover:text-white'}`}
+      >
+        {locked ? <Lock className="w-5 h-5" /> : <LockOpen className="w-5 h-5" />}
+      </button>
+      {unlockDialog}
+    </div>
+  );
+
+
   const handleModeSelect = (m: Mode) => {
     setMode(m);
+    setFx({});
     if (m === 'mundial' || m === 'figuritas') {
       setStep('mundialCountry');
     } else {
@@ -304,65 +461,151 @@ export default function KioskAI() {
   };
 
   // Countdown + capture
+  const countdownTimerRef = useRef<number | null>(null);
   const startCountdown = () => {
     setStep('countdown');
     const timer = cameraSettings.timer || 5;
-    setCountdown(timer);
-    const interval = setInterval(() => {
-      setCountdown(prev => {
-        if (prev === null || prev <= 1) {
-          clearInterval(interval);
-          capturePhoto();
-          return null;
-        }
-        return prev - 1;
-      });
+    // La foto se saca fuera del actualizador de estado: React puede ejecutarlo dos veces
+    let left = timer;
+    setCountdown(left);
+    if (countdownTimerRef.current) window.clearInterval(countdownTimerRef.current);
+    countdownTimerRef.current = window.setInterval(() => {
+      left -= 1;
+      if (left <= 0) {
+        window.clearInterval(countdownTimerRef.current!);
+        countdownTimerRef.current = null;
+        setCountdown(null);
+        capturePhoto();
+      } else {
+        setCountdown(left);
+      }
     }, 1000);
   };
+
+  // Filtro de color y accesorio que elige el invitado después de la foto (Fotos y Portada)
+  // Se elige en vivo antes de sacar la foto; la foto sale con el efecto aplicado
+  const [fx, setFx] = useState<FxChoice>({});
+  const fxRef = useRef<FxChoice>({});
+  useEffect(() => { fxRef.current = fx; }, [fx]);
+  const isFxActive = (c: FxChoice) => (!!c.filter && c.filter !== 'none') || (!!c.accessory && c.accessory !== 'none');
+  const fxEnabled = (mode === 'selfie' || mode === 'portada') && !!(generalSettings.enableFilters || generalSettings.enableAccessories);
+  // Tomas sin efecto, para el respaldo de originales
+  const rawShotsRef = useRef<string[]>([]);
+
+  // Varias fotos por toma (solo Fotos/selfie): Ajustes → Experiencias y marco → Diseño de la foto
+  const shotsRef = useRef<string[]>([]);
+  const [shotCount, setShotCount] = useState(0);
+  const shotsWanted = () => (mode === 'selfie' ? Math.min(4, Math.max(1, Number(generalSettings.photoShots) || 1)) : 1);
 
   const capturePhoto = () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
 
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
+    const vw = video.videoWidth || 1280;
+    const vh = video.videoHeight || 720;
+    const rot = ((Number(cameraSettings.rotation) || 0) % 360 + 360) % 360;
+    // Con la cámara girada 90°/270° la foto queda vertical: se intercambian ancho y alto
+    const sideways = rot === 90 || rot === 270;
+    canvas.width = sideways ? vh : vw;
+    canvas.height = sideways ? vw : vh;
     const ctx = canvas.getContext('2d')!;
-
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     if (cameraSettings.mirror) {
       ctx.translate(canvas.width, 0);
       ctx.scale(-1, 1);
     }
-    const rot = cameraSettings.rotation || 0;
-    if (rot !== 0) {
-      ctx.translate(canvas.width / 2, canvas.height / 2);
-      ctx.rotate((rot * Math.PI) / 180);
-      ctx.translate(-canvas.width / 2, -canvas.height / 2);
-    }
-    ctx.drawImage(video, 0, 0);
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate((rot * Math.PI) / 180);
+    ctx.drawImage(video, -vw / 2, -vh / 2, vw, vh);
 
     // Play shutter sound
-    try { new Audio('/kiosk-camera-sound.mp3').play(); } catch {}
+    try { new Audio('/kiosk-camera-sound.mp3').play(); } catch { /* sin sonido */ }
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
-    setCapturedImage(dataUrl);
+    rawShotsRef.current = [...rawShotsRef.current, dataUrl];
+    shotsRef.current = [...shotsRef.current, dataUrl];
+    setShotCount(shotsRef.current.length);
+    if (shotsRef.current.length < shotsWanted()) {
+      // Falta otra: pausa para prepararse (Ajustes → Diseño de la foto) y otra cuenta regresiva
+      setTimeout(() => setStep('nextShot'), 700);
+      return;
+    }
+    originalShotRef.current = dataUrl;
+    const chosen = fxRef.current;
+    if (fxEnabled && isFxActive(chosen)) {
+      // Efecto elegido en vivo: se aplica a resolución completa a todas las tomas
+      setStep('processing');
+      Promise.all(shotsRef.current.map(src => applyFx(src, chosen)))
+        .then(done => { shotsRef.current = done; })
+        .catch(e => console.error('No se pudo aplicar el efecto', e))
+        .finally(() => {
+          setCapturedImage(shotsRef.current[0]);
+          setStep('photoPreview');
+        });
+      return;
+    }
+    setCapturedImage(shotsRef.current[0]);
     // Always go to preview first — user can approve or retake
     setStep('photoPreview');
   };
 
   const savePhotoToAlbum = async (dataUrl: string): Promise<string | null> => {
-    if (!kioskEventId) return null;
+    // Respaldo en el equipo (original + final), siempre: con o sin evento e internet
+    let saved: SavedPhoto[] = [];
+    try {
+      saved = await backupPhoto(dataUrl, rawShotsRef.current.length ? rawShotsRef.current : originalShotRef.current, mode || 'foto');
+    } catch (e) {
+      console.error('No se pudo guardar la foto en el equipo', e);
+      toast.error('No se pudo guardar la foto en el equipo');
+    }
+    const wantsQr = !offlineMode && generalSettings.showQr !== false;
+
+    // QR con Drive (destino único): se sube ya la foto final y queda visible con el link
+    let driveRef: string | null = null;
+    if (wantsQr && !generalSettings.cloudSupabase && isDriveConfigured() && saved[0]) {
+      try {
+        driveRef = `drive:${await uploadForShare(dataUrl, saved[0].name, saved[0].folder)}`;
+      } catch (e) {
+        console.error(e);
+        toast.error('No se pudo subir la foto a Drive: el QR no va a estar disponible');
+      }
+    }
+    queueForDrive(saved); // el resto (originales, o la final si falló) se sube a Drive cuando hay internet
+    if (driveRef || !wantsQr) return driveRef;
+
+    // Supabase: solo si está activado en Compartir y nube (y el equipo tiene evento)
+    if (!generalSettings.cloudSupabase || !kioskEventId) return null;
     try {
       const blob = await (await fetch(dataUrl)).blob();
       const fileName = `kiosk_sessions/${kioskEventId}/${Date.now()}.jpg`;
-      await supabase.storage.from('photos').upload(fileName, blob, { contentType: 'image/jpeg' });
+      const { error: uploadError } = await supabase.storage.from('photos').upload(fileName, blob, { contentType: 'image/jpeg' });
+      if (uploadError) throw uploadError;
       const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(fileName);
       await supabase.from('kiosk_photos').insert([{ kiosk_event_id: kioskEventId, image_url: publicUrl }]);
       return publicUrl;
     } catch (e) { 
       console.error(e);
+      toast.error('No se pudo subir la foto: el QR no va a estar disponible');
       return null;
     }
+  };
+
+
+  // Guarda y sube la foto final en segundo plano: el invitado ve su foto enseguida
+  // y el QR aparece cuando termina la subida
+  const photoSessionRef = useRef(0);
+  const [uploading, setUploading] = useState(false);
+  const finishPhoto = (finalImage: string) => {
+    const session = ++photoSessionRef.current;
+    setCapturedImage(finalImage);
+    setLastPublicUrl(null);
+    setUploading(true);
+    savePhotoToAlbum(finalImage).then(url => {
+      if (photoSessionRef.current !== session) return;
+      setLastPublicUrl(url);
+      setUploading(false);
+    });
   };
 
   const runAI = async (imageDataUrl: string, theme: any) => {
@@ -460,6 +703,12 @@ The subject must perfectly match the facial features and gender of the reference
       setStep('result');
     } catch (e: any) {
       console.error(e);
+      // Sin saldo o sin servicio de IA: mensaje para el invitado y vuelta al menú
+      if (/credit|billing|payment|insufficient|quota|402|429/i.test(String(e?.message || ''))) {
+        toast.error('La magia con IA no está disponible en este momento. ¡Probá con Fotos!', { duration: 6000 });
+        setStep('modeSelect');
+        return;
+      }
       toast.error(e.message || 'Error al procesar la foto');
       if (mode === 'figuritas') {
         setStep('modeSelect'); // Volver al inicio si falla la figurita
@@ -471,49 +720,21 @@ The subject must perfectly match the facial features and gender of the reference
     }
   };
 
-  const mergeImages = (base: string, frame: string | null): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d')!;
-      canvas.width = 1200;
-      canvas.height = 1800;
-
-      const img = new Image(); img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        const imgAspect = img.width / img.height;
-        const canvasAspect = canvas.width / canvas.height;
-        let sx, sy, sw, sh;
-
-        if (imgAspect > canvasAspect) {
-          sw = img.height * canvasAspect;
-          sh = img.height;
-          sx = (img.width - sw) / 2;
-          sy = 0;
-        } else {
-          sw = img.width;
-          sh = img.width / canvasAspect;
-          sx = 0;
-          sy = (img.height - sh) / 2;
-        }
-
-        // Aplicamos un pequeño "zoom out" artificial si es posible para no quedar tan cerca
-        ctx.fillStyle = 'black';
-        ctx.fillRect(0,0, canvas.width, canvas.height);
-        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-        
-        if (!frame) return resolve(canvas.toDataURL('image/jpeg', 0.95));
-        
-        const fi = new Image(); fi.crossOrigin = 'anonymous';
-        fi.onload = () => { 
-          ctx.drawImage(fi, 0, 0, canvas.width, canvas.height); 
-          resolve(canvas.toDataURL('image/jpeg', 0.95)); 
-        };
-        fi.onerror = () => resolve(canvas.toDataURL('image/jpeg', 0.95));
-        fi.src = frame;
-      };
-      img.onerror = reject;
-      img.src = base;
+  const mergeImages = async (base: string, frame: string | null): Promise<string> => {
+    // Hoja final: vertical u horizontal según la foto, con una o varias fotos.
+    // El marco lleva siempre el nombre del evento de "Pantalla de inicio", nunca el del equipo.
+    const multi = mode === 'selfie' && shotsRef.current.length > 1;
+    return composePhotos(multi ? shotsRef.current : [base], {
+      frame,
+      orientation: (generalSettings.photoOrientation as PageOrientation) || 'auto',
+      strips: !!generalSettings.photoStrips,
+      title: generalSettings.eventTitle || undefined,
+      subtitle: generalSettings.frameSubtitle || undefined,
+      guestName: mode === 'selfie' ? guestNameRef.current || undefined : undefined,
+      // Fondo de la hoja subido en Ajustes (detrás de las fotos)
+      background: generalSettings.pageBackground ? await getPageBackground() : null,
     });
+  };
 
   // Build World Cup player card on canvas
   const buildMundialCard = (portraitUrl: string): Promise<string> =>
@@ -618,89 +839,52 @@ The subject must perfectly match the facial features and gender of the reference
       portrait.src = portraitUrl;
     });
 
-  const triggerPrint = async (imageUrl: string) => {
-    const cfg = (() => {
-      try { return JSON.parse(localStorage.getItem('kiosk_print_settings') || '{}'); }
-      catch { return {}; }
-    })();
+  const triggerPrint = (imageUrl: string) => printKioskPhoto(imageUrl);
 
-    // 1. INTENTAR IMPRESIÓN SILENCIOSA (Local Server)
-    if (cfg.selectedPrinter && cfg.selectedPrinter !== 'Impresora del Sistema (diálogo del navegador)') {
+  // Nombre que escribió el invitado (va en la foto); ref para usarlo enseguida al armarla
+  const guestNameRef = useRef('');
+
+  // Fotos (selfie): elegir marco si está habilitado, o armar la hoja directamente
+  const continueSelfie = async (photo?: string) => {
+    const capturedImage = photo ?? capturedImageState;
+    if (!capturedImage) return;
+    if (mode === 'portada') {
+      // Portada Fashion: la foto como tapa de revista con los textos de Ajustes
+      setStep('processing');
+      setResultPhrase('¡Sos la tapa del momento! 📸✨');
+      let cover = capturedImage;
       try {
-        const res = await fetch('http://localhost:3001/print', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            imageUrl: imageUrl,
-            printerName: cfg.selectedPrinter,
-            copies: cfg.copies || 1
-          })
-        });
-        
-        if (res.ok) {
-          toast.success("Impresión enviada correctamente");
-          return; // Éxito, no necesitamos abrir el diálogo del navegador
-        }
-      } catch (err) {
-        console.warn("Servidor de impresión local no disponible, usando diálogo del navegador.");
+        cover = await renderMagazineCover(capturedImage, coverOptionsFrom(generalSettings, guestNameRef.current || undefined));
+      } catch (e) {
+        console.error('No se pudo armar la portada', e);
       }
-    }
-
-    // 2. FALLBACK: DIÁLOGO DEL NAVEGADOR (Si el servidor no está o falla)
-    const pw = window.open('', '_blank', 'width=800,height=600');
-    if (!pw) {
-      toast.error("Por favor, permite las ventanas emergentes para imprimir");
+      finishPhoto(cover);
+      setStep('flashResult');
       return;
     }
-
-
-    const rotation = cfg.rotation || 0;
-    const orientation = cfg.orientation || 'portrait';
-
-    pw.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Imprimir Foto - Kiosco</title>
-          <style>
-            @page {
-              size: 4in 6in ${orientation};
-              margin: 0;
-            }
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body {
-              width: 4in;
-              height: 6in;
-              background: white;
-              overflow: hidden;
-            }
-            .print-container {
-              width: 4in;
-              height: 6in;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              ${rotation !== 0 ? `transform: rotate(${rotation}deg); transform-origin: center;` : ''}
-            }
-            img {
-              width: 100%;
-              height: 100%;
-              object-fit: cover;
-              image-rendering: -webkit-optimize-contrast;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="print-container">
-            <img src="${imageUrl}" onload="setTimeout(() => { window.print(); window.close(); }, 500)"/>
-          </div>
-        </body>
-      </html>
-    `);
-    pw.document.close();
+    const choices = guestFrameOptions();
+    if (choices.length > 1) {
+      setFrameChoices(choices);
+      setStep('frameSelect');
+      return;
+    }
+    setStep('processing'); // Show a brief processing state while merging
+    setResultPhrase(SELFIE_PHRASES[Math.floor(Math.random() * SELFIE_PHRASES.length)]);
+    let finalImage = capturedImage;
+    try {
+      finalImage = await mergeImages(capturedImage, frameUrl);
+    } catch (e) {
+      console.error("Error applying frame to selfie:", e);
+    }
+    finishPhoto(finalImage);
+    setStep('flashResult');
   };
 
   const resetKiosk = () => {
+    photoSessionRef.current++;
+    if (countdownTimerRef.current) window.clearInterval(countdownTimerRef.current);
+    setUploading(false);
+    setLastPublicUrl(null);
     setStep('splash');
     setMode(null);
     setCapturedImage(null);
@@ -713,45 +897,81 @@ The subject must perfectly match the facial features and gender of the reference
   // ─── SCREENS ────────────────────────────────────────────────
 
   if (step === 'splash') return (
-    <div className="kiosk-root" onClick={handleSplashTap} style={{ cursor: 'pointer' }}>
-      <video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover opacity-80">
-        <source src="/kiosk-animacion1.mp4" type="video/mp4" />
-      </video>
-      <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/50" />
-      <Corners />
-      <div className="relative z-10 flex flex-col items-center justify-center h-full">
-        <h1 className="carlmarx-bold text-[clamp(4rem,12vw,9rem)] text-white drop-shadow-2xl text-center leading-tight animate-pulse-slow">
-          Toca para<br />empezar
-        </h1>
-        <div className="mt-8 w-20 h-20 border-4 border-white/60 rounded-full flex items-center justify-center animate-bounce">
-          <div className="w-10 h-10 border-4 border-white rounded-full" />
-        </div>
-      </div>
+    <div
+      className="kiosk-root outline-none"
+      onClick={handleSplashTap}
+      // OK del control remoto = tocar la pantalla
+      tabIndex={0}
+      data-autofocus
+      // Al soltar OK: con keydown, la pulsación de la misma tecla caía en el botón
+      // que quedaba enfocado en la pantalla siguiente (p. ej. "Inicio"). Solo si OK
+      // se apretó acá: al entrar desde el inicio con OK, la tecla se suelta ya en esta pantalla.
+      onKeyDown={(e) => { if (e.key === 'Enter') splashEnterRef.current = true; }}
+      onKeyUp={(e) => {
+        if (e.key === 'Enter' && e.target === e.currentTarget && splashEnterRef.current) handleSplashTap();
+        splashEnterRef.current = false;
+      }}
+      style={{ cursor: 'pointer' }}
+    >
+      {homeButton}
+      {showHomeButton && generalSettings.splashGallery !== false && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            const params = new URLSearchParams({ back: `${location.pathname}${location.search}` });
+            if (modesParam === 'selfie' || modesParam === 'ai') params.set('kind', modesParam);
+            navigate(`/box/galeria?${params.toString()}`);
+          }}
+          onKeyDown={(e) => e.stopPropagation()}
+          onKeyUp={(e) => e.stopPropagation()}
+          className="absolute top-6 right-6 z-30 flex items-center gap-2 px-5 py-3 rounded-full bg-black/50 border border-white/20 text-white/80 hover:text-white hover:bg-black/70 focus:outline-none focus:ring-4 focus:ring-white/70"
+        >
+          <Images className="w-5 h-5" /> Galería
+        </button>
+      )}
+      <AttractScreen
+        splash={getScreenBackground('splash')}
+        eventTitle={generalSettings.eventTitle}
+        welcomeTitle={generalSettings.welcomeTitle}
+        subtitle={generalSettings.welcomeSubtitle}
+        nameStyle={generalSettings.nameStyle}
+      />
     </div>
   );
 
   if (step === 'modeSelect') return (
     <div className="kiosk-root">
-      <div className="absolute inset-0 bg-[#0a0a1a]" />
+      {homeButton}
+      <ScreenBackground screen="modes" />
       <Corners />
       <div className="relative z-10 flex flex-col items-center justify-center h-full gap-12 px-8">
         <h2 className="carlmarx-bold text-[clamp(2rem,5vw,4rem)] text-white text-center">¿Cómo querés tu foto?</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl overflow-y-auto max-h-[70vh] p-4">
 
           {/* SELFIE GRUPAL */}
-          {(generalSettings.enableSelfie !== false) && (
-            <button onClick={() => handleModeSelect('selfie')}
-              className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-cyan-400 bg-black/40 backdrop-blur hover:bg-cyan-400/10 transition-all">
+          {(generalSettings.enableSelfie !== false && isModeAllowed('selfie')) && (
+            <button data-autofocus onClick={() => handleModeSelect('selfie')}
+              className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-cyan-400 kiosk-glass hover:scale-[1.03] focus:scale-[1.03] focus:outline-none focus:ring-4 focus:ring-white/80 hover:bg-cyan-400/10 transition-all">
               <Users className="w-16 h-16 text-cyan-400" />
               <span className="carlmarx-bold text-cyan-400 text-2xl uppercase tracking-wider">Selfie Grupal</span>
               <p className="text-white/70 text-sm text-center">Una foto con amigos o familia.<br />Podés ponerle un marco decorativo.</p>
             </button>
           )}
 
+          {/* PORTADA FASHION (tapa de revista, sin IA) */}
+          {(generalSettings.enablePortada === true && isModeAllowed('portada')) && (
+            <button data-autofocus onClick={() => handleModeSelect('portada')}
+              className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-pink-400 kiosk-glass hover:scale-[1.03] focus:scale-[1.03] focus:outline-none focus:ring-4 focus:ring-white/80 hover:bg-pink-400/10 transition-all">
+              <Crown className="w-16 h-16 text-pink-400" />
+              <span className="carlmarx-bold text-pink-400 text-2xl uppercase tracking-wider">Portada Fashion</span>
+              <p className="text-white/70 text-sm text-center">¡Sé la tapa de la revista!<br />Con tu nombre y titulares de la fiesta.</p>
+            </button>
+          )}
+
           {/* RETRATO MÁGICO */}
-          {(generalSettings.enableAI !== false) && (
-            <button onClick={() => handleModeSelect('retrato')}
-              className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-violet-400 bg-black/40 backdrop-blur hover:bg-violet-400/10 transition-all">
+          {(generalSettings.enableAI !== false && isModeAllowed('retrato')) && (
+            <button data-autofocus onClick={() => handleModeSelect('retrato')}
+              className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-violet-400 kiosk-glass hover:scale-[1.03] focus:scale-[1.03] focus:outline-none focus:ring-4 focus:ring-white/80 hover:bg-violet-400/10 transition-all">
               <Sparkles className="w-16 h-16 text-violet-400" />
               <span className="carlmarx-bold text-violet-400 text-2xl uppercase tracking-wider">Retrato Mágico</span>
               <p className="text-white/70 text-sm text-center">Una foto de vos solo.<br />Elegí entre muchos estilos de retrato.</p>
@@ -759,18 +979,18 @@ The subject must perfectly match the facial features and gender of the reference
           )}
 
           {/* MUNDIAL */}
-          {(generalSettings.enableMundial !== false) && (
-            <button onClick={() => handleModeSelect('mundial')}
-              className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-green-400 bg-black/40 backdrop-blur hover:bg-green-400/10 transition-all">
+          {(generalSettings.enableMundial !== false && isModeAllowed('mundial')) && (
+            <button data-autofocus onClick={() => handleModeSelect('mundial')}
+              className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-green-400 kiosk-glass hover:scale-[1.03] focus:scale-[1.03] focus:outline-none focus:ring-4 focus:ring-white/80 hover:bg-green-400/10 transition-all">
               <Trophy className="w-16 h-16 text-green-400" />
               <span className="carlmarx-bold text-green-400 text-2xl uppercase tracking-wider">Mundial 2026</span>
               <p className="text-white/70 text-sm text-center">¡Convertite en una estrella del fútbol!<br />Tu carta de jugador con nombre y posición.</p>
             </button>
           )}
           {/* CARICATURA MUNDIAL */}
-          {(generalSettings.enableCaricatura !== false) && (
-            <button onClick={() => handleModeSelect('caricatura')}
-              className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-orange-400 bg-black/40 backdrop-blur hover:bg-orange-400/10 transition-all">
+          {(generalSettings.enableCaricatura !== false && isModeAllowed('caricatura')) && (
+            <button data-autofocus onClick={() => handleModeSelect('caricatura')}
+              className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-orange-400 kiosk-glass hover:scale-[1.03] focus:scale-[1.03] focus:outline-none focus:ring-4 focus:ring-white/80 hover:bg-orange-400/10 transition-all">
               <Palette className="w-16 h-16 text-orange-400" />
               <span className="carlmarx-bold text-orange-400 text-2xl uppercase tracking-wider">Caricatura Mundial</span>
               <p className="text-white/70 text-sm text-center">¡Tu caricatura del Mundial!<br />Transformate en dibujo con tu nombre.</p>
@@ -778,12 +998,14 @@ The subject must perfectly match the facial features and gender of the reference
           )}
 
           {/* FIGURITAS */}
-          <button onClick={() => handleModeSelect('figuritas')}
-            className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-teal-400 bg-black/40 backdrop-blur hover:bg-teal-400/10 transition-all">
+          {generalSettings.enableFiguritas !== false && isModeAllowed('figuritas') && (
+          <button data-autofocus onClick={() => handleModeSelect('figuritas')}
+            className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-teal-400 kiosk-glass hover:scale-[1.03] focus:scale-[1.03] focus:outline-none focus:ring-4 focus:ring-white/80 hover:bg-teal-400/10 transition-all">
             <Sticker className="w-16 h-16 text-teal-400" />
             <span className="carlmarx-bold text-teal-400 text-2xl uppercase tracking-wider">Hacer Figurita</span>
             <p className="text-white/70 text-sm text-center">¡Crea tu propia carta oficial!<br />Quita el fondo y personalízala.</p>
           </button>
+          )}
         </div>
       </div>
     </div>
@@ -791,7 +1013,7 @@ The subject must perfectly match the facial features and gender of the reference
 
   if (step === 'getReady') return (
     <div className="kiosk-root">
-      <div className="absolute inset-0 bg-[#0a0a1a]" />
+      <ScreenBackground screen="getReady" />
       <Corners />
       <div className="relative z-10 flex items-center justify-center h-full">
         <h1 className="carlmarx-bold text-[clamp(4rem,10vw,8rem)] text-white text-center animate-fade-in">
@@ -801,16 +1023,82 @@ The subject must perfectly match the facial features and gender of the reference
     </div>
   );
 
+  if (cameraActive && cameraError) return (
+    <div className="kiosk-root">
+      <AuroraBackground />
+      <Corners />
+      <div className="relative z-10 flex flex-col items-center justify-center h-full gap-8 px-10 text-center">
+        <h2 className="carlmarx-bold text-white text-5xl">No encontramos la cámara</h2>
+        <p className="text-white/70 text-2xl max-w-3xl">{cameraError}</p>
+        <div className="flex gap-6">
+          <button data-autofocus onClick={() => startCamera()}
+            className="px-10 py-5 rounded-3xl bg-violet-600 hover:bg-violet-500 text-white text-2xl font-bold focus:outline-none focus:ring-8 focus:ring-white/70">
+            Reintentar
+          </button>
+          <button onClick={() => (showHomeButton && !locked ? navigate('/box') : resetKiosk())}
+            className="px-10 py-5 rounded-3xl bg-white/10 hover:bg-white/20 text-white text-2xl font-bold focus:outline-none focus:ring-8 focus:ring-white/70">
+            Volver
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Efectos en vivo: el invitado prueba filtro y accesorio mirándose y toca "¡Sacar foto!"
+  if (step === 'lookCamera' && fxEnabled) {
+    const filters = COLOR_FILTERS.filter(f => f.value === 'none' || (generalSettings.filters ?? COLOR_FILTERS.map(x => x.value)).includes(f.value));
+    const customs = (generalSettings.customAccessories ?? []) as { id: string; name: string }[];
+    const accs = [
+      { value: 'none', label: 'Sin accesorio' },
+      ...BUILT_IN_ACCESSORIES.filter(a => (generalSettings.accessories ?? BUILT_IN_ACCESSORIES.map(x => x.value)).includes(a.value)),
+      ...customs.filter(c => (generalSettings.accessories ?? [`custom:${c.id}`]).includes(`custom:${c.id}`)).map(c => ({ value: `custom:${c.id}`, label: c.name })),
+    ];
+    const chip = (on: boolean) => `px-4 py-2 rounded-full text-[clamp(0.95rem,2.2vmin,1.15rem)] font-semibold border focus:outline-none focus:ring-4 focus:ring-white/80 ${on ? 'bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7] border-transparent text-white' : 'bg-black/55 border-white/25 text-white/85 backdrop-blur'}`;
+    return (
+      <div className="kiosk-root">
+        <div className="absolute inset-0 bg-black" />
+        <CameraVideo videoRef={videoRef} mirror={!!cameraSettings.mirror} rotation={Number(cameraSettings.rotation) || 0}
+          filter={fx.filter} accessory={generalSettings.enableAccessories ? fx.accessory : undefined} />
+        <div className="absolute top-0 inset-x-0 h-40 bg-gradient-to-b from-black/70 to-transparent" />
+        <div className="absolute bottom-0 inset-x-0 h-72 bg-gradient-to-t from-black/85 to-transparent" />
+        <p className="absolute top-8 inset-x-0 z-10 text-center carlmarx-bold text-white text-[clamp(1.8rem,4vmin,3rem)] drop-shadow-lg">
+          Elegí tu efecto y tocá <span className="text-[#ff7ac0]">¡Sacar foto!</span>
+        </p>
+        <div className="absolute bottom-6 inset-x-0 z-20 flex flex-col items-center gap-2.5 px-4 max-h-[60%] overflow-y-auto">
+          {generalSettings.enableFilters && (
+            <div className="flex flex-wrap justify-center gap-2 max-w-full">
+              {filters.map(f => (
+                <button key={f.value} onClick={() => setFx(v => ({ ...v, filter: f.value }))} className={chip((fx.filter ?? 'none') === f.value)}>{f.label}</button>
+              ))}
+            </div>
+          )}
+          {generalSettings.enableAccessories && (
+            <div className="flex flex-wrap justify-center gap-2 max-w-full">
+              {accs.map(a => (
+                <button key={a.value} onClick={() => setFx(v => ({ ...v, accessory: a.value }))} className={chip((fx.accessory ?? 'none') === a.value)}>{a.label}</button>
+              ))}
+            </div>
+          )}
+          <button data-autofocus onClick={startCountdown} disabled={!cameraReady}
+            className="mt-2 shrink-0 px-12 py-4 rounded-full carlmarx-bold text-white text-[clamp(1.6rem,3.5vmin,2rem)] disabled:opacity-50 focus:outline-none focus:ring-4 focus:ring-white/80"
+            style={{ background: 'linear-gradient(135deg,#ff2e93,#7b2ff7)', boxShadow: '0 0 40px rgba(255,46,147,0.55)' }}>
+            📸 ¡Sacar foto!
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (step === 'lookCamera') {
     return (
       <div className="kiosk-root">
-        <div className="absolute inset-0 bg-[#0a0a1a]" />
+        <AuroraBackground />
         <Corners />
-        <video ref={videoRef} autoPlay playsInline muted className={`absolute inset-0 w-full h-full object-cover ${cameraSettings.mirror ? 'scale-x-[-1]' : ''}`} />
+        <CameraVideo videoRef={videoRef} mirror={!!cameraSettings.mirror} rotation={Number(cameraSettings.rotation) || 0} />
         <div className="absolute inset-0 bg-black/40 z-0" />
         <div className="relative z-10 flex flex-col items-center justify-center h-full gap-8">
           <p className="carlmarx-regular text-white/60 text-2xl uppercase tracking-widest">
-            {mode === 'selfie' ? '📸 Selfie Grupal' : mode === 'retrato' ? '✨ Retrato Mágico' : '⚽ Mundial 2026'}
+            {mode === 'selfie' ? '📸 Selfie Grupal' : mode === 'portada' ? '👑 Portada Fashion' : mode === 'retrato' ? '✨ Retrato Mágico' : '⚽ Mundial 2026'}
           </p>
           <h1 className="carlmarx-bold text-7xl text-white text-center uppercase tracking-widest">
             ¡Mirá a la<br /><span className="text-violet-400">Cámara! 📸</span>
@@ -823,23 +1111,51 @@ The subject must perfectly match the facial features and gender of the reference
   if (step === 'countdown') return (
     <div className="kiosk-root">
       <div className="absolute inset-0 bg-black" />
-      <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover" style={{ transform: `scaleX(${cameraSettings.mirror ? -1 : 1}) rotate(${cameraSettings.rotation || 0}deg)` }} />
+      <CameraVideo videoRef={videoRef} mirror={!!cameraSettings.mirror} rotation={Number(cameraSettings.rotation) || 0}
+        filter={fxEnabled ? fx.filter : undefined} accessory={fxEnabled && generalSettings.enableAccessories ? fx.accessory : undefined} />
       <canvas ref={canvasRef} className="hidden" />
       <div className="absolute inset-0 bg-black/30" />
       <div className="relative z-10 flex items-center justify-center h-full">
-        <span className="carlmarx-bold text-[clamp(8rem,25vw,18rem)] text-white drop-shadow-2xl animate-ping-once" style={{ textShadow: '0 0 80px rgba(139,92,246,0.8)' }}>
-          {countdown}
-        </span>
+        <CountdownRing value={countdown} total={cameraSettings.timer || 5} />
       </div>
+      {shotsWanted() > 1 && (
+        <div className="absolute top-8 inset-x-0 z-20 flex justify-center">
+          <span className="kiosk-glass rounded-full px-8 py-3 carlmarx-bold text-white text-3xl">
+            Foto {Math.min(shotCount + 1, shotsWanted())} de {shotsWanted()}
+          </span>
+        </div>
+      )}
       <Corners />
     </div>
   );
 
   // ── PHOTO PREVIEW — approve or retake ───────────────────────
+  if (step === 'guestName') return (
+    <GuestNameScreen
+      photo={capturedImage}
+      onDone={(name) => {
+        guestNameRef.current = name;
+        void continueSelfie();
+      }}
+    />
+  );
+
+  if (step === 'nextShot') return (
+    <NextShot
+      shots={shotsRef.current}
+      total={shotsWanted()}
+      seconds={Math.max(3, Number(generalSettings.shotPause) || 10)}
+      videoRef={videoRef}
+      mirror={!!cameraSettings.mirror}
+      rotation={Number(cameraSettings.rotation) || 0}
+      onReady={startCountdown}
+    />
+  );
+
   if (step === 'photoPreview') {
     const goNext = async () => {
       if (!capturedImage) return;
-      
+      const photo = capturedImage;
       // Si es caricatura mundialista, lanzamos la IA directamente con el prompt especial
       if (mode === 'caricatura') {
         const specialTheme = {
@@ -850,28 +1166,20 @@ The subject must perfectly match the facial features and gender of the reference
         return;
       }
 
+      if (mode === 'portada') {
+        // La tapa siempre pide el nombre de la estrella (se puede saltear)
+        guestNameRef.current = '';
+        setStep('guestName');
+        return;
+      }
       if (mode === 'selfie') {
-        setStep('processing'); // Show a brief processing state while merging
-        const phrase = SELFIE_PHRASES[Math.floor(Math.random() * SELFIE_PHRASES.length)];
-        setResultPhrase(phrase);
-        
-        // Apply frame if exists
-        let finalImage = capturedImage!;
-        if (frameUrl) {
-          try {
-            const replicateToken = import.meta.env.VITE_REPLICATE_TOKEN_B64 ? atob(import.meta.env.VITE_REPLICATE_TOKEN_B64) : (import.meta.env.VITE_REPLICATE_API_TOKEN || '');
-            if (!replicateToken) {
-                throw new Error("Falta el token de Replicate (B64 o plano) en las variables de entorno.");
-            }
-            finalImage = await mergeImages(capturedImage!, frameUrl);
-          } catch (e) {
-            console.error("Error applying frame to selfie:", e);
-          }
+        // Nombre del invitado antes de armar la foto (Ajustes → Experiencias y marco)
+        guestNameRef.current = '';
+        if (generalSettings.askGuestName) {
+          setStep('guestName');
+          return;
         }
-        
-        setCapturedImage(finalImage);
-        await savePhotoToAlbum(finalImage);
-        setStep('flashResult');
+        await continueSelfie(photo);
       } else if (mode === 'retrato') {
         setStep('themeSelect');
       } else if (mode === 'mundial') {
@@ -884,21 +1192,36 @@ The subject must perfectly match the facial features and gender of the reference
       <div className="kiosk-root">
         <div className="absolute inset-0 bg-black" />
         <Corners />
-        {capturedImage && (
-          <img src={capturedImage} alt="preview"
-            className="absolute inset-0 w-full h-full object-contain"
-            style={{ transform: `scaleX(${cameraSettings.mirror ? -1 : 1})` }} />
+        {/* La foto tal cual se guarda (el espejo ya está aplicado al sacarla) */}
+        {capturedImage && shotsRef.current.length <= 1 && (
+          <motion.div className="absolute inset-0" initial={{ scale: 1.08 }} animate={{ scale: 1 }} transition={{ duration: 0.7, ease: 'easeOut' }}>
+            <img src={capturedImage} alt="preview" className="absolute inset-0 w-full h-full object-contain" />
+          </motion.div>
         )}
+        {shotsRef.current.length > 1 && (
+          <div className="absolute inset-0 pb-40 pt-10 px-10 flex items-center justify-center gap-6">
+            {shotsRef.current.map((src, i) => (
+              <motion.img key={i} src={src} alt={`Foto ${i + 1}`}
+                className="min-w-0 max-h-full rounded-2xl shadow-2xl object-contain"
+                style={{ maxWidth: `${92 / shotsRef.current.length}%` }}
+                initial={{ opacity: 0, y: 40, rotate: (i - 1) * 3 }} animate={{ opacity: 1, y: 0, rotate: 0 }}
+                transition={{ delay: i * 0.15, type: 'spring', stiffness: 160, damping: 18 }} />
+            ))}
+          </div>
+        )}
+        <CameraFlash key={capturedImage ?? 'flash'} />
         {/* Gradient bottom overlay for buttons */}
         <div className="absolute bottom-0 inset-x-0 h-48 bg-gradient-to-t from-black to-transparent" />
         <div className="absolute bottom-0 inset-x-0 flex items-end justify-center gap-6 p-8 z-10">
+          {generalSettings.allowRetake !== false && (
           <button onClick={() => setStep('lookCamera')}
-            className="flex-1 max-w-xs py-5 rounded-2xl border-2 border-white/30 bg-black/60 carlmarx-bold text-white text-2xl backdrop-blur hover:border-white/60 transition-all">
+            className="flex-1 max-w-xs py-5 rounded-2xl border-2 border-white/30 bg-black/60 carlmarx-bold text-white text-2xl backdrop-blur hover:border-white/60 transition-all focus:outline-none focus:ring-4 focus:ring-white/80">
             ↩ Repetir foto
           </button>
-          <button onClick={goNext}
-            className="flex-1 max-w-xs py-5 rounded-2xl carlmarx-bold text-white text-2xl transition-all"
-            style={{ background: 'linear-gradient(135deg,#7c3aed,#db2777)', boxShadow: '0 0 40px rgba(124,58,237,0.5)' }}>
+          )}
+          <button data-autofocus onClick={goNext}
+            className="flex-1 max-w-xs py-5 rounded-2xl carlmarx-bold text-white text-2xl transition-all focus:outline-none focus:ring-4 focus:ring-white/80"
+            style={{ background: 'linear-gradient(135deg,#ff2e93,#7b2ff7)', boxShadow: '0 0 40px rgba(255,46,147,0.5)' }}>
             ¡Me gusta! →
           </button>
         </div>
@@ -906,9 +1229,24 @@ The subject must perfectly match the facial features and gender of the reference
     );
   }
 
+  if (step === 'frameSelect' && capturedImage) return (
+    <FrameChooser
+      photo={capturedImage}
+      options={frameChoices}
+      // Arranca en el marco que está elegido en Ajustes
+      initialIndex={Math.max(0, frameChoices.findIndex(o => o.url === frameUrl))}
+      merge={mergeImages}
+      onConfirm={async (finalImage) => {
+        setResultPhrase(SELFIE_PHRASES[Math.floor(Math.random() * SELFIE_PHRASES.length)]);
+        finishPhoto(finalImage);
+        setStep('flashResult');
+      }}
+    />
+  );
+
   if (step === 'flashResult') return (
     <div className="kiosk-root" onClick={() => setStep('result')}>
-      <div className="absolute inset-0 bg-[#0a0a1a]" />
+      <ScreenBackground screen="reveal" />
       <Corners />
       {capturedImage && (
         <img src={capturedImage} alt="captured" className="absolute inset-0 w-full h-full object-cover opacity-20 blur-sm" />
@@ -1062,7 +1400,7 @@ The subject must perfectly match the facial features and gender of the reference
 
     return (
       <div className="kiosk-root">
-        <div className="absolute inset-0 bg-[#0a0a1a]" />
+        <ScreenBackground screen="modes" />
         <Corners />
         <div className="relative z-10 flex flex-col h-full overflow-auto">
           {/* Header */}
@@ -1133,42 +1471,38 @@ The subject must perfectly match the facial features and gender of the reference
 
   if (step === 'processing') return (
     <div className="kiosk-root">
-      <div className="absolute inset-0 bg-[#0a0a1a]" />
+      <ScreenBackground screen="processing" />
       <Corners />
       {capturedImage && <img src={capturedImage} className="absolute inset-0 w-full h-full object-cover opacity-10 blur-md grayscale" />}
-      <div className="relative z-10 flex flex-col items-center justify-center h-full gap-8">
-        <div className="w-40 h-40 rounded-full border-4 border-violet-500/30 flex items-center justify-center relative">
-          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-violet-500 animate-spin" />
-          <Sparkles className="w-16 h-16 text-white animate-pulse" />
-        </div>
-        <h2 className="carlmarx-bold text-[clamp(3rem,7vw,6rem)] text-white text-center">
-          {mode === 'selfie' ? 'Preparando Foto' : 'Creando Magia'}
-        </h2>
-        <p className="carlmarx-regular text-white/60 text-2xl">
-          {mode === 'selfie' ? 'Estamos aplicando los últimos retoques...' : 'La IA está dibujando tu retrato...'}
-        </p>
-      </div>
+      <AIProcessing
+        title={mode === 'selfie' ? 'Preparando tu foto' : 'Creando magia'}
+        subtitle={mode === 'selfie' ? 'Aplicando los últimos retoques…' : undefined}
+      />
     </div>
   );
 
   if (step === 'result') {
     const printerCfg = (() => { try { return JSON.parse(localStorage.getItem('kiosk_print_settings') || '{}'); } catch { return {}; } })();
     const igCfg = (() => { try { return JSON.parse(localStorage.getItem('kiosk_ig_settings') || '{}'); } catch { return {}; } })();
-    const showPrint = printerCfg.autoPrint !== false;
+    const showPrint = generalSettings.showPrintButton !== false && printerCfg.autoPrint !== false;
+    // QR solo con internet y con el equipo asignado a un evento (las fotos se suben ahí)
+    const showQrBlock = generalSettings.showQr !== false && !offlineMode && (generalSettings.cloudSupabase ? !!kioskEventId : isDriveConfigured());
     // The QR points directly to the photo for downloading
-    const qrUrl = lastPublicUrl 
-      ? `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(lastPublicUrl)}&bgcolor=ffffff&color=000000`
+    // El QR abre la página del invitado (bajar / compartir por WhatsApp o Instagram)
+    const qrUrl = lastPublicUrl
+      ? `https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=8&data=${encodeURIComponent(guestPhotoUrl(lastPublicUrl, generalSettings.eventTitle || undefined))}&bgcolor=ffffff&color=000000`
       : null;
 
     return (
       <div className="kiosk-root">
-        <div className="absolute inset-0 bg-[#0a0a1a]" />
+        <ScreenBackground screen="result" />
         <Corners />
         
         <div className="relative z-10 flex flex-col md:flex-row h-full items-center justify-center gap-6 md:gap-12 p-6 animate-in fade-in zoom-in duration-500 overflow-y-auto">
           {/* Photo Preview - ACHICADO PARA QUE ENTREN BOTONES */}
-          <div className="relative flex-shrink-0 h-[45vh] md:h-[70vh] aspect-[2/3] rounded-[2rem] overflow-hidden shadow-[0_0_80px_rgba(139,92,246,0.3)] border border-violet-500/30 group">
-            {capturedImage && <img src={capturedImage} alt="result" className="w-full h-full object-cover" />}
+          {/* Se adapta a la hoja: vertical u horizontal */}
+          <div className="relative flex-shrink-0 rounded-[2rem] overflow-hidden shadow-[0_0_80px_rgba(139,92,246,0.3)] border border-violet-500/30 group">
+            {capturedImage && <motion.img key={capturedImage} src={capturedImage} alt="result" className="block w-auto h-auto max-h-[45vh] md:max-h-[70vh] max-w-[90vw] md:max-w-[55vw]" {...revealPhoto} />}
           </div>
 
           {/* Actions Column */}
@@ -1191,11 +1525,28 @@ The subject must perfectly match the facial features and gender of the reference
               </button>
             )}
 
-            <button onClick={() => setShowQrModal(true)}
-              className="py-6 px-8 bg-slate-800/80 hover:bg-slate-700 text-white rounded-3xl carlmarx-bold text-2xl flex items-center justify-center gap-4 border border-white/10 transition-all hover:scale-[1.02]">
-              <QrCode className="w-7 h-7 text-pink-400" /> Obtener QR
-            </button>
+            {/* QR a la vista: el invitado lo escanea y se lleva la foto al celular */}
+            {showQrBlock && (
+              <div className="flex items-center gap-5 rounded-3xl bg-white/95 p-4 shadow-[0_10px_40px_rgba(139,92,246,0.35)]">
+                <div className="w-36 h-36 shrink-0 rounded-2xl bg-white flex items-center justify-center overflow-hidden">
+                  {qrUrl ? (
+                    <motion.img src={qrUrl} alt="QR para descargar la foto" className="w-full h-full"
+                      initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} />
+                  ) : uploading ? (
+                    <Loader2 className="w-10 h-10 text-violet-500 animate-spin" />
+                  ) : (
+                    <QrCode className="w-12 h-12 text-slate-300" />
+                  )}
+                </div>
+                <div className="text-slate-900">
+                  <p className="carlmarx-bold text-2xl leading-tight">{qrUrl ? 'Escaneá y llevátela' : uploading ? 'Preparando tu QR…' : 'QR no disponible'}</p>
+                  <p className="text-slate-500 text-sm mt-1">{qrUrl ? 'Bajala al celular y compartila por WhatsApp o Instagram' : uploading ? 'Un segundo' : 'La foto quedó guardada en el equipo'}</p>
+                </div>
+              </div>
+            )}
 
+            {/* En la TV box compartir desde el equipo no le sirve al invitado: usa el QR */}
+            {!offlineMode && !showHomeButton && (
             <button onClick={async () => {
               if (!navigator.share) { toast.info("Guardá la foto con un toque largo"); return; }
               try {
@@ -1208,6 +1559,7 @@ The subject must perfectly match the facial features and gender of the reference
               className="py-7 px-8 bg-gradient-to-br from-violet-600 to-pink-600 hover:from-violet-500 hover:to-pink-500 text-white rounded-[2rem] carlmarx-bold text-2xl flex items-center justify-center gap-4 shadow-[0_10px_40px_rgba(139,92,246,0.4)] transition-all hover:scale-[1.05] active:scale-95">
               <Instagram className="w-8 h-8" /> Compartir
             </button>
+            )}
           </div>
         </div>
 

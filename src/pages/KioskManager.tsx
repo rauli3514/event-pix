@@ -6,11 +6,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from 'sonner';
+import { Capacitor } from '@capacitor/core';
+import { isNativePrintAvailable, discoverNativePrinters, printImageNative, PAPER_SIZES, printErrorMessage, isPrintableDirect, connectWifiDirectPrinter, type NativePrinter } from '@/lib/nativePrint';
 import {
     Sparkles, ArrowLeft, Trash2, Save,
     Monitor, Download, Printer, Settings, ExternalLink, Camera, Instagram, Users,
-    FolderOpen, Plus, RefreshCw, AlertCircle
+    FolderOpen, Plus, RefreshCw, AlertCircle, Tv
 } from 'lucide-react';
+import KioskDevicesPanel from '@/components/kiosk/KioskDevicesPanel';
 import { Link } from 'react-router-dom';
 
 // Simple Modal Component
@@ -85,6 +88,38 @@ const KioskManager = () => {
     });
     const [availablePrinters, setAvailablePrinters] = useState<string[]>([]);
     const [isLoadingPrinters, setIsLoadingPrinters] = useState(false);
+    const isNativePrint = isNativePrintAvailable();
+    // En la app, target=_blank abriría el navegador del sistema (sin impresión nativa ni ajustes)
+    const kioskLinkTarget = Capacitor.isNativePlatform() ? {} : { target: '_blank', rel: 'noreferrer' };
+    const [nativePrinters, setNativePrinters] = useState<NativePrinter[]>(() =>
+        printerSettings.nativePrinter ? [printerSettings.nativePrinter] : []
+    );
+    const [isTestPrinting, setIsTestPrinting] = useState(false);
+    const [wifiDirectSsid, setWifiDirectSsid] = useState<string>(printerSettings.nativePrinter?.wifiDirect?.ssid || '');
+    const [wifiDirectPass, setWifiDirectPass] = useState<string>(printerSettings.nativePrinter?.wifiDirect?.passphrase || '');
+    const [isConnectingWifiDirect, setIsConnectingWifiDirect] = useState(false);
+
+    const connectWifiDirect = async () => {
+        setIsConnectingWifiDirect(true);
+        try {
+            const { printer, result } = await connectWifiDirectPrinter({
+                ssid: wifiDirectSsid.trim(),
+                passphrase: wifiDirectPass,
+            });
+            setNativePrinters(prev => [printer, ...prev.filter(p => p.serviceName !== printer.serviceName)]);
+            setPrinterSettings({ ...printerSettings, nativePrinter: printer, selectedPrinter: printer.name });
+            if (result.mode === 'p2p') {
+                toast.success(`Conectada a ${printer.name} por Wi-Fi Direct${result.internet ? ', con internet' : ', pero sin internet'}`);
+            } else {
+                toast.success(`Conectada a ${printer.name}. Este equipo no permite impresora e internet a la vez: al imprimir se desconecta de internet unos segundos.`);
+            }
+            if (!isPrintableDirect(printer)) toast.error(`La impresora no acepta un formato compatible (${printer.pdl})`);
+        } catch (err) {
+            toast.error(printErrorMessage(err));
+        } finally {
+            setIsConnectingWifiDirect(false);
+        }
+    };
 
 
     // Persist printer settings
@@ -94,6 +129,24 @@ const KioskManager = () => {
 
     const enumeratePrinters = async () => {
         setIsLoadingPrinters(true);
+        if (isNativePrint) {
+            try {
+                const found = await discoverNativePrinters();
+                const current = printerSettings.nativePrinter as NativePrinter | undefined;
+                // Mantiene la elegida aunque no haya respondido en esta búsqueda
+                const merged = current && !found.some(p => p.serviceName === current.serviceName)
+                    ? [current, ...found] : found;
+                setNativePrinters(merged);
+                toast.success(found.length
+                    ? `${found.length} impresora${found.length === 1 ? '' : 's'} en la red`
+                    : 'No se encontraron impresoras. Revisá que estén en la misma WiFi.');
+            } catch (err) {
+                toast.error(printErrorMessage(err));
+            } finally {
+                setIsLoadingPrinters(false);
+            }
+            return;
+        }
         try {
             // Browsers don't expose printers directly. We try the print server API first.
             const res = await fetch('http://localhost:3001/printers').catch(() => null);
@@ -265,6 +318,7 @@ const KioskManager = () => {
     const handleDeleteKioskEvent = async (id: string) => {
         if (!confirm('¿Eliminar este evento y todas sus fotos?')) return;
         try {
+            await deleteEventUploads(id);
             const { error } = await supabase.from('kiosk_events').delete().eq('id', id);
             if (error) throw error;
             toast.success('Evento eliminado');
@@ -272,6 +326,37 @@ const KioskManager = () => {
             if (selectedEvent?.id === id) setSelectedEvent(null);
         } catch (err: any) {
             toast.error('Error al eliminar: ' + err.message);
+        }
+    };
+
+    // Borra de Supabase las fotos subidas por el kiosco para un evento (archivos y registros).
+    // En el equipo quedan las copias locales.
+    const deleteEventUploads = async (eventId: string) => {
+        const folder = `kiosk_sessions/${eventId}`;
+        let removed = 0;
+        for (;;) {
+            const { data, error } = await supabase.storage.from('photos').list(folder, { limit: 100 });
+            if (error) throw error;
+            if (!data?.length) break;
+            const { error: rmError } = await supabase.storage.from('photos').remove(data.map(f => `${folder}/${f.name}`));
+            if (rmError) throw rmError;
+            removed += data.length;
+            if (data.length < 100) break;
+        }
+        const { error } = await supabase.from('kiosk_photos').delete().eq('kiosk_event_id', eventId);
+        if (error) throw error;
+        return removed;
+    };
+
+    const handleDeleteUploads = async () => {
+        if (!selectedEvent) return;
+        if (!confirm(`¿Borrar de la nube todas las fotos de "${selectedEvent.name}"? Los QR de esas fotos dejan de funcionar. Las copias guardadas en el equipo no se tocan.`)) return;
+        try {
+            const n = await deleteEventUploads(selectedEvent.id);
+            setEventPhotos([]);
+            toast.success(`Se borraron ${n} fotos de la nube`);
+        } catch (err: any) {
+            toast.error('No se pudieron borrar: ' + err.message);
         }
     };
 
@@ -508,7 +593,7 @@ const KioskManager = () => {
                         </Link>
                     </Button>
                     <Button asChild className="bg-violet-600 hover:bg-violet-700 text-white shadow-[0_0_15px_rgba(139,92,246,0.3)]">
-                        <a href={`/kiosco${selectedEvent ? `?event=${selectedEvent.id}` : ''}`} target="_blank" rel="noreferrer">
+                        <a href={`/kiosco${selectedEvent ? `?event=${selectedEvent.id}` : ''}`} {...kioskLinkTarget}>
                             <ExternalLink className="w-4 h-4 mr-2" /> Lanzar Kiosco (Pantalla Completa)
                         </a>
                     </Button>
@@ -529,6 +614,9 @@ const KioskManager = () => {
                         </TabsTrigger>
                         <TabsTrigger value="albums" className="justify-start gap-2 data-[state=active]:bg-slate-800 data-[state=active]:text-white text-slate-400">
                             <FolderOpen className="w-4 h-4" /> Álbumes / Eventos
+                        </TabsTrigger>
+                        <TabsTrigger value="devices" className="justify-start gap-2 data-[state=active]:bg-slate-800 data-[state=active]:text-white text-slate-400">
+                            <Tv className="w-4 h-4" /> Equipos
                         </TabsTrigger>
                         <TabsTrigger value="printing" className="justify-start gap-2 data-[state=active]:bg-slate-800 data-[state=active]:text-white text-slate-400">
                             <Printer className="w-4 h-4" /> Impresoras
@@ -894,12 +982,15 @@ const KioskManager = () => {
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <Button asChild size="sm" className="bg-violet-600 hover:bg-violet-700">
-                                                        <a href={`/kiosco?event=${selectedEvent.id}`} target="_blank" rel="noreferrer">
+                                                        <a href={`/kiosco?event=${selectedEvent.id}`} {...kioskLinkTarget}>
                                                             <Monitor className="w-4 h-4 mr-2" /> Iniciar Kiosco
                                                         </a>
                                                     </Button>
                                                     <Button onClick={handleDownloadAll} variant="outline" size="sm" className="bg-slate-950 border-slate-800">
                                                         <Download className="w-4 h-4 mr-2" /> Descargar Todo
+                                                    </Button>
+                                                    <Button onClick={handleDeleteUploads} variant="outline" size="sm" className="bg-slate-950 border-red-900 text-red-300 hover:bg-red-950">
+                                                        <Trash2 className="w-4 h-4 mr-2" /> Borrar de la nube
                                                     </Button>
                                                 </div>
                                             </CardHeader>
@@ -960,6 +1051,10 @@ const KioskManager = () => {
                             </Modal>
                         </TabsContent>
 
+                        <TabsContent value="devices" className="m-0">
+                            <KioskDevicesPanel events={kioskEvents} />
+                        </TabsContent>
+
                         <TabsContent value="printing" className="m-0">
                             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                                 {/* LEFT: CALIBRATION */}
@@ -975,6 +1070,23 @@ const KioskManager = () => {
                                             <div className="space-y-3">
                                                 <Label className="text-slate-300 text-[10px] uppercase font-bold tracking-wider">Impresora Activa</Label>
                                                 <div className="flex gap-3">
+                                                    {isNativePrint ? (
+                                                        <select
+                                                            className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white appearance-none focus:ring-2 focus:ring-violet-500/20 outline-none"
+                                                            value={printerSettings.nativePrinter?.serviceName || ''}
+                                                            onChange={(e) => {
+                                                                const printer = nativePrinters.find(p => p.serviceName === e.target.value) || null;
+                                                                setPrinterSettings({...printerSettings, nativePrinter: printer, selectedPrinter: printer?.name || ''});
+                                                            }}
+                                                        >
+                                                            <option value="">Diálogo de Android (elegir al imprimir)</option>
+                                                            {nativePrinters.map(p => (
+                                                                <option key={p.serviceName} value={p.serviceName}>
+                                                                    {p.name} — {p.host}{isPrintableDirect(p) ? '' : ' (formato no compatible)'}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    ) : (
                                                     <select 
                                                         className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white appearance-none focus:ring-2 focus:ring-violet-500/20 outline-none"
                                                         value={printerSettings.selectedPrinter}
@@ -983,11 +1095,106 @@ const KioskManager = () => {
                                                         <option value="">Seleccionar impresora...</option>
                                                         {availablePrinters.map(p => <option key={p} value={p}>{p}</option>)}
                                                     </select>
+                                                    )}
                                                     <Button onClick={enumeratePrinters} disabled={isLoadingPrinters} className="bg-slate-800 hover:bg-slate-700 text-white uppercase text-xs font-bold px-6 py-6 rounded-xl">
                                                         {isLoadingPrinters ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Actualizar'}
                                                     </Button>
                                                 </div>
                                             </div>
+
+                                            {isNativePrint && (
+                                                <p className="text-slate-500 text-xs -mt-5">
+                                                    {printerSettings.nativePrinter
+                                                        ? 'Las fotos se imprimen directo por WiFi, sin diálogo. Si falla, se abre el diálogo de Android.'
+                                                        : 'Tocá "Actualizar" para buscar impresoras en la WiFi e imprimir sin diálogo.'}
+                                                </p>
+                                            )}
+
+                                            {isNativePrint && (
+                                                <div className="space-y-3">
+                                                    <Label className="text-slate-300 text-[10px] uppercase font-bold tracking-wider">Impresora por Wi-Fi Direct (sin router)</Label>
+                                                    <p className="text-slate-500 text-xs">
+                                                        Para usar la red DIRECT-... de la impresora sin dejar la WiFi con internet. El nombre y la clave están en la hoja de estado de red de la impresora.
+                                                    </p>
+                                                    <div className="flex flex-col sm:flex-row gap-3">
+                                                        <Input
+                                                            placeholder="DIRECT-xx-EPSON-..."
+                                                            value={wifiDirectSsid}
+                                                            onChange={(e) => setWifiDirectSsid(e.target.value)}
+                                                            className="flex-1 bg-slate-950 border-slate-800 text-white py-6 rounded-xl"
+                                                        />
+                                                        <Input
+                                                            type="password"
+                                                            placeholder="Clave"
+                                                            value={wifiDirectPass}
+                                                            onChange={(e) => setWifiDirectPass(e.target.value)}
+                                                            className="flex-1 bg-slate-950 border-slate-800 text-white py-6 rounded-xl"
+                                                        />
+                                                    </div>
+                                                    <Button
+                                                        disabled={isConnectingWifiDirect || !wifiDirectSsid.trim() || wifiDirectPass.length < 8}
+                                                        onClick={connectWifiDirect}
+                                                        className="w-full bg-slate-800 hover:bg-slate-700 text-white py-6 rounded-xl flex items-center justify-center gap-2"
+                                                    >
+                                                        {isConnectingWifiDirect && <RefreshCw className="w-4 h-4 animate-spin" />} Conectar y probar
+                                                    </Button>
+                                                    {printerSettings.nativePrinter?.wifiDirect?.mode && (
+                                                        <p className="text-slate-500 text-xs">
+                                                            {printerSettings.nativePrinter.wifiDirect.mode === 'p2p'
+                                                                ? 'Modo: impresora e internet a la vez.'
+                                                                : 'Modo: conexión temporal (sin internet unos segundos al imprimir).'}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {isNativePrint && (
+                                                <div className="space-y-3">
+                                                    <Label className="text-slate-300 text-[10px] uppercase font-bold tracking-wider">Papel</Label>
+                                                    <div className="flex gap-3">
+                                                        <select
+                                                            className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white appearance-none outline-none"
+                                                            value={printerSettings.paper || '4x6'}
+                                                            onChange={(e) => setPrinterSettings({...printerSettings, paper: e.target.value})}
+                                                        >
+                                                            {PAPER_SIZES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                                                        </select>
+                                                        <Button
+                                                            onClick={() => setPrinterSettings({...printerSettings, borderless: !printerSettings.borderless})}
+                                                            className={`px-6 py-6 rounded-xl text-xs font-bold uppercase ${printerSettings.borderless ? 'bg-violet-600 hover:bg-violet-700 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-400'}`}
+                                                        >
+                                                            Sin bordes: {printerSettings.borderless ? 'Sí' : 'No'}
+                                                        </Button>
+                                                    </div>
+                                                    <Button
+                                                        disabled={isTestPrinting}
+                                                        onClick={async () => {
+                                                            setIsTestPrinting(true);
+                                                            try {
+                                                                const res = await printImageNative({
+                                                                    image: '/ai-themes/jugador-seleccion.jpg',
+                                                                    printer: printerSettings.nativePrinter || null,
+                                                                    paper: printerSettings.paper || '4x6',
+                                                                    orientation: printerSettings.orientation,
+                                                                    rotation: printerSettings.rotation,
+                                                                    scaleMode: printerSettings.imageAdjust,
+                                                                    copies: 1,
+                                                                    borderless: !!printerSettings.borderless,
+                                                                    jobName: 'EventPix - prueba',
+                                                                });
+                                                                if (res.mode === 'silent') toast.success('Prueba enviada a la impresora');
+                                                            } catch (err) {
+                                                                toast.error(printErrorMessage(err));
+                                                            } finally {
+                                                                setIsTestPrinting(false);
+                                                            }
+                                                        }}
+                                                        className="w-full bg-slate-800 hover:bg-slate-700 text-white py-6 rounded-xl flex items-center justify-center gap-2"
+                                                    >
+                                                        {isTestPrinting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />} Imprimir prueba
+                                                    </Button>
+                                                </div>
+                                            )}
 
                                             {/* PREFERENCES */}
                                             <div className="space-y-3">

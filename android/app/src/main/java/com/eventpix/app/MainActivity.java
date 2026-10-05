@@ -2,12 +2,24 @@ package com.eventpix.app;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.media.AudioManager;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.webkit.JavascriptInterface;
 
+import com.eventpix.app.print.NativePrintPlugin;
+import com.eventpix.app.screen.KioskScreenPlugin;
+import com.eventpix.app.storage.KioskStoragePlugin;
 import com.getcapacitor.BridgeActivity;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 public class MainActivity extends BridgeActivity {
     private BluetoothServer bluetoothServer;
@@ -15,7 +27,14 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(NativePrintPlugin.class);
+        registerPlugin(KioskStoragePlugin.class);
+        registerPlugin(KioskScreenPlugin.class);
         super.onCreate(savedInstanceState);
+        // Tele colgada en vertical: se gira desde el arranque, sin esperar a la página
+        if (getBridge() != null) {
+            KioskScreenPlugin.apply(getBridge().getWebView(), KioskScreenPlugin.savedRotation(this));
+        }
         bluetoothServer = new BluetoothServer(this);
         // BluetoothClient se inicializa después del Bridge (webview disponible)
     }
@@ -88,6 +107,41 @@ public class MainActivity extends BridgeActivity {
             } catch (Exception e) {
                 openSettings();
             }
+        }
+
+        /** Abre otra app instalada (p. ej. Ingreso VIP). Devuelve false si no está. */
+        @JavascriptInterface
+        public boolean openApp(String packageName) {
+            Intent launch = context.getPackageManager().getLaunchIntentForPackage(packageName);
+            if (launch == null) return false;
+            launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(launch);
+            return true;
+        }
+
+        /** Apps que se pueden abrir, como JSON [{label, packageName}], para elegir desde Ajustes. */
+        @JavascriptInterface
+        public String listApps() {
+            PackageManager pm = context.getPackageManager();
+            JSONArray apps = new JSONArray();
+            Set<String> seen = new HashSet<>();
+            seen.add(context.getPackageName());
+            for (String category : new String[]{Intent.CATEGORY_LAUNCHER, Intent.CATEGORY_LEANBACK_LAUNCHER}) {
+                Intent query = new Intent(Intent.ACTION_MAIN).addCategory(category);
+                List<ResolveInfo> found = pm.queryIntentActivities(query, 0);
+                for (ResolveInfo info : found) {
+                    String pkg = info.activityInfo.packageName;
+                    if (!seen.add(pkg)) continue;
+                    try {
+                        apps.put(new JSONObject()
+                                .put("label", info.loadLabel(pm).toString())
+                                .put("packageName", pkg));
+                    } catch (Exception ignored) {
+                        // se omite esa app
+                    }
+                }
+            }
+            return apps.toString();
         }
 
         @JavascriptInterface
