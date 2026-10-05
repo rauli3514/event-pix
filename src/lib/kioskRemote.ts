@@ -23,7 +23,7 @@ export const REMOTE_GENERAL_KEYS = [
   'enableSelfie', 'enablePortada', 'enablePortadaAI', 'enableAI', 'enableMundial', 'enableCaricatura', 'enableFiguritas',
   'photoShots', 'shotPause', 'photoOrientation', 'photoStrips', 'askGuestName', 'guestFrameChoice',
   'showQr', 'showPrintButton', 'allowRetake', 'enableGallery', 'splashGallery',
-  'resultTimeout', 'idleTimeout', 'screensaver', 'screensaverMinutes', 'enableFilters', 'photoGame', 'triviaQuestions', 'enableVip', 'vipTitle', 'vipSubtitle', 'vipVideo', 'vipResultSeconds', 'vipAfterPartyTime', 'enableAccessories', 'offline', 'screenRotation',
+  'resultTimeout', 'idleTimeout', 'screensaver', 'screensaverMinutes', 'enableFilters', 'photoGame', 'triviaQuestions', 'bluetoothShutter', 'enableVip', 'vipTitle', 'vipSubtitle', 'vipVideo', 'vipResultSeconds', 'vipAfterPartyTime', 'enableAccessories', 'offline', 'screenRotation',
   'portadaTitle', 'portadaIssue', 'portadaHeadlines', 'portadaStarLabel', 'portadaBadge', 'portadaColor',
 ] as const;
 export const REMOTE_CAMERA_KEYS = ['timer', 'mirror', 'rotation', 'quality'] as const;

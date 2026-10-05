@@ -17,6 +17,11 @@ Para dejar el espejo en un salón sin estar presente y cobrar por horas (ej. 23:
 - **A) Fondo verde real (chroma key)**: tela verde detrás. Muy liviano (cuenta por píxel en la placa de video), en vivo en la cámara, calidad profesional con buena luz. Fondos elegibles (propios o del evento). **Recomendado para empezar.**
 - **B) Sin tela (recorte con IA) solo sobre la foto ya sacada**: en el equipo (1–3 s por foto, borde medio) o en la nube como "Figurita" (mejor borde, centavos por foto, se puede cobrar en créditos). En vivo NO: es pesado como los accesorios de rostro.
 
+## El celular del invitado (por internet)
+- **Celular como control remoto**: QR en la pantalla → botón "Sacar foto" (elegir marco/modo) en el celular; la foto la saca la webcam del kiosco. Sin video en vivo en el celular (pesado para el Tanix).
+- **"Imprimí tu foto del celular"** (estación de impresión): QR → el invitado sube una foto de su celular → el kiosco le pone el marco y la imprime.
+- **Ingreso VIP: subir el Excel de invitados desde el celular** escaneando un QR (hoy se carga desde pendrive / Drive / Descargas).
+
 ## Otros pendientes
 - Compra de créditos con Mercado Pago (analizando comisiones).
 - Logins de clientes (cada cliente ve sus equipos y créditos).

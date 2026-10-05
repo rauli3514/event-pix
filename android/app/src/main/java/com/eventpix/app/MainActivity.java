@@ -9,6 +9,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.view.KeyEvent;
 import android.webkit.JavascriptInterface;
 
 import com.eventpix.app.print.NativePrintPlugin;
@@ -26,6 +27,23 @@ import java.util.Set;
 public class MainActivity extends BridgeActivity {
     private BluetoothServer bluetoothServer;
     private BluetoothClient bluetoothClient;
+    // Disparador Bluetooth: mientras el kiosco lo pide, Volumen +/- y Cámara sacan la foto
+    private volatile boolean captureShutter = false;
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        int code = event.getKeyCode();
+        boolean shutterKey = code == KeyEvent.KEYCODE_VOLUME_UP || code == KeyEvent.KEYCODE_VOLUME_DOWN
+                || code == KeyEvent.KEYCODE_CAMERA;
+        if (captureShutter && shutterKey && getBridge() != null && getBridge().getWebView() != null) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+                getBridge().getWebView().post(() -> getBridge().getWebView()
+                        .evaluateJavascript("window.dispatchEvent(new Event('kiosk-shutter'))", null));
+            }
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
+    }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -109,6 +127,12 @@ public class MainActivity extends BridgeActivity {
             } catch (Exception e) {
                 openSettings();
             }
+        }
+
+        /** El kiosco pide (o suelta) las teclas del disparador Bluetooth. */
+        @JavascriptInterface
+        public void setShutterCapture(boolean on) {
+            captureShutter = on;
         }
 
         /** Si esta app es la pantalla de inicio (lanzador) elegida del equipo. */

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Camera, RefreshCw } from 'lucide-react';
 import { describeStream, listCameras, openCameraStream, stopStream, type CameraOption } from '@/lib/kioskCamera';
-import { getCameraSettings, saveCameraSettings } from '@/lib/kioskSettings';
+import { getCameraSettings, getGeneralSettings, saveCameraSettings, saveGeneralSettings } from '@/lib/kioskSettings';
+import { useShutter } from '@/lib/kioskShutter';
 import { Choice, Panel, Toggle, primaryClass } from './ui';
 
 export default function CameraSection() {
@@ -111,6 +112,26 @@ export default function CameraSection() {
           options={[3, 5, 10].map(t => ({ value: t, label: `${t} s` }))}
           onChange={t => update({ timer: t })} />
       </Panel>
+
+      <ShutterPanel />
     </div>
+  );
+}
+
+/** Disparador Bluetooth: para fotos grupales a distancia. */
+function ShutterPanel() {
+  const [on, setOn] = useState(() => !!getGeneralSettings().bluetoothShutter);
+  const [hits, setHits] = useState(0);
+  useShutter(() => setHits(h => h + 1), on);
+  return (
+    <Panel title="Disparador Bluetooth" description='El botoncito "selfie remote": emparejalo en los ajustes de Bluetooth de Android y el grupo saca la foto a distancia.'>
+      <Toggle label="Esperar el disparador para sacar la foto" hint='En "Mirá a la cámara" la cuenta regresiva arranca con el botón (o tocando la pantalla), no sola.'
+        checked={on} onChange={v => { setOn(v); saveGeneralSettings({ bluetoothShutter: v }); }} />
+      {on && (
+        <p className={`rounded-2xl px-5 py-4 text-lg font-semibold ${hits ? 'bg-emerald-500/15 text-emerald-200' : 'bg-black/20 text-white/70'}`}>
+          {hits ? `¡Disparador recibido! (${hits})` : 'Probalo: apretá el botón del disparador y acá aparece el aviso.'}
+        </p>
+      )}
+    </Panel>
   );
 }
