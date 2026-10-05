@@ -12,11 +12,12 @@ import PinDialog from '@/components/kiosk/PinDialog';
 import { backupPhoto, type SavedPhoto } from '@/lib/kioskStorage';
 import { composePhotos, type PageOrientation } from '@/lib/photoLayout';
 import { coverOptionsFrom, renderMagazineCover } from '@/lib/magazineCover';
-import { applyFx, BUILT_IN_ACCESSORIES, COLOR_FILTERS, type FxChoice } from '@/lib/faceFx';
+import { applyFx, COLOR_FILTERS, type FxChoice } from '@/lib/faceFx';
 import AttractScreen from '@/components/kiosk/AttractScreen';
 import FrameChooser from '@/components/kiosk/FrameChooser';
 import NextShot from '@/components/kiosk/NextShot';
 import CameraVideo from '@/components/kiosk/CameraVideo';
+import FilterCarousel from '@/components/kiosk/FilterCarousel';
 import GuestNameScreen from '@/components/kiosk/GuestNameScreen';
 import { isDriveConfigured, queueForDrive, startDriveSync, uploadForShare } from '@/lib/driveBackup';
 import { guestPhotoUrl } from '@/lib/kioskShare';
@@ -491,7 +492,8 @@ export default function KioskAI() {
   const fxRef = useRef<FxChoice>({});
   useEffect(() => { fxRef.current = fx; }, [fx]);
   const isFxActive = (c: FxChoice) => (!!c.filter && c.filter !== 'none') || (!!c.accessory && c.accessory !== 'none');
-  const fxEnabled = (mode === 'selfie' || mode === 'portada') && !!(generalSettings.enableFilters || generalSettings.enableAccessories);
+  // Efectos en vivo: solo filtros de color (los accesorios que siguen la cara no se usan)
+  const fxEnabled = (mode === 'selfie' || mode === 'portada') && !!generalSettings.enableFilters;
   // Tomas sin efecto, para el respaldo de originales
   const rawShotsRef = useRef<string[]>([]);
 
@@ -1062,40 +1064,20 @@ The subject must perfectly match the facial features and gender of the reference
   // Efectos en vivo: el invitado prueba filtro y accesorio mirándose y toca "¡Sacar foto!"
   if (step === 'lookCamera' && fxEnabled) {
     const filters = COLOR_FILTERS.filter(f => f.value === 'none' || (generalSettings.filters ?? COLOR_FILTERS.map(x => x.value)).includes(f.value));
-    const customs = (generalSettings.customAccessories ?? []) as { id: string; name: string }[];
-    const accs = [
-      { value: 'none', label: 'Sin accesorio' },
-      ...BUILT_IN_ACCESSORIES.filter(a => (generalSettings.accessories ?? BUILT_IN_ACCESSORIES.map(x => x.value)).includes(a.value)),
-      ...customs.filter(c => (generalSettings.accessories ?? [`custom:${c.id}`]).includes(`custom:${c.id}`)).map(c => ({ value: `custom:${c.id}`, label: c.name })),
-    ];
-    const chip = (on: boolean) => `px-4 py-2 rounded-full text-[clamp(0.95rem,2.2vmin,1.15rem)] font-semibold border focus:outline-none focus:ring-4 focus:ring-white/80 ${on ? 'bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7] border-transparent text-white' : 'bg-black/55 border-white/25 text-white/85 backdrop-blur'}`;
+    // Solo filtros de color: se cambian con las flechas de los costados (o el control)
     return (
       <div className="kiosk-root">
         <div className="absolute inset-0 bg-black" />
-        <CameraVideo videoRef={videoRef} mirror={!!cameraSettings.mirror} rotation={Number(cameraSettings.rotation) || 0}
-          filter={fx.filter} accessory={generalSettings.enableAccessories ? fx.accessory : undefined} />
+        <CameraVideo videoRef={videoRef} mirror={!!cameraSettings.mirror} rotation={Number(cameraSettings.rotation) || 0} filter={fx.filter} />
         <div className="absolute top-0 inset-x-0 h-40 bg-gradient-to-b from-black/70 to-transparent" />
-        <div className="absolute bottom-0 inset-x-0 h-72 bg-gradient-to-t from-black/85 to-transparent" />
-        <p className="absolute top-8 inset-x-0 z-10 text-center carlmarx-bold text-white text-[clamp(1.8rem,4vmin,3rem)] drop-shadow-lg">
-          Elegí tu efecto y tocá <span className="text-[#ff7ac0]">¡Sacar foto!</span>
+        <div className="absolute bottom-0 inset-x-0 h-56 bg-gradient-to-t from-black/80 to-transparent" />
+        <p className="absolute top-8 inset-x-0 z-10 text-center carlmarx-bold text-white text-[clamp(1.6rem,3.6vmin,2.8rem)] drop-shadow-lg">
+          Elegí tu filtro con las flechas y tocá <span className="text-[#ff7ac0]">¡Sacar foto!</span>
         </p>
-        <div className="absolute bottom-6 inset-x-0 z-20 flex flex-col items-center gap-2.5 px-4 max-h-[60%] overflow-y-auto">
-          {generalSettings.enableFilters && (
-            <div className="flex flex-wrap justify-center gap-2 max-w-full">
-              {filters.map(f => (
-                <button key={f.value} onClick={() => setFx(v => ({ ...v, filter: f.value }))} className={chip((fx.filter ?? 'none') === f.value)}>{f.label}</button>
-              ))}
-            </div>
-          )}
-          {generalSettings.enableAccessories && (
-            <div className="flex flex-wrap justify-center gap-2 max-w-full">
-              {accs.map(a => (
-                <button key={a.value} onClick={() => setFx(v => ({ ...v, accessory: a.value }))} className={chip((fx.accessory ?? 'none') === a.value)}>{a.label}</button>
-              ))}
-            </div>
-          )}
+        <FilterCarousel filters={filters} value={fx.filter ?? 'none'} onChange={filter => setFx(v => ({ ...v, filter }))} />
+        <div className="absolute bottom-[6vmin] inset-x-0 z-20 flex justify-center">
           <button data-autofocus onClick={startCountdown} disabled={!cameraReady}
-            className="mt-2 shrink-0 px-12 py-4 rounded-full carlmarx-bold text-white text-[clamp(1.6rem,3.5vmin,2rem)] disabled:opacity-50 focus:outline-none focus:ring-4 focus:ring-white/80"
+            className="px-12 py-4 rounded-full carlmarx-bold text-white text-[clamp(1.6rem,3.5vmin,2rem)] disabled:opacity-50 focus:outline-none focus:ring-4 focus:ring-white/80"
             style={{ background: 'linear-gradient(135deg,#ff2e93,#7b2ff7)', boxShadow: '0 0 40px rgba(255,46,147,0.55)' }}>
             📸 ¡Sacar foto!
           </button>
@@ -1127,7 +1109,7 @@ The subject must perfectly match the facial features and gender of the reference
     <div className="kiosk-root">
       <div className="absolute inset-0 bg-black" />
       <CameraVideo videoRef={videoRef} mirror={!!cameraSettings.mirror} rotation={Number(cameraSettings.rotation) || 0}
-        filter={fxEnabled ? fx.filter : undefined} accessory={fxEnabled && generalSettings.enableAccessories ? fx.accessory : undefined} />
+        filter={fxEnabled ? fx.filter : undefined} />
       <canvas ref={canvasRef} className="hidden" />
       <div className="absolute inset-0 bg-black/30" />
       <div className="relative z-10 flex items-center justify-center h-full">
