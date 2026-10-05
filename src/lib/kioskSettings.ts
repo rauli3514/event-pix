@@ -79,6 +79,8 @@ export interface KioskGeneralSettings {
   enableGallery?: boolean;
   /** Carpeta del equipo donde se guardan las fotos (vacío = nombre del evento) */
   localFolder?: string;
+  /** Fotos: un juego al azar durante un minuto antes del resultado (con la IA siempre hay juego) */
+  photoGame?: boolean;
   /** Protector de pantalla con el logo animado (por defecto sí) */
   screensaver?: boolean;
   /** Minutos sin tocar nada para que aparezca el protector (por defecto 5) */

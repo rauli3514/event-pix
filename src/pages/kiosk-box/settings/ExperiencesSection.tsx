@@ -76,6 +76,8 @@ export default function ExperiencesSection() {
             checked={'off' in m ? settings[m.key] === true : settings[m.key] !== false}
             onChange={v => setSettings(saveGeneralSettings({ [m.key]: v }))} />
         ))}
+        <Toggle label="Juego de 1 minuto antes de la foto (Fotos)" hint="Un juego al azar (tateti, vaso con la pelotita, piedra papel o tijera, memotest) y después la foto. En Fotos IA siempre hay juego mientras la IA trabaja."
+          checked={settings.photoGame === true} onChange={photoGame => setSettings(saveGeneralSettings({ photoGame }))} />
       </Panel>
 
       <CoverPanel />

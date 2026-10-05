@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'; // Kiosk AI Optimized Flow
+import { useState, useRef, useEffect, useCallback } from 'react'; // Kiosk AI Optimized Flow
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Printer, Users, Sparkles, Trophy, QrCode, Loader2, Images, Crown, Instagram, Palette, Sticker, Home, Lock, LockOpen } from 'lucide-react';
 import { toast } from 'sonner';
@@ -27,12 +27,14 @@ import { guestFrameOptions, type FrameOption } from '@/lib/frameOptions';
 import { motion } from 'framer-motion';
 import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
 import ScreenBackground from '@/components/kiosk/ScreenBackground';
+import WaitingGames from '@/components/kiosk/WaitingGames';
 import { getPageBackground, getScreenBackground } from '@/lib/kioskMedia';
 import { AIProcessing, CameraFlash, CountdownRing } from '@/components/kiosk/KioskAnimations';
 import { revealPhoto, useConfettiBurst } from '@/components/kiosk/kioskEffects';
 
 // ---- Types ----
 type Step =
+  | 'photoGame'
   | 'splash'
   | 'modeSelect'
   | 'getReady'
@@ -185,6 +187,8 @@ export default function KioskAI() {
   const [lastPublicUrl, setLastPublicUrl] = useState<string | null>(null);
   const [resultPhrase, setResultPhrase] = useState('');
   const [isAIGenerating, setIsAIGenerating] = useState(false);
+  // Foto IA lista mientras el invitado juega: se muestra al terminar el aviso de los juegos
+  const [aiReadyStep, setAiReadyStep] = useState<Step | null>(null);
   // Mundial state
   const [mundialCountry, setMundialCountry] = useState<any>(null);
   const [mundialName, setMundialName] = useState('');
@@ -616,9 +620,21 @@ export default function KioskAI() {
     });
   };
 
+  // Mientras trabaja la IA hay un juego: la foto lista pasa por el aviso "¡Tu foto está lista!"
+  const revealAI = (next: Step) => setAiReadyStep(next);
+  // Fotos: si está activado, un juego de un minuto antes del resultado
+  const toFlashResult = () => setStep(generalSettings.photoGame === true ? 'photoGame' : 'flashResult');
+  const continueFromGames = useCallback(() => {
+    setAiReadyStep(ready => {
+      if (ready) setStep(ready);
+      return null;
+    });
+  }, []);
+
   const runAI = async (imageDataUrl: string, theme: any) => {
     if (isAIGenerating) return;
     setIsAIGenerating(true);
+    setAiReadyStep(null);
     setStep('processing');
     try {
       // 1. Subir a Storage para tener un link (necesario para este modelo de IA)
@@ -702,7 +718,7 @@ The subject must perfectly match the facial features and gender of the reference
 
       if (mode === 'figuritas') {
         setCapturedImage(outputUrl);
-        setStep('stickerEditor');
+        revealAI('stickerEditor');
         setIsAIGenerating(false);
         return;
       }
@@ -720,7 +736,7 @@ The subject must perfectly match the facial features and gender of the reference
       setCapturedImage(finalImage);
       const url = await savePhotoToAlbum(finalImage);
       setLastPublicUrl(url);
-      setStep('result');
+      revealAI('result');
     } catch (e: any) {
       console.error(e);
       // Sin saldo o sin servicio de IA: mensaje para el invitado y vuelta al menú
@@ -879,7 +895,7 @@ The subject must perfectly match the facial features and gender of the reference
         console.error('No se pudo armar la portada', e);
       }
       finishPhoto(cover);
-      setStep('flashResult');
+      toFlashResult();
       return;
     }
     const choices = guestFrameOptions();
@@ -897,7 +913,7 @@ The subject must perfectly match the facial features and gender of the reference
       console.error("Error applying frame to selfie:", e);
     }
     finishPhoto(finalImage);
-    setStep('flashResult');
+    toFlashResult();
   };
 
   const resetKiosk = () => {
@@ -905,6 +921,7 @@ The subject must perfectly match the facial features and gender of the reference
     if (countdownTimerRef.current) window.clearInterval(countdownTimerRef.current);
     setUploading(false);
     setLastPublicUrl(null);
+    setAiReadyStep(null);
     setStep('splash');
     setMode(null);
     setCapturedImage(null);
@@ -1257,9 +1274,16 @@ The subject must perfectly match the facial features and gender of the reference
       onConfirm={async (finalImage) => {
         setResultPhrase(SELFIE_PHRASES[Math.floor(Math.random() * SELFIE_PHRASES.length)]);
         finishPhoto(finalImage);
-        setStep('flashResult');
+        toFlashResult();
       }}
     />
+  );
+
+  if (step === 'photoGame') return (
+    <div className="kiosk-root">
+      <ScreenBackground screen="processing" />
+      <WaitingGames title="¡Tu foto ya casi está!" seconds={60} onContinue={() => setStep('flashResult')} />
+    </div>
   );
 
   if (step === 'flashResult') return (
@@ -1493,10 +1517,14 @@ The subject must perfectly match the facial features and gender of the reference
       <ScreenBackground screen="processing" />
       <Corners />
       {capturedImage && <img src={capturedImage} className="absolute inset-0 w-full h-full object-cover opacity-10 blur-md grayscale" />}
-      <AIProcessing
-        title={mode === 'selfie' ? 'Preparando tu foto' : 'Creando magia'}
-        subtitle={mode === 'selfie' ? 'Aplicando los últimos retoques…' : undefined}
-      />
+      {isAIGenerating || aiReadyStep ? (
+        <WaitingGames title="Creando magia" ready={!!aiReadyStep} onContinue={continueFromGames} />
+      ) : (
+        <AIProcessing
+          title={mode === 'selfie' ? 'Preparando tu foto' : 'Creando magia'}
+          subtitle={mode === 'selfie' ? 'Aplicando los últimos retoques…' : undefined}
+        />
+      )}
     </div>
   );
 
