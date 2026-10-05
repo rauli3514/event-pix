@@ -56,8 +56,12 @@ const tx = async <T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => I
   }).finally(() => db.close());
 };
 
+/** El video de bienvenida del Ingreso VIP puede ser más largo que un fondo. */
+export const MAX_VIP_VIDEO_BYTES = 300 * 1024 * 1024;
+
 export const saveScreenMedia = async (screen: ScreenKey | `acc:${string}` | `vip:${string}`, file: File) => {
-  if (file.size > MAX_MEDIA_BYTES) throw new Error('El archivo pesa más de 40 MB');
+  const max = screen.startsWith('vip:') ? MAX_VIP_VIDEO_BYTES : MAX_MEDIA_BYTES;
+  if (file.size > max) throw new Error(`El archivo pesa más de ${Math.round(max / 1024 / 1024)} MB`);
   await tx('readwrite', s => s.put({ screen, blob: file, type: file.type, name: file.name } satisfies MediaRecord));
   window.dispatchEvent(new CustomEvent('kiosk-media-changed', { detail: screen }));
 };

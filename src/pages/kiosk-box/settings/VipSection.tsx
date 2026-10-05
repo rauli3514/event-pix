@@ -121,7 +121,7 @@ export default function VipSection() {
             <div className="bg-white p-3 rounded-2xl shrink-0"><QRCodeSVG value={VIP_TEMPLATE_URL} size={150} /></div>
             <div className="space-y-2">
               <p className="text-lg font-semibold">Escaneá con el celular para bajar la plantilla de Excel</p>
-              <p className="text-white/60">Completala con los invitados (una fila por persona) y pasala al equipo: desde un pendrive, Google Drive o la carpeta Descargas, con "Cargar Excel de invitados".</p>
+              <p className="text-white/60">La plantilla tiene las columnas en el orden correcto: <b className="text-white/80">Mesa, Nombre, Apellido, Trasnoche, Living</b> (una fila por persona). Completala y pasala al equipo con "Cargar Excel de invitados": desde un pendrive, por Bluetooth (queda en Descargas), Google Drive o la carpeta Descargas.</p>
             </div>
           </div>
         )}
@@ -163,7 +163,7 @@ export default function VipSection() {
                 </button>
               )}
             </div>
-            <p className="text-white/50">{video ? `Video: ${video}` : 'Sin video: se muestra directamente la mesa.'} (hasta 40 MB, queda guardado en el equipo)</p>
+            <p className="text-white/50">{video ? `Video: ${video}` : 'Sin video: se muestra directamente la mesa.'} (hasta 300 MB; se puede cargar desde un pendrive y queda guardado en el equipo)</p>
           </>
         )}
         <Choice label="La mesa se muestra durante" value={Number(settings.vipResultSeconds) || 15}

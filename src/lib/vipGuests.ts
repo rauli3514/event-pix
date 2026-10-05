@@ -38,7 +38,7 @@ const yes = (s: string | undefined) => /^(si|sí|s|x|yes|y|1|true|verdadero)$/i.
 const HEADERS = {
   first: ['nombre', 'nombres', 'first_name', 'name'],
   last: ['apellido', 'apellidos', 'last_name', 'surname'],
-  table: ['mesa', 'mesas', 'table', 'ubicacion', 'lugar'],
+  table: ['mesa', 'mesas', 'nro de mesa', 'nro mesa', 'n de mesa', 'numero de mesa', 'num mesa', 'n° mesa', 'n° de mesa', 'nº mesa', 'nº de mesa', 'table', 'ubicacion', 'lugar'],
   afterParty: ['trasnoche', 'after', 'after_party'],
   living: ['living', 'puff', 'sillon'],
 } as const;
