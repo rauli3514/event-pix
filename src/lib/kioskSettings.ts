@@ -53,6 +53,8 @@ export interface KioskGeneralSettings {
   enableFiguritas?: boolean;
   /** Portada Fashion (tapa de revista, sin IA): aparece en "Fotos" */
   enablePortada?: boolean;
+  /** Portada Fashion con IA (en Fotos IA, gasta un crédito): por defecto sí */
+  enablePortadaAI?: boolean;
   portadaTitle?: string;
   portadaIssue?: string;
   /** Titulares, uno por línea */

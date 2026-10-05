@@ -11,6 +11,7 @@ import CoverPanel from './CoverPanel';
 const MODES = [
   { key: 'enableSelfie', label: 'Fotos (selfie con marco)', hint: 'Ícono "Fotos" del inicio.' },
   { key: 'enableAI', label: 'Retrato mágico (IA)', hint: 'Estilos de retrato con inteligencia artificial.' },
+  { key: 'enablePortadaAI', label: 'Portada Fashion IA', hint: 'La IA viste de modelo y sale la tapa de revista con el nombre.' },
   { key: 'enableCaricatura', label: 'Caricatura con Messi (IA)', hint: 'Caricatura del invitado festejando con Messi.' },
   // El Mundial ya pasó: viene apagado, se puede prender
   { key: 'enableMundial', label: 'Mundial 2026 (IA)', hint: 'Carta de jugador con nombre y posición (apagado por defecto).', off: true },
