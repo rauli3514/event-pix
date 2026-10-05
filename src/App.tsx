@@ -69,13 +69,17 @@ const App = () => (
             <Route path="/box/galeria" element={<KioskGallery />} />
             {/* Página pública del QR del kiosco: el invitado baja o comparte su foto */}
             <Route path="/foto" element={<GuestPhoto />} />
+            {/* Atajo al panel de kioscos */}
+            <Route path="/kioscos" element={<Navigate to="/admin/kioscos" replace />} />
             <Route path="/sticker-test" element={<div className="min-h-screen bg-zinc-950 pt-10"><StickerEditor userPhotoUrl="/placeholder-user.jpg" onSave={(url) => console.log(url)} onCancel={() => console.log("cancel")} /></div>} />
 
             <Route element={<EventProvider><Outlet /></EventProvider>}>
               <Route element={<ProtectedRoute />}>
                 <Route path="/admin" element={<AdminDashboard />} />
                 <Route path="/admin/providers" element={<ProvidersList />} />
-                <Route path="/admin/kiosco-manager" element={<KioskManager />} />
+                {/* El kiosco viejo (Kiosco IA Global) se reemplazó por el panel de kioscos */}
+                <Route path="/admin/kiosco-manager" element={<Navigate to="/admin/kioscos" replace />} />
+                <Route path="/admin/kiosco-anterior" element={<KioskManager />} />
                 <Route path="/admin/kioscos" element={<KioskAdmin />} />
                 <Route path="/admin/display" element={<DisplayHubMain />} />
                 <Route path="/intelligence" element={<ErrorBoundary><IntelligenceCanvasPage /></ErrorBoundary>} />
