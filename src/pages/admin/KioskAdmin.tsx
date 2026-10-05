@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, CalendarDays, Coins, MonitorSmartphone, RefreshCw } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Coins, MonitorSmartphone, RefreshCw, Wand2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import DevicesTab from '@/components/kiosk-admin/DevicesTab';
 import DeviceConfig from '@/components/kiosk-admin/DeviceConfig';
 import EventsTab from '@/components/kiosk-admin/EventsTab';
 import ClientsTab from '@/components/kiosk-admin/ClientsTab';
+import ThemesTab from '@/components/kiosk-admin/ThemesTab';
 import { btnGhost } from '@/components/kiosk-admin/ui';
 import type { KioskAccountRow, KioskDeviceRow, KioskEventRow } from '@/components/kiosk-admin/types';
 
@@ -18,7 +19,7 @@ const DEVICE_COLUMNS = 'id, device_code, name, pairing_status, kiosk_event_id, a
 const REMOTE_COLUMNS = 'settings, settings_rev, applied_rev, reported, reported_at';
 const CREDIT_COLUMNS = 'account_id';
 
-type Tab = 'devices' | 'events' | 'clients';
+type Tab = 'devices' | 'events' | 'clients' | 'themes';
 
 export default function KioskAdmin() {
   const [tab, setTab] = useState<Tab>('devices');
@@ -89,6 +90,10 @@ export default function KioskAdmin() {
                 className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold ${tab === 'clients' ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-white'}`}>
                 <Coins className="h-4 w-4" /> Clientes y créditos
               </button>
+              <button onClick={() => { setTab('themes'); setConfiguring(null); }}
+                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold ${tab === 'themes' ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-white'}`}>
+                <Wand2 className="h-4 w-4" /> Temáticas IA
+              </button>
             </nav>
             <button onClick={load} disabled={loading} className={btnGhost} aria-label="Actualizar"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></button>
           </div>
@@ -106,6 +111,7 @@ export default function KioskAdmin() {
           ? <DeviceConfig key={device.id} device={device} onClose={() => setConfiguring(null)} onSaved={() => { setConfiguring(null); void load(); }} />
           : <DevicesTab devices={devices} events={events} accounts={accounts} loadedAt={loadedAt} onChange={load}
               onConfigure={d => (missingMigration ? toast.error('Primero corré la migración de configuración remota') : setConfiguring(d.id))} />)}
+        {tab === 'themes' && <ThemesTab />}
         {tab === 'events' && <EventsTab events={events} devices={devices} onChange={load} />}
         {tab === 'clients' && (accounts
           ? <ClientsTab accounts={accounts} devices={devices} onChange={load} />
