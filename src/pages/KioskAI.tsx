@@ -20,7 +20,7 @@ import CameraVideo from '@/components/kiosk/CameraVideo';
 import GuestNameScreen from '@/components/kiosk/GuestNameScreen';
 import { isDriveConfigured, queueForDrive, startDriveSync, uploadForShare } from '@/lib/driveBackup';
 import { guestPhotoUrl } from '@/lib/kioskShare';
-import { startDeviceSync } from '@/lib/kioskDevice';
+import { getCachedDeviceState, getDeviceCode, getDeviceSecret, startDeviceSync } from '@/lib/kioskDevice';
 import { REMOTE_APPLIED_EVENT } from '@/lib/kioskRemote';
 import { guestFrameOptions, type FrameOption } from '@/lib/frameOptions';
 import { motion } from 'framer-motion';
@@ -648,8 +648,11 @@ High-end sports photography, 8k, cinematic, extremely detailed face, looking at 
 The subject must perfectly match the facial features and gender of the reference image.`;
         }
       }
-      // Llamada unificada a la Edge Function
+      // Llamada unificada a la Edge Function. El equipo paga con los créditos de su cliente
       const requestBody: any = { imageUrl: publicUrl };
+      if (getCachedDeviceState()?.pairingStatus === 'linked') {
+        requestBody.device = { code: getDeviceCode(), secret: getDeviceSecret() };
+      }
       if (mode === 'figuritas') {
         requestBody.action = 'remove_bg';
       } else {
@@ -660,6 +663,12 @@ The subject must perfectly match the facial features and gender of the reference
         body: requestBody
       });
 
+      // Sin créditos / sin cliente: se avisa y se vuelve al menú (la cabina clásica sigue)
+      if (data?.code && data.code !== 'credit_error') {
+        toast.error(data.code === 'no_credits' ? 'Se terminaron los créditos de IA. ¡Probá con Fotos!' : data.error, { duration: 7000 });
+        setStep('modeSelect');
+        return;
+      }
       if (functionError || !data?.success) throw new Error(functionError?.message || data?.error || 'Error iniciando IA');
 
       let currentPrediction = data.prediction;

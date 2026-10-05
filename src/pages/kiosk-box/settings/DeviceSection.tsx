@@ -40,6 +40,8 @@ export default function DeviceSection() {
           <Info label="Código" value={device?.deviceCode || '—'} mono />
           <Info label="Nombre" value={device?.name || '—'} />
           <Info label="Evento" value={device?.eventName || 'Sin evento'} />
+          <Info label="Cliente" value={device?.accountName || 'Sin cliente'} />
+          <Info label="Créditos de IA" value={device?.aiCredits == null ? '—' : String(device.aiCredits)} />
         </div>
         {version && <p className="text-white/40">Versión de la app: {version}</p>}
       </Panel>

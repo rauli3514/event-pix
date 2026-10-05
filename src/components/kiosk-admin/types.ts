@@ -13,6 +13,16 @@ export interface KioskDeviceRow {
   applied_rev: number;
   reported: RemoteSettings | null;
   reported_at: string | null;
+  /** Cliente dueño (créditos de IA) */
+  account_id?: string | null;
+}
+
+export interface KioskAccountRow {
+  id: string;
+  name: string;
+  contact: string | null;
+  credits: number;
+  created_at: string;
 }
 
 export interface KioskEventRow {
