@@ -986,78 +986,36 @@ The subject must perfectly match the facial features and gender of the reference
       {homeButton}
       <ScreenBackground screen="modes" />
       <Corners />
-      <div className="relative z-10 flex flex-col items-center justify-center h-full gap-12 px-8">
+      <div className="relative z-10 flex flex-col items-center justify-center h-full gap-6 px-8 pt-10">
         <h2 className="carlmarx-bold text-[clamp(2rem,5vw,4rem)] text-white text-center">¿Cómo querés tu foto?</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl overflow-y-auto max-h-[70vh] p-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 portrait:grid-cols-2 gap-5 w-full max-w-5xl overflow-y-auto max-h-[74vh] p-4">
 
-          {/* SELFIE GRUPAL */}
-          {(generalSettings.enableSelfie !== false && isModeAllowed('selfie')) && (
-            <button data-autofocus onClick={() => handleModeSelect('selfie')}
-              className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-cyan-400 kiosk-glass hover:scale-[1.03] focus:scale-[1.03] focus:outline-none focus:ring-4 focus:ring-white/80 hover:bg-cyan-400/10 transition-all">
-              <Users className="w-16 h-16 text-cyan-400" />
-              <span className="carlmarx-bold text-cyan-400 text-2xl uppercase tracking-wider">Selfie Grupal</span>
-              <p className="text-white/70 text-sm text-center">Una foto con amigos o familia.<br />Podés ponerle un marco decorativo.</p>
+          {[
+            { mode: 'selfie' as Exclude<Mode, null>, on: generalSettings.enableSelfie !== false, title: 'Selfie Grupal', text: 'Una foto con amigos o familia, con marco decorativo.', img: '/modes/selfie.jpg', icon: Users, color: '#22d3ee', ai: false },
+            { mode: 'portada' as Exclude<Mode, null>, on: generalSettings.enablePortada === true, title: 'Portada Fashion', text: '¡Sé la tapa de la revista! Tu foto real con tu nombre y titulares.', img: '/modes/portada.jpg', icon: Crown, color: '#f472b6', ai: false, cover: true },
+            { mode: 'portadaIA' as Exclude<Mode, null>, on: generalSettings.enablePortadaAI !== false, title: 'Portada Fashion IA', text: 'La IA te viste de modelo y salís en la tapa de revista con tu nombre.', img: '/modes/portada-ia.jpg', icon: Crown, color: '#e879f9', ai: true, cover: true },
+            { mode: 'retrato' as Exclude<Mode, null>, on: generalSettings.enableAI !== false, title: 'Retrato Mágico', text: 'Elegí un estilo (realeza, pirata, vikingo…) y la IA te transforma.', img: '/modes/retrato.jpg', icon: Sparkles, color: '#a78bfa', ai: true },
+            { mode: 'mundial' as Exclude<Mode, null>, on: generalSettings.enableMundial === true, title: 'Mundial 2026', text: 'Tu carta de jugador con nombre y posición.', img: '/modes/mundial.jpg', icon: Trophy, color: '#4ade80', ai: true },
+            { mode: 'caricatura' as Exclude<Mode, null>, on: generalSettings.enableCaricatura !== false, title: 'Caricatura con Messi', text: '¡Festejá con Messi! Tu caricatura con la camiseta argentina.', img: themes.find((t: any) => t.result_style === 'caricatura')?.preview_url || '/modes/caricatura.jpg', icon: Palette, color: '#fb923c', ai: true },
+            { mode: 'figuritas' as Exclude<Mode, null>, on: generalSettings.enableFiguritas !== false, title: 'Hacer Figurita', text: 'Tu propia figurita del álbum, con el fondo recortado.', img: '/modes/figurita.jpg', icon: Sticker, color: '#2dd4bf', ai: true },
+          ].filter(m => m.on && isModeAllowed(m.mode)).map(m => (
+            <button key={m.mode} data-autofocus onClick={() => handleModeSelect(m.mode)}
+              className="relative group flex flex-col rounded-2xl overflow-hidden border-2 kiosk-glass text-left hover:scale-[1.03] focus:scale-[1.03] focus:outline-none focus:ring-4 focus:ring-white/80 transition-all"
+              style={{ borderColor: m.color }}>
+              <div className="relative w-full aspect-[16/10] bg-black/40 overflow-hidden">
+                <img src={m.img} alt="" loading="lazy" className={`absolute inset-0 w-full h-full object-cover ${m.cover ? 'object-top' : 'object-center'}`} />
+                <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/70 to-transparent" />
+                <span className={`absolute top-2 left-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider shadow-lg ${m.ai ? 'bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7] text-white' : 'bg-white/90 text-black'}`}>
+                  {m.ai ? '✨ Con IA' : 'Foto real'}
+                </span>
+                <m.icon className="absolute bottom-2 left-3 w-9 h-9 drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)]" style={{ color: m.color }} />
+              </div>
+              <div className="flex flex-col gap-1.5 px-4 py-3">
+                <span className="carlmarx-bold text-xl uppercase tracking-wider" style={{ color: m.color }}>{m.title}</span>
+                <p className="text-white/75 text-sm leading-snug">{m.text}</p>
+              </div>
             </button>
-          )}
-
-          {/* PORTADA FASHION (tapa de revista, sin IA) */}
-          {(generalSettings.enablePortada === true && isModeAllowed('portada')) && (
-            <button data-autofocus onClick={() => handleModeSelect('portada')}
-              className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-pink-400 kiosk-glass hover:scale-[1.03] focus:scale-[1.03] focus:outline-none focus:ring-4 focus:ring-white/80 hover:bg-pink-400/10 transition-all">
-              <Crown className="w-16 h-16 text-pink-400" />
-              <span className="carlmarx-bold text-pink-400 text-2xl uppercase tracking-wider">Portada Fashion</span>
-              <p className="text-white/70 text-sm text-center">¡Sé la tapa de la revista!<br />Con tu nombre y titulares de la fiesta.</p>
-            </button>
-          )}
-
-          {/* PORTADA FASHION CON IA: la IA viste de modelo y sale la tapa con el nombre */}
-          {(generalSettings.enablePortadaAI !== false && isModeAllowed('portadaIA')) && (
-            <button data-autofocus onClick={() => handleModeSelect('portadaIA')}
-              className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-fuchsia-400 kiosk-glass hover:scale-[1.03] focus:scale-[1.03] focus:outline-none focus:ring-4 focus:ring-white/80 hover:bg-fuchsia-400/10 transition-all">
-              <Crown className="w-16 h-16 text-fuchsia-400" />
-              <span className="carlmarx-bold text-fuchsia-400 text-2xl uppercase tracking-wider">Portada Fashion IA</span>
-              <p className="text-white/70 text-sm text-center">La IA te viste de modelo<br />y salís en la tapa con tu nombre.</p>
-            </button>
-          )}
-
-          {/* RETRATO MÁGICO */}
-          {(generalSettings.enableAI !== false && isModeAllowed('retrato')) && (
-            <button data-autofocus onClick={() => handleModeSelect('retrato')}
-              className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-violet-400 kiosk-glass hover:scale-[1.03] focus:scale-[1.03] focus:outline-none focus:ring-4 focus:ring-white/80 hover:bg-violet-400/10 transition-all">
-              <Sparkles className="w-16 h-16 text-violet-400" />
-              <span className="carlmarx-bold text-violet-400 text-2xl uppercase tracking-wider">Retrato Mágico</span>
-              <p className="text-white/70 text-sm text-center">Una foto de vos solo.<br />Elegí entre muchos estilos de retrato.</p>
-            </button>
-          )}
-
-          {/* MUNDIAL */}
-          {(generalSettings.enableMundial === true && isModeAllowed('mundial')) && (
-            <button data-autofocus onClick={() => handleModeSelect('mundial')}
-              className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-green-400 kiosk-glass hover:scale-[1.03] focus:scale-[1.03] focus:outline-none focus:ring-4 focus:ring-white/80 hover:bg-green-400/10 transition-all">
-              <Trophy className="w-16 h-16 text-green-400" />
-              <span className="carlmarx-bold text-green-400 text-2xl uppercase tracking-wider">Mundial 2026</span>
-              <p className="text-white/70 text-sm text-center">¡Convertite en una estrella del fútbol!<br />Tu carta de jugador con nombre y posición.</p>
-            </button>
-          )}
-          {/* CARICATURA MUNDIAL */}
-          {(generalSettings.enableCaricatura !== false && isModeAllowed('caricatura')) && (
-            <button data-autofocus onClick={() => handleModeSelect('caricatura')}
-              className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-orange-400 kiosk-glass hover:scale-[1.03] focus:scale-[1.03] focus:outline-none focus:ring-4 focus:ring-white/80 hover:bg-orange-400/10 transition-all">
-              <Palette className="w-16 h-16 text-orange-400" />
-              <span className="carlmarx-bold text-orange-400 text-2xl uppercase tracking-wider">Caricatura con Messi</span>
-              <p className="text-white/70 text-sm text-center">¡Festejá con Messi!<br />Tu caricatura con la camiseta argentina.</p>
-            </button>
-          )}
-
-          {/* FIGURITAS */}
-          {generalSettings.enableFiguritas !== false && isModeAllowed('figuritas') && (
-          <button data-autofocus onClick={() => handleModeSelect('figuritas')}
-            className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-teal-400 kiosk-glass hover:scale-[1.03] focus:scale-[1.03] focus:outline-none focus:ring-4 focus:ring-white/80 hover:bg-teal-400/10 transition-all">
-            <Sticker className="w-16 h-16 text-teal-400" />
-            <span className="carlmarx-bold text-teal-400 text-2xl uppercase tracking-wider">Hacer Figurita</span>
-            <p className="text-white/70 text-sm text-center">¡Crea tu propia carta oficial!<br />Quita el fondo y personalízala.</p>
-          </button>
-          )}
+          ))}
         </div>
       </div>
     </div>
