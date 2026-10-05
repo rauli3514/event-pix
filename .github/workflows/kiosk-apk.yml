@@ -1,11 +1,16 @@
 name: APK del kiosco
 
 # Genera el APK de prueba del kiosco (VITE_APP_FLAVOR=kiosk) y lo publica en la
-# release "kiosco-prueba", con un link fijo para bajarlo desde la TV box.
+# release elegida (por defecto "kiosco-prueba"), con un link fijo para bajarlo desde la TV box.
 # Solo a mano (Actions → "APK del kiosco" → Run workflow): para probar cambios
 # alcanza con la versión web de Vercel; el APK hace falta para la impresión nativa.
 on:
   workflow_dispatch:
+    inputs:
+      release:
+        description: 'Release donde se publica el APK (ej. kiosco-prueba, kiosco-v2)'
+        required: false
+        default: kiosco-prueba
 
 permissions:
   contents: write
@@ -81,13 +86,14 @@ jobs:
           name: eventpix-kiosco
           path: eventpix-kiosco.apk
 
-      - name: Publicar en la release "kiosco-prueba"
+      - name: Publicar en la release "${{ inputs.release || 'kiosco-prueba' }}"
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE: ${{ inputs.release || 'kiosco-prueba' }}
         run: |
-          gh release delete kiosco-prueba --yes --cleanup-tag || true
-          gh release create kiosco-prueba eventpix-kiosco.apk \
+          gh release delete "$RELEASE" --yes --cleanup-tag || true
+          gh release create "$RELEASE" eventpix-kiosco.apk \
             --prerelease \
             --target "$GITHUB_SHA" \
-            --title "Kiosco de prueba" \
-            --notes "APK de prueba del kiosco (commit ${GITHUB_SHA::7}). Se instala al lado de la app de TV como \"EventPix Kiosco\"."
+            --title "Kiosco ($RELEASE)" \
+            --notes "APK del kiosco (commit ${GITHUB_SHA::7}). Se instala como \"EventPix Kiosco\" y se actualiza encima de la versión anterior sin perder los ajustes."

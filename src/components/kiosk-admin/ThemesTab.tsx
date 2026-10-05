@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { ImagePlus, Loader2, Plus, Save, Sparkles, Wand2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { coverOptionsFrom } from '@/lib/magazineCover';
+import { useCoverPreview } from '@/hooks/use-cover-preview';
 import { btnGhost, btnPrimary, card, Check, Field, input, Select } from './ui';
 
 // Temáticas de "Retrato mágico" (tabla ai_themes): editar el prompt, probarlo con
@@ -233,8 +235,8 @@ function ThemeEditor({ theme, onSaved }: { theme: ThemeRow; onSaved: () => void 
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
           <Preview label="Foto original" src={photo} />
-          <Preview label="Resultado" src={result} loading={running} />
-          <Preview label="Muestra actual en el kiosco" src={theme.preview_url} />
+          <Preview label="Resultado" src={result} loading={running} cover={form.result_style === 'cover'} />
+          <Preview label="Muestra actual en el kiosco" src={theme.preview_url} cover={form.result_style === 'cover'} />
         </div>
         {result && (
           <button onClick={useAsPreview} disabled={usingResult} className={btnPrimary}>
@@ -246,7 +248,13 @@ function ThemeEditor({ theme, onSaved }: { theme: ThemeRow; onSaved: () => void 
   );
 }
 
-function Preview({ label, src, loading }: { label: string; src: string | null; loading?: boolean }) {
+// Portada Fashion IA: la muestra se ve dentro de la tapa de revista, como en el kiosco
+// (con los textos de portada por defecto; cada equipo usa los suyos)
+const DEFAULT_COVER = coverOptionsFrom({});
+
+function Preview({ label, src, loading, cover }: { label: string; src: string | null; loading?: boolean; cover?: boolean }) {
+  const coverUrl = useCoverPreview(cover ? src : null, DEFAULT_COVER);
+  if (cover && src && coverUrl) src = coverUrl;
   return (
     <div className="space-y-1.5">
       <p className="text-xs font-medium text-slate-400">{label}</p>
