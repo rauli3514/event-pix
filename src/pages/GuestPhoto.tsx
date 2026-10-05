@@ -1,12 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Download, MessageCircle, Share2 } from 'lucide-react';
 import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
 import { EventPixLogo } from '@/components/kiosk/brand/EventPixLogo';
 import { driveImageUrl } from '@/lib/kioskShare';
+import { getCachedStore, loadStore } from '@/lib/kioskStore';
 
 // Página que abre el invitado en el celular al escanear el QR del kiosco:
 // ve su foto y la baja o la comparte (WhatsApp, Instagram y lo que tenga el teléfono).
+
+// WhatsApp de EventPix por si no está cargado en el panel (Clientes y créditos)
+const EVENTPIX_WHATSAPP = '5493624547382';
 
 const isPhotoUrl = (u: string) => /^https:\/\/[\w.-]+\/storage\/v1\/object\/public\//.test(u);
 
@@ -18,6 +22,10 @@ export default function GuestPhoto() {
   const downloadUrl = driveId ? `https://drive.google.com/uc?export=download&id=${driveId}` : url;
   const title = params.get('t') || '';
   const [busy, setBusy] = useState(false);
+  const [contactPhone, setContactPhone] = useState(() => getCachedStore().contact_phone || EVENTPIX_WHATSAPP);
+  useEffect(() => {
+    loadStore().then(s => { if (s.contact_phone) setContactPhone(s.contact_phone); }).catch(() => {});
+  }, []);
   const valid = !!driveId || isPhotoUrl(url);
 
   const fileOf = async () => {
@@ -63,6 +71,10 @@ export default function GuestPhoto() {
   };
 
   const whatsapp = `https://wa.me/?text=${encodeURIComponent(`${title ? `Mi foto de ${title} 📸 ` : 'Mi foto 📸 '}${window.location.href}`)}`;
+  const contactText = title
+    ? `Hola! Vi mi foto del photobooth de EventPix en ${title} y quiero info para mi evento.`
+    : 'Hola! Vi mi foto del photobooth de EventPix y quiero info para mi evento.';
+  const contact = `https://wa.me/${contactPhone.replace(/\D/g, '')}?text=${encodeURIComponent(contactText)}`;
   const button = 'w-full flex items-center justify-center gap-3 rounded-2xl py-4 text-lg font-bold disabled:opacity-50';
 
   return (
@@ -92,6 +104,15 @@ export default function GuestPhoto() {
         ) : (
           <p className="text-white/70 text-center mt-10">No encontramos la foto. Volvé a escanear el código del kiosco.</p>
         )}
+
+        {/* Contacto con EventPix: el invitado que quiere el photobooth para su evento */}
+        <div className="w-full kiosk-glass rounded-3xl p-5 mt-2 flex flex-col items-center gap-3 text-center">
+          <p className="text-lg font-bold">¿Querés un photobooth como este en tu evento?</p>
+          <p className="text-white/60 text-sm">Fotos al instante, impresión y fotos con IA.</p>
+          <a href={contact} target="_blank" rel="noreferrer" className={`${button} bg-[#25D366] text-[#05300f]`}>
+            <MessageCircle className="w-6 h-6" /> Escribinos por WhatsApp
+          </a>
+        </div>
       </div>
     </div>
   );

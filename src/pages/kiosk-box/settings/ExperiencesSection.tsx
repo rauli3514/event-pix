@@ -7,6 +7,7 @@ import { allFrameOptions, isCustomFrame } from '@/lib/frameOptions';
 import { buttonClass, Field, inputClass, Panel, Toggle } from './ui';
 import PhotoLayoutPanel from './PhotoLayoutPanel';
 import CoverPanel from './CoverPanel';
+import TriviaPanel from './TriviaPanel';
 
 const MODES = [
   { key: 'enableSelfie', label: 'Fotos (selfie con marco)', hint: 'Ícono "Fotos" del inicio.' },
@@ -76,7 +77,11 @@ export default function ExperiencesSection() {
             checked={'off' in m ? settings[m.key] === true : settings[m.key] !== false}
             onChange={v => setSettings(saveGeneralSettings({ [m.key]: v }))} />
         ))}
+        <Toggle label="Juego de 1 minuto antes de la foto (Fotos)" hint="Un juego al azar (tateti, pelotita, piedra papel o tijera, memotest, reflejos, Simón dice, trivia) y después la foto. En Fotos IA siempre hay juego mientras la IA trabaja."
+          checked={settings.photoGame === true} onChange={photoGame => setSettings(saveGeneralSettings({ photoGame }))} />
       </Panel>
+
+      <TriviaPanel />
 
       <CoverPanel />
 
