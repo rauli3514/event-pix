@@ -8,6 +8,17 @@
 
 ALTER TABLE public.ai_themes ADD COLUMN IF NOT EXISTS result_style TEXT;
 ALTER TABLE public.ai_themes ADD COLUMN IF NOT EXISTS sort_order INTEGER;
+ALTER TABLE public.ai_themes ADD COLUMN IF NOT EXISTS max_people INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE public.ai_themes ADD COLUMN IF NOT EXISTS emoji TEXT;
+ALTER TABLE public.ai_themes ADD COLUMN IF NOT EXISTS is_default BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE public.ai_themes ADD COLUMN IF NOT EXISTS preview_url TEXT;
+
+-- El nombre tiene que ser único (lo usa ON CONFLICT más abajo)
+DO $c$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ai_themes_name_key' AND conrelid = 'public.ai_themes'::regclass) THEN
+    ALTER TABLE public.ai_themes ADD CONSTRAINT ai_themes_name_key UNIQUE (name);
+  END IF;
+END $c$;
 
 -- Renombradas (conservan su imagen de muestra)
 UPDATE public.ai_themes SET name = 'Realeza de Cuento' WHERE name = 'Princesa de Cuento' AND NOT EXISTS (SELECT 1 FROM public.ai_themes WHERE name = 'Realeza de Cuento');
