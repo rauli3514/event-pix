@@ -660,8 +660,6 @@ The subject must perfectly match the facial features and gender of the reference
         requestBody.action = 'remove_bg';
       } else {
         requestBody.prompt = prompt;
-        // Modelo de IA elegido para la temática en el panel (vacío = el de la función)
-        if (theme?.ai_model) requestBody.model = theme.ai_model;
       }
 
       const { data, error: functionError } = await supabase.functions.invoke('generate-ai-photo', {

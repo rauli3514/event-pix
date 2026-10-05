@@ -37,18 +37,10 @@ interface Prediction { id: string; status: 'starting' | 'processing' | 'succeede
 // ─── fal.ai ─────────────────────────────────────────────────────────
 const FAL_QUEUE = 'https://queue.fal.run/'
 
-// Modelos que cada temática puede elegir (lista cerrada: nadie puede pedir uno caro)
-const ALLOWED_MODELS = [
-  'fal-ai/nano-banana/edit',
-  'fal-ai/nano-banana-2/edit',
-  'fal-ai/flux-pro/kontext',
-  'fal-ai/flux-pro/kontext/max',
-]
-
-async function falStart(key: string, imageUrl: string, prompt: string | undefined, removeBg: boolean, wanted?: string): Promise<Prediction> {
+async function falStart(key: string, imageUrl: string, prompt: string | undefined, removeBg: boolean): Promise<Prediction> {
   const model = removeBg
     ? (Deno.env.get('FAL_BG_MODEL') || 'fal-ai/birefnet')
-    : (wanted && ALLOWED_MODELS.includes(wanted) ? wanted : (Deno.env.get('FAL_MODEL') || 'fal-ai/nano-banana/edit'))
+    : (Deno.env.get('FAL_MODEL') || 'fal-ai/nano-banana/edit')
   // Nano Banana y GPT Image reciben una lista de fotos; Kontext y BiRefNet, una sola
   const input = removeBg ? { image_url: imageUrl }
     : /nano-banana|gpt-image/.test(model) ? { prompt, image_urls: [imageUrl], num_images: 1 }
@@ -121,7 +113,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json()
-    const { imageUrl, prompt, predictionId, action, device, model } = body
+    const { imageUrl, prompt, predictionId, action, device } = body
 
     // ─── Consultar un trabajo ───
     if (predictionId) {
@@ -166,7 +158,7 @@ serve(async (req) => {
     let prediction: Prediction
     try {
       prediction = FAL_KEY
-        ? await falStart(FAL_KEY, imageUrl, prompt, removeBg, typeof model === 'string' ? model : undefined)
+        ? await falStart(FAL_KEY, imageUrl, prompt, removeBg)
         : await replicateStart(REPLICATE_API_TOKEN!, imageUrl, prompt, removeBg)
     } catch (e) {
       if (ledgerId) await admin.rpc('kiosk_ai_refund', { p_ledger: ledgerId })
