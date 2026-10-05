@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { Aperture, Clapperboard, Images, PartyPopper, Ban, Zap } from 'lucide-react';
+import { Aperture, Clapperboard, Images, PartyPopper, Ban, Zap, MonitorPlay } from 'lucide-react';
 import AttractScreen from '@/components/kiosk/AttractScreen';
 import { NAME_STYLES } from '@/components/kiosk/attractStyles';
 import { getGeneralSettings, saveGeneralSettings, SPLASH_STYLES, SPLASH_VIDEOS } from '@/lib/kioskSettings';
 import { getScreenBackground, setScreenBackground } from '@/lib/kioskMedia';
-import { Choice, Field, inputClass, Panel } from './ui';
+import { buttonClass, Choice, Field, inputClass, Panel, Toggle } from './ui';
+import { DEFAULT_SCREENSAVER_MINUTES, SCREENSAVER_PREVIEW_EVENT } from '@/lib/kioskScreensaver';
 import RotationPanel from './RotationPanel';
 
 export const DEFAULT_WELCOME_TITLE = 'Tocá para empezar';
@@ -92,6 +93,19 @@ export default function SplashSection() {
             </StyleOption>
           ))}
         </div>
+      </Panel>
+
+      <Panel title="Protector de pantalla" description="Si nadie toca la pantalla ni el control, aparece el logo de EventPix animado. Se cierra con cualquier toque o tecla.">
+        <Toggle label="Usar protector de pantalla" checked={settings.screensaver !== false}
+          onChange={screensaver => update({ screensaver })} />
+        {settings.screensaver !== false && (
+          <Choice label="Aparece después de" value={Number(settings.screensaverMinutes) || DEFAULT_SCREENSAVER_MINUTES}
+            options={[1, 2, 5, 10, 15, 30].map(m => ({ value: m, label: `${m} min` }))}
+            onChange={screensaverMinutes => update({ screensaverMinutes })} />
+        )}
+        <button onClick={() => window.dispatchEvent(new Event(SCREENSAVER_PREVIEW_EVENT))} className={buttonClass}>
+          <MonitorPlay className="w-5 h-5" /> Ver cómo queda
+        </button>
       </Panel>
 
       <RotationPanel />

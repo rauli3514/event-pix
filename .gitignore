@@ -67,3 +67,4 @@ coverage/
 build_log.txt
 job_log.txt
 logs.zip
+docs/marca/*.zip

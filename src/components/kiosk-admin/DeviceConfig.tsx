@@ -210,6 +210,11 @@ export default function DeviceConfig({ device, onClose, onSaved }: {
                 options={[{ value: 'auto', label: 'Automática' }, { value: '1080', label: 'Full HD' }, { value: '720', label: 'HD' }, { value: '480', label: 'Baja' }]}
                 onChange={v => set('camera', 'quality', v)} />
             </Field>
+            <Field label="Protector de pantalla">
+              <Select value={bool('general', 'screensaver', true) ? num(g('screensaverMinutes'), 5) : 0}
+                options={[{ value: 0, label: 'Apagado' }, ...[1, 2, 5, 10, 15, 30].map(n => ({ value: n, label: `Después de ${n} min` }))]}
+                onChange={v => { set('general', 'screensaver', Number(v) > 0); if (Number(v) > 0) set('general', 'screensaverMinutes', Number(v)); }} />
+            </Field>
           </div>
           <Check label="Modo espejo" checked={bool('camera', 'mirror', false)} onChange={v => set('camera', 'mirror', v)} />
         </Section>

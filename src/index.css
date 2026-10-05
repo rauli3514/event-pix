@@ -9,6 +9,15 @@
 @import "@fontsource/great-vibes";
 
 /* ── Kiosk Custom Fonts ── */
+/* Letra del logo EventPix (Poppins ExtraBold, licencia OFL), igual que en la publicidad */
+@font-face {
+  font-family: 'EventPixBrand';
+  src: url('/fonts/poppins-800.woff2') format('woff2');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+.brand-wordmark { font-family: 'EventPixBrand', system-ui, sans-serif; font-weight: 800; letter-spacing: -0.02em; }
 @font-face {
   font-family: 'CarlMarx';
   src: url('/CarlMarx-Bold.ttf') format('truetype');
@@ -377,4 +386,38 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .attract-polaroid, .attract-neon, .attract-iris, .attract-flash, .attract-shutter,
   .attract-confetti, .attract-beam, .attract-cta-ring, .attract-shine { animation: none; }
+}
+
+/* ── Protector de pantalla del kiosco ───────────────────────────────── */
+@keyframes saver-in { from { opacity: 0; } to { opacity: 1; } }
+.kiosk-saver-in { animation: saver-in 1.2s ease-out both; }
+@keyframes saver-x { from { transform: translate3d(-26vw, 0, 0); } to { transform: translate3d(26vw, 0, 0); } }
+@keyframes saver-y { from { transform: translate3d(0, -13vh, 0); } to { transform: translate3d(0, 13vh, 0); } }
+.kiosk-saver-x { animation: saver-x 29s ease-in-out infinite alternate; will-change: transform; }
+.kiosk-saver-y { animation: saver-y 19s ease-in-out infinite alternate; will-change: transform; }
+@keyframes saver-pop { 0% { transform: scale(0.3) rotate(-25deg); opacity: 0; } 70% { transform: scale(1.08) rotate(4deg); opacity: 1; } 100% { transform: scale(1) rotate(0); } }
+.kiosk-saver-pop { animation: saver-pop 1.4s cubic-bezier(.2,.9,.3,1.2) both; }
+@keyframes saver-breathe { 0%, 100% { transform: scale(1) rotate(-3deg); } 50% { transform: scale(1.06) rotate(3deg); } }
+.kiosk-saver-breathe { animation: saver-breathe 5s ease-in-out infinite; filter: drop-shadow(0 2vmin 5vmin rgba(123,47,247,0.6)); }
+@keyframes saver-glow { 0%, 100% { opacity: 0.45; transform: scale(0.9); } 50% { opacity: 0.9; transform: scale(1.1); } }
+.kiosk-saver-glow { background: radial-gradient(circle, rgba(177,75,255,0.55), rgba(255,46,147,0.18) 45%, transparent 70%); animation: saver-glow 5s ease-in-out infinite; }
+@keyframes saver-ring { 0% { transform: scale(0.95); opacity: 0.8; } 100% { transform: scale(1.7); opacity: 0; } }
+.kiosk-saver-ring { animation: saver-ring 3s ease-out infinite; }
+.kiosk-saver-iris, .kiosk-saver-focus, .kiosk-saver-star, .kiosk-saver-glint { transform-box: fill-box; transform-origin: center; }
+@keyframes saver-spin { to { transform: rotate(360deg); } }
+.kiosk-saver-iris { animation: saver-spin 9s linear infinite; }
+@keyframes saver-focus { 0%, 100% { transform: scale(1); } 45% { transform: scale(0.72); } 55% { transform: scale(0.72); } }
+.kiosk-saver-focus { animation: saver-focus 4s ease-in-out infinite; }
+@keyframes saver-star { 0%, 100% { transform: scale(1) rotate(0); opacity: 1; } 50% { transform: scale(0.55) rotate(45deg); opacity: 0.6; } }
+.kiosk-saver-star { animation: saver-star 2.4s ease-in-out infinite; }
+.kiosk-saver-star.small { animation-delay: 1.2s; }
+@keyframes saver-glint { 0%, 55% { transform: translateX(0); } 100% { transform: translateX(110px); } }
+.kiosk-saver-glint { animation: saver-glint 4.5s ease-in-out infinite; }
+@keyframes saver-twinkle { 0%, 100% { transform: scale(0.2) rotate(0); opacity: 0; } 50% { transform: scale(1) rotate(90deg); opacity: 0.9; } }
+.kiosk-saver-twinkle { animation: saver-twinkle 4s ease-in-out infinite; will-change: transform, opacity; }
+@keyframes saver-hint { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.9; } }
+.kiosk-saver-hint { animation: saver-hint 3s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .kiosk-saver-x, .kiosk-saver-y, .kiosk-saver-breathe, .kiosk-saver-glow, .kiosk-saver-ring, .kiosk-saver-iris,
+  .kiosk-saver-focus, .kiosk-saver-star, .kiosk-saver-glint, .kiosk-saver-twinkle { animation: none; }
 }

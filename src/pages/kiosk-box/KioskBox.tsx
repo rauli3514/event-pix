@@ -152,7 +152,7 @@ export default function KioskBox() {
 
   return (
     <div ref={rootRef} className="relative min-h-screen overflow-hidden text-white">
-      <ScreenBackground screen="home" />
+      <ScreenBackground screen="home" brand={false} />
       <div className="relative min-h-screen flex flex-col">
         <header className="flex items-center justify-between px-12 pt-10">
           <EventPixLogo size={60} />

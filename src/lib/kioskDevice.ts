@@ -117,6 +117,21 @@ export const checkinDevice = async (appVersion?: string): Promise<KioskDeviceSta
   return state;
 };
 
+/** Cambia el nombre del equipo (se ve en el panel). Necesita internet. */
+export const renameDevice = async (name: string) => {
+  const { data, error } = await supabase.rpc('kiosk_device_rename', {
+    p_code: getDeviceCode(), p_secret: getDeviceSecret(), p_name: name,
+  });
+  if (error) {
+    throw new Error(/function|schema cache/i.test(error.message)
+      ? 'Falta correr el SQL de renombrar equipos en Supabase'
+      : error.message);
+  }
+  const state = getCachedDeviceState();
+  if (state) write(STATE_KEY, JSON.stringify({ ...state, name: (data as string | null) ?? null }));
+  return (data as string | null) ?? null;
+};
+
 /**
  * Checkin cada minuto mientras el kiosco está abierto (el inicio /box ya lo hace
  * por su cuenta): así el panel lo ve en línea y le llegan los cambios.
