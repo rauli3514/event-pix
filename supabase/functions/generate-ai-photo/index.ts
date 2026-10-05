@@ -8,7 +8,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0"
 // crédito se devuelve solo. Un usuario logueado en el panel puede probar sin gastar.
 //
 // Proveedor: fal.ai si está el secreto FAL_KEY (modelo FAL_MODEL, por defecto
-// fal-ai/flux-pro/kontext; figuritas con FAL_BG_MODEL, por defecto fal-ai/birefnet).
+// fal-ai/nano-banana/edit, ~US$0,04 por foto; también sirven fal-ai/nano-banana-2/edit
+// o fal-ai/flux-pro/kontext). Figuritas con FAL_BG_MODEL, por defecto fal-ai/birefnet.
 // Sin FAL_KEY se usa Replicate (REPLICATE_API_TOKEN), como antes.
 //
 // La respuesta mantiene la forma de Replicate ({ prediction: { id, status, output } })
@@ -39,8 +40,11 @@ const FAL_QUEUE = 'https://queue.fal.run/'
 async function falStart(key: string, imageUrl: string, prompt: string | undefined, removeBg: boolean): Promise<Prediction> {
   const model = removeBg
     ? (Deno.env.get('FAL_BG_MODEL') || 'fal-ai/birefnet')
-    : (Deno.env.get('FAL_MODEL') || 'fal-ai/flux-pro/kontext')
-  const input = removeBg ? { image_url: imageUrl } : { image_url: imageUrl, prompt }
+    : (Deno.env.get('FAL_MODEL') || 'fal-ai/nano-banana/edit')
+  // Nano Banana y GPT Image reciben una lista de fotos; Kontext y BiRefNet, una sola
+  const input = removeBg ? { image_url: imageUrl }
+    : /nano-banana|gpt-image/.test(model) ? { prompt, image_urls: [imageUrl], num_images: 1 }
+    : { image_url: imageUrl, prompt }
   const res = await fetch(FAL_QUEUE + model, {
     method: 'POST',
     headers: { Authorization: `Key ${key}`, 'Content-Type': 'application/json' },

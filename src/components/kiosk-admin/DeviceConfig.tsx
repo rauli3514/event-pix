@@ -144,8 +144,8 @@ export default function DeviceConfig({ device, onClose, onSaved }: {
             <Check label="Fotos" checked={bool('general', 'enableSelfie', true)} onChange={v => set('general', 'enableSelfie', v)} />
             <Check label="Portada Fashion" checked={bool('general', 'enablePortada', false)} onChange={v => set('general', 'enablePortada', v)} />
             <Check label="Retrato IA" checked={bool('general', 'enableAI', true)} onChange={v => set('general', 'enableAI', v)} />
-            <Check label="Mundial" checked={bool('general', 'enableMundial', true)} onChange={v => set('general', 'enableMundial', v)} />
-            <Check label="Caricatura" checked={bool('general', 'enableCaricatura', true)} onChange={v => set('general', 'enableCaricatura', v)} />
+            <Check label="Caricatura con Messi" checked={bool('general', 'enableCaricatura', true)} onChange={v => set('general', 'enableCaricatura', v)} />
+            <Check label="Mundial (carta)" checked={bool('general', 'enableMundial', false)} onChange={v => set('general', 'enableMundial', v)} />
             <Check label="Figuritas" checked={bool('general', 'enableFiguritas', true)} onChange={v => set('general', 'enableFiguritas', v)} />
             <Check label="Filtros de color" checked={bool('general', 'enableFilters', false)} onChange={v => set('general', 'enableFilters', v)} />
             <Check label="Accesorios" checked={bool('general', 'enableAccessories', false)} onChange={v => set('general', 'enableAccessories', v)} />

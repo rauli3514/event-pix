@@ -11,10 +11,11 @@ import CoverPanel from './CoverPanel';
 const MODES = [
   { key: 'enableSelfie', label: 'Fotos (selfie con marco)', hint: 'Ícono "Fotos" del inicio.' },
   { key: 'enableAI', label: 'Retrato mágico (IA)', hint: 'Estilos de retrato con inteligencia artificial.' },
-  { key: 'enableMundial', label: 'Mundial 2026 (IA)', hint: 'Carta de jugador con nombre y posición.' },
-  { key: 'enableCaricatura', label: 'Caricatura Mundial (IA)', hint: 'Caricatura con el nombre del invitado.' },
+  { key: 'enableCaricatura', label: 'Caricatura con Messi (IA)', hint: 'Caricatura del invitado festejando con Messi.' },
+  // El Mundial ya pasó: viene apagado, se puede prender
+  { key: 'enableMundial', label: 'Mundial 2026 (IA)', hint: 'Carta de jugador con nombre y posición (apagado por defecto).', off: true },
   { key: 'enableFiguritas', label: 'Hacer figurita', hint: 'Figurita del álbum con fondo quitado.' },
-] as const;
+] as const satisfies readonly { key: string; label: string; hint: string; off?: boolean }[];
 
 // Un PNG de marco pesado puede no entrar en el almacenamiento del equipo
 const MAX_FRAME_BYTES = 3 * 1024 * 1024;
@@ -71,7 +72,7 @@ export default function ExperiencesSection() {
       <Panel title="Experiencias" description="Las que apagues no aparecen en el kiosco.">
         {MODES.map(m => (
           <Toggle key={m.key} label={m.label} hint={m.hint}
-            checked={settings[m.key] !== false}
+            checked={'off' in m ? settings[m.key] === true : settings[m.key] !== false}
             onChange={v => setSettings(saveGeneralSettings({ [m.key]: v }))} />
         ))}
       </Panel>

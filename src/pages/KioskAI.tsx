@@ -275,7 +275,10 @@ export default function KioskAI() {
     });
 
     (async () => {
-      const { data } = await supabase.from('ai_themes').select('*').order('created_at', { ascending: false });
+      // Orden elegido en el panel (sort_order); bases viejas sin esa columna: por fecha
+      let { data, error } = await supabase.from('ai_themes').select('*')
+        .order('sort_order', { ascending: true, nullsFirst: false }).order('created_at', { ascending: false });
+      if (error) ({ data } = await supabase.from('ai_themes').select('*').order('created_at', { ascending: false }));
       if (data) setThemes(data);
     })();
 
@@ -702,6 +705,9 @@ The subject must perfectly match the facial features and gender of the reference
       let finalImage: string;
       if (mode === 'mundial') {
         finalImage = await buildMundialCard(outputUrl);
+      } else if (theme?.result_style === 'cover') {
+        // Portada Fashion IA: la foto de la IA va dentro de la tapa de revista
+        finalImage = await renderMagazineCover(outputUrl, coverOptionsFrom(generalSettings));
       } else {
         finalImage = await mergeImages(outputUrl, frameUrl);
       }
@@ -988,7 +994,7 @@ The subject must perfectly match the facial features and gender of the reference
           )}
 
           {/* MUNDIAL */}
-          {(generalSettings.enableMundial !== false && isModeAllowed('mundial')) && (
+          {(generalSettings.enableMundial === true && isModeAllowed('mundial')) && (
             <button data-autofocus onClick={() => handleModeSelect('mundial')}
               className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-green-400 kiosk-glass hover:scale-[1.03] focus:scale-[1.03] focus:outline-none focus:ring-4 focus:ring-white/80 hover:bg-green-400/10 transition-all">
               <Trophy className="w-16 h-16 text-green-400" />
@@ -1001,8 +1007,8 @@ The subject must perfectly match the facial features and gender of the reference
             <button data-autofocus onClick={() => handleModeSelect('caricatura')}
               className="relative group flex flex-col items-center gap-4 p-8 rounded-2xl border-2 border-orange-400 kiosk-glass hover:scale-[1.03] focus:scale-[1.03] focus:outline-none focus:ring-4 focus:ring-white/80 hover:bg-orange-400/10 transition-all">
               <Palette className="w-16 h-16 text-orange-400" />
-              <span className="carlmarx-bold text-orange-400 text-2xl uppercase tracking-wider">Caricatura Mundial</span>
-              <p className="text-white/70 text-sm text-center">¡Tu caricatura del Mundial!<br />Transformate en dibujo con tu nombre.</p>
+              <span className="carlmarx-bold text-orange-400 text-2xl uppercase tracking-wider">Caricatura con Messi</span>
+              <p className="text-white/70 text-sm text-center">¡Festejá con Messi!<br />Tu caricatura con la camiseta argentina.</p>
             </button>
           )}
 
@@ -1167,9 +1173,10 @@ The subject must perfectly match the facial features and gender of the reference
       const photo = capturedImage;
       // Si es caricatura mundialista, lanzamos la IA directamente con el prompt especial
       if (mode === 'caricatura') {
+        // Prompt de edición (fal.ai kontext): conserva las caras de la foto y suma a Messi
         const specialTheme = {
-          name: 'Caricatura Mundialista',
-          prompt: 'A professional digital caricature of the person standing next to Lionel Messi, both wearing Argentina national team jerseys, celebrating a goal in a crowded stadium, gold confetti in the air, joyful expression, vibrant colors, artistic caricature style'
+          name: 'Caricatura con Messi',
+          prompt: 'Restyle this photo as a vibrant, fun 3D caricature illustration. Keep the exact likeness of every person in the photo: same face shape, facial features, skin tone, hairstyle and expression, slightly exaggerated in a friendly caricature way but clearly recognizable. Do not remove anyone. Add Lionel Messi next to them as a caricature too. Everyone wears the Argentina national team jersey with white and sky-blue vertical stripes, celebrating a goal together inside a packed stadium with golden confetti in the air. Joyful, colorful. No text, no logos, no watermark.'
         };
         runAI(capturedImage, specialTheme);
         return;
@@ -1398,7 +1405,7 @@ The subject must perfectly match the facial features and gender of the reference
   if (step === 'themeSelect') {
     const CATEGORY_LABELS: Record<string, string> = {
       deportes: '⚽ Deportes', fantasia: '🏰 Fantasía', epocas: '🕰️ Épocas',
-      animacion: '🎬 Animación', moda: '👗 Moda', scifi: '🤖 Sci-Fi', aventura: '🌿 Aventura',
+      arte: '🎨 Arte y animación', animacion: '🎬 Animación', moda: '👗 Moda', scifi: '🤖 Sci-Fi', aventura: '🌿 Aventura',
     };
     const grouped = themes.reduce((acc: Record<string, any[]>, t: any) => {
       const cat = t.category || 'otros';
