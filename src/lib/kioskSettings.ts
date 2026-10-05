@@ -5,6 +5,13 @@ const GENERAL_KEY = 'kiosk_general_settings';
 const CAMERA_KEY = 'kiosk_camera_settings';
 const FRAME_KEY = 'kiosk_frame_url';
 
+/** Pregunta de la trivia de la fiesta (Ajustes → Experiencias). answer = índice de la correcta. */
+export interface TriviaQuestion { q: string; options: string[]; answer: number }
+
+/** Preguntas de la trivia completas (pregunta, al menos 2 opciones y la correcta marcada). */
+export const validTrivia = (list: TriviaQuestion[] | undefined) =>
+  (list ?? []).filter(q => q.q?.trim() && (q.options ?? []).filter(o => o?.trim()).length >= 2 && q.options[q.answer]?.trim());
+
 export interface KioskGeneralSettings {
   /** Nombre del evento (ej. "15 de Pía"): se muestra en la bienvenida y va en los marcos */
   eventTitle?: string;
@@ -81,6 +88,8 @@ export interface KioskGeneralSettings {
   localFolder?: string;
   /** Fotos: un juego al azar durante un minuto antes del resultado (con la IA siempre hay juego) */
   photoGame?: boolean;
+  /** Preguntas de la trivia de la fiesta (sobre los novios, la quinceañera…) */
+  triviaQuestions?: TriviaQuestion[];
   /** Protector de pantalla con el logo animado (por defecto sí) */
   screensaver?: boolean;
   /** Minutos sin tocar nada para que aparezca el protector (por defecto 5) */

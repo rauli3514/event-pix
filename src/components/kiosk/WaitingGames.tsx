@@ -1,16 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { rotateArrowKey } from '@/lib/screenRotation';
+import { getGeneralSettings, validTrivia } from '@/lib/kioskSettings';
 
 // Juegos cortos mientras se espera la foto: tateti, el vaso con la pelotita,
-// piedra, papel o tijera y memotest. Sale uno al azar (en Fotos IA siempre, mientras
+// piedra, papel o tijera, memotest, reflejos, Simón dice y la trivia de la fiesta
+// (esta última solo si se cargaron preguntas en Ajustes). Sale uno al azar (en Fotos IA siempre, mientras
 // la IA trabaja; en Fotos, si está activado, durante un minuto antes del resultado).
 // Se juegan tocando la pantalla o con el control (flechas + OK). Todo es CSS liviano
 // para la TV box. Cuando la foto está lista se avisa y se pasa sola.
 
-type Game = 'tateti' | 'vasos' | 'ppt' | 'memo';
-const GAMES: Game[] = ['tateti', 'vasos', 'ppt', 'memo'];
+type Game = 'tateti' | 'vasos' | 'ppt' | 'memo' | 'reflejos' | 'simon' | 'trivia';
+const GAMES: Game[] = ['tateti', 'vasos', 'ppt', 'memo', 'reflejos', 'simon'];
+
 const randomGame = (except?: Game) => {
-  const options = GAMES.filter(g => g !== except);
+  const games = validTrivia(getGeneralSettings().triviaQuestions).length ? [...GAMES, 'trivia' as Game] : GAMES;
+  const options = games.filter(g => g !== except);
   return options[Math.floor(Math.random() * options.length)];
 };
 
@@ -98,6 +102,9 @@ export default function WaitingGames({ title, ready = false, seconds, onContinue
           {game === 'vasos' && <ShellGame />}
           {game === 'ppt' && <RockPaperScissors />}
           {game === 'memo' && <Memotest />}
+          {game === 'reflejos' && <Reflexes />}
+          {game === 'simon' && <SimonSays />}
+          {game === 'trivia' && <Trivia />}
           <div className="flex gap-[2vmin]">
             <button onClick={() => { setGame(g => randomGame(g)); setRound(r => r + 1); }}
               className={`${btn} px-[4vmin] py-[1.6vmin] bg-white/10 text-[clamp(0.9rem,2.4vmin,1.6rem)]`}>
@@ -508,6 +515,204 @@ function Memotest() {
           className={`${btn} px-[4vmin] py-[1.6vmin] bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7] text-[clamp(1rem,3vmin,2rem)]`}>
           {done ? 'Otra vez' : 'Mezclar de nuevo'}
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Reflejos ────────────────────────────────────────────────────────────────
+
+type ReflexPhase = 'idle' | 'wait' | 'go' | 'early' | 'result';
+
+function Reflexes() {
+  const [phase, setPhase] = useState<ReflexPhase>('idle');
+  const [ms, setMs] = useState(0);
+  const [best, setBest] = useState<number | null>(null);
+  const startAt = useRef(0);
+  const timer = useRef<number>(0);
+  const pad = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => { focusSoon(pad.current); return () => window.clearTimeout(timer.current); }, []);
+
+  const press = () => {
+    if (phase === 'idle' || phase === 'early' || phase === 'result') {
+      setPhase('wait');
+      timer.current = window.setTimeout(() => { startAt.current = performance.now(); setPhase('go'); }, 1500 + Math.random() * 2500);
+    } else if (phase === 'wait') {
+      window.clearTimeout(timer.current);
+      setPhase('early');
+    } else {
+      const t = Math.round(performance.now() - startAt.current);
+      setMs(t);
+      setBest(b => (b === null || t < b ? t : b));
+      setPhase('result');
+    }
+  };
+
+  const look = {
+    idle: { bg: 'from-[#7b2ff7] to-[#00d4ff]', big: '⚡', text: 'Apretá OK (o tocá) para empezar' },
+    wait: { bg: 'from-[#b5174f] to-[#ff4d6d]', big: '✋', text: 'Esperá el verde…' },
+    go: { bg: 'from-[#00c853] to-[#64dd17]', big: '¡YA!', text: '¡Apretá ahora!' },
+    early: { bg: 'from-[#ff8f00] to-[#ffd23f]', big: '😅', text: '¡Muy temprano! Apretá para probar de nuevo' },
+    result: { bg: 'from-[#7b2ff7] to-[#ff2e93]', big: `${ms} ms`, text: ms < 300 ? '¡Rapidísimo! 🏆 Apretá para otra' : 'Apretá para otra' },
+  }[phase];
+
+  return (
+    <div className="flex flex-col items-center gap-[2.5vmin]">
+      <p className="carlmarx-bold text-white text-[clamp(1.4rem,5vmin,3.6rem)] text-center leading-tight">¿Qué tan rápido sos?</p>
+      <button ref={pad} onClick={press}
+        className={`${btn} w-[70vmin] h-[34vmin] min-w-72 bg-gradient-to-br ${look.bg} flex flex-col items-center justify-center gap-[1.5vmin]`}>
+        <span className="carlmarx-bold text-[12vmin] leading-none">{look.big}</span>
+        <span className="text-[clamp(1rem,3vmin,2.2rem)]">{look.text}</span>
+      </button>
+      <p className="text-white/80 text-[clamp(1rem,3vmin,2.2rem)] font-semibold">Mejor tiempo: {best === null ? '—' : `${best} ms`}</p>
+    </div>
+  );
+}
+
+// ─── Simón dice ──────────────────────────────────────────────────────────────
+
+const SIMON_COLORS = [
+  { off: 'bg-[#7a0e37]', on: 'bg-[#ff2e93] shadow-[0_0_6vmin_#ff2e93]' },
+  { off: 'bg-[#0b4f63]', on: 'bg-[#00d4ff] shadow-[0_0_6vmin_#00d4ff]' },
+  { off: 'bg-[#6b5300]', on: 'bg-[#ffd23f] shadow-[0_0_6vmin_#ffd23f]' },
+  { off: 'bg-[#3a1773]', on: 'bg-[#b14bff] shadow-[0_0_6vmin_#b14bff]' },
+];
+
+function SimonSays() {
+  const [seq, setSeq] = useState<number[]>(() => [Math.floor(Math.random() * 4)]);
+  const [lit, setLit] = useState<number | null>(null);
+  const [phase, setPhase] = useState<'show' | 'play' | 'lost'>('show');
+  const [pos, setPos] = useState(0);
+  const [best, setBest] = useState(0);
+  const pads = useRef<(HTMLButtonElement | null)[]>([]);
+  const again = useRef<HTMLButtonElement>(null);
+  const timers = useRef<number[]>([]);
+
+  // Muestra la secuencia encendiendo cada color
+  useEffect(() => {
+    if (phase !== 'show') return;
+    const ts = timers.current;
+    seq.forEach((c, i) => {
+      ts.push(window.setTimeout(() => setLit(c), 700 + i * 650));
+      ts.push(window.setTimeout(() => setLit(null), 700 + i * 650 + 420));
+    });
+    ts.push(window.setTimeout(() => { setPhase('play'); setPos(0); focusSoon(pads.current[0]); }, 700 + seq.length * 650));
+    return () => { ts.forEach(t => window.clearTimeout(t)); timers.current = []; };
+  }, [seq, phase]);
+
+  const press = (c: number) => {
+    if (phase !== 'play') return;
+    setLit(c);
+    window.setTimeout(() => setLit(l => (l === c ? null : l)), 220);
+    if (seq[pos] !== c) {
+      setPhase('lost');
+      setBest(b => Math.max(b, seq.length - 1));
+      focusSoon(again.current);
+      return;
+    }
+    if (pos + 1 === seq.length) {
+      setBest(b => Math.max(b, seq.length));
+      window.setTimeout(() => { setSeq(s => [...s, Math.floor(Math.random() * 4)]); setPhase('show'); }, 450);
+    } else {
+      setPos(pos + 1);
+    }
+  };
+
+  useGameKeys(key => {
+    const i = pads.current.indexOf(document.activeElement as HTMLButtonElement);
+    if (i < 0) return false;
+    const r = Math.floor(i / 2), c = i % 2;
+    const [nr, nc] = key === 'ArrowUp' ? [r - 1, c] : key === 'ArrowDown' ? [r + 1, c] : key === 'ArrowLeft' ? [r, c - 1] : [r, c + 1];
+    if (nr > 1) { again.current?.focus(); return true; }
+    if (nr < 0 || nc < 0 || nc > 1) return true;
+    pads.current[nr * 2 + nc]?.focus();
+    return true;
+  });
+
+  const status = phase === 'show' ? 'Mirá la secuencia…' : phase === 'play' ? '¡Repetila!' : `¡Uy! Llegaste a ${seq.length - 1}`;
+
+  return (
+    <div className="flex items-center gap-[5vmin]">
+      <div className="grid grid-cols-2 gap-[1.6vmin]">
+        {SIMON_COLORS.map((c, i) => (
+          <button key={i} ref={el => { pads.current[i] = el; }} onClick={() => press(i)} disabled={phase !== 'play'}
+            aria-label={`Color ${i + 1}`}
+            className={`${btn} w-[18vmin] h-[18vmin] min-w-24 min-h-24 transition-all duration-150 disabled:cursor-default ${lit === i ? c.on : c.off}`} />
+        ))}
+      </div>
+      <div className="flex flex-col items-center gap-[2vmin] w-[30vmin]">
+        <p className="carlmarx-bold text-white text-[clamp(1.4rem,5vmin,3.6rem)] text-center leading-tight">{status}</p>
+        <p className="text-white/80 text-[clamp(1rem,3vmin,2.2rem)] font-semibold">Nivel {seq.length} · Récord {best}</p>
+        <button ref={again} disabled={phase !== 'lost'}
+          onClick={() => { setSeq([Math.floor(Math.random() * 4)]); setPhase('show'); }}
+          className={`${btn} px-[4vmin] py-[1.6vmin] bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7] text-[clamp(1rem,3vmin,2rem)] disabled:opacity-30`}>
+          Otra vez
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Trivia de la fiesta ─────────────────────────────────────────────────────
+
+const shuffle = <T,>(list: T[]) => list.map(v => ({ v, r: Math.random() })).sort((a, b) => a.r - b.r).map(x => x.v);
+
+function Trivia() {
+  const [questions, setQuestions] = useState(() => shuffle(validTrivia(getGeneralSettings().triviaQuestions)));
+  const [index, setIndex] = useState(0);
+  const [chosen, setChosen] = useState<number | null>(null);
+  const [score, setScore] = useState(0);
+  const first = useRef<HTMLButtonElement>(null);
+  const again = useRef<HTMLButtonElement>(null);
+  const finished = index >= questions.length;
+  const q = questions[index];
+
+  useEffect(() => { if (!finished) focusSoon(first.current); else focusSoon(again.current); }, [index, finished]);
+
+  useGameKeys(key => {
+    const opts = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-trivia-option]'));
+    const i = opts.indexOf(document.activeElement as HTMLButtonElement);
+    if (i < 0 || (key !== 'ArrowUp' && key !== 'ArrowDown')) return false;
+    if (key === 'ArrowDown' && i === opts.length - 1) return false;
+    opts[Math.max(0, key === 'ArrowUp' ? i - 1 : i + 1)]?.focus();
+    return true;
+  });
+
+  const answer = (i: number) => {
+    if (chosen !== null) return;
+    setChosen(i);
+    if (i === q.answer) setScore(s => s + 1);
+    window.setTimeout(() => { setChosen(null); setIndex(n => n + 1); }, 1600);
+  };
+
+  if (finished) return (
+    <div className="flex flex-col items-center gap-[2.5vmin]">
+      <p className="text-[10vmin] leading-none">{score === questions.length ? '🏆' : '🎉'}</p>
+      <p className="carlmarx-bold text-white text-[clamp(1.6rem,6vmin,4.4rem)] text-center leading-tight">
+        Acertaste {score} de {questions.length}
+      </p>
+      <button ref={again} onClick={() => { setQuestions(shuffle(questions)); setIndex(0); setScore(0); }}
+        className={`${btn} px-[4vmin] py-[1.6vmin] bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7] text-[clamp(1rem,3vmin,2rem)]`}>
+        Otra vez
+      </button>
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col items-center gap-[2.2vmin] w-[80vmin] max-w-[92vw]">
+      <p className="text-white/60 text-[clamp(0.9rem,2.4vmin,1.6rem)]">Trivia de la fiesta · {index + 1}/{questions.length} · Aciertos {score}</p>
+      <p className="carlmarx-bold text-white text-[clamp(1.4rem,5.4vmin,4rem)] text-center leading-tight">{q.q}</p>
+      <div className="w-full flex flex-col gap-[1.4vmin]">
+        {q.options.map((o, i) => o?.trim() && (
+          <button key={i} ref={i === 0 ? first : undefined} onClick={() => answer(i)} data-trivia-option
+            className={`${btn} w-full px-[3vmin] py-[1.8vmin] text-[clamp(1rem,3.2vmin,2.4rem)] text-left ${
+              chosen === null ? 'kiosk-glass hover:bg-white/10'
+                : i === q.answer ? 'bg-[#00c853]'
+                : i === chosen ? 'bg-[#d50000]' : 'bg-white/10 opacity-60'}`}>
+            {o}{chosen !== null && i === q.answer ? '  ✓' : ''}
+          </button>
+        ))}
       </div>
     </div>
   );
