@@ -5,6 +5,8 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.media.AudioManager;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.webkit.JavascriptInterface;
@@ -106,6 +108,41 @@ public class MainActivity extends BridgeActivity {
                 context.startActivity(intent);
             } catch (Exception e) {
                 openSettings();
+            }
+        }
+
+        /** Si esta app es la pantalla de inicio (lanzador) elegida del equipo. */
+        @JavascriptInterface
+        public boolean isDefaultHome() {
+            Intent home = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
+            ResolveInfo info = context.getPackageManager().resolveActivity(home, PackageManager.MATCH_DEFAULT_ONLY);
+            return info != null && info.activityInfo != null
+                    && context.getPackageName().equals(info.activityInfo.packageName);
+        }
+
+        /** Permiso "Mostrar sobre otras apps": deja abrir la app sola al prender. */
+        @JavascriptInterface
+        public boolean canStartOnBoot() {
+            return Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(context);
+        }
+
+        @JavascriptInterface
+        public void openOverlaySettings() {
+            try {
+                Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:" + context.getPackageName()));
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(intent);
+            } catch (Exception e) {
+                // Algunas TV box no tienen esa pantalla: la lista general de permisos
+                try {
+                    Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.parse("package:" + context.getPackageName()));
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    context.startActivity(intent);
+                } catch (Exception ignored) {
+                    openSettings();
+                }
             }
         }
 

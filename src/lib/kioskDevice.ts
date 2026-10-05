@@ -173,6 +173,10 @@ interface AndroidKioskBridge {
   openSettings?: () => void;
   openApp?: (packageName: string) => boolean;
   listApps?: () => string;
+  openHomeSettings?: () => void;
+  isDefaultHome?: () => boolean;
+  canStartOnBoot?: () => boolean;
+  openOverlaySettings?: () => void;
 }
 
 const bridge = () => (window as unknown as { AndroidKiosk?: AndroidKioskBridge }).AndroidKiosk;
@@ -198,3 +202,24 @@ export const listInstalledApps = (): InstalledApp[] => {
     return [];
   }
 };
+
+/**
+ * Arranque automático al prender el equipo. Lo más seguro es que la app sea la
+ * pantalla de inicio (lanzador); si no, Android necesita el permiso "Mostrar sobre
+ * otras apps" para abrirla sola. null = no se puede saber (web o APK viejo).
+ */
+export const getAutostartStatus = () => {
+  const b = bridge();
+  if (!b?.isDefaultHome || !b.canStartOnBoot) return null;
+  try {
+    return { isHome: !!b.isDefaultHome(), canStartOnBoot: !!b.canStartOnBoot() };
+  } catch {
+    return null;
+  }
+};
+export const openHomeAppSettings = () => {
+  const b = bridge();
+  if (b?.openHomeSettings) b.openHomeSettings();
+  else b?.openSettings?.();
+};
+export const openStartOnBootSettings = () => bridge()?.openOverlaySettings?.();

@@ -33,7 +33,14 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <!-- Algunas TV box avisan el encendido rápido con estas -->
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
                 <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <!-- Después de actualizar la app (instalar un APK nuevo) se vuelve a abrir -->
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
 
