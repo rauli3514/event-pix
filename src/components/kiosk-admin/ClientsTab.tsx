@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Coins, Plus, Trash2 } from 'lucide-react';
+import { Coins, Plus, Save, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { DEFAULT_STORE, formatArs, loadStore, saveStore, type CreditPack, type StoreSettings } from '@/lib/kioskStore';
 import { btnDanger, btnGhost, btnPrimary, card, Field, input } from './ui';
 import type { KioskAccountRow, KioskDeviceRow } from './types';
 
 // Clientes y créditos de IA. La cabina clásica es libre; cada conversión con IA
 // gasta 1 crédito del cliente dueño del equipo. Los créditos se cargan acá.
 
-const PACKS = [10, 20, 30, 50, 100];
 
 interface LedgerRow {
   id: string;
@@ -50,7 +50,12 @@ export default function ClientsTab({ accounts, devices, onChange }: {
     onChange();
   };
 
+  const [store, setStore] = useState<StoreSettings>(DEFAULT_STORE);
+  useEffect(() => { loadStore().then(setStore).catch(() => {}); }, []);
+
   return (
+    <div className="space-y-6">
+    <StoreEditor store={store} onSaved={setStore} />
     <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
       <div className="space-y-4">
         <div className={`${card} space-y-3`}>
@@ -80,16 +85,81 @@ export default function ClientsTab({ accounts, devices, onChange }: {
 
       <div>
         {current
-          ? <ClientDetail key={current.id} account={current} devices={devices.filter(d => d.account_id === current.id)} onChange={onChange}
+          ? <ClientDetail key={current.id} account={current} packs={store.packs} devices={devices.filter(d => d.account_id === current.id)} onChange={onChange}
               onDeleted={() => { setSelected(null); onChange(); }} />
           : <div className={`${card} flex min-h-[240px] items-center justify-center text-slate-400`}><Coins className="mr-2 h-5 w-5" /> Elegí un cliente para ver y cargar sus créditos.</div>}
       </div>
     </div>
+    </div>
   );
 }
 
-function ClientDetail({ account, devices, onChange, onDeleted }: {
+/** Precios de los packs y WhatsApp de contacto: los equipos los muestran en Ajustes → Equipo. */
+function StoreEditor({ store, onSaved }: { store: StoreSettings; onSaved: (s: StoreSettings) => void }) {
+  const [form, setForm] = useState(store);
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { setForm(store); }, [store]);
+  const setPack = (i: number, patch: Partial<CreditPack>) => setForm(f => ({ ...f, packs: f.packs.map((p, j) => (j === i ? { ...p, ...patch } : p)) }));
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const clean = { ...form, packs: form.packs.filter(p => p.credits > 0).sort((a, b) => a.credits - b.credits), contact_phone: form.contact_phone?.replace(/\D/g, '') || null };
+      await saveStore(clean);
+      onSaved(clean);
+      toast.success('Precios guardados: los equipos los muestran en Ajustes → Equipo');
+      setOpen(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className={`${card} space-y-4`}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-base font-bold text-white">Precios de los créditos</h3>
+          <p className="text-sm text-slate-400">
+            {store.packs.map(p => `${p.credits}: ${formatArs(p.ars)} / USD ${p.usd}`).join(' · ')}
+            {store.contact_phone ? ` · WhatsApp +${store.contact_phone}` : ' · sin WhatsApp de contacto'}
+          </p>
+        </div>
+        <button onClick={() => setOpen(o => !o)} className={btnGhost}>{open ? 'Cerrar' : 'Editar precios y contacto'}</button>
+      </div>
+      {open && (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            {form.packs.map((p, i) => (
+              <div key={i} className="grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-3">
+                <Field label="Créditos"><input className={input} inputMode="numeric" value={p.credits || ''} onChange={e => setPack(i, { credits: Number(e.target.value.replace(/\D/g, '')) })} /></Field>
+                <Field label="Pesos (ARS)"><input className={input} inputMode="numeric" value={p.ars || ''} onChange={e => setPack(i, { ars: Number(e.target.value.replace(/\D/g, '')) })} /></Field>
+                <Field label="Dólares (USD)"><input className={input} inputMode="decimal" value={p.usd || ''} onChange={e => setPack(i, { usd: Number(e.target.value.replace(/[^\d.]/g, '')) })} /></Field>
+                <button onClick={() => setForm(f => ({ ...f, packs: f.packs.filter((_, j) => j !== i) }))} className={btnDanger} aria-label="Quitar pack"><Trash2 className="h-4 w-4" /></button>
+              </div>
+            ))}
+            <button onClick={() => setForm(f => ({ ...f, packs: [...f.packs, { credits: 0, ars: 0, usd: 0 }] }))} className={btnGhost}><Plus className="h-4 w-4" /> Agregar pack</button>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <Field label="WhatsApp de contacto" hint="Con código de país, ej. 5491122334455. Los equipos muestran un QR para escribirte con su código.">
+              <input className={input} inputMode="tel" value={form.contact_phone ?? ''} onChange={e => setForm(f => ({ ...f, contact_phone: e.target.value }))} placeholder="5491122334455" />
+            </Field>
+            <Field label="Nota debajo de los precios">
+              <input className={input} value={form.contact_note ?? ''} onChange={e => setForm(f => ({ ...f, contact_note: e.target.value }))} />
+            </Field>
+          </div>
+          <button onClick={save} disabled={saving} className={btnPrimary}><Save className="h-4 w-4" /> {saving ? 'Guardando…' : 'Guardar precios'}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ClientDetail({ account, packs, devices, onChange, onDeleted }: {
   account: KioskAccountRow;
+  packs: CreditPack[];
   devices: KioskDeviceRow[];
   onChange: () => void;
   onDeleted: () => void;
@@ -162,8 +232,8 @@ function ClientDetail({ account, devices, onChange, onDeleted }: {
         <div>
           <p className="mb-2 text-sm font-medium text-slate-300">Cargar pack</p>
           <div className="flex flex-wrap gap-2">
-            {PACKS.map(n => (
-              <button key={n} onClick={() => add(n, 'purchase', `Pack ${n}`)} disabled={busy} className={btnPrimary}>+{n}</button>
+            {packs.map(p => (
+              <button key={p.credits} onClick={() => add(p.credits, 'purchase', `Pack ${p.credits}`)} disabled={busy} className={btnPrimary}>+{p.credits}</button>
             ))}
           </div>
         </div>

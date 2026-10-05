@@ -158,7 +158,7 @@ export default function KioskBox() {
           <EventPixLogo size={60} />
           <div className="kiosk-glass rounded-full px-8 py-3 text-center">
             <p className="text-white/60 text-xs uppercase tracking-[0.3em]">{device.name || `Equipo ${device.deviceCode}`}</p>
-            <p className="text-xl font-bold">{device.eventName || 'Sin evento asignado'}</p>
+            <p className="text-xl font-bold">{general.eventTitle || device.eventName || 'Sin nombre de evento'}</p>
           </div>
           <div className="flex items-center gap-4">
             {general.offline && (
@@ -172,12 +172,13 @@ export default function KioskBox() {
           </div>
         </header>
 
-        {!general.offline && (!device.kioskEventId || offline) && (
+        {/* El equipo es autónomo: el evento es el nombre que se pone en Ajustes (no hace falta el panel) */}
+        {!general.offline && (offline || (!general.eventTitle && !general.localFolder && !device.kioskEventId)) && (
           <div className="mx-12 mt-6 kiosk-glass rounded-2xl px-6 py-3 flex items-center gap-3 text-amber-100">
             <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
-            {!device.kioskEventId
-              ? 'Asigná un evento a este equipo desde el panel (app.eventpix.com.ar → Kioscos) para que las fotos se guarden.'
-              : 'Sin conexión: usando la última configuración guardada.'}
+            {offline
+              ? 'Sin conexión: usando la última configuración guardada.'
+              : 'Poné el nombre del evento en Ajustes → Pantalla de inicio: es la carpeta donde se guardan las fotos.'}
           </div>
         )}
 
