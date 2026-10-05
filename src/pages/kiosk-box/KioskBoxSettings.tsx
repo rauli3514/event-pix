@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Camera, Film, FolderOpen, Image as ImageIcon, LayoutGrid, Monitor, Printer, Share2, Timer, Wand2 } from 'lucide-react';
+import { ArrowLeft, Camera, Film, FolderOpen, Image as ImageIcon, LayoutGrid, Monitor, Printer, Share2, Ticket, Timer, Wand2 } from 'lucide-react';
 import { useRemoteFocus } from '@/hooks/use-remote-focus';
 import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
 import { EventPixLogo } from '@/components/kiosk/brand/EventPixLogo';
@@ -14,6 +14,7 @@ import ShareSection from './settings/ShareSection';
 import FxSection from './settings/FxSection';
 import PrinterSection from './settings/PrinterSection';
 import DeviceSection from './settings/DeviceSection';
+import VipSection from './settings/VipSection';
 
 // Ajustes del equipo (TV box), detrás del PIN del inicio. Todo se guarda al
 // instante en el equipo y el kiosco lo lee al abrirse.
@@ -28,6 +29,7 @@ const SECTIONS = [
   { key: 'photos', label: 'Fotos y respaldo', icon: FolderOpen, Component: PhotosSection },
   { key: 'share', label: 'Compartir y nube', icon: Share2, Component: ShareSection },
   { key: 'printer', label: 'Impresora', icon: Printer, Component: PrinterSection },
+  { key: 'vip', label: 'Ingreso VIP', icon: Ticket, Component: VipSection },
   { key: 'device', label: 'Equipo', icon: Monitor, Component: DeviceSection },
 ] as const;
 

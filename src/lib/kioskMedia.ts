@@ -12,6 +12,7 @@ export const SCREENS = [
   { key: 'processing', label: 'Procesando', hint: 'Mientras se arma la foto' },
   { key: 'reveal', label: 'Frase y marco', hint: 'Frase divertida y elegir marco' },
   { key: 'result', label: 'Resultado', hint: 'Foto final, imprimir y QR' },
+  { key: 'vip', label: 'Ingreso VIP', hint: '"Buscá tu mesa"' },
 ] as const;
 export type ScreenKey = typeof SCREENS[number]['key'];
 
@@ -55,7 +56,7 @@ const tx = async <T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => I
   }).finally(() => db.close());
 };
 
-export const saveScreenMedia = async (screen: ScreenKey | `acc:${string}`, file: File) => {
+export const saveScreenMedia = async (screen: ScreenKey | `acc:${string}` | `vip:${string}`, file: File) => {
   if (file.size > MAX_MEDIA_BYTES) throw new Error('El archivo pesa más de 40 MB');
   await tx('readwrite', s => s.put({ screen, blob: file, type: file.type, name: file.name } satisfies MediaRecord));
   window.dispatchEvent(new CustomEvent('kiosk-media-changed', { detail: screen }));
@@ -64,7 +65,7 @@ export const saveScreenMedia = async (screen: ScreenKey | `acc:${string}`, file:
 export const getScreenMedia = async (screen: string): Promise<MediaRecord | null> =>
   (await tx<MediaRecord | undefined>('readonly', s => s.get(screen))) ?? null;
 
-export const removeScreenMedia = async (screen: ScreenKey | `acc:${string}`) => {
+export const removeScreenMedia = async (screen: ScreenKey | `acc:${string}` | `vip:${string}`) => {
   await tx('readwrite', s => s.delete(screen));
   window.dispatchEvent(new CustomEvent('kiosk-media-changed', { detail: screen }));
 };

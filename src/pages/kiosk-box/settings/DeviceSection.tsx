@@ -5,8 +5,8 @@ import { QRCodeSVG } from 'qrcode.react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import {
-  checkinDevice, getAutostartStatus, getCachedDeviceState, openHomeAppSettings, openStartOnBootSettings, getVipAppPackage, listInstalledApps, openWifiSettings,
-  renameDevice, setBoxPin, setVipAppPackage, type KioskDeviceState,
+  checkinDevice, getAutostartStatus, getCachedDeviceState, openHomeAppSettings, openStartOnBootSettings, openWifiSettings,
+  renameDevice, setBoxPin, type KioskDeviceState,
 } from '@/lib/kioskDevice';
 import { eventFolder } from '@/lib/kioskStorage';
 import { formatArs, getCachedStore, loadStore, whatsappLink } from '@/lib/kioskStore';
@@ -14,8 +14,6 @@ import { buttonClass, inputClass, Panel, primaryClass } from './ui';
 
 export default function DeviceSection() {
   const [device, setDevice] = useState<KioskDeviceState | null>(getCachedDeviceState);
-  const [apps] = useState(listInstalledApps);
-  const [vipPackage, setVip] = useState(getVipAppPackage);
   const [newPin, setNewPin] = useState('');
   const [version, setVersion] = useState('');
   const [store, setStore] = useState(getCachedStore);
@@ -90,17 +88,6 @@ export default function DeviceSection() {
         <button data-autofocus onClick={openWifiSettings} className={buttonClass}>
           <Wifi className="w-5 h-5" /> Configurar WiFi del equipo
         </button>
-      </Panel>
-
-      <Panel title="Ingreso VIP" description='Elegí la app que abre el ícono "Ingreso VIP" del inicio. Si no elegís ninguna, el ícono no aparece.'>
-        <div className="grid grid-cols-2 gap-3 max-h-80 overflow-y-auto p-1">
-          {[{ label: 'Ninguna', packageName: '' }, ...apps].map(a => (
-            <button key={a.packageName || 'none'} onClick={() => { setVip(a.packageName); setVipAppPackage(a.packageName); }}
-              className={`text-left rounded-2xl px-5 py-3 text-lg focus:outline-none focus:ring-4 focus:ring-[#00d4ff] ${vipPackage === a.packageName ? 'bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7]' : 'bg-white/10 hover:bg-white/20'}`}>
-              {a.label}
-            </button>
-          ))}
-        </div>
       </Panel>
 
       <Panel title="Clave de ajustes" description="La que se pide al tocar Ajustes en el inicio.">
