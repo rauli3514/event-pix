@@ -1,18 +1,22 @@
 import { getGeneralSettings } from '@/lib/kioskSettings';
 
-// A dónde lleva el QR del kiosco: a la página /foto del sitio (con botones para
-// bajar y compartir) o, si no hay una dirección pública, directo a la imagen.
+// A dónde lleva el QR del kiosco: a la página /foto del sitio, con la foto, botones
+// para bajarla y compartirla y el contacto de EventPix.
+
+/** Sitio de EventPix: la página del invitado vive acá si no se configuró otra. */
+export const DEFAULT_PUBLIC_SITE = 'https://app.event-pix.com.ar';
 
 /**
  * Dirección pública del sitio para la página del invitado: la de Ajustes → Compartir
- * y nube, o VITE_PUBLIC_SITE_URL al compilar. No se usa la de la página actual porque
- * los links de prueba de Vercel piden iniciar sesión. Sin dirección, el QR abre la
- * foto directo en Drive (que es público).
+ * y nube, o VITE_PUBLIC_SITE_URL al compilar, o la de EventPix. No se usa la de la
+ * página actual: en la app del equipo no es una dirección pública y los links de
+ * prueba de Vercel piden iniciar sesión. (Antes, sin dirección, el QR abría la foto
+ * directo en Google Drive, que en celulares sin la app pide iniciar sesión.)
  */
 export const publicSiteUrl = () => {
   const configured = (((getGeneralSettings().publicSiteUrl as string) || '').trim()
-    || ((import.meta.env.VITE_PUBLIC_SITE_URL as string | undefined) || '').trim()).replace(/\/+$/, '');
-  if (!configured) return '';
+    || ((import.meta.env.VITE_PUBLIC_SITE_URL as string | undefined) || '').trim()
+    || DEFAULT_PUBLIC_SITE).replace(/\/+$/, '');
   return /^https?:\/\//.test(configured) ? configured : `https://${configured}`;
 };
 

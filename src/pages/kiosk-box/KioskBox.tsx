@@ -150,9 +150,9 @@ export default function KioskBox() {
     <div ref={rootRef} className="relative min-h-screen overflow-hidden text-white">
       <ScreenBackground screen="home" brand={false} />
       <div className="relative min-h-screen flex flex-col">
-        <header className="flex items-center justify-between px-12 pt-10">
+        <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4 px-[5vmin] pt-[4vmin]">
           <EventPixLogo size={60} />
-          <div className="kiosk-glass rounded-full px-8 py-3 text-center">
+          <div className="kiosk-glass rounded-full px-8 py-3 text-center portrait:order-last portrait:basis-full portrait:rounded-3xl">
             <p className="text-white/60 text-xs uppercase tracking-[0.3em]">{device.name || `Equipo ${device.deviceCode}`}</p>
             <p className="text-xl font-bold">{general.eventTitle || device.eventName || 'Sin nombre de evento'}</p>
           </div>
@@ -178,8 +178,9 @@ export default function KioskBox() {
           </div>
         )}
 
-        <main className="flex-1 flex items-center justify-center px-12">
-          <div className={`flex ${tiles.length > 3 ? 'gap-12' : 'gap-20'}`}>
+        <main className="flex-1 flex items-center justify-center px-[4vmin] py-[3vmin]">
+          {/* Tamaños en vmin: entran igual con la tele horizontal o vertical */}
+          <div className={`flex flex-wrap justify-center ${tiles.length > 3 ? 'gap-[3vmin]' : 'gap-[5vmin]'} portrait:gap-[4vmin]`}>
             {tiles.map((t, i) => (
               <motion.button
                 key={t.key}
@@ -188,20 +189,20 @@ export default function KioskBox() {
                 initial={{ opacity: 0, y: 40 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 + i * 0.1, type: 'spring', stiffness: 140, damping: 15 }}
-                className="group flex flex-col items-center gap-6 rounded-[3rem] p-4 focus:outline-none"
+                className="group flex flex-col items-center gap-[2.5vmin] rounded-[3rem] p-[1.5vmin] focus:outline-none"
               >
                 <span
-                  className={`relative w-64 h-64 rounded-[4rem] bg-gradient-to-br ${t.gradient} flex items-center justify-center transition-transform duration-300 group-hover:scale-105 group-focus:scale-110 group-focus:-translate-y-2`}
+                  className={`relative w-[min(16rem,24vmin)] h-[min(16rem,24vmin)] portrait:w-[34vmin] portrait:h-[34vmin] rounded-[25%] bg-gradient-to-br ${t.gradient} flex items-center justify-center transition-transform duration-300 group-hover:scale-105 group-focus:scale-110 group-focus:-translate-y-2`}
                   style={{ boxShadow: `0 30px 70px -20px ${t.glow}, inset 0 2px 0 rgba(255,255,255,0.45)` }}
                 >
                   {/* brillo de vidrio */}
-                  <span className="absolute inset-x-6 top-4 h-1/2 rounded-[3rem] bg-gradient-to-b from-white/45 to-transparent" />
-                  <span className="absolute inset-0 rounded-[4rem] ring-0 group-focus:ring-[6px] ring-white/90 transition-all" />
-                  <t.icon className="relative w-32 h-32 text-white drop-shadow-[0_6px_14px_rgba(0,0,0,0.35)]" strokeWidth={1.6} />
+                  <span className="absolute inset-x-[9%] top-[6%] h-1/2 rounded-[20%] bg-gradient-to-b from-white/45 to-transparent" />
+                  <span className="absolute inset-0 rounded-[25%] ring-0 group-focus:ring-[6px] ring-white/90 transition-all" />
+                  <t.icon className="relative w-1/2 h-1/2 text-white drop-shadow-[0_6px_14px_rgba(0,0,0,0.35)]" strokeWidth={1.6} />
                 </span>
-                <span className="text-center">
-                  <span className="block text-4xl font-black tracking-tight">{t.label}</span>
-                  <span className="block text-lg text-white/65 mt-1">{t.hint}</span>
+                <span className="text-center max-w-[36vmin]">
+                  <span className="block text-[clamp(1.4rem,4.2vmin,2.25rem)] font-black tracking-tight leading-tight">{t.label}</span>
+                  <span className="block text-[clamp(0.9rem,2.2vmin,1.125rem)] text-white/65 mt-1">{t.hint}</span>
                 </span>
               </motion.button>
             ))}

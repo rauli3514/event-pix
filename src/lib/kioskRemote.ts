@@ -3,6 +3,7 @@ import {
   saveCameraSettings, saveFrameUrl, saveGeneralSettings, savePrintSettings,
 } from '@/lib/kioskSettings';
 import { applyScreenRotation } from '@/lib/screenRotation';
+import { applyLiteMode } from '@/lib/liteMode';
 
 // Configuración a distancia: el panel admin guarda en kiosk_devices.settings los
 // ajustes que quiere cambiar y el equipo los aplica en el próximo checkin (cada
@@ -23,7 +24,7 @@ export const REMOTE_GENERAL_KEYS = [
   'enableSelfie', 'enablePortada', 'enablePortadaAI', 'enableAI', 'enableMundial', 'enableCaricatura', 'enableFiguritas',
   'photoShots', 'shotPause', 'photoOrientation', 'photoStrips', 'askGuestName', 'guestFrameChoice',
   'showQr', 'showPrintButton', 'allowRetake', 'enableGallery', 'splashGallery',
-  'resultTimeout', 'idleTimeout', 'screensaver', 'screensaverMinutes', 'enableFilters', 'photoGame', 'triviaQuestions', 'bluetoothShutter', 'enableVip', 'vipTitle', 'vipSubtitle', 'vipVideo', 'vipResultSeconds', 'vipAfterPartyTime', 'enableAccessories', 'offline', 'screenRotation',
+  'resultTimeout', 'idleTimeout', 'screensaver', 'screensaverMinutes', 'enableFilters', 'photoGame', 'triviaQuestions', 'bluetoothShutter', 'liteMode', 'enableVip', 'vipTitle', 'vipSubtitle', 'vipVideo', 'vipResultSeconds', 'vipAfterPartyTime', 'enableAccessories', 'offline', 'screenRotation',
   'portadaTitle', 'portadaIssue', 'portadaHeadlines', 'portadaStarLabel', 'portadaBadge', 'portadaColor',
 ] as const;
 export const REMOTE_CAMERA_KEYS = ['timer', 'mirror', 'rotation', 'quality'] as const;
@@ -93,6 +94,7 @@ export async function applyRemoteSettings(settings: RemoteSettings | null | unde
   }
 
   if (general.screenRotation !== undefined && general.screenRotation !== rotationBefore) await applyScreenRotation();
+  applyLiteMode();
   setAppliedRev(rev);
   window.dispatchEvent(new Event(REMOTE_APPLIED_EVENT));
   return true;

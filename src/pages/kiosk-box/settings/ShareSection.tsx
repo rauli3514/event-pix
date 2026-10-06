@@ -55,8 +55,8 @@ export default function ShareSection() {
         )}
         <Toggle label="Usar Supabase para el QR en lugar de Drive" hint="Opcional. Requiere que el equipo tenga un evento asignado en el panel."
           checked={!!settings.cloudSupabase} onChange={cloudSupabase => update({ cloudSupabase })} />
-        <Field label="Dirección del sitio para la página del invitado (opcional)">
-          <input className={inputClass} placeholder="Ej: https://fotos.eventpix.com" value={(settings.publicSiteUrl as string) || ''}
+        <Field label="Dirección del sitio para la página del invitado (vacío = app.event-pix.com.ar)">
+          <input className={inputClass} placeholder="https://app.event-pix.com.ar" value={(settings.publicSiteUrl as string) || ''}
             onChange={e => update({ publicSiteUrl: e.target.value })} />
         </Field>
         <p className="text-white/55 text-sm">

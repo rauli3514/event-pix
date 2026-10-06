@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client'
 import 'resize-observer-polyfill/dist/ResizeObserver.global'
 import './index.css'
 import App from './App.tsx'
+import { applyLiteMode } from './lib/liteMode'
+
+applyLiteMode()
 
 // Limpieza de Service Workers viejos en modo desarrollo para evitar conflictos de caché
 if (import.meta.env.DEV && 'serviceWorker' in navigator) {

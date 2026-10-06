@@ -124,7 +124,7 @@ function ShutterPanel() {
   const [hits, setHits] = useState(0);
   useShutter(() => setHits(h => h + 1), on);
   return (
-    <Panel title="Disparador Bluetooth" description='El botoncito "selfie remote": emparejalo en los ajustes de Bluetooth de Android y el grupo saca la foto a distancia.'>
+    <Panel title="Disparador Bluetooth" description='El botoncito "selfie remote": vinculalo en Ajustes → Equipo → Bluetooth y el grupo saca la foto a distancia.'>
       <Toggle label="Esperar el disparador para sacar la foto" hint='En "Mirá a la cámara" la cuenta regresiva arranca con el botón (o tocando la pantalla), no sola.'
         checked={on} onChange={v => { setOn(v); saveGeneralSettings({ bluetoothShutter: v }); }} />
       {on && (

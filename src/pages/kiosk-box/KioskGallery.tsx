@@ -111,7 +111,7 @@ export default function KioskGallery() {
               <ChevronRight className="w-10 h-10" />
             </button>
             <button onClick={reprint} disabled={!full || printing}
-              className="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-3 rounded-2xl px-10 py-5 text-2xl font-bold bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7] shadow-[0_10px_40px_rgba(255,46,147,0.45)] disabled:opacity-50 focus:outline-none focus:ring-4 focus:ring-[#00d4ff]">
+              className="absolute bottom-10 portrait:bottom-[32vh] left-1/2 -translate-x-1/2 flex items-center gap-3 rounded-2xl px-10 py-5 text-2xl font-bold bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7] shadow-[0_10px_40px_rgba(255,46,147,0.45)] disabled:opacity-50 focus:outline-none focus:ring-4 focus:ring-[#00d4ff]">
               {printing ? <Loader2 className="w-7 h-7 animate-spin" /> : <Printer className="w-7 h-7" />} Imprimir de nuevo
             </button>
             <button onClick={() => setOpen(null)} className="absolute top-8 right-10 kiosk-glass w-16 h-16 rounded-full flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-[#00d4ff]" aria-label="Cerrar">
