@@ -8,7 +8,7 @@ const BRAND_COLORS = ['#ff2e93', '#7b2ff7', '#00d4ff', '#ffd23f', '#ffffff'];
 /** Estallido de confeti con los colores de la marca (una vez). */
 export function useConfettiBurst(active: boolean) {
   useEffect(() => {
-    if (!active) return;
+    if (!active || document.documentElement.classList.contains('kiosk-lite')) return;
     const shoot = (x: number, angle: number) => confetti({
       particleCount: 90, spread: 70, angle, origin: { x, y: 0.75 },
       colors: BRAND_COLORS, startVelocity: 55, scalar: 1.1, disableForReducedMotion: true,

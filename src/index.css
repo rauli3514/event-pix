@@ -421,3 +421,19 @@ body {
   .kiosk-saver-x, .kiosk-saver-y, .kiosk-saver-breathe, .kiosk-saver-glow, .kiosk-saver-ring, .kiosk-saver-iris,
   .kiosk-saver-focus, .kiosk-saver-star, .kiosk-saver-glint, .kiosk-saver-twinkle { animation: none; }
 }
+
+/* ── Modo liviano (Ajustes → Equipo) ─────────────────────────────────────
+   Para TV box con poca potencia: sin desenfoque de vidrio, sin sombras con
+   filtro y sin animaciones de fondo (lo que más le cuesta a la placa de video). */
+.kiosk-lite .kiosk-glass,
+.kiosk-lite [class*="backdrop-blur"] { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+.kiosk-lite .kiosk-glass { background: rgba(24, 17, 56, 0.9) !important; box-shadow: none !important; }
+.kiosk-lite [class*="drop-shadow"],
+.kiosk-lite [class*=" blur-"],
+.kiosk-lite [class^="blur-"] { filter: none !important; }
+.kiosk-lite .kiosk-aurora-blob,
+.kiosk-lite .attract-polaroid, .kiosk-lite .attract-confetti, .kiosk-lite .attract-beam,
+.kiosk-lite .attract-shine, .kiosk-lite .attract-neon,
+.kiosk-lite .kiosk-saver-twinkle, .kiosk-lite .kiosk-saver-glint, .kiosk-lite .kiosk-saver-ring,
+.kiosk-lite .kiosk-saver-glow, .kiosk-lite .kiosk-saver-iris { animation: none !important; }
+.kiosk-lite .kiosk-saver-breathe { filter: none !important; }

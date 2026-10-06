@@ -217,6 +217,7 @@ export default function DeviceConfig({ device, onClose, onSaved }: {
                 onChange={v => { set('general', 'screensaver', Number(v) > 0); if (Number(v) > 0) set('general', 'screensaverMinutes', Number(v)); }} />
             </Field>
           </div>
+          <Check label="Modo liviano (menos efectos, para equipos lentos)" checked={bool('general', 'liteMode', false)} onChange={v => set('general', 'liteMode', v)} />
           <Check label="Modo espejo" checked={bool('camera', 'mirror', false)} onChange={v => set('camera', 'mirror', v)} />
         </Section>
       </div>

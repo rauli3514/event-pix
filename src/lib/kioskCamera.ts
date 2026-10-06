@@ -1,3 +1,4 @@
+import { isLiteMode } from '@/lib/liteMode';
 import { getCameraSettings, type KioskCameraSettings } from '@/lib/kioskSettings';
 
 // Cámara del kiosco (webcam USB en la TV box). Lo usan el kiosco y Ajustes.
@@ -43,6 +44,8 @@ export async function openCameraStream(deviceId?: string, quality: Quality = get
   if (!navigator.mediaDevices?.getUserMedia) {
     throw new Error('Este equipo no permite usar la cámara desde la app.');
   }
+  // Modo liviano: en "Automática" se pide HD (720p), que le cuesta menos a la TV box
+  if (quality === 'auto' && isLiteMode()) quality = '720';
   const wanted = QUALITY[quality] ?? QUALITY.auto;
   const hd = QUALITY.auto;
   const attempts: (MediaTrackConstraints | true)[] = [];

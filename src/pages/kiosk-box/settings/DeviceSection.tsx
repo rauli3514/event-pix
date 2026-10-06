@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { CheckCircle2, AlertTriangle, Power, RefreshCw, Sparkles, Wifi } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Power, RefreshCw, Sparkles } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import {
-  checkinDevice, getAutostartStatus, getCachedDeviceState, openHomeAppSettings, openStartOnBootSettings, openWifiSettings,
+  checkinDevice, getAutostartStatus, getCachedDeviceState, openHomeAppSettings, openStartOnBootSettings,
   renameDevice, setBoxPin, type KioskDeviceState,
 } from '@/lib/kioskDevice';
 import { eventFolder } from '@/lib/kioskStorage';
 import { formatArs, getCachedStore, loadStore, whatsappLink } from '@/lib/kioskStore';
-import { buttonClass, inputClass, Panel, primaryClass } from './ui';
+import { buttonClass, inputClass, Panel, primaryClass, Toggle } from './ui';
+import { BluetoothPanel, WifiPanel } from './NetPanels';
+import { getGeneralSettings, saveGeneralSettings } from '@/lib/kioskSettings';
+import { applyLiteMode } from '@/lib/liteMode';
 
 export default function DeviceSection() {
   const [device, setDevice] = useState<KioskDeviceState | null>(getCachedDeviceState);
@@ -84,11 +87,11 @@ export default function DeviceSection() {
 
       <AutostartPanel />
 
-      <Panel title="Internet">
-        <button data-autofocus onClick={openWifiSettings} className={buttonClass}>
-          <Wifi className="w-5 h-5" /> Configurar WiFi del equipo
-        </button>
-      </Panel>
+      <WifiPanel />
+
+      <BluetoothPanel />
+
+      <LitePanel />
 
       <Panel title="Clave de ajustes" description="La que se pide al tocar Ajustes en el inicio.">
         <div className="flex gap-3">
@@ -215,6 +218,17 @@ function AutostartPanel() {
           "Mostrar sobre otras apps" para EventPix Kiosco.
         </p>
       )}
+    </Panel>
+  );
+}
+
+/** Modo liviano: para probar si al equipo le pesan los efectos. */
+function LitePanel() {
+  const [on, setOn] = useState(() => getGeneralSettings().liteMode === true);
+  return (
+    <Panel title="Modo liviano" description="Si el equipo se traba, probalo: saca el efecto de vidrio esmerilado, las sombras y las animaciones de fondo, y la cámara en Automática pasa a HD (720p). Se ve un poco más simple pero anda más fluido.">
+      <Toggle label="Usar modo liviano" hint={on ? 'Activado: menos efectos visuales.' : 'Desactivado: todos los efectos.'}
+        checked={on} onChange={v => { setOn(v); saveGeneralSettings({ liteMode: v }); applyLiteMode(); }} />
     </Panel>
   );
 }

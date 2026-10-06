@@ -12,6 +12,7 @@ import android.provider.Settings;
 import android.view.KeyEvent;
 import android.webkit.JavascriptInterface;
 
+import com.eventpix.app.net.KioskNetPlugin;
 import com.eventpix.app.print.NativePrintPlugin;
 import com.eventpix.app.screen.KioskScreenPlugin;
 import com.eventpix.app.storage.KioskStoragePlugin;
@@ -50,6 +51,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(NativePrintPlugin.class);
         registerPlugin(KioskStoragePlugin.class);
         registerPlugin(KioskScreenPlugin.class);
+        registerPlugin(KioskNetPlugin.class);
         super.onCreate(savedInstanceState);
         // La página puede fijar su ancho de diseño (vertical: 1080 puntos, ver screenRotation.ts)
         if (getBridge() != null && getBridge().getWebView() != null) {
