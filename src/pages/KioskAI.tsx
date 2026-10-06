@@ -583,24 +583,27 @@ export default function KioskAI() {
       console.error('No se pudo guardar la foto en el equipo', e);
       toast.error('No se pudo guardar la foto en el equipo');
     }
-    const wantsQr = !offlineMode && generalSettings.showQr !== false;
-
-    // QR con Drive (destino único): se sube ya la foto final y queda visible con el link
-    let driveRef: string | null = null;
-    if (wantsQr && !generalSettings.cloudSupabase && isDriveConfigured() && saved[0]) {
-      try {
-        driveRef = `drive:${await uploadForShare(dataUrl, saved[0].name, saved[0].folder)}`;
-      } catch (e) {
-        console.error(e);
-        toast.error('No se pudo subir la foto a Drive: el QR no va a estar disponible');
-      }
-    }
+    lastSavedRef.current = saved;
+    const url = await uploadForQr(dataUrl, saved);
     queueForDrive(saved); // el resto (originales, o la final si falló) se sube a Drive cuando hay internet
-    if (driveRef || !wantsQr) return driveRef;
+    return url;
+  };
 
-    // Supabase: solo si está activado en Compartir y nube (y el equipo tiene evento)
-    if (!generalSettings.cloudSupabase || !kioskEventId) return null;
-    try {
+  // Sube la foto final para el QR. Si falla, se reintenta una vez sola y el motivo
+  // queda a la vista (con un botón para reintentar) en vez de un aviso que se va.
+  const lastSavedRef = useRef<SavedPhoto[]>([]);
+  const [qrError, setQrError] = useState('');
+  const uploadForQr = async (dataUrl: string, saved: SavedPhoto[]): Promise<string | null> => {
+    const wantsQr = !offlineMode && generalSettings.showQr !== false;
+    if (!wantsQr) return null;
+    const attempt = async (): Promise<string> => {
+      // QR con Drive (destino único): la foto final queda visible con el link
+      if (!generalSettings.cloudSupabase && isDriveConfigured()) {
+        if (!saved[0]) throw new Error('La foto no se pudo guardar en el equipo');
+        return `drive:${await uploadForShare(dataUrl, saved[0].name, saved[0].folder)}`;
+      }
+      // Supabase: solo si está activado en Compartir y nube (y el equipo tiene evento)
+      if (!generalSettings.cloudSupabase || !kioskEventId) throw new Error('El equipo no tiene a dónde subir la foto');
       const blob = await (await fetch(dataUrl)).blob();
       const fileName = `kiosk_sessions/${kioskEventId}/${Date.now()}.jpg`;
       const { error: uploadError } = await supabase.storage.from('photos').upload(fileName, blob, { contentType: 'image/jpeg' });
@@ -608,11 +611,18 @@ export default function KioskAI() {
       const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(fileName);
       await supabase.from('kiosk_photos').insert([{ kiosk_event_id: kioskEventId, image_url: publicUrl }]);
       return publicUrl;
-    } catch (e) { 
-      console.error(e);
-      toast.error('No se pudo subir la foto: el QR no va a estar disponible');
-      return null;
+    };
+    setQrError('');
+    for (let i = 0; i < 2; i++) {
+      try {
+        return await attempt();
+      } catch (e) {
+        console.error('QR: no se pudo subir la foto', e);
+        if (i === 1) setQrError(!navigator.onLine ? 'Sin internet' : (e instanceof Error ? e.message : String(e)) || 'Error desconocido');
+        else await new Promise(r => setTimeout(r, 2000));
+      }
     }
+    return null;
   };
 
 
@@ -626,6 +636,16 @@ export default function KioskAI() {
     setLastPublicUrl(null);
     setUploading(true);
     savePhotoToAlbum(finalImage).then(url => {
+      if (photoSessionRef.current !== session) return;
+      setLastPublicUrl(url);
+      setUploading(false);
+    });
+  };
+  const retryQr = () => {
+    if (!capturedImage || uploading) return;
+    const session = photoSessionRef.current;
+    setUploading(true);
+    uploadForQr(capturedImage, lastSavedRef.current).then(url => {
       if (photoSessionRef.current !== session) return;
       setLastPublicUrl(url);
       setUploading(false);
@@ -1566,6 +1586,12 @@ The subject must perfectly match the facial features and gender of the reference
                 <div className="text-slate-900">
                   <p className="carlmarx-bold text-2xl leading-tight">{qrUrl ? 'Escaneá y llevátela' : uploading ? 'Preparando tu QR…' : 'QR no disponible'}</p>
                   <p className="text-slate-500 text-sm mt-1">{qrUrl ? 'Bajala al celular y compartila por WhatsApp o Instagram' : uploading ? 'Un segundo' : 'La foto quedó guardada en el equipo'}</p>
+                  {!qrUrl && !uploading && (
+                    <>
+                      {qrError && <p className="text-red-600 text-xs mt-1 max-w-[16rem] break-words">{qrError}</p>}
+                      <button onClick={retryQr} className="mt-2 px-4 py-2 rounded-full bg-violet-600 text-white text-sm font-bold">Reintentar</button>
+                    </>
+                  )}
                 </div>
               </div>
             )}
