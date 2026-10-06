@@ -147,7 +147,7 @@ export default function KioskVip() {
       )}
 
       {view === 'search' && (
-        <div className="relative z-10 h-full flex flex-col items-center px-[3vmin] pt-[9vmin] pb-[2vmin] gap-[2vmin]">
+        <div className="relative z-10 h-full flex flex-col items-center px-[3vmin] pt-[9vmin] portrait:pt-[18vh] pb-[2vmin] gap-[2vmin]">
           <div className="w-full max-w-[110vmin] flex items-center gap-[2vmin]">
             <button onClick={reset} className="shrink-0 px-[3vmin] py-[1.6vmin] rounded-full bg-black/50 border border-white/20 text-[clamp(1rem,2.6vmin,1.8rem)] font-semibold">
               Volver
@@ -162,7 +162,7 @@ export default function KioskVip() {
           </div>
 
           {/* Resultados */}
-          <div className="w-full max-w-[110vmin] flex-1 min-h-0 overflow-y-auto flex flex-col gap-[1.4vmin]">
+          <div className="w-full max-w-[110vmin] flex-1 min-h-0 overflow-y-auto flex flex-col gap-[1.4vmin] portrait:order-3">
             {query.trim().length < 3 ? (
               <p className="text-center text-white/70 text-[clamp(1rem,3vmin,2.2rem)] mt-[3vmin]">Escribí al menos 3 letras de tu nombre o apellido</p>
             ) : results.length === 0 ? (
@@ -204,7 +204,7 @@ export default function KioskVip() {
 function Keyboard({ onKey, onDelete, onClear }: { onKey: (k: string) => void; onDelete: () => void; onClear: () => void }) {
   const key = 'h-[8.5vmin] min-h-11 rounded-[1.6vmin] bg-white/15 border border-white/15 text-white font-bold text-[clamp(1.1rem,3.8vmin,2.6rem)] active:bg-white/35 active:scale-95 transition-transform';
   return (
-    <div className="w-full max-w-[120vmin] flex flex-col gap-[1vmin] kiosk-glass rounded-[3vmin] p-[1.4vmin]">
+    <div className="w-full max-w-[120vmin] flex flex-col gap-[1vmin] kiosk-glass rounded-[3vmin] p-[1.4vmin] portrait:order-2">
       {ROWS.map((row, r) => (
         <div key={r} className="flex gap-[1vmin] justify-center">
           {row.split('').map(ch => (

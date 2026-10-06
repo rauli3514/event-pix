@@ -86,7 +86,7 @@ export default function FrameChooser({ photo, options, initialIndex = 0, merge, 
   return (
     <div className="kiosk-root text-white">
       <ScreenBackground screen="reveal" />
-      <div className="relative z-10 h-full flex flex-col items-center gap-[2.5vmin] p-[4vmin]">
+      <div className="relative z-10 h-full flex flex-col items-center gap-[2.5vmin] p-[4vmin] portrait:pb-[28vh]">
         <h2 className="carlmarx-bold text-[clamp(2rem,6vmin,4rem)] text-center">Elegí tu marco</h2>
 
         <div ref={areaRef} className="flex-1 min-h-0 w-full flex items-center justify-center">

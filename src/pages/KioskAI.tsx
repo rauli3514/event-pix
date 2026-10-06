@@ -1075,7 +1075,7 @@ The subject must perfectly match the facial features and gender of the reference
           Elegí tu filtro con las flechas y tocá <span className="text-[#ff7ac0]">¡Sacar foto!</span>
         </p>
         <FilterCarousel filters={filters} value={fx.filter ?? 'none'} onChange={filter => setFx(v => ({ ...v, filter }))} />
-        <div className="absolute bottom-[6vmin] inset-x-0 z-20 flex justify-center">
+        <div className="absolute bottom-[6vmin] portrait:bottom-[32vh] inset-x-0 z-20 flex justify-center">
           <button data-autofocus onClick={startCountdown} disabled={!cameraReady}
             className="px-12 py-4 rounded-full carlmarx-bold text-white text-[clamp(1.6rem,3.5vmin,2rem)] disabled:opacity-50 focus:outline-none focus:ring-4 focus:ring-white/80"
             style={{ background: 'linear-gradient(135deg,#ff2e93,#7b2ff7)', boxShadow: '0 0 40px rgba(255,46,147,0.55)' }}>
@@ -1222,7 +1222,7 @@ The subject must perfectly match the facial features and gender of the reference
         <CameraFlash key={capturedImage ?? 'flash'} />
         {/* Gradient bottom overlay for buttons */}
         <div className="absolute bottom-0 inset-x-0 h-48 bg-gradient-to-t from-black to-transparent" />
-        <div className="absolute bottom-0 inset-x-0 flex items-end justify-center gap-6 p-8 z-10">
+        <div className="absolute bottom-0 portrait:bottom-[30vh] inset-x-0 flex items-end justify-center gap-6 p-8 z-10">
           {generalSettings.allowRetake !== false && (
           <button onClick={() => setStep('lookCamera')}
             className="flex-1 max-w-xs py-5 rounded-2xl border-2 border-white/30 bg-black/60 carlmarx-bold text-white text-2xl backdrop-blur hover:border-white/60 transition-all focus:outline-none focus:ring-4 focus:ring-white/80">
@@ -1468,7 +1468,7 @@ The subject must perfectly match the facial features and gender of the reference
         
         {/* BOTÓN DE CONFIRMACIÓN FLOTANTE */}
         {selectedAITheme && !isAIGenerating && (
-          <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-8 duration-300">
+          <div className="fixed bottom-12 portrait:bottom-[32vh] left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-8 duration-300">
             <button 
               onClick={handleThemeConfirm}
               className="bg-gradient-to-r from-violet-600 to-pink-600 text-white px-12 py-6 rounded-3xl carlmarx-bold text-3xl shadow-[0_10px_50px_rgba(139,92,246,0.6)] hover:scale-105 active:scale-95 transition-all flex items-center gap-4"
@@ -1520,11 +1520,11 @@ The subject must perfectly match the facial features and gender of the reference
         <ScreenBackground screen="result" />
         <Corners />
         
-        <div className="relative z-10 flex flex-col md:flex-row h-full items-center justify-center gap-6 md:gap-12 p-6 animate-in fade-in zoom-in duration-500 overflow-y-auto">
+        <div className="relative z-10 flex flex-col md:flex-row portrait:!flex-col h-full items-center justify-center portrait:justify-start portrait:pt-[8vh] gap-6 md:gap-12 portrait:!gap-6 p-6 animate-in fade-in zoom-in duration-500 overflow-y-auto">
           {/* Photo Preview - ACHICADO PARA QUE ENTREN BOTONES */}
           {/* Se adapta a la hoja: vertical u horizontal */}
           <div className="relative flex-shrink-0 rounded-[2rem] overflow-hidden shadow-[0_0_80px_rgba(139,92,246,0.3)] border border-violet-500/30 group">
-            {capturedImage && <motion.img key={capturedImage} src={capturedImage} alt="result" className="block w-auto h-auto max-h-[45vh] md:max-h-[70vh] max-w-[90vw] md:max-w-[55vw]" {...revealPhoto} />}
+            {capturedImage && <motion.img key={capturedImage} src={capturedImage} alt="result" className="block w-auto h-auto max-h-[45vh] md:max-h-[70vh] portrait:!max-h-[36vh] max-w-[90vw] md:max-w-[55vw] portrait:!max-w-[80vw]" {...revealPhoto} />}
           </div>
 
           {/* Actions Column */}

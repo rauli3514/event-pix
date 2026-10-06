@@ -42,7 +42,7 @@ export default function GuestNameScreen({ photo, onDone }: { photo?: string | nu
   return (
     <div className="kiosk-root text-white">
       <ScreenBackground screen="reveal" />
-      <div className="relative z-10 h-full flex flex-col items-center justify-center gap-[3vmin] p-[4vmin]">
+      <div className="relative z-10 h-full flex flex-col items-center justify-center portrait:justify-start portrait:pt-[10vh] gap-[3vmin] p-[4vmin]">
         <div className="flex items-center gap-[4vmin]">
           {photo && (
             <motion.img src={photo} alt="" className="h-[22vmin] rounded-[1.6vmin] shadow-2xl border-[0.5vmin] border-white"
