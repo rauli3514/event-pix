@@ -51,6 +51,11 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(KioskStoragePlugin.class);
         registerPlugin(KioskScreenPlugin.class);
         super.onCreate(savedInstanceState);
+        // La página puede fijar su ancho de diseño (vertical: 1080 puntos, ver screenRotation.ts)
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            getBridge().getWebView().getSettings().setUseWideViewPort(true);
+            getBridge().getWebView().getSettings().setLoadWithOverviewMode(true);
+        }
         // Tele colgada en vertical: se gira desde el arranque, sin esperar a la página
         if (getBridge() != null) {
             KioskScreenPlugin.apply(getBridge().getWebView(), KioskScreenPlugin.savedRotation(this));

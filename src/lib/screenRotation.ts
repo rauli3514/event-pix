@@ -24,8 +24,26 @@ export const getScreenRotation = (): ScreenRotation => {
   return v === 90 || v === 180 || v === 270 ? v : 0;
 };
 
+/**
+ * Con la tele vertical, el WebView queda angosto (en el Tanix ~720 puntos por la
+ * densidad de pantalla) y las pantallas pensadas para más ancho se salían de los
+ * costados. En la app nativa, vertical usa un ancho de diseño fijo de 1080 puntos
+ * y Android lo escala para que entre (MainActivity activa el "viewport ancho").
+ */
+const PORTRAIT_DESIGN_WIDTH = 1080;
+export const applyViewport = (degrees: ScreenRotation = getScreenRotation()) => {
+  if (!Capacitor.isNativePlatform()) return;
+  const meta = document.querySelector('meta[name="viewport"]');
+  if (!meta) return;
+  const sideways = degrees === 90 || degrees === 270;
+  meta.setAttribute('content', sideways
+    ? `width=${PORTRAIT_DESIGN_WIDTH}`
+    : 'width=device-width, initial-scale=1.0');
+};
+
 /** Gira la app nativa; en la web solo avisa a RotatedScreen. */
 export const applyScreenRotation = async (degrees: ScreenRotation = getScreenRotation()) => {
+  applyViewport(degrees);
   if (Capacitor.isNativePlatform()) {
     try {
       await KioskScreen.setRotation({ degrees });
