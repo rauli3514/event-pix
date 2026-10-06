@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
-import { Bluetooth, Keyboard, Loader2, Lock, Printer, Smartphone, Speaker, Wifi, WifiOff } from 'lucide-react';
+import { Bluetooth, Keyboard, Loader2, Lock, MonitorSmartphone, Printer, Smartphone, Speaker, Tablet, Wifi, WifiOff } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { openWifiSettings } from '@/lib/kioskDevice';
+import { getGeneralSettings, saveGeneralSettings } from '@/lib/kioskSettings';
+import { KioskLink, linkAvailable, REMOTE_HOST_EVENT, setDeviceRole, type LinkState } from '@/lib/kioskLink';
 import { errorText, KioskNet, netAvailable, type BtDevice, type BtStatus, type WifiNetwork, type WifiStatus } from '@/lib/kioskNet';
-import { buttonClass, inputClass, Panel, primaryClass } from './ui';
+import { buttonClass, inputClass, Panel, primaryClass, Toggle } from './ui';
 
 // WiFi y Bluetooth desde Ajustes → Equipo: sin entrar a los ajustes de Android, que con
 // la tele vertical se ven de costado.
@@ -305,6 +308,75 @@ export function BluetoothPanel() {
           )}
         </>
       )}
+    </Panel>
+  );
+}
+
+/** Control con tablet por Bluetooth: esta pantalla la maneja una tablet, o este equipo es la tablet. */
+export function RemoteControlPanel() {
+  const navigate = useNavigate();
+  const available = linkAvailable();
+  const [on, setOn] = useState(() => getGeneralSettings().remoteHost === true);
+  const [name, setName] = useState('');
+  const [link, setLink] = useState<{ state: LinkState; name?: string } | null>(null);
+
+  useEffect(() => {
+    if (!available) return;
+    KioskLink.info().then(i => {
+      setName(i.name || '');
+      if (i.connected) setLink({ state: 'connected' });
+    }).catch(() => {});
+    const h = KioskLink.addListener('linkState', e => setLink(e));
+    return () => { h.then(x => x.remove()).catch(() => {}); };
+  }, [available]);
+
+  const toggle = (v: boolean) => {
+    setOn(v);
+    saveGeneralSettings({ remoteHost: v });
+    window.dispatchEvent(new Event(REMOTE_HOST_EVENT));
+  };
+
+  const visible = async () => {
+    try { await KioskLink.makeDiscoverable(); } catch (e) { toast.error(errorText(e)); }
+  };
+
+  const useAsRemote = () => {
+    if (!window.confirm('¿Usar este equipo como tablet de control? Al abrir la app va a ir directo al control (se puede volver con el botón de salir).')) return;
+    toggle(false);
+    setDeviceRole('remote');
+    navigate('/control', { replace: true });
+  };
+
+  if (!available) {
+    return (
+      <Panel title="Control con tablet" description="Una tablet al costado maneja esta pantalla por Bluetooth, sin internet. Desde la APK 2.2.">
+        <p className="text-white/60">Se configura en la app del equipo.</p>
+      </Panel>
+    );
+  }
+
+  return (
+    <Panel title="Control con tablet" description="Una tablet al costado maneja esta pantalla por Bluetooth, sin internet: ve los mismos botones y los toca desde ahí. Ideal para teles sin pantalla táctil.">
+      <Toggle label="Permitir que una tablet maneje esta pantalla" hint={on ? 'Esperando la tablet…' : 'Apagado'}
+        checked={on} onChange={toggle} />
+      {on && (
+        <>
+          <div className={`flex items-center gap-3 rounded-2xl px-5 py-4 ${link?.state === 'connected' ? 'bg-emerald-500/15 text-emerald-200' : 'bg-black/20 text-white/80'}`}>
+            <Tablet className="w-6 h-6 shrink-0" />
+            <p className="text-lg font-semibold">
+              {link?.state === 'connected' ? `Tablet conectada${link.name ? `: ${link.name}` : ''}` : 'Ninguna tablet conectada'}
+            </p>
+          </div>
+          <p className="text-white/70">
+            Nombre de esta pantalla en Bluetooth: <b className="text-white">{name || '—'}</b>. En la tablet (con la app EventPix Kiosco):
+            Ajustes → Equipo → <b>"Usar este equipo como control"</b>, tocá <b>Buscar</b> y elegí este nombre. La primera vez tocá acá <b>"Hacer visible"</b>.
+          </p>
+          <button onClick={visible} className={primaryClass}><Bluetooth className="w-5 h-5" /> Hacer visible (5 minutos)</button>
+        </>
+      )}
+      <button onClick={useAsRemote} className={buttonClass}>
+        <MonitorSmartphone className="w-5 h-5" /> Usar este equipo como control (tablet)
+      </button>
     </Panel>
   );
 }

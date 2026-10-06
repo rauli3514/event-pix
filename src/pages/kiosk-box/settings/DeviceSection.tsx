@@ -11,7 +11,7 @@ import {
 import { eventFolder } from '@/lib/kioskStorage';
 import { formatArs, getCachedStore, loadStore, whatsappLink } from '@/lib/kioskStore';
 import { buttonClass, inputClass, Panel, primaryClass, Toggle } from './ui';
-import { BluetoothPanel, WifiPanel } from './NetPanels';
+import { BluetoothPanel, RemoteControlPanel, WifiPanel } from './NetPanels';
 import { getGeneralSettings, saveGeneralSettings } from '@/lib/kioskSettings';
 import { applyLiteMode } from '@/lib/liteMode';
 
@@ -90,6 +90,8 @@ export default function DeviceSection() {
       <WifiPanel />
 
       <BluetoothPanel />
+
+      <RemoteControlPanel />
 
       <LitePanel />
 

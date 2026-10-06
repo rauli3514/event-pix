@@ -7,6 +7,7 @@ import { nameStyleProps } from '@/components/kiosk/attractStyles';
 import { useConfettiBurst } from '@/components/kiosk/kioskEffects';
 import { getGeneralSettings, getSectionLock, setSectionLock } from '@/lib/kioskSettings';
 import { getScreenMedia } from '@/lib/kioskMedia';
+import { REMOTE_TEXT_EVENT } from '@/lib/kioskLink';
 import { fullName, getVipGuests, isNumberedTable, searchGuests, tableLabel, VIP_VIDEO_KEY, type VipGuest } from '@/lib/vipGuests';
 
 // Ingreso VIP en el kiosco: el invitado escribe al menos 3 letras de su nombre o
@@ -81,6 +82,14 @@ export default function KioskVip() {
 
   useConfettiBurst(view === 'result');
 
+  // Lo que se escribe en la tablet de control
+  useEffect(() => {
+    if (view !== 'search') return;
+    const onText = (e: Event) => setQuery(String((e as CustomEvent).detail ?? '').slice(0, 30));
+    window.addEventListener(REMOTE_TEXT_EVENT, onText);
+    return () => window.removeEventListener(REMOTE_TEXT_EVENT, onText);
+  }, [view]);
+
   // Teclado físico o control remoto con letras
   useEffect(() => {
     if (view !== 'search') return;
@@ -119,7 +128,7 @@ export default function KioskVip() {
               {locked ? <Lock className="w-5 h-5" /> : <LockOpen className="w-5 h-5" />}
             </button>
           </div>
-          <button data-autofocus onClick={() => setView('search')}
+          <button data-autofocus data-remote="Buscar mi nombre" onClick={() => setView('search')}
             className="relative z-10 w-full h-full flex flex-col items-center justify-center gap-[4vmin] px-[6vmin] text-center focus:outline-none">
             <span className="flex items-center gap-[1.5vmin] text-white/85 uppercase tracking-[0.5em] text-[2.4vmin] font-semibold">
               <Ticket className="w-[3.4vmin] h-[3.4vmin]" /> Ingreso
@@ -152,7 +161,8 @@ export default function KioskVip() {
             <button onClick={reset} className="shrink-0 px-[3vmin] py-[1.6vmin] rounded-full bg-black/50 border border-white/20 text-[clamp(1rem,2.6vmin,1.8rem)] font-semibold">
               Volver
             </button>
-            <div className="flex-1 kiosk-glass rounded-[2.5vmin] px-[3vmin] py-[1.6vmin] flex items-center gap-[2vmin] min-h-[9vmin]">
+            <div data-remote-text="Nombre o apellido" data-remote-value={query}
+              className="flex-1 kiosk-glass rounded-[2.5vmin] px-[3vmin] py-[1.6vmin] flex items-center gap-[2vmin] min-h-[9vmin]">
               <Search className="w-[4vmin] h-[4vmin] text-white/60 shrink-0" />
               <span className="text-[clamp(1.4rem,5vmin,3.6rem)] font-bold tracking-wide truncate">
                 {query || <span className="text-white/40 font-normal text-[clamp(1rem,3.4vmin,2.4rem)]">Escribí tu nombre o apellido</span>}
@@ -204,7 +214,7 @@ export default function KioskVip() {
 function Keyboard({ onKey, onDelete, onClear }: { onKey: (k: string) => void; onDelete: () => void; onClear: () => void }) {
   const key = 'h-[8.5vmin] min-h-11 rounded-[1.6vmin] bg-white/15 border border-white/15 text-white font-bold text-[clamp(1.1rem,3.8vmin,2.6rem)] active:bg-white/35 active:scale-95 transition-transform';
   return (
-    <div className="w-full max-w-[120vmin] flex flex-col gap-[1vmin] kiosk-glass rounded-[3vmin] p-[1.4vmin] portrait:order-2">
+    <div data-remote-skip className="w-full max-w-[120vmin] flex flex-col gap-[1vmin] kiosk-glass rounded-[3vmin] p-[1.4vmin] portrait:order-2">
       {ROWS.map((row, r) => (
         <div key={r} className="flex gap-[1vmin] justify-center">
           {row.split('').map(ch => (

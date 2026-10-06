@@ -102,6 +102,8 @@ export interface KioskGeneralSettings {
   vipAfterPartyTime?: string;
   /** Disparador Bluetooth: la foto espera el botón (o un toque) en vez de arrancar sola */
   bluetoothShutter?: boolean;
+  /** Esta pantalla acepta que una tablet la maneje por Bluetooth (ver kioskLink.ts) */
+  remoteHost?: boolean;
   /** Modo liviano para equipos con poca potencia (ver liteMode.ts) */
   liteMode?: boolean;
   /** Protector de pantalla con el logo animado (por defecto sí) */

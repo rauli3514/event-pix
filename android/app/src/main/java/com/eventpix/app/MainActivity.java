@@ -12,6 +12,7 @@ import android.provider.Settings;
 import android.view.KeyEvent;
 import android.webkit.JavascriptInterface;
 
+import com.eventpix.app.net.KioskLinkPlugin;
 import com.eventpix.app.net.KioskNetPlugin;
 import com.eventpix.app.print.NativePrintPlugin;
 import com.eventpix.app.screen.KioskScreenPlugin;
@@ -52,7 +53,10 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(KioskStoragePlugin.class);
         registerPlugin(KioskScreenPlugin.class);
         registerPlugin(KioskNetPlugin.class);
+        registerPlugin(KioskLinkPlugin.class);
         super.onCreate(savedInstanceState);
+        // Kiosco: la pantalla no se apaga ni entra en protector de Android
+        getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         // La página puede fijar su ancho de diseño (vertical: 1080 puntos, ver screenRotation.ts)
         if (getBridge() != null && getBridge().getWebView() != null) {
             getBridge().getWebView().getSettings().setUseWideViewPort(true);

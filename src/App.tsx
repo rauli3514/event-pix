@@ -13,6 +13,8 @@ import KioskBox from "./pages/kiosk-box/KioskBox";
 import KioskBoxSettings from "./pages/kiosk-box/KioskBoxSettings";
 import KioskGallery from "./pages/kiosk-box/KioskGallery";
 import KioskVip from "./pages/kiosk-box/KioskVip";
+import KioskControl from "./pages/kiosk-box/KioskControl";
+import RemoteHost from "./components/kiosk/RemoteHost";
 import KioskAdmin from "./pages/admin/KioskAdmin";
 import KioskScreensaver from "./components/kiosk/KioskScreensaver";
 import RotatedScreen from "./components/kiosk/RotatedScreen";
@@ -59,6 +61,7 @@ const App = () => (
         <BrowserRouter>
           <RotatedScreen>
           <KioskScreensaver />
+          <RemoteHost />
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/usuarios" element={<DisplayUserLogin />} />
@@ -71,6 +74,8 @@ const App = () => (
             <Route path="/box/ajustes" element={<KioskBoxSettings />} />
             <Route path="/box/galeria" element={<KioskGallery />} />
             <Route path="/box/vip" element={<KioskVip />} />
+            {/* Tablet que maneja la pantalla del kiosco por Bluetooth */}
+            <Route path="/control" element={<KioskControl />} />
             {/* Página pública del QR del kiosco: el invitado baja o comparte su foto */}
             <Route path="/foto" element={<GuestPhoto />} />
             {/* Atajo al panel de kioscos */}
