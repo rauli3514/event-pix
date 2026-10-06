@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Delete } from 'lucide-react';
 import ScreenBackground from '@/components/kiosk/ScreenBackground';
+import { REMOTE_TEXT_EVENT } from '@/lib/kioskLink';
 
 // El invitado escribe su nombre (o los nombres del grupo) para que vaya en la
 // foto. Teclado en pantalla para la tele táctil o el control remoto; también
@@ -26,6 +27,13 @@ export default function GuestNameScreen({ photo, onDone }: { photo?: string | nu
     onDone(capitalize(value.trim()));
   };
   const add = (ch: string) => setName(n => (n + ch).slice(0, MAX));
+
+  // Lo que se escribe en la tablet de control
+  useEffect(() => {
+    const onText = (e: Event) => setName(String((e as CustomEvent).detail ?? '').slice(0, MAX));
+    window.addEventListener(REMOTE_TEXT_EVENT, onText);
+    return () => window.removeEventListener(REMOTE_TEXT_EVENT, onText);
+  }, []);
 
   // Teclado físico (USB)
   useEffect(() => {
@@ -54,12 +62,14 @@ export default function GuestNameScreen({ photo, onDone }: { photo?: string | nu
           </div>
         </div>
 
-        <div className="min-w-[60vmin] max-w-[90vw] rounded-[2vmin] bg-black/40 border-[0.4vmin] border-white/40 px-[4vmin] py-[2vmin] text-center carlmarx-bold text-[6vmin] min-h-[11vmin]">
+        <div data-remote-text="Nombre para la foto" data-remote-value={name}
+          className="min-w-[60vmin] max-w-[90vw] rounded-[2vmin] bg-black/40 border-[0.4vmin] border-white/40 px-[4vmin] py-[2vmin] text-center carlmarx-bold text-[6vmin] min-h-[11vmin]">
           {name ? capitalize(name) : <span className="text-white/35">Ej: Sofi y Juan</span>}
           <span className="inline-block w-[0.5vmin] h-[5vmin] bg-white/80 ml-1 align-middle animate-pulse" />
         </div>
 
-        <div className="flex flex-col items-center gap-[1.2vmin]">
+        {/* El teclado no se manda a la tablet: ahí se escribe en su propio cuadro */}
+        <div data-remote-skip className="flex flex-col items-center gap-[1.2vmin]">
           {ROWS.map((row, i) => (
             <div key={i} className="flex gap-[1.2vmin]">
               {row.map(ch => (

@@ -949,6 +949,7 @@ The subject must perfectly match the facial features and gender of the reference
     <div
       className="kiosk-root outline-none"
       onClick={handleSplashTap}
+      data-remote="Tocá para empezar"
       // OK del control remoto = tocar la pantalla
       tabIndex={0}
       data-autofocus
@@ -1006,7 +1007,7 @@ The subject must perfectly match the facial features and gender of the reference
             { mode: 'caricatura' as Exclude<Mode, null>, on: generalSettings.enableCaricatura !== false, title: 'Caricatura con Messi', text: '¡Festejá con Messi! Tu caricatura con la camiseta argentina.', img: themes.find((t: any) => t.result_style === 'caricatura')?.preview_url || '/modes/caricatura.jpg', icon: Palette, color: '#fb923c', ai: true },
             { mode: 'figuritas' as Exclude<Mode, null>, on: generalSettings.enableFiguritas !== false, title: 'Hacer Figurita', text: 'Tu propia figurita del álbum, con el fondo recortado.', img: '/modes/figurita.jpg', icon: Sticker, color: '#2dd4bf', ai: true },
           ].filter(m => m.on && isModeAllowed(m.mode)).map(m => (
-            <button key={m.mode} data-autofocus onClick={() => handleModeSelect(m.mode)}
+            <button key={m.mode} data-autofocus data-remote={m.title} onClick={() => handleModeSelect(m.mode)}
               className="relative group flex flex-col rounded-2xl overflow-hidden border-2 kiosk-glass text-left hover:scale-[1.03] focus:scale-[1.03] focus:outline-none focus:ring-4 focus:ring-white/80 transition-all"
               style={{ borderColor: m.color }}>
               <div className="relative w-full aspect-[16/10] bg-black/40 overflow-hidden">
@@ -1088,7 +1089,8 @@ The subject must perfectly match the facial features and gender of the reference
 
   if (step === 'lookCamera') {
     return (
-      <div className="kiosk-root" onClick={shutterMode && cameraReady ? startCountdown : undefined}>
+      <div className="kiosk-root" onClick={shutterMode && cameraReady ? startCountdown : undefined}
+        data-remote={shutterMode && cameraReady ? '📸 Sacar foto' : undefined}>
         <AuroraBackground />
         <Corners />
         <CameraVideo videoRef={videoRef} mirror={!!cameraSettings.mirror} rotation={Number(cameraSettings.rotation) || 0} />
@@ -1442,6 +1444,7 @@ The subject must perfectly match the facial features and gender of the reference
                     <button
                       key={t.id}
                       onClick={() => setSelectedAITheme(t)}
+                      data-remote={`${selectedAITheme?.id === t.id ? '✓ ' : ''}${t.name}`}
                       className={`relative rounded-2xl overflow-hidden border-2 transition-all group bg-slate-900 ${isAIGenerating ? 'opacity-50 cursor-not-allowed' : (selectedAITheme?.id === t.id ? 'border-violet-400 scale-[1.03] ring-4 ring-violet-500/20' : 'border-violet-800/40 hover:border-violet-400')}`}
                       style={{ aspectRatio: '3/4' }}
                     >
