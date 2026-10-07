@@ -1509,10 +1509,6 @@ const KioskManager = () => {
                                                     <span className="text-[10px] text-slate-400 uppercase font-bold">IA</span>
                                                     <input type="checkbox" checked={generalSettings.enableAI !== false} onChange={(e) => setGeneralSettings({...generalSettings, enableAI: e.target.checked})} className="w-5 h-5 accent-violet-500" />
                                                 </div>
-                                                <div className="flex flex-col items-center gap-1">
-                                                    <span className="text-[10px] text-slate-400 uppercase font-bold">Mundial</span>
-                                                    <input type="checkbox" checked={generalSettings.enableMundial !== false} onChange={(e) => setGeneralSettings({...generalSettings, enableMundial: e.target.checked})} className="w-5 h-5 accent-green-500" />
-                                                </div>
                                             </div>
                                         </div>
 

@@ -14,9 +14,7 @@ const MODES = [
   { key: 'enableAI', label: 'Retrato mágico (IA)', hint: 'Estilos de retrato con inteligencia artificial.' },
   { key: 'enablePortadaAI', label: 'Portada Fashion IA', hint: 'La IA viste de modelo y sale la tapa de revista con el nombre.' },
   { key: 'enableCaricatura', label: 'Caricatura con Messi (IA)', hint: 'Caricatura del invitado festejando con Messi.' },
-  // El Mundial ya pasó: viene apagado, se puede prender
-  { key: 'enableMundial', label: 'Mundial 2026 (IA)', hint: 'Carta de jugador con nombre y posición (apagado por defecto).', off: true },
-  { key: 'enableFiguritas', label: 'Hacer figurita', hint: 'Figurita del álbum con fondo quitado.' },
+  { key: 'enableFiguritas', label: 'Figurita Mundial 2026', hint: 'Figurita del álbum con la cara del invitado, su país, posición y datos.' },
 ] as const satisfies readonly { key: string; label: string; hint: string; off?: boolean }[];
 
 // Un PNG de marco pesado puede no entrar en el almacenamiento del equipo

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'; // Kiosk AI Optimized Flow
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Printer, Users, Sparkles, Trophy, QrCode, Loader2, Images, Crown, Instagram, Palette, Sticker, Home, Lock, LockOpen } from 'lucide-react';
+import { Printer, Users, Sparkles, QrCode, Loader2, Images, Crown, Instagram, Palette, Sticker, Home, Lock, LockOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { printKioskPhoto } from '@/lib/kioskPrint';
@@ -49,34 +49,16 @@ type Step =
   | 'flashResult'
   | 'themeSelect'
   | 'mundialCountry'
-  | 'mundialInfo'
   | 'processing'
   | 'stickerEditor'
   | 'result';
 
-type Mode = 'selfie' | 'portada' | 'portadaIA' | 'retrato' | 'mundial' | 'caricatura' | 'figuritas' | null;
+type Mode = 'selfie' | 'portada' | 'portadaIA' | 'retrato' | 'caricatura' | 'figuritas' | null;
 
 // Portada Fashion con IA: si la temática 'cover' no está en la base, se usa este prompt
 const PORTADA_IA_PROMPT = 'Edit this photo. Keep every person exactly as they are: same face, facial features, skin tone, age, body shape, hairstyle and expression, so each one is instantly recognizable. Do not add, remove or merge people, and keep their poses. Dress them for a high fashion magazine shoot: sophisticated designer outfits, styled hair, subtle glam makeup. Replace the background with a clean seamless studio backdrop in a soft neutral tone, professional beauty lighting, framed from the waist up with empty space above the heads. Relight the people to match the new scene (same light direction, color and warmth) and use a shallow depth of field with a softly blurred background, so the result looks like one real professional photo taken there, not a collage. Photorealistic, high detail. No text, no logos, no watermark.';
 
-// ---- Mundial Data ----
-const COUNTRIES = [
-  { id: 'argentina', name: 'Argentina', flag: '/flags/argentina.png', jersey: 'white and light blue vertical stripes Adidas Argentina AFA national team jersey with three gold stars' },
-  { id: 'brasil',    name: 'Brasil',    flag: '/flags/brasil.png',    jersey: 'yellow Adidas Brazil CBF national team jersey with green collar' },
-  { id: 'uruguay',   name: 'Uruguay',   flag: '/flags/uruguay.png',   jersey: 'light blue Puma Uruguay AUF national team jersey' },
-  { id: 'chile',     name: 'Chile',     flag: '/flags/chile.png',     jersey: 'red Nike Chile FEF national team jersey' },
-  { id: 'mexico',    name: 'México',    flag: '/flags/mexico.png',    jersey: 'green Adidas Mexico FMF national team jersey' },
-  { id: 'espana',    name: 'España',    flag: '/flags/espana.png',    jersey: 'red Adidas Spain RFEF national team jersey' },
-  { id: 'portugal',  name: 'Portugal',  flag: '/flags/portugal.png',  jersey: 'dark red Nike Portugal FPF national team jersey' },
-  { id: 'venezuela', name: 'Venezuela', flag: '/flags/venezuela.png', jersey: 'red and black Hummel Venezuela FVF national team jersey' },
-  { id: 'estados-unidos', name: 'USA',  flag: '/flags/estados-unidos.png', jersey: 'white Nike USA USMNT national team jersey with red and blue details' },
-  { id: 'corea',     name: 'Corea',     flag: '/flags/corea.png',     jersey: 'red Nike South Korea KFA national team jersey' },
-  { id: 'japon',     name: 'Japón',     flag: '/flags/japon.png',     jersey: 'blue Adidas Japan JFA national team jersey' },
-  { id: 'marruecos', name: 'Marruecos', flag: '/flags/marruecos.png', jersey: 'red Puma Morocco FRMF national team jersey' },
-  { id: 'croacia',   name: 'Croacia',   flag: '/flags/croacia.png',   jersey: 'white with red checkered pattern Nike Croatia HNS national team jersey' },
-  { id: 'gana',      name: 'Ghana',     flag: '/flags/gana.png',      jersey: 'white Nike Ghana GFA national team jersey' },
-];
-
+// ---- Figurita Mundial 2026: países con figurita diseñada ----
 const FIGURITAS_COUNTRIES = [
   { id: 'argentina', name: 'Argentina', flag: '/flags/argentina.png' },
   { id: 'canada', name: 'Canadá', flag: '🇨🇦' },
@@ -85,11 +67,6 @@ const FIGURITAS_COUNTRIES = [
   { id: 'mexico', name: 'México', flag: '/flags/mexico.png' },
   { id: 'sudafrica', name: 'Sudáfrica', flag: '🇿🇦' },
   { id: 'otros', name: 'Otros', flag: '🌍' }
-];
-
-const POSITIONS = [
-  'Delantero', 'Centrocampista', 'Defensa', 'Arquero',
-  'Extremo', 'Mediapunta', 'Lateral', 'Líbero',
 ];
 
 // ---- Funny phrases for Selfie Grupal ----
@@ -101,44 +78,6 @@ const SELFIE_PHRASES = [
   "¡Esto no es una foto, esto es una OBRA DE ARTE!",
   "¡Paren todo! La mejor foto del evento acaba de tomarse.",
 ];
-
-// ---- On-screen keyboard ----
-const KB_ROWS = [
-  ['Q','W','E','R','T','Y','U','I','O','P'],
-  ['A','S','D','F','G','H','J','K','L'],
-  ['Z','X','C','V','B','N','M','⌫'],
-  ['ESPACIO'],
-];
-interface VKProps { value: string; onChange: (v: string) => void; onClose: () => void; }
-const VirtualKeyboard = ({ value, onChange, onClose }: VKProps) => {
-  const press = (key: string) => {
-    if (key === '⌫') { onChange(value.slice(0, -1)); return; }
-    if (key === 'ESPACIO') { if (value.length < 24) onChange(value + ' '); return; }
-    if (value.length < 24) onChange(value + key);
-  };
-  return (
-    <div className="fixed inset-x-0 bottom-0 z-50 bg-[#0a0f1a]/95 border-t border-white/10 p-4 pb-6 backdrop-blur">
-      <div className="flex justify-between items-center mb-3">
-        <p className="carlmarx-bold text-white text-2xl tracking-wider">{value || <span className="text-white/30">RAUL GUTIERREZ</span>}</p>
-        <button onClick={onClose} className="text-white/50 hover:text-white text-lg carlmarx-regular px-4 py-2 border border-white/20 rounded-xl">Listo ✓</button>
-      </div>
-      {KB_ROWS.map((row, ri) => (
-        <div key={ri} className="flex justify-center gap-1.5 mb-1.5">
-          {row.map(k => (
-            <button
-              key={k}
-              onPointerDown={e => { e.preventDefault(); press(k); }}
-              className={`carlmarx-bold text-white rounded-xl border border-white/20 bg-white/10 active:bg-white/30 transition-colors flex items-center justify-center select-none
-                ${ k === 'ESPACIO' ? 'text-base px-16 py-4 flex-1 max-w-xs' : k === '⌫' ? 'text-xl px-4 py-4 bg-red-900/40 border-red-700/40' : 'text-xl w-12 h-12' }`}
-            >
-              {k === 'ESPACIO' ? '— ESPACIO —' : k}
-            </button>
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-};
 
 // ---- Corner decoration ----
 const Corners = () => (
@@ -191,13 +130,9 @@ export default function KioskAI() {
   const [isAIGenerating, setIsAIGenerating] = useState(false);
   // Foto IA lista mientras el invitado juega: se muestra al terminar el aviso de los juegos
   const [aiReadyStep, setAiReadyStep] = useState<Step | null>(null);
-  // Mundial state
+  // País de la Figurita Mundial 2026
   const [mundialCountry, setMundialCountry] = useState<any>(null);
-  const [mundialName, setMundialName] = useState('');
-  const [mundialPosition, setMundialPosition] = useState('');
-  const [mundialGender, setMundialGender] = useState<'M' | 'F'>('M');
   const [showQrModal, setShowQrModal] = useState(false);
-  const [showKeyboard, setShowKeyboard] = useState(false);
   const [themes, setThemes] = useState<any[]>([]);
   const [frameUrl, setFrameUrl] = useState<string | null>(null);
   // Marcos para que elija el invitado (se fijan al entrar a la pantalla)
@@ -382,7 +317,7 @@ export default function KioskAI() {
   // Sin actividad en las pantallas de elección, vuelve al inicio
   const idleTimeout = Number(generalSettings.idleTimeout) || 0;
   useEffect(() => {
-    const idleSteps: Step[] = ['modeSelect', 'themeSelect', 'mundialCountry', 'mundialInfo', 'lookCamera'];
+    const idleSteps: Step[] = ['modeSelect', 'themeSelect', 'mundialCountry', 'lookCamera'];
     if (idleTimeout <= 0 || !idleSteps.includes(step)) return;
     let t = setTimeout(() => resetKiosk(), idleTimeout * 1000);
     const restart = () => {
@@ -457,7 +392,7 @@ export default function KioskAI() {
   const handleModeSelect = (m: Mode) => {
     setMode(m);
     setFx({});
-    if (m === 'mundial' || m === 'figuritas') {
+    if (m === 'figuritas') {
       setStep('mundialCountry');
     } else {
       setStep('getReady');
@@ -684,28 +619,8 @@ export default function KioskAI() {
       const publicUrl = signedData.signedUrl;
 
       // Build prompt based on mode
-      let prompt = theme?.prompt || '';
+      const prompt = theme?.prompt || '';
       
-      // Si es modo mundial, generamos un retrato profesional del jugador (sin Messi)
-      if (mode === 'mundial' && mundialCountry) {
-        const isCaricature = theme?.name?.toLowerCase().includes('caricatura') || prompt.toLowerCase().includes('caricatura');
-        const genderLabel = mundialGender === 'F' ? 'female' : 'male';
-        const playerLabel = mundialGender === 'F' ? 'football player' : 'football star';
-
-        if (isCaricature) {
-          prompt = `3D digital illustration, Pixar style caricature of the subject as a professional ${genderLabel} ${playerLabel}. \
-The subject is wearing the ${mundialCountry.name} official jersey. \
-Smiling at the camera in a professional football stadium at night. \
-Ultra detailed facial features, volumetric lighting, cinematic composition. \
-The subject must perfectly match the facial features and gender of the reference image.`;
-        } else {
-          prompt = `Photorealistic official FIFA World Cup 2026 player portrait of the subject as a ${genderLabel} ${playerLabel}. \
-The subject is wearing the ${mundialCountry.name} official jersey. \
-Dramatic professional stadium lighting with bright floodlights bokeh in background. \
-High-end sports photography, 8k, cinematic, extremely detailed face, looking at camera. \
-The subject must perfectly match the facial features and gender of the reference image.`;
-        }
-      }
       // Llamada unificada a la Edge Function. El equipo paga con los créditos de su cliente
       const requestBody: any = { imageUrl: publicUrl };
       if (getCachedDeviceState()?.pairingStatus === 'linked') {
@@ -758,9 +673,7 @@ The subject must perfectly match the facial features and gender of the reference
       }
 
       let finalImage: string;
-      if (mode === 'mundial') {
-        finalImage = await buildMundialCard(outputUrl);
-      } else if (theme?.result_style === 'cover') {
+      if (theme?.result_style === 'cover') {
         // Portada Fashion IA: la foto de la IA va dentro de la tapa de revista
         finalImage = await renderMagazineCover(outputUrl, coverOptionsFrom(generalSettings, guestNameRef.current || undefined));
       } else {
@@ -783,7 +696,7 @@ The subject must perfectly match the facial features and gender of the reference
       if (mode === 'figuritas') {
         setStep('modeSelect'); // Volver al inicio si falla la figurita
       } else {
-        setStep(mode === 'mundial' ? 'mundialInfo' : mode === 'portadaIA' ? 'modeSelect' : 'themeSelect');
+        setStep(mode === 'portadaIA' ? 'modeSelect' : 'themeSelect');
       }
     } finally {
       setIsAIGenerating(false);
@@ -805,109 +718,6 @@ The subject must perfectly match the facial features and gender of the reference
       background: generalSettings.pageBackground ? await getPageBackground() : null,
     });
   };
-
-  // Build World Cup player card on canvas
-  const buildMundialCard = (portraitUrl: string): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const W = 800, H = 1140;
-      const canvas = document.createElement('canvas');
-      canvas.width = W; canvas.height = H;
-      const ctx = canvas.getContext('2d')!;
-
-      const portrait = new Image(); portrait.crossOrigin = 'anonymous';
-      portrait.onload = () => {
-        // 1 — Portrait fills FULL canvas using cover-crop logic
-        const pA = portrait.width / portrait.height;
-        const cA = W / H;
-        let sx, sy, sw, sh;
-
-        if (pA > cA) {
-          // La foto es más ancha que el marco (recortamos los lados)
-          sw = portrait.height * cA;
-          sh = portrait.height;
-          sx = (portrait.width - sw) / 2;
-          sy = 0;
-        } else {
-          // La foto es más alta que el marco (recortamos arriba/abajo)
-          sw = portrait.width;
-          sh = portrait.width / cA;
-          sx = 0;
-          sy = (portrait.height - sh) / 6; // Menos recorte arriba para ver más ambiente
-        }
-        
-        // Dibujamos con un margen interno sutil para "zoom out"
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0,0,W,H);
-        ctx.drawImage(portrait, sx, sy, sw, sh, 0, 0, W, H);
-
-        // 2 — Frame overlay (marco3mundial) at full canvas size
-        const frame = new Image(); frame.crossOrigin = 'anonymous';
-        frame.onload = () => {
-          ctx.drawImage(frame, 0, 0, W, H);
-
-          // 3 — Subtle localized gradient only behind text (top-left corner)
-          const B = 48;
-          const tX = B + 14;  // text X — just inside frame border
-          const tY = B + 14;  // text Y — just inside frame border
-
-          const nameText = (mundialName || 'JUGADOR').toUpperCase();
-          const posText  = (mundialPosition || '').toUpperCase();
-
-          // Measure widths so gradient only covers text area
-          ctx.font = `bold 62px 'CarlMarx', Impact, sans-serif`;
-          const nameW = ctx.measureText(nameText).width;
-          ctx.font = `bold 32px 'CarlMarx', Impact, sans-serif`;
-          const posW  = ctx.measureText(posText).width;
-          const bgW = Math.max(nameW, posW) + 32;
-          const bgH = 110;
-
-          const bgGrad = ctx.createLinearGradient(tX, tY, tX + bgW, tY);
-          bgGrad.addColorStop(0,   'rgba(0,0,0,0.78)');
-          bgGrad.addColorStop(1,   'rgba(0,0,0,0)');
-          ctx.fillStyle = bgGrad;
-          ctx.fillRect(tX - 8, tY, bgW + 20, bgH);
-
-          // 4 — Player name
-          ctx.font = `bold 62px 'CarlMarx', Impact, sans-serif`;
-          ctx.fillStyle = '#FFFFFF';
-          ctx.shadowColor = 'rgba(0,0,0,0.9)';
-          ctx.shadowBlur = 6;
-          ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 2;
-          ctx.fillText(nameText, tX, tY + 62);
-
-          // 5 — Position
-          ctx.font = `bold 32px 'CarlMarx', Impact, sans-serif`;
-          ctx.fillStyle = '#e2e8f0';
-          ctx.fillText(posText, tX, tY + 100);
-          ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
-
-          // 6 — Country flag (top-right inside header)
-          const finish = (flagSrc?: string) => {
-            if (!flagSrc) { resolve(canvas.toDataURL('image/jpeg', 0.96)); return; }
-            const fi = new Image(); fi.crossOrigin = 'anonymous';
-            fi.onload = () => {
-              const fW = 92, fH = 62;
-              const fX = W - B - fW - 10;   // right side, inside frame border
-              const fY = B + 14;             // same top margin as text
-              ctx.shadowBlur = 0;
-              ctx.drawImage(fi, fX, fY, fW, fH);
-              resolve(canvas.toDataURL('image/jpeg', 0.96));
-            };
-            fi.onerror = () => resolve(canvas.toDataURL('image/jpeg', 0.96));
-            fi.src = flagSrc;
-          };
-          finish(mundialCountry?.flag);
-        };
-        frame.onerror = () => resolve(canvas.toDataURL('image/jpeg', 0.96));
-        if (frameUrl === 'none') {
-          resolve(canvas.toDataURL('image/jpeg', 0.9));
-          return;
-        }
-        frame.src = frameUrl || '/kiosk-marco-mundial.png';
-      };
-      portrait.onerror = reject;
-      portrait.src = portraitUrl;
-    });
 
   const triggerPrint = (imageUrl: string) => printKioskPhoto(imageUrl);
 
@@ -960,8 +770,6 @@ The subject must perfectly match the facial features and gender of the reference
     setMode(null);
     setCapturedImage(null);
     setMundialCountry(null);
-    setMundialName('');
-    setMundialPosition('');
     setSelectedAITheme(null);
   };
 
@@ -1026,9 +834,8 @@ The subject must perfectly match the facial features and gender of the reference
             { mode: 'selfie' as Exclude<Mode, null>, on: generalSettings.enableSelfie !== false, title: 'Selfie Grupal', text: 'Una foto con amigos o familia, con marco decorativo.', img: '/modes/selfie.jpg', icon: Users, color: '#22d3ee', ai: false },
             { mode: 'portada' as Exclude<Mode, null>, on: generalSettings.enablePortada === true, title: 'Portada Fashion', text: '¡Sé la tapa de la revista! Tu foto real con tu nombre y titulares.', img: portadaCard || '/modes/portada.jpg', icon: Crown, color: '#f472b6', ai: false, cover: true },
             { mode: 'portadaIA' as Exclude<Mode, null>, on: generalSettings.enablePortadaAI !== false, title: 'Portada Fashion IA', text: 'La IA te viste de modelo y salís en la tapa de revista con tu nombre.', img: portadaIACard || '/modes/portada-ia.jpg', icon: Crown, color: '#e879f9', ai: true, cover: true },
-            { mode: 'mundial' as Exclude<Mode, null>, on: generalSettings.enableMundial === true, title: 'Mundial 2026', text: 'Tu carta de jugador con nombre y posición.', img: '/modes/mundial.jpg', icon: Trophy, color: '#4ade80', ai: true },
             { mode: 'caricatura' as Exclude<Mode, null>, on: generalSettings.enableCaricatura !== false, title: 'Caricatura con Messi', text: '¡Festejá con Messi! Tu caricatura con la camiseta argentina.', img: themes.find((t: any) => t.result_style === 'caricatura')?.preview_url || '/modes/caricatura.jpg', icon: Palette, color: '#fb923c', ai: true },
-            { mode: 'figuritas' as Exclude<Mode, null>, on: generalSettings.enableFiguritas !== false, title: 'Hacer Figurita', text: 'Tu propia figurita del álbum, con el fondo recortado.', img: '/modes/figurita.jpg', icon: Sticker, color: '#2dd4bf', ai: true },
+            { mode: 'figuritas' as Exclude<Mode, null>, on: generalSettings.enableFiguritas !== false, title: 'Figurita Mundial 2026', text: 'Tu figurita del álbum con tu cara, tu país, posición y datos.', img: '/modes/figurita.jpg', icon: Sticker, color: '#2dd4bf', ai: true },
           ].filter(m => m.on && isModeAllowed(m.mode)).map(m => (
             <button key={m.mode} data-autofocus data-remote={m.title} onClick={() => handleModeSelect(m.mode)}
               className="relative group flex flex-col w-full md:w-[calc((100%-2.5rem)/3)] portrait:!w-[calc((100%-1.25rem)/2)] rounded-2xl overflow-hidden border-2 kiosk-glass text-left hover:scale-[1.03] focus:scale-[1.03] focus:outline-none focus:ring-4 focus:ring-white/80 transition-all"
@@ -1123,7 +930,7 @@ The subject must perfectly match the facial features and gender of the reference
         <div className="absolute inset-0 bg-black/40 z-0" />
         <div className="relative z-10 flex flex-col items-center justify-center h-full gap-8">
           <p className="carlmarx-regular text-white/60 text-2xl uppercase tracking-widest">
-            {mode === 'selfie' ? '📸 Selfie Grupal' : mode === 'portada' ? '👑 Portada Fashion' : mode === 'portadaIA' ? '👑 Portada Fashion IA' : mode === 'retrato' ? '✨ Retrato Mágico' : '⚽ Mundial 2026'}
+            {mode === 'selfie' ? '📸 Selfie Grupal' : mode === 'portada' ? '👑 Portada Fashion' : mode === 'portadaIA' ? '👑 Portada Fashion IA' : mode === 'retrato' ? '✨ Retrato Mágico' : mode === 'caricatura' ? '🎨 Caricatura con Messi' : '⚽ Figurita Mundial 2026'}
           </p>
           <h1 className="carlmarx-bold text-7xl text-white text-center uppercase tracking-widest">
             ¡Mirá a la<br /><span className="text-violet-400">Cámara! 📸</span>
@@ -1220,8 +1027,6 @@ The subject must perfectly match the facial features and gender of the reference
         await continueSelfie(photo);
       } else if (mode === 'retrato') {
         setStep('themeSelect');
-      } else if (mode === 'mundial') {
-        setStep('mundialCountry');
       } else if (mode === 'figuritas') {
         runAI(capturedImage, null);
       }
@@ -1306,7 +1111,7 @@ The subject must perfectly match the facial features and gender of the reference
   );
   // ── MUNDIAL / FIGURITAS: Country Selection ──────────────────────────────
   if (step === 'mundialCountry') {
-    const listToRender = mode === 'figuritas' ? FIGURITAS_COUNTRIES : COUNTRIES;
+    const listToRender = FIGURITAS_COUNTRIES;
     return (
       <div className="kiosk-root">
         <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg,#040c1a 0%,#0a1628 100%)' }} />
@@ -1314,7 +1119,7 @@ The subject must perfectly match the facial features and gender of the reference
         <div className="relative z-10 flex flex-col items-center h-full py-10 px-8 gap-6 overflow-auto">
           <div>
             <p className="carlmarx-regular text-green-400 text-center text-xl tracking-widest uppercase">
-              {mode === 'figuritas' ? '🌍 Tus Figuritas' : '⚽ Mundial 2026'}
+              ⚽ Figurita Mundial 2026
             </p>
             <h2 className="carlmarx-bold text-white text-center text-[clamp(2rem,4vw,3.5rem)]">¿De qué país jugás?</h2>
           </div>
@@ -1322,8 +1127,8 @@ The subject must perfectly match the facial features and gender of the reference
             {listToRender.map(c => (
               <button key={c.id} onClick={() => { 
                   setMundialCountry(c as any); 
-                  if (mode === 'figuritas') setStep('lookCamera');
-                  else setStep('mundialInfo'); 
+ 
+                  setStep('lookCamera');
                 }}
                 className="flex flex-col items-center gap-2 p-3 rounded-2xl border-2 border-white/10 bg-white/5 hover:border-green-400 hover:bg-green-400/10 transition-all group">
                 {c.flag.startsWith('/') ? (
@@ -1343,93 +1148,6 @@ The subject must perfectly match the facial features and gender of the reference
       </div>
     );
   }
-
-  // ── MUNDIAL: Player Name + Position ─────────────────────────
-  if (step === 'mundialInfo') return (
-    <div className="kiosk-root">
-      <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg,#040c1a 0%,#0a1628 100%)' }} />
-      <img src="/kiosk-fondo-cancha.png" alt="" className="absolute inset-0 w-full h-full object-cover opacity-10" />
-      <Corners />
-      <div className="relative z-10 flex flex-col items-center justify-center h-full gap-8 px-8 max-w-2xl mx-auto">
-        {/* Flag + country */}
-        {mundialCountry && (
-          <div className="flex items-center gap-4">
-            <img src={mundialCountry.flag} alt={mundialCountry.name} className="w-20 h-14 object-cover rounded-lg shadow-xl border-2 border-white/20" />
-            <p className="carlmarx-bold text-white text-3xl">{mundialCountry.name}</p>
-          </div>
-        )}
-
-        {/* Name input — teclado virtual */}
-        <div className="w-full space-y-2">
-          <label className="carlmarx-regular text-white/60 text-lg uppercase tracking-widest">Tu nombre en la tarjeta</label>
-          <div
-            onClick={() => setShowKeyboard(true)}
-            className={`w-full bg-white/10 border-2 rounded-2xl px-6 py-4 text-3xl carlmarx-bold uppercase cursor-pointer transition-colors ${showKeyboard ? 'border-green-400' : 'border-white/20'}`}
-            style={{ fontFamily: "'CarlMarx', Impact, sans-serif", color: mundialName ? '#fff' : 'rgba(255,255,255,0.2)', minHeight: 72 }}
-          >
-            {mundialName || 'RAUL GUTIERREZ'}
-          </div>
-        </div>
-
-        {showKeyboard && (
-          <VirtualKeyboard
-            value={mundialName}
-            onChange={setMundialName}
-            onClose={() => setShowKeyboard(false)}
-          />
-        )}
-
-        {/* Gender selector */}
-        <div className="w-full space-y-2">
-          <label className="carlmarx-regular text-white/60 text-lg uppercase tracking-widest">Género</label>
-          <div className="grid grid-cols-2 gap-4">
-            <button onClick={() => setMundialGender('M')}
-              className={`py-4 rounded-xl border-2 carlmarx-bold text-xl uppercase transition-all flex items-center justify-center gap-3 ${mundialGender === 'M' ? 'border-blue-400 bg-blue-400/20 text-blue-300' : 'border-white/20 bg-white/5 text-white'}`}>
-              <span>👨</span> Jugador
-            </button>
-            <button onClick={() => setMundialGender('F')}
-              className={`py-4 rounded-xl border-2 carlmarx-bold text-xl uppercase transition-all flex items-center justify-center gap-3 ${mundialGender === 'F' ? 'border-pink-400 bg-pink-400/20 text-pink-300' : 'border-white/20 bg-white/5 text-white'}`}>
-              <span>👩</span> Jugadora
-            </button>
-          </div>
-        </div>
-
-        {/* Position selector */}
-        <div className="w-full space-y-2">
-          <label className="carlmarx-regular text-white/60 text-lg uppercase tracking-widest">Tu posición</label>
-          <div className="grid grid-cols-4 gap-3">
-            {POSITIONS.map(p => (
-              <button key={p} onClick={() => setMundialPosition(p)}
-                className={`py-3 px-2 rounded-xl border-2 carlmarx-bold text-base uppercase transition-all ${mundialPosition === p ? 'border-green-400 bg-green-400/20 text-green-300' : 'border-white/20 bg-white/5 text-white hover:border-white/40'}`}>
-                {p}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <button
-          onClick={() => {
-            if (!mundialName.trim()) { toast.error('Ingresá tu nombre'); return; }
-            if (!mundialPosition) { toast.error('Elegí tu posición'); return; }
-            
-            const mundialTheme = {
-              name: 'Carta Mundialista',
-              prompt: `Professional digital caricature of ${mundialName} as a football player for ${mundialCountry?.name || 'Argentina'}, in the position of ${mundialPosition}, standing next to Lionel Messi in a World Cup celebration, vibrant stadium background, 8k resolution`
-            };
-            runAI(capturedImage!, mundialTheme);
-          }}
-          className="w-full py-6 rounded-2xl carlmarx-bold text-2xl text-white transition-all"
-          style={{ background: 'linear-gradient(135deg,#16a34a,#15803d)', boxShadow: '0 0 40px rgba(22,163,74,0.4)' }}
-        >
-          ⚽ ¡Generar mi carta de jugador!
-        </button>
-
-        <button onClick={() => setStep('mundialCountry')} className="text-white/40 text-lg carlmarx-regular hover:text-white/70 transition-colors">
-          ← Cambiar país
-        </button>
-      </div>
-    </div>
-  );
 
   if (step === 'themeSelect') {
     const CATEGORY_LABELS: Record<string, string> = {
