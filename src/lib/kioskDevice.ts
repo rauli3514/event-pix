@@ -170,13 +170,14 @@ export const setVipAppPackage = (pkg: string) => write(VIP_APP_KEY, pkg);
 // Puente nativo de MainActivity (window.AndroidKiosk)
 interface AndroidKioskBridge {
   openWifiSettings?: () => void;
-  openSettings?: () => void;
   openApp?: (packageName: string) => boolean;
   listApps?: () => string;
   openHomeSettings?: () => void;
   isDefaultHome?: () => boolean;
   canStartOnBoot?: () => boolean;
   openOverlaySettings?: () => void;
+  openOtherLauncher?: () => boolean;
+  openSettings?: () => void;
 }
 
 const bridge = () => (window as unknown as { AndroidKiosk?: AndroidKioskBridge }).AndroidKiosk;
@@ -223,3 +224,12 @@ export const openHomeAppSettings = () => {
   else b?.openSettings?.();
 };
 export const openStartOnBootSettings = () => bridge()?.openOverlaySettings?.();
+
+/** Salir a Android: la pantalla de inicio original del equipo (o los ajustes de Android). */
+export const canExitToAndroid = () => !!bridge()?.openOtherLauncher || !!bridge()?.openSettings;
+export const exitToAndroid = () => {
+  const b = bridge();
+  if (b?.openOtherLauncher) b.openOtherLauncher();
+  else b?.openSettings?.();
+};
+export const openAndroidSettings = () => bridge()?.openSettings?.();

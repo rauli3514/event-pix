@@ -216,6 +216,35 @@ public class MainActivity extends BridgeActivity {
             return apps.toString();
         }
 
+        /**
+         * Sale a Android: abre la pantalla de inicio original del equipo (la otra
+         * aplicación de inicio). Si el kiosco es la pantalla de inicio, el botón Home
+         * vuelve al kiosco; desde la original se entra a las otras apps.
+         * Devuelve false si no hay otra (entonces abre los ajustes de Android).
+         */
+        @JavascriptInterface
+        public boolean openOtherLauncher() {
+            PackageManager pm = context.getPackageManager();
+            Intent home = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
+            for (ResolveInfo info : pm.queryIntentActivities(home, 0)) {
+                if (info.activityInfo == null) continue;
+                String pkg = info.activityInfo.packageName;
+                // La propia y el selector de Android ("com.android.settings" FallbackHome) no sirven
+                if (context.getPackageName().equals(pkg) || "com.android.settings".equals(pkg)) continue;
+                try {
+                    Intent launch = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+                            .setClassName(pkg, info.activityInfo.name)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    context.startActivity(launch);
+                    return true;
+                } catch (Exception ignored) {
+                    // se prueba con la siguiente
+                }
+            }
+            openSettings();
+            return false;
+        }
+
         @JavascriptInterface
         public void exitApp() {
             finishAndRemoveTask();
