@@ -113,6 +113,13 @@ public class KioskNetPlugin extends Plugin {
             // sin permiso de ubicación no se ve el nombre
         }
         ret.put("ssid", ssid);
+        // Señal de 0 a 4 rayitas (la intensidad no necesita permiso de ubicación)
+        try {
+            WifiInfo info = wm != null ? wm.getConnectionInfo() : null;
+            if (info != null && info.getRssi() > -127 && info.getRssi() < 0) ret.put("bars", WifiManager.calculateSignalLevel(info.getRssi(), 5));
+        } catch (Exception ignored) {
+            // sin datos de señal
+        }
         call.resolve(ret);
     }
 
