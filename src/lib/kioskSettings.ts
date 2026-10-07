@@ -55,7 +55,6 @@ export interface KioskGeneralSettings {
   guestFrames?: string[];
   enableSelfie?: boolean;
   enableAI?: boolean;
-  enableMundial?: boolean;
   enableCaricatura?: boolean;
   enableFiguritas?: boolean;
   /** Portada Fashion (tapa de revista, sin IA): aparece en "Fotos" */

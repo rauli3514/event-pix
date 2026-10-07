@@ -21,7 +21,7 @@ export interface RemoteSettings {
 /** Ajustes de Ajustes del equipo que se pueden manejar desde el panel. */
 export const REMOTE_GENERAL_KEYS = [
   'eventTitle', 'welcomeSubtitle', 'frameSubtitle', 'nameStyle', 'splashVideo',
-  'enableSelfie', 'enablePortada', 'enablePortadaAI', 'enableAI', 'enableMundial', 'enableCaricatura', 'enableFiguritas',
+  'enableSelfie', 'enablePortada', 'enablePortadaAI', 'enableAI', 'enableCaricatura', 'enableFiguritas',
   'photoShots', 'shotPause', 'photoOrientation', 'photoStrips', 'askGuestName', 'guestFrameChoice',
   'showQr', 'showPrintButton', 'allowRetake', 'enableGallery', 'splashGallery',
   'resultTimeout', 'idleTimeout', 'screensaver', 'screensaverMinutes', 'enableFilters', 'photoGame', 'triviaQuestions', 'bluetoothShutter', 'liteMode', 'enableVip', 'vipTitle', 'vipSubtitle', 'vipVideo', 'vipResultSeconds', 'vipAfterPartyTime', 'enableAccessories', 'offline', 'screenRotation',

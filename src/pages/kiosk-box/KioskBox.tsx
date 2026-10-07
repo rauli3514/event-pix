@@ -144,7 +144,7 @@ export default function KioskBox() {
   // ─── Inicio ──────────────────────────────────────────────────────
   const general = getGeneralSettings();
   const aiEnabled = !general.offline && ((['enableAI', 'enablePortadaAI', 'enableCaricatura', 'enableFiguritas'] as const)
-    .some(k => general[k] !== false) || general.enableMundial === true);
+    .some(k => general[k] !== false));
   const tiles: { key: string; label: string; hint: string; icon: LucideIcon; gradient: string; glow: string; onClick: () => void }[] = [
     ...(general.enableSelfie !== false ? [{ key: 'fotos', label: 'Fotos', hint: general.enablePortada ? 'Selfie y Portada Fashion' : 'Selfie con marco', icon: Camera, gradient: 'from-[#00d4ff] via-[#2b8cff] to-[#5b3bff]', glow: 'rgba(0,212,255,0.55)', onClick: () => openExperience('selfie') }] : []),
     ...(aiEnabled ? [{ key: 'ia', label: 'Fotos IA', hint: 'Retratos, caricaturas y más', icon: Sparkles, gradient: 'from-[#ff2e93] via-[#c03bff] to-[#7b2ff7]', glow: 'rgba(255,46,147,0.55)', onClick: () => openExperience('ai') }] : []),

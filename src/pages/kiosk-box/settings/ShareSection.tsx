@@ -50,11 +50,9 @@ export default function ShareSection() {
         description="El QR lleva a la foto en tu Google Drive: se sube apenas se saca y queda visible solo esa foto (no la carpeta). Con el QR apagado, la foto igual se respalda en Drive.">
         <Toggle label="Mostrar QR en la pantalla final" hint={qrOn ? 'La foto se comparte desde Drive.' : 'Sin QR: la foto queda en el equipo y en Drive.'}
           checked={qrOn} onChange={showQr => update({ showQr })} />
-        {qrOn && !isDriveConfigured() && !settings.cloudSupabase && (
+        {qrOn && !isDriveConfigured() && (
           <p className="text-amber-300">Para el QR hace falta Drive configurado (abajo).</p>
         )}
-        <Toggle label="Usar Supabase para el QR en lugar de Drive" hint="Opcional. Requiere que el equipo tenga un evento asignado en el panel."
-          checked={!!settings.cloudSupabase} onChange={cloudSupabase => update({ cloudSupabase })} />
         <Field label="Dirección del sitio para la página del invitado (vacío = app.event-pix.com.ar)">
           <input className={inputClass} placeholder="https://app.event-pix.com.ar" value={(settings.publicSiteUrl as string) || ''}
             onChange={e => update({ publicSiteUrl: e.target.value })} />
@@ -65,11 +63,6 @@ export default function ShareSection() {
             ? <>Se usa: <b className="text-white/80">{publicSiteUrl()}</b></>
             : 'Sin una dirección pública, el QR abre la foto directo en Google Drive (desde ahí se puede descargar y compartir).'}
         </p>
-        {settings.cloudSupabase && (
-          <p className="text-white/55 text-sm">
-            Para borrar lo subido a Supabase: en el panel web, <b>Kiosco IA → el evento → "Borrar de la nube"</b>.
-          </p>
-        )}
       </Panel>
 
       <Panel title="Respaldo en Google Drive"

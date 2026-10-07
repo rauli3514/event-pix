@@ -146,8 +146,7 @@ export default function DeviceConfig({ device, onClose, onSaved }: {
             <Check label="Portada Fashion IA" checked={bool('general', 'enablePortadaAI', true)} onChange={v => set('general', 'enablePortadaAI', v)} />
             <Check label="Retrato IA" checked={bool('general', 'enableAI', true)} onChange={v => set('general', 'enableAI', v)} />
             <Check label="Caricatura con Messi" checked={bool('general', 'enableCaricatura', true)} onChange={v => set('general', 'enableCaricatura', v)} />
-            <Check label="Mundial (carta)" checked={bool('general', 'enableMundial', false)} onChange={v => set('general', 'enableMundial', v)} />
-            <Check label="Figuritas" checked={bool('general', 'enableFiguritas', true)} onChange={v => set('general', 'enableFiguritas', v)} />
+            <Check label="Figurita Mundial 2026" checked={bool('general', 'enableFiguritas', true)} onChange={v => set('general', 'enableFiguritas', v)} />
             <Check label="Filtros de color" checked={bool('general', 'enableFilters', false)} onChange={v => set('general', 'enableFilters', v)} />
             <Check label="Juego de 1 min antes de la foto (Fotos)" checked={bool('general', 'photoGame', false)} onChange={v => set('general', 'photoGame', v)} />
           </div>

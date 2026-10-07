@@ -1026,6 +1026,9 @@ export default defineConfig({
         // (Node 20 vs Node 24, por ejemplo) hacía que el build pasara
         // localmente y fallara en CI. Con margen real de sobra.
         maximumFileSizeToCacheInBytes: 8000000,
+        // Las direcciones de archivos (p. ej. /plantilla-invitados.xlsx) y la API van al
+        // servidor: si no, el service worker abre la app y la toma como nombre de evento
+        navigateFallbackDenylist: [/^\/api\//, /\.[a-z0-9]{2,5}$/i],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
