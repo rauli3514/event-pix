@@ -593,17 +593,19 @@ export default function KioskAI() {
   // queda a la vista (con un botón para reintentar) en vez de un aviso que se va.
   const lastSavedRef = useRef<SavedPhoto[]>([]);
   const [qrError, setQrError] = useState('');
+  // El QR va solo por Drive: la opción de Supabase se sacó de Ajustes (el código queda por si vuelve)
+  const useSupabaseQr = false;
   const uploadForQr = async (dataUrl: string, saved: SavedPhoto[]): Promise<string | null> => {
     const wantsQr = !offlineMode && generalSettings.showQr !== false;
     if (!wantsQr) return null;
     const attempt = async (): Promise<string> => {
       // QR con Drive (destino único): la foto final queda visible con el link
-      if (!generalSettings.cloudSupabase && isDriveConfigured()) {
+      if (!useSupabaseQr && isDriveConfigured()) {
         if (!saved[0]) throw new Error('La foto no se pudo guardar en el equipo');
         return `drive:${await uploadForShare(dataUrl, saved[0].name, saved[0].folder)}`;
       }
       // Supabase: solo si está activado en Compartir y nube (y el equipo tiene evento)
-      if (!generalSettings.cloudSupabase || !kioskEventId) throw new Error('El equipo no tiene a dónde subir la foto');
+      if (!useSupabaseQr || !kioskEventId) throw new Error('El equipo no tiene a dónde subir la foto');
       const blob = await (await fetch(dataUrl)).blob();
       const fileName = `kiosk_sessions/${kioskEventId}/${Date.now()}.jpg`;
       const { error: uploadError } = await supabase.storage.from('photos').upload(fileName, blob, { contentType: 'image/jpeg' });
@@ -1016,7 +1018,7 @@ The subject must perfectly match the facial features and gender of the reference
       <Corners />
       <div className="relative z-10 flex flex-col items-center justify-center h-full gap-6 px-8 pt-10">
         <h2 className="carlmarx-bold text-[clamp(2rem,5vw,4rem)] text-white text-center">¿Cómo querés tu foto?</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 portrait:grid-cols-2 gap-5 w-full max-w-5xl overflow-y-auto max-h-[74vh] p-4">
+        <div className="flex flex-wrap justify-center content-start gap-5 w-full max-w-5xl overflow-y-auto max-h-[74vh] p-4">
 
           {[
             { mode: 'selfie' as Exclude<Mode, null>, on: generalSettings.enableSelfie !== false, title: 'Selfie Grupal', text: 'Una foto con amigos o familia, con marco decorativo.', img: '/modes/selfie.jpg', icon: Users, color: '#22d3ee', ai: false },
@@ -1028,7 +1030,7 @@ The subject must perfectly match the facial features and gender of the reference
             { mode: 'figuritas' as Exclude<Mode, null>, on: generalSettings.enableFiguritas !== false, title: 'Hacer Figurita', text: 'Tu propia figurita del álbum, con el fondo recortado.', img: '/modes/figurita.jpg', icon: Sticker, color: '#2dd4bf', ai: true },
           ].filter(m => m.on && isModeAllowed(m.mode)).map(m => (
             <button key={m.mode} data-autofocus data-remote={m.title} onClick={() => handleModeSelect(m.mode)}
-              className="relative group flex flex-col rounded-2xl overflow-hidden border-2 kiosk-glass text-left hover:scale-[1.03] focus:scale-[1.03] focus:outline-none focus:ring-4 focus:ring-white/80 transition-all"
+              className="relative group flex flex-col w-full md:w-[calc((100%-2.5rem)/3)] portrait:!w-[calc((100%-1.25rem)/2)] rounded-2xl overflow-hidden border-2 kiosk-glass text-left hover:scale-[1.03] focus:scale-[1.03] focus:outline-none focus:ring-4 focus:ring-white/80 transition-all"
               style={{ borderColor: m.color }}>
               <div className="relative w-full aspect-[16/10] bg-black/40 overflow-hidden">
                 <img src={m.img} alt="" loading="lazy" className={`absolute inset-0 w-full h-full object-cover ${m.cover ? 'object-top' : 'object-center'}`} />
@@ -1531,7 +1533,7 @@ The subject must perfectly match the facial features and gender of the reference
     const igCfg = (() => { try { return JSON.parse(localStorage.getItem('kiosk_ig_settings') || '{}'); } catch { return {}; } })();
     const showPrint = generalSettings.showPrintButton !== false && printerCfg.autoPrint !== false;
     // QR solo con internet y con el equipo asignado a un evento (las fotos se suben ahí)
-    const showQrBlock = generalSettings.showQr !== false && !offlineMode && (generalSettings.cloudSupabase ? !!kioskEventId : isDriveConfigured());
+    const showQrBlock = generalSettings.showQr !== false && !offlineMode && (useSupabaseQr ? !!kioskEventId : isDriveConfigured());
     // The QR points directly to the photo for downloading
     // El QR abre la página del invitado (bajar / compartir por WhatsApp o Instagram)
     const qrUrl = lastPublicUrl
