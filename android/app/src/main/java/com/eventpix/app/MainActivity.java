@@ -11,6 +11,7 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
+import android.graphics.Matrix;
 import android.webkit.JavascriptInterface;
 
 import com.eventpix.app.net.KioskLinkPlugin;
@@ -42,9 +43,25 @@ public class MainActivity extends BridgeActivity {
     private boolean stabilizing = false;
     private float downX, downY;
 
+    // Calibración del marco táctil (Ajustes → Equipo → Marco táctil): corrección que lleva
+    // cada toque al lugar real. Se aplica antes que todo lo demás.
+    private static final String KEY_TOUCH_MATRIX = "touch_matrix";
+    private volatile Matrix touchMatrix = null;
+    private TouchCalibrationView calibrationView = null;
+
     @Override
-    public boolean dispatchTouchEvent(MotionEvent ev) {
-        if (!tapStabilize) return super.dispatchTouchEvent(ev);
+    public boolean dispatchTouchEvent(MotionEvent raw) {
+        // Mientras se calibra, los toques llegan tal cual a las cruces
+        if (calibrationView != null || touchMatrix == null) return dispatchStabilized(raw);
+        MotionEvent ev = MotionEvent.obtain(raw);
+        ev.transform(touchMatrix);
+        boolean handled = dispatchStabilized(ev);
+        ev.recycle();
+        return handled;
+    }
+
+    private boolean dispatchStabilized(MotionEvent ev) {
+        if (!tapStabilize || calibrationView != null) return super.dispatchTouchEvent(ev);
         int action = ev.getActionMasked();
         if (action == MotionEvent.ACTION_DOWN) {
             downX = ev.getX();
@@ -71,6 +88,55 @@ public class MainActivity extends BridgeActivity {
         }
         if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) stabilizing = false;
         return super.dispatchTouchEvent(ev);
+    }
+
+    private Matrix loadTouchMatrix() {
+        String saved = getSharedPreferences(PREFS, MODE_PRIVATE).getString(KEY_TOUCH_MATRIX, null);
+        if (saved == null) return null;
+        try {
+            String[] parts = saved.split(",");
+            float[] v = new float[9];
+            for (int i = 0; i < 9; i++) v[i] = Float.parseFloat(parts[i]);
+            Matrix m = new Matrix();
+            m.setValues(v);
+            return m;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private void saveTouchMatrix(Matrix m) {
+        android.content.SharedPreferences.Editor ed = getSharedPreferences(PREFS, MODE_PRIVATE).edit();
+        if (m == null) {
+            ed.remove(KEY_TOUCH_MATRIX);
+        } else {
+            float[] v = new float[9];
+            m.getValues(v);
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < 9; i++) sb.append(i == 0 ? "" : ",").append(v[i]);
+            ed.putString(KEY_TOUCH_MATRIX, sb.toString());
+        }
+        ed.apply();
+        touchMatrix = m;
+    }
+
+    /** Muestra las cruces de calibración; al terminar avisa a la página (evento kiosk-touch-calibrated). */
+    private void startTouchCalibration() {
+        if (calibrationView != null) return;
+        float rotation = getBridge() != null && getBridge().getWebView() != null ? getBridge().getWebView().getRotation() : 0f;
+        calibrationView = new TouchCalibrationView(this, rotation, correction -> {
+            android.view.ViewGroup parent = (android.view.ViewGroup) calibrationView.getParent();
+            if (parent != null) parent.removeView(calibrationView);
+            calibrationView = null;
+            if (correction != null) saveTouchMatrix(correction);
+            String result = correction != null ? "true" : "false";
+            if (getBridge() != null && getBridge().getWebView() != null) {
+                getBridge().getWebView().evaluateJavascript(
+                        "window.dispatchEvent(new CustomEvent('kiosk-touch-calibrated',{detail:" + result + "}))", null);
+            }
+        });
+        addContentView(calibrationView, new android.view.ViewGroup.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT));
     }
 
     /** Cuánto se tiene que mover el dedo para que cuente como deslizar (4 % del lado corto). */
@@ -103,6 +169,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(KioskLinkPlugin.class);
         super.onCreate(savedInstanceState);
         tapStabilize = getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(KEY_TAP_STABILIZE, true);
+        touchMatrix = loadTouchMatrix();
         // Kiosco: la pantalla no se apaga ni entra en protector de Android
         getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         // La página puede fijar su ancho de diseño (vertical: 1080 puntos, ver screenRotation.ts)
@@ -198,6 +265,22 @@ public class MainActivity extends BridgeActivity {
         @JavascriptInterface
         public boolean getTapStabilize() {
             return tapStabilize;
+        }
+
+        /** Calibrar el marco táctil (cruces en las esquinas). */
+        @JavascriptInterface
+        public void calibrateTouch() {
+            runOnUiThread(MainActivity.this::startTouchCalibration);
+        }
+
+        @JavascriptInterface
+        public void resetTouchCalibration() {
+            runOnUiThread(() -> saveTouchMatrix(null));
+        }
+
+        @JavascriptInterface
+        public boolean isTouchCalibrated() {
+            return touchMatrix != null;
         }
 
         /** El kiosco pide (o suelta) las teclas del disparador Bluetooth. */

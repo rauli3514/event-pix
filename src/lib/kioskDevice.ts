@@ -179,6 +179,9 @@ interface AndroidKioskBridge {
   openOverlaySettings?: () => void;
   setTapStabilize?: (on: boolean) => void;
   getTapStabilize?: () => boolean;
+  calibrateTouch?: () => void;
+  resetTouchCalibration?: () => void;
+  isTouchCalibrated?: () => boolean;
 }
 
 const bridge = () => (window as unknown as { AndroidKiosk?: AndroidKioskBridge }).AndroidKiosk;
@@ -233,3 +236,12 @@ export const getTapStabilize = (): boolean | null => {
   try { return !!b.getTapStabilize(); } catch { return null; }
 };
 export const setTapStabilize = (on: boolean) => bridge()?.setTapStabilize?.(on);
+
+/** Calibración del marco táctil (APK 2.6+): cruces en las esquinas, la corrección queda guardada. */
+export const TOUCH_CALIBRATED_EVENT = 'kiosk-touch-calibrated';
+export const canCalibrateTouch = () => !!bridge()?.calibrateTouch;
+export const calibrateTouch = () => bridge()?.calibrateTouch?.();
+export const resetTouchCalibration = () => bridge()?.resetTouchCalibration?.();
+export const isTouchCalibrated = () => {
+  try { return !!bridge()?.isTouchCalibrated?.(); } catch { return false; }
+};
