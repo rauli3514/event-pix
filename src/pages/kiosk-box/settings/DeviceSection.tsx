@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { CheckCircle2, AlertTriangle, LogOut, Power, RefreshCw, Settings, Sparkles } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Power, RefreshCw, Sparkles } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import {
-  canExitToAndroid, checkinDevice, exitToAndroid, getAutostartStatus, openAndroidSettings, getCachedDeviceState, openHomeAppSettings, openStartOnBootSettings,
+  checkinDevice, getAutostartStatus, getCachedDeviceState, openHomeAppSettings, openStartOnBootSettings,
   renameDevice, setBoxPin, type KioskDeviceState,
 } from '@/lib/kioskDevice';
 import { eventFolder } from '@/lib/kioskStorage';
@@ -84,8 +84,6 @@ export default function DeviceSection() {
         </div>
         {version && <p className="text-white/40">Versión de la app: {version}</p>}
       </Panel>
-
-      <ExitPanel />
 
       <AutostartPanel />
 
@@ -220,25 +218,6 @@ function AutostartPanel() {
         <p className="text-white/50">
           En "Pantalla de inicio" elegí <b className="text-white/80">EventPix Kiosco</b> (si pregunta, "Siempre"). La otra opción es activar
           "Mostrar sobre otras apps" para EventPix Kiosco.
-        </p>
-      )}
-    </Panel>
-  );
-}
-
-/** Salir de la app al Android del equipo (con el kiosco como pantalla de inicio, Home vuelve al kiosco). */
-function ExitPanel() {
-  if (!canExitToAndroid()) return null;
-  const isHome = getAutostartStatus()?.isHome;
-  return (
-    <Panel title="Salir a Android" description="Para usar otras apps del equipo o los ajustes de Android.">
-      <div className="grid grid-cols-2 gap-3">
-        <button onClick={exitToAndroid} className={primaryClass}><LogOut className="w-5 h-5" /> Salir a Android</button>
-        <button onClick={openAndroidSettings} className={buttonClass}><Settings className="w-5 h-5" /> Ajustes de Android</button>
-      </div>
-      {isHome && (
-        <p className="text-white/50">
-          El kiosco es la pantalla de inicio: el botón <b className="text-white/80">Home</b> del control vuelve siempre al kiosco. Para volver al kiosco desde Android, apretá Home.
         </p>
       )}
     </Panel>
