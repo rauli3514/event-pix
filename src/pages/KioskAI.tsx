@@ -1021,18 +1021,22 @@ The subject must perfectly match the facial features and gender of the reference
         <div className="flex flex-wrap justify-center content-start gap-5 w-full max-w-5xl overflow-y-auto max-h-[74vh] p-4">
 
           {[
+            // Retrato Mágico es el modo estrella: va primero y destacado
+            { mode: 'retrato' as Exclude<Mode, null>, on: generalSettings.enableAI !== false, title: 'Retrato Mágico', text: 'Elegí un estilo (realeza, pirata, vikingo…) y la IA te transforma.', img: '/modes/retrato.jpg', icon: Sparkles, color: '#a78bfa', ai: true, featured: true },
             { mode: 'selfie' as Exclude<Mode, null>, on: generalSettings.enableSelfie !== false, title: 'Selfie Grupal', text: 'Una foto con amigos o familia, con marco decorativo.', img: '/modes/selfie.jpg', icon: Users, color: '#22d3ee', ai: false },
             { mode: 'portada' as Exclude<Mode, null>, on: generalSettings.enablePortada === true, title: 'Portada Fashion', text: '¡Sé la tapa de la revista! Tu foto real con tu nombre y titulares.', img: portadaCard || '/modes/portada.jpg', icon: Crown, color: '#f472b6', ai: false, cover: true },
             { mode: 'portadaIA' as Exclude<Mode, null>, on: generalSettings.enablePortadaAI !== false, title: 'Portada Fashion IA', text: 'La IA te viste de modelo y salís en la tapa de revista con tu nombre.', img: portadaIACard || '/modes/portada-ia.jpg', icon: Crown, color: '#e879f9', ai: true, cover: true },
-            { mode: 'retrato' as Exclude<Mode, null>, on: generalSettings.enableAI !== false, title: 'Retrato Mágico', text: 'Elegí un estilo (realeza, pirata, vikingo…) y la IA te transforma.', img: '/modes/retrato.jpg', icon: Sparkles, color: '#a78bfa', ai: true },
             { mode: 'mundial' as Exclude<Mode, null>, on: generalSettings.enableMundial === true, title: 'Mundial 2026', text: 'Tu carta de jugador con nombre y posición.', img: '/modes/mundial.jpg', icon: Trophy, color: '#4ade80', ai: true },
             { mode: 'caricatura' as Exclude<Mode, null>, on: generalSettings.enableCaricatura !== false, title: 'Caricatura con Messi', text: '¡Festejá con Messi! Tu caricatura con la camiseta argentina.', img: themes.find((t: any) => t.result_style === 'caricatura')?.preview_url || '/modes/caricatura.jpg', icon: Palette, color: '#fb923c', ai: true },
             { mode: 'figuritas' as Exclude<Mode, null>, on: generalSettings.enableFiguritas !== false, title: 'Hacer Figurita', text: 'Tu propia figurita del álbum, con el fondo recortado.', img: '/modes/figurita.jpg', icon: Sticker, color: '#2dd4bf', ai: true },
           ].filter(m => m.on && isModeAllowed(m.mode)).map(m => (
             <button key={m.mode} data-autofocus data-remote={m.title} onClick={() => handleModeSelect(m.mode)}
               className="relative group flex flex-col w-full md:w-[calc((100%-2.5rem)/3)] portrait:!w-[calc((100%-1.25rem)/2)] rounded-2xl overflow-hidden border-2 kiosk-glass text-left hover:scale-[1.03] focus:scale-[1.03] focus:outline-none focus:ring-4 focus:ring-white/80 transition-all"
-              style={{ borderColor: m.color }}>
+              style={{ borderColor: m.color, ...('featured' in m && m.featured ? { boxShadow: `0 0 0 2px ${m.color}, 0 0 45px -4px ${m.color}` } : {}) }}>
               <div className="relative w-full aspect-[16/10] bg-black/40 overflow-hidden">
+                {'featured' in m && m.featured && (
+                  <span className="absolute top-2 left-2 z-10 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-gradient-to-r from-[#ffd23f] to-[#ff9f1c] text-black shadow-lg">⭐ El favorito</span>
+                )}
                 <img src={m.img} alt="" loading="lazy" className={`absolute inset-0 w-full h-full object-cover ${m.cover ? 'object-top' : 'object-center'}`} />
                 <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/70 to-transparent" />
                 <span className={`absolute bottom-2 right-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider shadow-lg ${m.ai ? 'bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7] text-white' : 'bg-white/90 text-black'}`}>
