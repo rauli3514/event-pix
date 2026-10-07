@@ -15,7 +15,7 @@ import { getGeneralSettings, getSectionLock } from '@/lib/kioskSettings';
 import { isSupabaseConfigured, supabaseProjectRef } from '@/lib/supabase';
 import { startDriveSync } from '@/lib/driveBackup';
 import { getDeviceRole } from '@/lib/kioskLink';
-import WifiIndicator from '@/components/kiosk/WifiIndicator';
+import WifiIndicator, { BluetoothIndicator } from '@/components/kiosk/WifiIndicator';
 
 // Inicio de la app "EventPix Kiosco" en la TV box: sin login. Si el equipo no
 // está vinculado muestra su código para registrarlo en el panel; si lo está,
@@ -169,6 +169,7 @@ export default function KioskBox() {
               </span>
             )}
             <span className="text-3xl font-light tabular-nums text-white/85 mr-2">{clock}</span>
+            <BluetoothIndicator className="w-10 h-16" />
             <WifiIndicator className="w-12 h-16" />
             <button onClick={() => setPinOpen(true)} className={roundButton} aria-label="Ajustes"><Settings className="w-7 h-7" /></button>
           </div>

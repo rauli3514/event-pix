@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Cable } from 'lucide-react';
+import { Bluetooth, BluetoothConnected, BluetoothOff, Cable } from 'lucide-react';
 import { KioskNet, netAvailable, type WifiStatus } from '@/lib/kioskNet';
+import { KioskLink, linkAvailable } from '@/lib/kioskLink';
 
 // Antenita del inicio: solo muestra si hay conexión y cuánta señal (no se toca).
 // El WiFi se configura en Ajustes → Equipo.
@@ -59,5 +60,42 @@ function SignalArcs({ bars, off }: { bars: number; off: boolean }) {
       {arcs.map((d, i) => <path key={d} d={d} opacity={i < lit ? 1 : 0.25} />)}
       {off && <path d="M3 3l18 18" />}
     </svg>
+  );
+}
+
+/**
+ * Bluetooth del inicio: apagado, prendido o con la tablet de control conectada.
+ * Solo en la app del equipo (en la web no hay Bluetooth).
+ */
+export function BluetoothIndicator({ className = '' }: { className?: string }) {
+  const [state, setState] = useState<{ supported: boolean; enabled: boolean; tablet: boolean } | null>(null);
+
+  useEffect(() => {
+    if (!linkAvailable()) return;
+    let alive = true;
+    const read = () => {
+      KioskLink.info()
+        .then(i => { if (alive) setState({ supported: i.supported, enabled: !!i.enabled, tablet: i.connected }); })
+        .catch(() => {});
+    };
+    read();
+    const t = window.setInterval(read, POLL_MS);
+    // La tablet se conecta o se va: se actualiza en el momento
+    const h = KioskLink.addListener('linkState', read);
+    return () => {
+      alive = false;
+      window.clearInterval(t);
+      h.then(x => x.remove()).catch(() => {});
+    };
+  }, []);
+
+  if (!state?.supported) return null;
+  const label = !state.enabled ? 'Bluetooth apagado' : state.tablet ? 'Tablet conectada' : 'Bluetooth prendido';
+  const Icon = !state.enabled ? BluetoothOff : state.tablet ? BluetoothConnected : Bluetooth;
+  const color = !state.enabled ? 'text-white/35' : state.tablet ? 'text-[#00d4ff]' : 'text-white/90';
+  return (
+    <div role="img" aria-label={label} title={label} className={`flex items-center justify-center ${color} ${className}`}>
+      <Icon className="w-7 h-7" />
+    </div>
   );
 }
