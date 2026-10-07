@@ -79,6 +79,9 @@ const SELFIE_PHRASES = [
   "¡Paren todo! La mejor foto del evento acaba de tomarse.",
 ];
 
+// Pantalla "¡Boom! Estamos procesando tu foto": cuánto dura antes de mostrar la foto
+const FLASH_RESULT_MS = 5000;
+
 // ---- Corner decoration ----
 const Corners = () => (
   <>
@@ -284,8 +287,10 @@ export default function KioskAI() {
       setShotCount(0);
       // Con efectos, el invitado los prueba en vivo y toca "¡Sacar foto!"; con el
       // disparador Bluetooth se espera el botón (o un toque)
-      if (fxEnabled || shutterMode) return;
-      const t = setTimeout(() => startCountdown(), 2500);
+      const auto = autoShootRef.current && !fxEnabled;
+      autoShootRef.current = false;
+      if ((fxEnabled || shutterMode) && !auto) return;
+      const t = setTimeout(() => startCountdown(), auto ? 1200 : 2500);
       return () => clearTimeout(t);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -333,12 +338,16 @@ export default function KioskAI() {
   }, [step, idleTimeout]);
 
   // Go to mode after splash
+  // Desde la bienvenida con un solo modo, la cuenta regresiva arranca sin otro toque
+  const autoShootRef = useRef(false);
   const handleSplashTap = () => {
     if (generalSettings.autoFullscreen && !document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(() => {});
     }
     // Con un solo modo posible (p. ej. "Fotos" = selfie) se saltea la elección
     if (modesParam === 'selfie' && generalSettings.enablePortada !== true) {
+      // Un solo paso: la cámara arranca la cuenta regresiva sola
+      autoShootRef.current = true;
       handleModeSelect('selfie');
       return;
     }
@@ -448,6 +457,8 @@ export default function KioskAI() {
   // Disparador Bluetooth: en "Mirá a la cámara" la foto arranca con el botón (o tocando la pantalla)
   const shutterMode = !!generalSettings.bluetoothShutter;
   useShutter(() => { if (cameraReady) startCountdown(); }, step === 'lookCamera' && (shutterMode || fxEnabled));
+  // En la bienvenida el disparador hace lo mismo que tocar la pantalla
+  useShutter(() => handleSplashTap(), step === 'splash' && shutterMode);
   // Tomas sin efecto, para el respaldo de originales
   const rawShotsRef = useRef<string[]>([]);
 
@@ -771,9 +782,63 @@ export default function KioskAI() {
     setCapturedImage(null);
     setMundialCountry(null);
     setSelectedAITheme(null);
+    autoShootRef.current = false;
   };
 
   // ─── SCREENS ────────────────────────────────────────────────
+
+  // Vista previa: "¡Me gusta!" sigue con la foto (nombre, IA o foto final)
+  const approvePhoto = async () => {
+    if (!capturedImage) return;
+    const photo = capturedImage;
+    // Si es caricatura mundialista, lanzamos la IA directamente con el prompt especial
+    if (mode === 'caricatura') {
+      // Prompt de la base (editable en el panel → Temáticas IA) o el de respaldo
+      const specialTheme = themes.find((t: any) => t.result_style === 'caricatura') ?? {
+        name: 'Caricatura con Messi',
+        prompt: 'Turn this photo into a semi-realistic 3D caricature portrait. IDENTITY IS THE TOP PRIORITY: every person from the photo must be instantly recognizable as themselves. Keep each face exactly as in the photo: same face shape and proportions, same eyes and eye shape, eyebrows, nose, mouth and smile, same skin tone, same hairline and hairstyle, same beard or facial hair, same glasses if they wear them, same age and body type. Only a very light, friendly caricature exaggeration (slightly bigger head and smile); do not change their features, do not make them look younger, thinner or like a generic cartoon character, no oversized eyes. Keep everyone from the photo and add Lionel Messi standing right next to them, hugging and celebrating together, also as a recognizable semi-realistic 3D caricature. Everyone wears the Argentina national team jersey with white and sky-blue vertical stripes. Medium shot from the waist up, faces large and in sharp focus, centered. Background: a blurred packed stadium at night with golden confetti; no other people in the foreground. Bright, joyful, high detail. No text, no logos, no watermark.'
+      };
+      runAI(capturedImage, specialTheme);
+      return;
+    }
+
+    if (mode === 'portada' || mode === 'portadaIA') {
+      // La tapa siempre pide el nombre de la estrella (se puede saltear)
+      guestNameRef.current = '';
+      setStep('guestName');
+      return;
+    }
+    if (mode === 'selfie') {
+      // Nombre del invitado antes de armar la foto (Ajustes → Experiencias y marco)
+      guestNameRef.current = '';
+      if (generalSettings.askGuestName) {
+        setStep('guestName');
+        return;
+      }
+      await continueSelfie(photo);
+    } else if (mode === 'retrato') {
+      setStep('themeSelect');
+    } else if (mode === 'figuritas') {
+      runAI(capturedImage, null);
+    }
+  };
+
+  // Sin "Repetir foto" la vista previa no tiene nada que elegir: se sigue sola
+  const autoApprovedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (step !== 'photoPreview' || generalSettings.allowRetake !== false || !capturedImage) return;
+    if (autoApprovedRef.current === capturedImage) return;
+    autoApprovedRef.current = capturedImage;
+    void approvePhoto();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, capturedImage]);
+
+  // "Procesando tu foto": pasa sola a la foto final (o tocando)
+  useEffect(() => {
+    if (step !== 'flashResult') return;
+    const t = setTimeout(() => setStep('result'), FLASH_RESULT_MS);
+    return () => clearTimeout(t);
+  }, [step]);
 
   if (step === 'splash') return (
     <div
@@ -997,40 +1062,6 @@ export default function KioskAI() {
   );
 
   if (step === 'photoPreview') {
-    const goNext = async () => {
-      if (!capturedImage) return;
-      const photo = capturedImage;
-      // Si es caricatura mundialista, lanzamos la IA directamente con el prompt especial
-      if (mode === 'caricatura') {
-        // Prompt de la base (editable en el panel → Temáticas IA) o el de respaldo
-        const specialTheme = themes.find((t: any) => t.result_style === 'caricatura') ?? {
-          name: 'Caricatura con Messi',
-          prompt: 'Turn this photo into a semi-realistic 3D caricature portrait. IDENTITY IS THE TOP PRIORITY: every person from the photo must be instantly recognizable as themselves. Keep each face exactly as in the photo: same face shape and proportions, same eyes and eye shape, eyebrows, nose, mouth and smile, same skin tone, same hairline and hairstyle, same beard or facial hair, same glasses if they wear them, same age and body type. Only a very light, friendly caricature exaggeration (slightly bigger head and smile); do not change their features, do not make them look younger, thinner or like a generic cartoon character, no oversized eyes. Keep everyone from the photo and add Lionel Messi standing right next to them, hugging and celebrating together, also as a recognizable semi-realistic 3D caricature. Everyone wears the Argentina national team jersey with white and sky-blue vertical stripes. Medium shot from the waist up, faces large and in sharp focus, centered. Background: a blurred packed stadium at night with golden confetti; no other people in the foreground. Bright, joyful, high detail. No text, no logos, no watermark.'
-        };
-        runAI(capturedImage, specialTheme);
-        return;
-      }
-
-      if (mode === 'portada' || mode === 'portadaIA') {
-        // La tapa siempre pide el nombre de la estrella (se puede saltear)
-        guestNameRef.current = '';
-        setStep('guestName');
-        return;
-      }
-      if (mode === 'selfie') {
-        // Nombre del invitado antes de armar la foto (Ajustes → Experiencias y marco)
-        guestNameRef.current = '';
-        if (generalSettings.askGuestName) {
-          setStep('guestName');
-          return;
-        }
-        await continueSelfie(photo);
-      } else if (mode === 'retrato') {
-        setStep('themeSelect');
-      } else if (mode === 'figuritas') {
-        runAI(capturedImage, null);
-      }
-    };
     return (
       <div className="kiosk-root">
         <div className="absolute inset-0 bg-black" />
@@ -1062,7 +1093,7 @@ export default function KioskAI() {
             ↩ Repetir foto
           </button>
           )}
-          <button data-autofocus onClick={goNext}
+          <button data-autofocus onClick={approvePhoto}
             className="flex-1 max-w-xs py-5 rounded-2xl carlmarx-bold text-white text-2xl transition-all focus:outline-none focus:ring-4 focus:ring-white/80"
             style={{ background: 'linear-gradient(135deg,#ff2e93,#7b2ff7)', boxShadow: '0 0 40px rgba(255,46,147,0.5)' }}>
             ¡Me gusta! →
@@ -1105,7 +1136,13 @@ export default function KioskAI() {
         <p className="carlmarx-bold text-[clamp(2.5rem,5vw,4rem)] text-white leading-tight" style={{ textShadow: '0 0 40px rgba(255,255,255,0.4)' }}>
           {resultPhrase}
         </p>
-        <p className="carlmarx-regular text-white/60 text-2xl animate-pulse mt-4">Toca para ver tu foto →</p>
+        <div className="flex flex-col items-center gap-3 mt-4">
+          <p className="carlmarx-regular text-white/70 text-2xl animate-pulse">Estamos procesando tu foto…</p>
+          <div className="w-64 h-2 rounded-full bg-white/15 overflow-hidden">
+            <motion.div className="h-full bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7]"
+              initial={{ width: '0%' }} animate={{ width: '100%' }} transition={{ duration: FLASH_RESULT_MS / 1000, ease: 'linear' }} />
+          </div>
+        </div>
       </div>
     </div>
   );
