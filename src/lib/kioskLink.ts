@@ -67,6 +67,8 @@ export const setRemoteTarget = (t: RemoteTarget | null) => {
 // ─── Pantalla: qué hay para tocar ────────────────────────────────────────────
 
 const CLICKABLE = 'button, [data-remote]';
+/** Botón comodín de la tablet: toca el centro de la pantalla. */
+const SCREEN_ID = 'screen';
 
 const visible = (el: HTMLElement) => {
   const r = el.getBoundingClientRect();
@@ -103,6 +105,8 @@ export function snapshotView(): RemoteView {
     }
   }
   const textEl = saver ? null : Array.from(document.querySelectorAll<HTMLElement>('[data-remote-text]')).find(visible);
+  // Pantalla sin botones (p. ej. "tocá para seguir"): la tablet igual puede tocarla
+  if (!saver && items.length === 0 && !textEl) items.push({ id: SCREEN_ID, label: 'Tocar la pantalla' });
   return {
     t: 'view',
     title: saver ? 'Protector de pantalla: tocá para volver' : (heading?.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 80),
@@ -118,6 +122,11 @@ export function runCommand(cmd: RemoteCommand) {
   // Con el protector de pantalla, el primer toque solo lo cierra (como en la pantalla)
   if (document.querySelector('.kiosk-saver-in')) {
     window.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    return;
+  }
+  if (cmd.t === 'tap' && cmd.id === SCREEN_ID) {
+    const el = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2) as HTMLElement | null;
+    el?.click();
     return;
   }
   if (cmd.t === 'tap') {

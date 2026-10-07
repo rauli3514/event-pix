@@ -197,7 +197,7 @@ export default function KioskVip() {
       )}
 
       {view === 'video' && videoUrl && (
-        <div className="fixed inset-0 z-40 bg-black" onClick={() => setView('result')}>
+        <div className="fixed inset-0 z-40 bg-black" data-remote="Saltear video" onClick={() => setView('result')}>
           <video src={videoUrl} autoPlay playsInline className="w-full h-full object-contain"
             onEnded={() => setView('result')} onError={() => setView('result')} />
           <span className="absolute bottom-[3vmin] right-[3vmin] px-[3vmin] py-[1.4vmin] rounded-full bg-black/60 text-white/80 text-[clamp(0.9rem,2.4vmin,1.6rem)]">

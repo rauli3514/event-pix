@@ -1284,7 +1284,7 @@ The subject must perfectly match the facial features and gender of the reference
   );
 
   if (step === 'flashResult') return (
-    <div className="kiosk-root" onClick={() => setStep('result')}>
+    <div className="kiosk-root" data-remote="Ver mi foto →" onClick={() => setStep('result')}>
       <ScreenBackground screen="reveal" />
       <Corners />
       {capturedImage && (
@@ -1617,7 +1617,7 @@ The subject must perfectly match the facial features and gender of the reference
         {/* QR MODAL */}
         {showQrModal && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-8 animate-in fade-in duration-300">
-            <div className="absolute inset-0 bg-black/90 backdrop-blur-xl" onClick={() => setShowQrModal(false)} />
+            <div className="absolute inset-0 bg-black/90 backdrop-blur-xl" data-remote="Cerrar" onClick={() => setShowQrModal(false)} />
             <div className="relative bg-white rounded-[3rem] p-12 flex flex-col items-center gap-8 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-300">
               <div className="text-center space-y-2">
                 <h3 className="carlmarx-bold text-slate-900 text-3xl">Descargá tu foto</h3>
