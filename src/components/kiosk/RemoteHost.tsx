@@ -66,16 +66,24 @@ export default function RemoteHost() {
         } catch { /* mensaje inválido */ }
       }),
     ];
-    if (!started) {
+    // Si no puede escuchar (p. ej. Bluetooth apagado) se reintenta cada 10 s
+    let retry = 0;
+    const start = () => {
+      if (started) return;
       started = true;
-      KioskLink.startHost().catch(() => { started = false; });
-    }
+      KioskLink.startHost().catch(() => {
+        started = false;
+        retry = window.setTimeout(start, 10000);
+      });
+    };
+    start();
     KioskLink.info().then(i => { connected = i.connected; if (connected) send(true); }).catch(() => {});
 
     return () => {
       observer.disconnect();
       window.clearInterval(safety);
       window.clearTimeout(timer);
+      window.clearTimeout(retry);
       handles.forEach(h => h.then(x => x.remove()).catch(() => {}));
     };
   }, [active]);

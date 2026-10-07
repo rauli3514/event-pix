@@ -5,7 +5,7 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 
 export type WifiSecurity = 'open' | 'wpa2' | 'wpa3' | 'wep' | 'enterprise';
 export interface WifiNetwork { ssid: string; bars: number; security: WifiSecurity }
-export interface WifiStatus { enabled: boolean; connected: boolean; internet: boolean; ssid: string; ethernet?: boolean }
+export interface WifiStatus { enabled: boolean; connected: boolean; internet: boolean; ssid: string; ethernet?: boolean; /** 0 a 4 */ bars?: number }
 export interface BtDevice { name: string; address: string; bonded: boolean; kind: 'input' | 'audio' | 'phone' | 'printer' | 'computer' | 'other' }
 export interface BtStatus { supported: boolean; enabled?: boolean; bonded?: BtDevice[]; needsPermission?: boolean }
 

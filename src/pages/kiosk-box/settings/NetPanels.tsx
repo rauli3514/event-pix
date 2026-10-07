@@ -319,16 +319,43 @@ export function RemoteControlPanel() {
   const [on, setOn] = useState(() => getGeneralSettings().remoteHost === true);
   const [name, setName] = useState('');
   const [link, setLink] = useState<{ state: LinkState; name?: string } | null>(null);
+  const [hostInfo, setHostInfo] = useState<{ hosting: boolean; enabled?: boolean } | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [found, setFound] = useState<BtDevice[] | null>(null);
 
   useEffect(() => {
     if (!available) return;
-    KioskLink.info().then(i => {
+    const read = () => KioskLink.info().then(i => {
       setName(i.name || '');
-      if (i.connected) setLink({ state: 'connected' });
+      setHostInfo({ hosting: i.hosting, enabled: i.enabled });
+      if (i.connected) setLink(l => (l?.state === 'connected' ? l : { state: 'connected' }));
     }).catch(() => {});
+    read();
+    const t = window.setInterval(read, 3000);
     const h = KioskLink.addListener('linkState', e => setLink(e));
-    return () => { h.then(x => x.remove()).catch(() => {}); };
+    return () => { window.clearInterval(t); h.then(x => x.remove()).catch(() => {}); };
   }, [available]);
+
+  const startNow = async () => {
+    try { await KioskLink.startHost(); toast.success('La pantalla está esperando la tablet'); } catch (e) { toast.error(errorText(e)); }
+  };
+
+  // Otra forma: la pantalla busca la tablet y se vincula (la tablet con Ajustes → Bluetooth abierto)
+  const findTablet = async () => {
+    setScanning(true);
+    try {
+      const r = await KioskNet.btScan();
+      setFound(r.devices.filter(d => !d.bonded));
+      if (r.locationOff) toast.error('Activá la ubicación en los ajustes de Android para buscar.');
+    } catch (e) { toast.error(errorText(e)); }
+    setScanning(false);
+  };
+  const pairTablet = async (d: BtDevice) => {
+    try {
+      await KioskNet.btPair({ address: d.address });
+      toast.success(`Aceptá el código en la pantalla y en ${d.name}. Después elegí esta pantalla en la tablet.`);
+    } catch (e) { toast.error(errorText(e)); }
+  };
 
   const toggle = (v: boolean) => {
     setOn(v);
@@ -367,11 +394,33 @@ export function RemoteControlPanel() {
               {link?.state === 'connected' ? `Tablet conectada${link.name ? `: ${link.name}` : ''}` : 'Ninguna tablet conectada'}
             </p>
           </div>
+          {hostInfo && !hostInfo.hosting && link?.state !== 'connected' && (
+            <div className="flex items-center gap-3 rounded-2xl px-5 py-4 bg-amber-500/15 text-amber-200">
+              <p className="flex-1">{hostInfo.enabled === false ? 'El Bluetooth de este equipo está apagado: prendelo en el panel Bluetooth.' : 'La pantalla todavía no está esperando a la tablet.'}</p>
+              <button onClick={startNow} className={buttonClass}>Reintentar</button>
+            </div>
+          )}
           <p className="text-white/70">
             Nombre de esta pantalla en Bluetooth: <b className="text-white">{name || '—'}</b>. En la tablet (con la app EventPix Kiosco):
             Ajustes → Equipo → <b>"Usar este equipo como control"</b>, tocá <b>Buscar</b> y elegí este nombre. La primera vez tocá acá <b>"Hacer visible"</b>.
           </p>
-          <button onClick={visible} className={primaryClass}><Bluetooth className="w-5 h-5" /> Hacer visible (5 minutos)</button>
+          <div className="grid grid-cols-2 gap-3">
+            <button onClick={visible} className={primaryClass}><Bluetooth className="w-5 h-5" /> Hacer visible (5 minutos)</button>
+            <button onClick={findTablet} disabled={scanning} className={buttonClass}>
+              {scanning ? <Loader2 className="w-5 h-5 animate-spin" /> : <Tablet className="w-5 h-5" />} {scanning ? 'Buscando…' : 'Buscar la tablet desde acá'}
+            </button>
+          </div>
+          {found && (
+            <div className="space-y-2">
+              <p className="text-white/60 text-sm">Si la tablet no aparece en la búsqueda de la tablet: abrí en la tablet <b>Ajustes de Android → Bluetooth</b> (así queda visible), buscá desde acá y tocá su nombre para vincularlas.</p>
+              {found.length === 0 && <p className="text-white/60">No apareció nada. ¿La tablet tiene abierta la pantalla de Bluetooth?</p>}
+              {found.map(d => (
+                <button key={d.address} onClick={() => pairTablet(d)} className="w-full flex items-center justify-between rounded-2xl bg-black/20 px-5 py-3 text-left">
+                  <span className="font-semibold">{d.name}</span><span className="text-white/50 text-sm">Vincular</span>
+                </button>
+              ))}
+            </div>
+          )}
         </>
       )}
       <button onClick={useAsRemote} className={buttonClass}>

@@ -200,9 +200,8 @@ function PickScreen({ onPick }: { onPick: (d: BtDevice) => void }) {
   const [scanning, setScanning] = useState(false);
   const [msg, setMsg] = useState('');
 
-  useEffect(() => {
-    KioskNet.btStatus().then(s => setBonded(s.bonded ?? [])).catch(() => {});
-  }, []);
+  const loadBonded = () => KioskNet.btStatus().then(s => setBonded(s.bonded ?? [])).catch(() => {});
+  useEffect(() => { void loadBonded(); }, []);
 
   const scan = async () => {
     setScanning(true);
@@ -214,6 +213,8 @@ function PickScreen({ onPick }: { onPick: (d: BtDevice) => void }) {
     } catch (e) {
       setMsg(e instanceof Error ? e.message : String(e));
     }
+    // La búsqueda pide el permiso de Bluetooth: recién ahí se ven los ya vinculados
+    await loadBonded();
     setScanning(false);
   };
 
@@ -235,7 +236,12 @@ function PickScreen({ onPick }: { onPick: (d: BtDevice) => void }) {
             <span className="text-white/50 text-sm">{d.bonded ? 'vinculado' : ''}</span>
           </button>
         ))}
-        {found && list.length === 0 && <p className="text-white/60">No se encontró nada. ¿La pantalla está visible?</p>}
+        {found && (
+          <p className="text-white/60">
+            {list.length === 0 ? 'No se encontró nada. ' : '¿No ves la pantalla? '}
+            Otra forma: abrí en esta tablet <b>Ajustes de Android → Bluetooth</b>. En la pantalla andá a <b>Control con tablet → "Buscar la tablet desde acá"</b> y tocá el nombre de la tablet para vincularlas. Después volvé acá: la pantalla aparece como <b>vinculado</b>.
+          </p>
+        )}
       </div>
     </div>
   );

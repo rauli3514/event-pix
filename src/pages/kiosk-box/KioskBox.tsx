@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Camera, Sparkles, Ticket, Wifi, Settings, Loader2, AlertTriangle, Images, WifiOff, type LucideIcon } from 'lucide-react';
+import { Camera, Sparkles, Ticket, Settings, Loader2, AlertTriangle, Images, WifiOff, type LucideIcon } from 'lucide-react';
 import { useRemoteFocus } from '@/hooks/use-remote-focus';
 import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
 import ScreenBackground from '@/components/kiosk/ScreenBackground';
@@ -15,6 +15,7 @@ import { getGeneralSettings, getSectionLock } from '@/lib/kioskSettings';
 import { isSupabaseConfigured, supabaseProjectRef } from '@/lib/supabase';
 import { startDriveSync } from '@/lib/driveBackup';
 import { getDeviceRole } from '@/lib/kioskLink';
+import WifiIndicator from '@/components/kiosk/WifiIndicator';
 
 // Inicio de la app "EventPix Kiosco" en la TV box: sin login. Si el equipo no
 // está vinculado muestra su código para registrarlo en el panel; si lo está,
@@ -168,7 +169,7 @@ export default function KioskBox() {
               </span>
             )}
             <span className="text-3xl font-light tabular-nums text-white/85 mr-2">{clock}</span>
-            <button onClick={openWifiSettings} className={roundButton} aria-label="WiFi"><Wifi className="w-7 h-7" /></button>
+            <WifiIndicator className="w-12 h-16" />
             <button onClick={() => setPinOpen(true)} className={roundButton} aria-label="Ajustes"><Settings className="w-7 h-7" /></button>
           </div>
         </header>
