@@ -16,6 +16,12 @@ const POSES = [
   '¡Cara de sorpresa! 😱',
   '¡Corazón con las manos! 🫶',
   '¡La más elegante! 💃🕺',
+  '¡La pose más SEXY gana! 🔥',
+  '¡Pose de Instagram! 📸✨',
+  '¡Todos señalando a la cámara! 👉',
+  '¡Brindis imaginario! 🥂',
+  '¡Pongan cara de enojados! 😠',
+  '¡Ahora como una banda de rock! 🤘',
 ];
 
 export default function NextShot({ shots, total, seconds, videoRef, mirror, rotation, onReady }: {
@@ -33,6 +39,7 @@ export default function NextShot({ shots, total, seconds, videoRef, mirror, rota
   useEffect(() => { readyRef.current = onReady; });
   // Una pose distinta en cada pausa
   const [pose] = useState(() => POSES[(shots.length - 1 + Math.floor(Math.random() * POSES.length)) % POSES.length]);
+  const [, poseText, poseEmoji] = pose.match(/^(.*?)\s*([^\p{L}\p{N}!¡?¿.,…]*)$/u) ?? ['', pose, ''];
 
   const finish = () => {
     if (doneRef.current) return;
@@ -88,9 +95,11 @@ export default function NextShot({ shots, total, seconds, videoRef, mirror, rota
           </p>
           <AnimatePresence mode="wait">
             <motion.p key={pose}
-              className="carlmarx-bold text-[clamp(1.6rem,5.5vmin,3.6rem)] bg-gradient-to-r from-[#ffd23f] via-[#ff2e93] to-[#00d4ff] bg-clip-text text-transparent"
+              className="carlmarx-bold leading-tight text-[clamp(2.6rem,9vmin,6.5rem)]"
               initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.6 }}>
-              {pose}
+              <span className="bg-gradient-to-r from-[#ffd23f] via-[#ff2e93] to-[#00d4ff] bg-clip-text text-transparent">{poseText}</span>
+              {/* El emoji va aparte: con el degradé del texto se vería como una mancha */}
+              {poseEmoji && <span className="ml-[0.25em] whitespace-nowrap">{poseEmoji}</span>}
             </motion.p>
           </AnimatePresence>
 

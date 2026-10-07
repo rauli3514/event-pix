@@ -77,6 +77,12 @@ const SELFIE_PHRASES = [
   "¡Sonrieron como si supieran que iban a quedar perfectos... y tenían razón!",
   "¡Esto no es una foto, esto es una OBRA DE ARTE!",
   "¡Paren todo! La mejor foto del evento acaba de tomarse.",
+  "¿Estuvieron bebiendo? ¡Porque esas caras lo dicen todo! 🍻",
+  "¡Esta foto está para el Instagram!",
+  "¡Ni el fotógrafo profesional la sacaba tan bien!",
+  "¡Esta va directo al cuadro del living!",
+  "¡Atención! Nivel de facha: peligrosamente alto.",
+  "¡Qué grupo! Esta foto ya es leyenda.",
 ];
 
 // Pantalla "¡Boom! Estamos procesando tu foto": cuánto dura antes de mostrar la foto
@@ -340,6 +346,7 @@ export default function KioskAI() {
   // Go to mode after splash
   // Desde la bienvenida con un solo modo, la cuenta regresiva arranca sin otro toque
   const autoShootRef = useRef(false);
+  const [autoShoot, setAutoShoot] = useState(false);
   const handleSplashTap = () => {
     if (generalSettings.autoFullscreen && !document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(() => {});
@@ -348,6 +355,7 @@ export default function KioskAI() {
     if (modesParam === 'selfie' && generalSettings.enablePortada !== true) {
       // Un solo paso: la cámara arranca la cuenta regresiva sola
       autoShootRef.current = true;
+      setAutoShoot(true);
       handleModeSelect('selfie');
       return;
     }
@@ -421,6 +429,7 @@ export default function KioskAI() {
   // Countdown + capture
   const countdownTimerRef = useRef<number | null>(null);
   const startCountdown = () => {
+    setAutoShoot(false);
     setStep('countdown');
     const timer = cameraSettings.timer || 5;
     // La foto se saca fuera del actualizador de estado: React puede ejecutarlo dos veces
@@ -783,6 +792,7 @@ export default function KioskAI() {
     setMundialCountry(null);
     setSelectedAITheme(null);
     autoShootRef.current = false;
+    setAutoShoot(false);
   };
 
   // ─── SCREENS ────────────────────────────────────────────────
@@ -1000,7 +1010,8 @@ export default function KioskAI() {
           <h1 className="carlmarx-bold text-7xl text-white text-center uppercase tracking-widest">
             ¡Mirá a la<br /><span className="text-violet-400">Cámara! 📸</span>
           </h1>
-          {shutterMode && (
+          {/* Con la cuenta regresiva automática (un solo toque desde la bienvenida) no se pide el botón */}
+          {shutterMode && !autoShoot && (
             <p className="carlmarx-bold text-white text-[clamp(1.4rem,4vmin,3rem)] text-center animate-pulse">
               {cameraReady ? 'Cuando estén listos, apretá el disparador 📲 (o tocá la pantalla)' : 'Preparando la cámara…'}
             </p>
@@ -1133,12 +1144,12 @@ export default function KioskAI() {
         <img src={capturedImage} alt="captured" className="absolute inset-0 w-full h-full object-cover opacity-20 blur-sm" />
       )}
       <div className="relative z-10 flex flex-col items-center justify-center h-full px-12 text-center gap-8">
-        <p className="carlmarx-bold text-[clamp(2.5rem,5vw,4rem)] text-white leading-tight" style={{ textShadow: '0 0 40px rgba(255,255,255,0.4)' }}>
+        <p className="carlmarx-bold text-[clamp(2.8rem,8vmin,6.5rem)] text-white leading-tight" style={{ textShadow: '0 0 40px rgba(255,255,255,0.4)' }}>
           {resultPhrase}
         </p>
         <div className="flex flex-col items-center gap-3 mt-4">
-          <p className="carlmarx-regular text-white/70 text-2xl animate-pulse">Estamos procesando tu foto…</p>
-          <div className="w-64 h-2 rounded-full bg-white/15 overflow-hidden">
+          <p className="carlmarx-regular text-white/80 text-[clamp(1.6rem,4.5vmin,3rem)] animate-pulse">Estamos procesando tu foto…</p>
+          <div className="w-[min(70vw,28rem)] h-3 rounded-full bg-white/15 overflow-hidden">
             <motion.div className="h-full bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7]"
               initial={{ width: '0%' }} animate={{ width: '100%' }} transition={{ duration: FLASH_RESULT_MS / 1000, ease: 'linear' }} />
           </div>
