@@ -1,12 +1,26 @@
 import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 
-// Control del kiosco desde una tablet por Bluetooth (sin internet). Lo básico: la
-// pantalla (TV box) le manda a la tablet el título y los botones que hay para tocar
-// (solo el texto) y, si la pantalla pide escribir algo, un cuadro de texto. Al tocar un
-// botón en la tablet, la pantalla lo aprieta. Además hay flechas y OK como el control
-// remoto. Funciona en todas las pantallas sin programar cada una.
+// Control del kiosco desde una tablet por Bluetooth (sin internet). La pantalla (TV box)
+// le manda a la tablet lo que hay para elegir: título, botones con su imagen (miniaturas
+// que viajan por el mismo Bluetooth), la foto recién sacada y, si la pantalla pide
+// escribir algo, un cuadro de texto. Al tocar en la tablet, la pantalla lo aprieta.
+// Lo usan las dos apps: EventPix Kiosco (la pantalla, ver kioskLinkHost) y EventPix
+// Control (la tablet), así que acá no hay nada del kiosco.
 
-export interface RemoteItem { id: string; label: string }
+export interface RemoteItem {
+  id: string;
+  label: string;
+  /** Clave de la miniatura (llega aparte con un mensaje "img") */
+  img?: string;
+  /** Texto chico debajo del nombre (p. ej. la descripción del modo) */
+  sub?: string;
+  /** Opción elegida (p. ej. el estilo de IA marcado) */
+  selected?: boolean;
+  /** Opción destacada (p. ej. Retrato Mágico) */
+  featured?: boolean;
+  /** Botón principal (p. ej. "¡Me gusta!") */
+  primary?: boolean;
+}
 export interface RemoteView {
   t: 'view';
   title: string;
@@ -15,7 +29,15 @@ export interface RemoteView {
   saver?: boolean;
   /** La pantalla pide escribir (nombre del invitado, búsqueda del Ingreso VIP…) */
   text?: { placeholder: string; value: string };
+  /** Imagen grande (la foto recién sacada o la foto final) */
+  image?: string;
+  /** Pasa algo que hay que mirar en la pantalla grande (cuenta regresiva, cámara…) */
+  watch?: string;
 }
+/** Miniatura que manda la pantalla (data URL JPEG) */
+export interface RemoteImage { t: 'img'; key: string; data: string }
+export type RemoteMessage = RemoteView | RemoteImage;
+
 export type RemoteCommand =
   | { t: 'hello' }
   | { t: 'tap'; id: string }
@@ -39,21 +61,46 @@ interface KioskLinkPlugin {
   addListener(event: 'linkMessage', cb: (e: { data: string }) => void): Promise<PluginListenerHandle>;
 }
 
-export const KioskLink = registerPlugin<KioskLinkPlugin>('KioskLink');
+// Solo en desarrollo: ?mocklink=host | remote conecta dos pestañas del navegador como si
+// fuera Bluetooth (para probar la pantalla y la tablet juntas). No existe en la app.
+const mockRole = import.meta.env.DEV ? new URLSearchParams(location.search).get('mocklink') : null;
+
+function mockLink(role: string): KioskLinkPlugin {
+  const other = role === 'host' ? 'remote' : 'host';
+  const ch = new BroadcastChannel('kiosk-mock-link');
+  const listeners: Record<string, ((e: never) => void)[]> = { linkState: [], linkMessage: [] };
+  const emit = (ev: string, e: unknown) => listeners[ev].forEach(cb => cb(e as never));
+  let connected = false;
+  ch.onmessage = ({ data: m }) => {
+    if (m.to !== role) return;
+    if (m.type === 'connect') { connected = true; emit('linkState', { state: 'connected', name: 'Tablet (simulada)' }); }
+    if (m.type === 'data') emit('linkMessage', { data: m.data });
+  };
+  return {
+    info: async () => ({ supported: true, enabled: true, name: 'Pantalla (simulada)', hosting: role === 'host', connected }),
+    startHost: async () => {},
+    stopHost: async () => {},
+    makeDiscoverable: async () => {},
+    connect: async () => { connected = true; ch.postMessage({ to: other, type: 'connect' }); return { name: 'Pantalla (simulada)' }; },
+    disconnect: async () => { connected = false; },
+    send: async ({ data }) => { ch.postMessage({ to: other, type: 'data', data }); },
+    addListener: (async (ev: string, cb: (e: never) => void) => {
+      listeners[ev].push(cb);
+      return { remove: async () => { listeners[ev] = listeners[ev].filter(x => x !== cb); } };
+    }) as KioskLinkPlugin['addListener'],
+  };
+}
+
+export const KioskLink = mockRole ? mockLink(mockRole) : registerPlugin<KioskLinkPlugin>('KioskLink');
 
 /** Aviso de que se prendió o apagó el control con tablet en Ajustes. */
 export const REMOTE_HOST_EVENT = 'kiosk-remote-host-changed';
 
-export const linkAvailable = () => Capacitor.isNativePlatform() && Capacitor.isPluginAvailable('KioskLink');
+export const linkAvailable = () => !!mockRole || (Capacitor.isNativePlatform() && Capacitor.isPluginAvailable('KioskLink'));
 
-// ─── Rol del equipo ──────────────────────────────────────────────────────────
+// ─── Tablet: pantalla elegida ────────────────────────────────────────────────
 
-const ROLE_KEY = 'kiosk_device_role';
 const REMOTE_TARGET_KEY = 'kiosk_remote_target';
-
-/** "remote" = este equipo es la tablet que maneja otra pantalla. */
-export const getDeviceRole = () => (localStorage.getItem(ROLE_KEY) === 'remote' ? 'remote' : 'screen');
-export const setDeviceRole = (role: 'screen' | 'remote') => localStorage.setItem(ROLE_KEY, role);
 
 export interface RemoteTarget { address: string; name: string }
 export const getRemoteTarget = (): RemoteTarget | null => {
@@ -63,89 +110,3 @@ export const setRemoteTarget = (t: RemoteTarget | null) => {
   if (t) localStorage.setItem(REMOTE_TARGET_KEY, JSON.stringify(t));
   else localStorage.removeItem(REMOTE_TARGET_KEY);
 };
-
-// ─── Pantalla: qué hay para tocar ────────────────────────────────────────────
-
-const CLICKABLE = 'button, [data-remote]';
-/** Botón comodín de la tablet: toca el centro de la pantalla. */
-const SCREEN_ID = 'screen';
-
-const visible = (el: HTMLElement) => {
-  const r = el.getBoundingClientRect();
-  if (r.width < 4 || r.height < 4) return false;
-  if (r.bottom < 0 || r.right < 0 || r.top > window.innerHeight || r.left > window.innerWidth) return false;
-  const cs = getComputedStyle(el);
-  return cs.visibility !== 'hidden' && cs.display !== 'none' && Number(cs.opacity) > 0.05;
-};
-
-const labelOf = (el: HTMLElement) => {
-  const own = el.getAttribute('data-remote') || el.getAttribute('aria-label');
-  if (own) return own.trim();
-  const text = (el.innerText || '').split('\n').map(s => s.trim()).filter(Boolean);
-  return text.slice(0, 2).join(' · ');
-};
-
-/** Lo que se ve en la pantalla: título y botones (cada uno con un id para tocarlo). */
-export function snapshotView(): RemoteView {
-  const saver = !!document.querySelector('.kiosk-saver-in');
-  const heading = Array.from(document.querySelectorAll<HTMLElement>('h1, h2, h3')).find(visible);
-  const items: RemoteItem[] = [];
-  // Los ids viejos se borran: si no, un elemento que quedó oculto puede tener el mismo id
-  document.querySelectorAll('[data-remote-id]').forEach(el => el.removeAttribute('data-remote-id'));
-  if (!saver) {
-    let n = 0;
-    for (const el of Array.from(document.querySelectorAll<HTMLElement>(CLICKABLE))) {
-      if (items.length >= 60) break;
-      if ((el as HTMLButtonElement).disabled || el.closest('[data-remote-skip]') || !visible(el)) continue;
-      const label = labelOf(el);
-      if (!label) continue;
-      const id = String(++n);
-      el.setAttribute('data-remote-id', id);
-      items.push({ id, label: label.slice(0, 48) });
-    }
-  }
-  const textEl = saver ? null : Array.from(document.querySelectorAll<HTMLElement>('[data-remote-text]')).find(visible);
-  // Pantalla sin botones (p. ej. "tocá para seguir"): la tablet igual puede tocarla
-  if (!saver && items.length === 0 && !textEl) items.push({ id: SCREEN_ID, label: 'Tocar la pantalla' });
-  return {
-    t: 'view',
-    title: saver ? 'Protector de pantalla: tocá para volver' : (heading?.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 80),
-    items,
-    path: location.pathname,
-    saver,
-    ...(textEl ? { text: { placeholder: textEl.getAttribute('data-remote-text') || 'Escribí acá', value: textEl.getAttribute('data-remote-value') || '' } } : {}),
-  };
-}
-
-/** Ejecuta en la pantalla lo que mandó la tablet. */
-export function runCommand(cmd: RemoteCommand) {
-  // Con el protector de pantalla, el primer toque solo lo cierra (como en la pantalla)
-  if (document.querySelector('.kiosk-saver-in')) {
-    window.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
-    return;
-  }
-  if (cmd.t === 'tap' && cmd.id === SCREEN_ID) {
-    const el = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2) as HTMLElement | null;
-    el?.click();
-    return;
-  }
-  if (cmd.t === 'tap') {
-    const el = document.querySelector<HTMLElement>(`[data-remote-id="${CSS.escape(cmd.id)}"]`);
-    if (!el) return;
-    el.focus?.();
-    el.click();
-    return;
-  }
-  if (cmd.t === 'text') {
-    window.dispatchEvent(new CustomEvent(REMOTE_TEXT_EVENT, { detail: cmd.value.slice(0, 40) }));
-    return;
-  }
-  if (cmd.t === 'key') {
-    const target = (document.activeElement as HTMLElement | null) || document.body;
-    // La actividad cuenta para el protector de pantalla
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift' }));
-    if (cmd.key === 'Enter' && target !== document.body) { target.click(); return; }
-    target.dispatchEvent(new KeyboardEvent('keydown', { key: cmd.key, bubbles: true, cancelable: true }));
-    target.dispatchEvent(new KeyboardEvent('keyup', { key: cmd.key, bubbles: true, cancelable: true }));
-  }
-}

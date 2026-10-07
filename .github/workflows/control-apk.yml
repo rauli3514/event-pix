@@ -1,0 +1,101 @@
+name: APK de EventPix Control
+
+# Genera la app de la tablet que maneja la pantalla del kiosco por Bluetooth
+# ("EventPix Control"). Es una app aparte y liviana: solo la pantalla de control
+# (vite.control.config.ts), sin nada del kiosco. Se publica en la release elegida.
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: 'Release donde se publica el APK (ej. control-v1)'
+        required: false
+        default: control-v1
+      version_code:
+        description: 'Número de versión (sube de a uno con cada versión nueva)'
+        required: false
+        default: '1'
+      version_name:
+        description: 'Nombre de la versión (ej. 1.0)'
+        required: false
+        default: '1.0'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: control-apk
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22' # Capacitor 8 pide Node >= 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Compilar la web de control
+        run: |
+          npx vite build --config vite.control.config.ts
+          rm -rf dist && mv dist-control dist
+
+      - name: Sincronizar con Android
+        run: |
+          npx cap sync android
+          # Los nombres con espacios rompen Gradle (igual que en build-mobile-apk.sh)
+          find android -name '* *' -exec rm -rf {} + || true
+
+      - name: Firma de debug fija (la misma que la del kiosco)
+        uses: actions/cache@v4
+        with:
+          path: kiosk-debug.keystore
+          key: kiosk-debug-keystore-v1
+
+      - name: Crear la firma si no existe
+        run: |
+          if [ ! -f kiosk-debug.keystore ]; then
+            keytool -genkeypair -keystore kiosk-debug.keystore -storepass android \
+              -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
+              -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+      - name: Compilar el APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon \
+            -PeventpixAppId=com.eventpix.control \
+            "-PeventpixAppLabel=EventPix Control" \
+            -PeventpixDedicated=false \
+            -PeventpixVersionCode=${{ inputs.version_code || '1' }} \
+            -PeventpixVersionName=${{ inputs.version_name || '1.0' }} \
+            -PeventpixDebugKeystore=$GITHUB_WORKSPACE/kiosk-debug.keystore
+          cp app/build/outputs/apk/debug/app-debug.apk $GITHUB_WORKSPACE/eventpix-control.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eventpix-control
+          path: eventpix-control.apk
+
+      - name: Publicar en la release "${{ inputs.release || 'control-v1' }}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE: ${{ inputs.release || 'control-v1' }}
+        run: |
+          gh release delete "$RELEASE" --yes --cleanup-tag || true
+          gh release create "$RELEASE" eventpix-control.apk \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "EventPix Control ($RELEASE)" \
+            --notes "App de la tablet que maneja la pantalla del kiosco por Bluetooth (commit ${GITHUB_SHA::7}). Se instala como \"EventPix Control\"."

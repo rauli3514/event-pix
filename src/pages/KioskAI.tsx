@@ -854,7 +854,7 @@ export default function KioskAI() {
     <div
       className="kiosk-root outline-none"
       onClick={handleSplashTap}
-      data-remote="Tocá para empezar"
+      data-remote="Tocá para empezar" data-remote-noimg
       // OK del control remoto = tocar la pantalla
       tabIndex={0}
       data-autofocus
@@ -912,7 +912,8 @@ export default function KioskAI() {
             { mode: 'caricatura' as Exclude<Mode, null>, on: generalSettings.enableCaricatura !== false, title: 'Caricatura con Messi', text: '¡Festejá con Messi! Tu caricatura con la camiseta argentina.', img: themes.find((t: any) => t.result_style === 'caricatura')?.preview_url || '/modes/caricatura.jpg', icon: Palette, color: '#fb923c', ai: true },
             { mode: 'figuritas' as Exclude<Mode, null>, on: generalSettings.enableFiguritas !== false, title: 'Figurita Mundial 2026', text: 'Tu figurita del álbum con tu cara, tu país, posición y datos.', img: '/modes/figurita.jpg', icon: Sticker, color: '#2dd4bf', ai: true },
           ].filter(m => m.on && isModeAllowed(m.mode)).map(m => (
-            <button key={m.mode} data-autofocus data-remote={m.title} onClick={() => handleModeSelect(m.mode)}
+            <button key={m.mode} data-autofocus data-remote={m.title} data-remote-sub={m.text}
+              data-remote-featured={'featured' in m && m.featured ? '' : undefined} onClick={() => handleModeSelect(m.mode)}
               className="relative group flex flex-col w-full md:w-[calc((100%-2.5rem)/3)] portrait:!w-[calc((100%-1.25rem)/2)] rounded-2xl overflow-hidden border-2 kiosk-glass text-left hover:scale-[1.03] focus:scale-[1.03] focus:outline-none focus:ring-4 focus:ring-white/80 transition-all"
               style={{ borderColor: m.color, ...('featured' in m && m.featured ? { boxShadow: `0 0 0 2px ${m.color}, 0 0 45px -4px ${m.color}` } : {}) }}>
               <div className="relative w-full aspect-[16/10] bg-black/40 overflow-hidden">
@@ -938,7 +939,7 @@ export default function KioskAI() {
   );
 
   if (step === 'getReady') return (
-    <div className="kiosk-root">
+    <div className="kiosk-root" data-remote-watch="¡Preparate! Mirá la pantalla grande">
       <ScreenBackground screen="getReady" />
       <Corners />
       <div className="relative z-10 flex items-center justify-center h-full">
@@ -998,7 +999,8 @@ export default function KioskAI() {
   if (step === 'lookCamera') {
     return (
       <div className="kiosk-root" onClick={shutterMode && cameraReady ? startCountdown : undefined}
-        data-remote={shutterMode && cameraReady ? '📸 Sacar foto' : undefined}>
+        data-remote={shutterMode && cameraReady ? '📸 Sacar foto' : undefined}
+        data-remote-noimg data-remote-watch="¡Mirá a la cámara! 📸">
         <AuroraBackground />
         <Corners />
         <CameraVideo videoRef={videoRef} mirror={!!cameraSettings.mirror} rotation={Number(cameraSettings.rotation) || 0} />
@@ -1022,7 +1024,7 @@ export default function KioskAI() {
   }
 
   if (step === 'countdown') return (
-    <div className="kiosk-root">
+    <div className="kiosk-root" data-remote-watch="¡Sonrían a la cámara! 📸">
       <div className="absolute inset-0 bg-black" />
       <CameraVideo videoRef={videoRef} mirror={!!cameraSettings.mirror} rotation={Number(cameraSettings.rotation) || 0}
         filter={fxEnabled ? fx.filter : undefined} />
@@ -1080,7 +1082,7 @@ export default function KioskAI() {
         {/* La foto tal cual se guarda (el espejo ya está aplicado al sacarla) */}
         {capturedImage && shotsRef.current.length <= 1 && (
           <motion.div className="absolute inset-0" initial={{ scale: 1.08 }} animate={{ scale: 1 }} transition={{ duration: 0.7, ease: 'easeOut' }}>
-            <img src={capturedImage} alt="preview" className="absolute inset-0 w-full h-full object-contain" />
+            <img src={capturedImage} alt="preview" data-remote-image className="absolute inset-0 w-full h-full object-contain" />
           </motion.div>
         )}
         {shotsRef.current.length > 1 && (
@@ -1104,7 +1106,7 @@ export default function KioskAI() {
             ↩ Repetir foto
           </button>
           )}
-          <button data-autofocus onClick={approvePhoto}
+          <button data-autofocus data-remote-primary onClick={approvePhoto}
             className="flex-1 max-w-xs py-5 rounded-2xl carlmarx-bold text-white text-2xl transition-all focus:outline-none focus:ring-4 focus:ring-white/80"
             style={{ background: 'linear-gradient(135deg,#ff2e93,#7b2ff7)', boxShadow: '0 0 40px rgba(255,46,147,0.5)' }}>
             ¡Me gusta! →
@@ -1137,7 +1139,7 @@ export default function KioskAI() {
   );
 
   if (step === 'flashResult') return (
-    <div className="kiosk-root" data-remote="Ver mi foto →" onClick={() => setStep('result')}>
+    <div className="kiosk-root" data-remote="Ver mi foto →" data-remote-noimg data-remote-watch={resultPhrase} onClick={() => setStep('result')}>
       <ScreenBackground screen="reveal" />
       <Corners />
       {capturedImage && (
@@ -1236,7 +1238,7 @@ export default function KioskAI() {
                     <button
                       key={t.id}
                       onClick={() => setSelectedAITheme(t)}
-                      data-remote={`${selectedAITheme?.id === t.id ? '✓ ' : ''}${t.name}`}
+                      data-remote={t.name} data-remote-selected={selectedAITheme?.id === t.id ? '' : undefined}
                       className={`relative rounded-2xl overflow-hidden border-2 transition-all group bg-slate-900 ${isAIGenerating ? 'opacity-50 cursor-not-allowed' : (selectedAITheme?.id === t.id ? 'border-violet-400 scale-[1.03] ring-4 ring-violet-500/20' : 'border-violet-800/40 hover:border-violet-400')}`}
                       style={{ aspectRatio: '3/4' }}
                     >
@@ -1283,7 +1285,7 @@ export default function KioskAI() {
   }
 
   if (step === 'processing') return (
-    <div className="kiosk-root">
+    <div className="kiosk-root" data-remote-watch="Estamos creando tu foto… ¡mirá la pantalla grande!">
       <ScreenBackground screen="processing" />
       <Corners />
       {capturedImage && <img src={capturedImage} className="absolute inset-0 w-full h-full object-cover opacity-10 blur-md grayscale" />}
@@ -1319,7 +1321,7 @@ export default function KioskAI() {
           {/* Photo Preview - ACHICADO PARA QUE ENTREN BOTONES */}
           {/* Se adapta a la hoja: vertical u horizontal */}
           <div className="relative flex-shrink-0 rounded-[2rem] overflow-hidden shadow-[0_0_80px_rgba(139,92,246,0.3)] border border-violet-500/30 group">
-            {capturedImage && <motion.img key={capturedImage} src={capturedImage} alt="result" className="block w-auto h-auto max-h-[45vh] md:max-h-[70vh] portrait:!max-h-[36vh] max-w-[90vw] md:max-w-[55vw] portrait:!max-w-[80vw]" {...revealPhoto} />}
+            {capturedImage && <motion.img key={capturedImage} src={capturedImage} alt="result" data-remote-image className="block w-auto h-auto max-h-[45vh] md:max-h-[70vh] portrait:!max-h-[36vh] max-w-[90vw] md:max-w-[55vw] portrait:!max-w-[80vw]" {...revealPhoto} />}
           </div>
 
           {/* Actions Column */}
