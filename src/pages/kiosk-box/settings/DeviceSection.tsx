@@ -5,7 +5,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import {
-  checkinDevice, getAutostartStatus, getCachedDeviceState, openHomeAppSettings, openStartOnBootSettings,
+  checkinDevice, getAutostartStatus, getTapStabilize, setTapStabilize, getCachedDeviceState, openHomeAppSettings, openStartOnBootSettings,
   renameDevice, setBoxPin, type KioskDeviceState,
 } from '@/lib/kioskDevice';
 import { eventFolder } from '@/lib/kioskStorage';
@@ -92,6 +92,8 @@ export default function DeviceSection() {
       <BluetoothPanel />
 
       <RemoteControlPanel />
+
+      <TouchPanel />
 
       <LitePanel />
 
@@ -220,6 +222,18 @@ function AutostartPanel() {
           "Mostrar sobre otras apps" para EventPix Kiosco.
         </p>
       )}
+    </Panel>
+  );
+}
+
+/** Marco táctil infrarrojo: el toque se toma donde se apoya el dedo. */
+function TouchPanel() {
+  const [on, setOn] = useState(getTapStabilize);
+  if (on === null) return null;
+  return (
+    <Panel title="Marco táctil" description="Los marcos táctiles infrarrojos suelen correr el punto al levantar el dedo y el toque cae fuera del botón. Con esto, el toque se toma donde se apoyó el dedo (deslizar sigue andando).">
+      <Toggle label="Estabilizar toques" hint={on ? 'Activado (recomendado con marco táctil).' : 'Desactivado: los toques llegan tal cual.'}
+        checked={on} onChange={v => { setOn(v); setTapStabilize(v); }} />
     </Panel>
   );
 }

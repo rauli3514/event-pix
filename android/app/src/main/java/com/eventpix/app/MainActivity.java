@@ -10,6 +10,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.webkit.JavascriptInterface;
 
 import com.eventpix.app.net.KioskLinkPlugin;
@@ -31,6 +32,52 @@ public class MainActivity extends BridgeActivity {
     private BluetoothClient bluetoothClient;
     // Disparador Bluetooth: mientras el kiosco lo pide, Volumen +/- y Cámara sacan la foto
     private volatile boolean captureShutter = false;
+
+    // Estabilizador de toques (marcos táctiles infrarrojos): al levantar el dedo el marco
+    // suele mandar un último punto corrido y el toque cae fuera del botón. Mientras el
+    // dedo no se desliza de verdad, todo el toque se toma donde se apoyó.
+    private static final String PREFS = "eventpix_kiosk";
+    private static final String KEY_TAP_STABILIZE = "tap_stabilize";
+    private volatile boolean tapStabilize = true;
+    private boolean stabilizing = false;
+    private float downX, downY;
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        if (!tapStabilize) return super.dispatchTouchEvent(ev);
+        int action = ev.getActionMasked();
+        if (action == MotionEvent.ACTION_DOWN) {
+            downX = ev.getX();
+            downY = ev.getY();
+            stabilizing = true;
+            return super.dispatchTouchEvent(ev);
+        }
+        // Dos dedos (zoom) o un deslizamiento real: se deja pasar tal cual
+        if (action == MotionEvent.ACTION_POINTER_DOWN || ev.getPointerCount() > 1) stabilizing = false;
+        if (stabilizing && (action == MotionEvent.ACTION_MOVE || action == MotionEvent.ACTION_UP)) {
+            float dx = ev.getX() - downX;
+            float dy = ev.getY() - downY;
+            if (action == MotionEvent.ACTION_MOVE && Math.hypot(dx, dy) > slopPx()) {
+                stabilizing = false;
+                return super.dispatchTouchEvent(ev);
+            }
+            // Movimiento chico (o el punto al levantar): se lleva al lugar donde se apoyó
+            MotionEvent fixed = MotionEvent.obtain(ev);
+            fixed.offsetLocation(-dx, -dy);
+            boolean handled = super.dispatchTouchEvent(fixed);
+            fixed.recycle();
+            if (action == MotionEvent.ACTION_UP) stabilizing = false;
+            return handled;
+        }
+        if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) stabilizing = false;
+        return super.dispatchTouchEvent(ev);
+    }
+
+    /** Cuánto se tiene que mover el dedo para que cuente como deslizar (4 % del lado corto). */
+    private float slopPx() {
+        android.util.DisplayMetrics m = getResources().getDisplayMetrics();
+        return Math.min(m.widthPixels, m.heightPixels) * 0.04f;
+    }
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
@@ -55,6 +102,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(KioskNetPlugin.class);
         registerPlugin(KioskLinkPlugin.class);
         super.onCreate(savedInstanceState);
+        tapStabilize = getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(KEY_TAP_STABILIZE, true);
         // Kiosco: la pantalla no se apaga ni entra en protector de Android
         getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         // La página puede fijar su ancho de diseño (vertical: 1080 puntos, ver screenRotation.ts)
@@ -138,6 +186,18 @@ public class MainActivity extends BridgeActivity {
             } catch (Exception e) {
                 openSettings();
             }
+        }
+
+        /** Estabilizador de toques para marcos táctiles (Ajustes → Equipo). Queda guardado. */
+        @JavascriptInterface
+        public void setTapStabilize(boolean on) {
+            tapStabilize = on;
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_TAP_STABILIZE, on).apply();
+        }
+
+        @JavascriptInterface
+        public boolean getTapStabilize() {
+            return tapStabilize;
         }
 
         /** El kiosco pide (o suelta) las teclas del disparador Bluetooth. */
