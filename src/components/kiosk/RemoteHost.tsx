@@ -1,11 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { getGeneralSettings } from '@/lib/kioskSettings';
-import { KioskLink, linkAvailable, REMOTE_HOST_EVENT, runCommand, snapshotView, type RemoteCommand } from '@/lib/kioskLink';
+import { KioskLink, linkAvailable, REMOTE_HOST_EVENT, type RemoteCommand, type RemoteView } from '@/lib/kioskLink';
+import { runCommand, snapshotView, thumbnail } from '@/lib/kioskLinkHost';
 
 // Pantalla del kiosco manejada desde una tablet por Bluetooth (Ajustes → Equipo →
-// Control con tablet). Escucha a la tablet, le manda lo que hay en pantalla cada vez
-// que cambia y aprieta lo que la tablet toca. No dibuja nada.
+// Control con tablet). Escucha a la tablet (app EventPix Control), le manda lo que hay
+// en pantalla cada vez que cambia, con las miniaturas que todavía no tiene, y aprieta
+// lo que la tablet toca. No dibuja nada.
+
+/** Lado más largo de las miniaturas: tarjetas y foto grande */
+const CARD_PX = 360;
+const PHOTO_PX = 900;
 
 const KIOSK_PATH = /^\/(box|kiosco)(\/|$)/;
 const inFrame = (() => { try { return window.self !== window.top; } catch { return true; } })();
@@ -36,13 +42,43 @@ export default function RemoteHost() {
     let connected = false;
     let last = '';
     let timer = 0;
+    // Miniaturas que la tablet ya tiene (en esta conexión), y la cola para mandar de a una
+    let sent = new Set<string>();
+    let queue: { key: string; px: number }[] = [];
+    let sending = false;
+    const pump = async () => {
+      if (sending) return;
+      sending = true;
+      while (connected && queue.length) {
+        const { key, px } = queue.shift()!;
+        if (sent.has(key)) continue;
+        const data = await thumbnail(key, px);
+        sent.add(key);
+        if (!data || !connected) continue;
+        await KioskLink.send({ data: JSON.stringify({ t: 'img', key, data }) }).catch(() => {});
+      }
+      sending = false;
+    };
+    const sendImages = (view: RemoteView) => {
+      // La foto grande primero: es lo que el invitado espera ver
+      const wanted = [
+        ...(view.image ? [{ key: view.image, px: PHOTO_PX }] : []),
+        ...view.items.filter(i => i.img).map(i => ({ key: i.img!, px: CARD_PX })),
+      ].filter(w => !sent.has(w.key) && !queue.some(q => q.key === w.key));
+      if (!wanted.length) return;
+      queue = [...wanted, ...queue];
+      void pump();
+    };
     const send = (force = false) => {
       if (!connected) return;
-      const data = JSON.stringify(snapshotView());
+      const view = snapshotView();
+      const data = JSON.stringify(view);
       if (!force && data === last) return;
       last = data;
       KioskLink.send({ data }).catch(() => { /* se reconecta sola */ });
+      sendImages(view);
     };
+    const restart = () => { last = ''; sent = new Set(); queue = []; };
     // Lo que cambia en pantalla se manda agrupado (como mucho cada 0,4 s)
     const schedule = () => {
       if (timer) return;
@@ -55,12 +91,13 @@ export default function RemoteHost() {
     const handles = [
       KioskLink.addListener('linkState', e => {
         connected = e.state === 'connected';
-        if (connected) { last = ''; window.setTimeout(() => send(true), 300); }
+        if (connected) { restart(); window.setTimeout(() => send(true), 300); }
       }),
       KioskLink.addListener('linkMessage', e => {
         try {
           const cmd = JSON.parse(e.data) as RemoteCommand;
-          if (cmd.t === 'hello') { last = ''; send(true); return; }
+          // La tablet (re)conectada no tiene ninguna imagen
+          if (cmd.t === 'hello') { restart(); send(true); return; }
           runCommand(cmd);
           window.setTimeout(() => send(), 250);
         } catch { /* mensaje inválido */ }

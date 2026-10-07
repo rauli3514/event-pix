@@ -14,7 +14,6 @@ import {
 import { getGeneralSettings, getSectionLock } from '@/lib/kioskSettings';
 import { isSupabaseConfigured, supabaseProjectRef } from '@/lib/supabase';
 import { startDriveSync } from '@/lib/driveBackup';
-import { getDeviceRole } from '@/lib/kioskLink';
 import WifiIndicator, { BluetoothIndicator } from '@/components/kiosk/WifiIndicator';
 
 // Inicio de la app "EventPix Kiosco" en la TV box: sin login. Si el equipo no
@@ -39,10 +38,6 @@ function useClock() {
 
 export default function KioskBox() {
   const navigate = useNavigate();
-  // Este equipo es la tablet que maneja otra pantalla: va directo al control
-  useEffect(() => {
-    if (getDeviceRole() === 'remote') navigate('/control', { replace: true });
-  }, [navigate]);
   const [device, setDevice] = useState<KioskDeviceState | null>(() => getCachedDeviceState());
   const [offline, setOffline] = useState(false);
   // Motivo real de la falla (sin internet, sin configurar o error del servidor)
