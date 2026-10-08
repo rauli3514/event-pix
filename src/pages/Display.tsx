@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { useEvent } from "@/context/EventContext";
 import { useEventSettings } from "@/hooks/use-event-settings";
 import { GridTemplate } from "@/components/display/GridTemplate";
 import { SlideshowTemplate } from "@/components/display/SlideshowTemplate";
 import { MasonryTemplate } from "@/components/display/MasonryTemplate";
+import { NewPhotoSpotlight } from "@/components/display/NewPhotoSpotlight";
 import { PhotoVoteDisplayOverlay } from "@/components/photovote/PhotoVoteDisplayOverlay";
 import { TriviaDisplayOverlay } from "@/components/trivia/TriviaDisplayOverlay";
 import { Button } from "@/components/ui/button";
@@ -10,6 +12,7 @@ import { Button } from "@/components/ui/button";
 const Display = () => {
     const { event, isLoading: eventLoading } = useEvent();
     const { data: settings, isLoading: settingsLoading } = useEventSettings(event?.id);
+    const [spotlightActive, setSpotlightActive] = useState(false);
 
     if (eventLoading || settingsLoading) {
         return (
@@ -48,8 +51,11 @@ const Display = () => {
     return (
         <div className="absolute inset-0 w-full h-full bg-slate-950 text-white overflow-hidden">
             {template === 'grid' && <GridTemplate eventId={event.id} />}
-            {template === 'slideshow' && <SlideshowTemplate eventId={event.id} />}
+            {template === 'slideshow' && <SlideshowTemplate eventId={event.id} paused={spotlightActive} />}
             {template === 'masonry' && <MasonryTemplate eventId={event.id} />}
+
+            {/* Foto o mensaje recién aprobado, en grande (queda debajo de los juegos) */}
+            <NewPhotoSpotlight eventId={event.id} onActiveChange={setSpotlightActive} />
 
             {/* Overlays para juegos dinámicos */}
             <PhotoVoteDisplayOverlay eventId={event.id} />

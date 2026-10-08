@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { useState, useRef, useEffect } from "react";
 import { Mic, Square, Play, Send, CheckCircle2, Trash2 } from "lucide-react";
 import { useSubmissions } from "@/hooks/use-submissions";
+import { getGuestName, saveGuestName } from "@/lib/guestSubmissions";
 
 interface AudioRecorderModalProps {
     open: boolean;
@@ -22,7 +23,7 @@ export const AudioRecorderModal = ({ open, onOpenChange, eventId }: AudioRecorde
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
     const [audioUrl, setAudioUrl] = useState<string | null>(null);
     const [recordingTime, setRecordingTime] = useState(0);
-    const [name, setName] = useState("");
+    const [name, setName] = useState(getGuestName);
     const [showSuccess, setShowSuccess] = useState(false);
 
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -100,11 +101,12 @@ export const AudioRecorderModal = ({ open, onOpenChange, eventId }: AudioRecorde
         // Convert Blob to File
         const file = new File([audioBlob], `audio_message.webm`, { type: 'audio/webm' });
 
+        saveGuestName(name);
         createSubmission.mutate({
             type: 'audio',
             content: '', // Will be filled by hook with URL
             file: file,
-            author: name || 'Invitado'
+            author: name.trim() || undefined
         }, {
             onSuccess: () => {
                 setShowSuccess(true);
