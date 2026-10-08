@@ -465,9 +465,15 @@ export default function KioskAI() {
 
   // Disparador Bluetooth: en "Mirá a la cámara" la foto arranca con el botón (o tocando la pantalla)
   const shutterMode = !!generalSettings.bluetoothShutter;
-  useShutter(() => { if (cameraReady) startCountdown(); }, step === 'lookCamera' && (shutterMode || fxEnabled));
-  // En la bienvenida el disparador hace lo mismo que tocar la pantalla
-  useShutter(() => handleSplashTap(), step === 'splash' && shutterMode);
+  // Con el disparador activado se toma el botón en todas las pantallas (así nunca cambia
+  // el volumen) y hace la acción principal de cada una: empezar, sacar la foto, "¡Me gusta!"
+  // y pasar a la foto final. En las demás no hace nada.
+  useShutter(() => {
+    if (step === 'splash') handleSplashTap();
+    else if (step === 'lookCamera') { if (cameraReady) startCountdown(); }
+    else if (step === 'photoPreview') void approvePhoto();
+    else if (step === 'flashResult') setStep('result');
+  }, shutterMode || (step === 'lookCamera' && fxEnabled));
   // Tomas sin efecto, para el respaldo de originales
   const rawShotsRef = useRef<string[]>([]);
 
