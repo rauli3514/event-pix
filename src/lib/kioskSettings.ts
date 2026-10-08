@@ -29,6 +29,8 @@ export interface KioskGeneralSettings {
   shotPause?: number;
   /** Tira doble (dos tiras iguales para cortar al medio) */
   photoStrips?: boolean;
+  /** Varias fotos: 'full' (por defecto) cada una entera sin recortar; 'fill' llenan su lugar recortando */
+  photoFit?: 'full' | 'fill';
   /** Hay una imagen de fondo para la hoja impresa (guardada en el equipo) */
   pageBackground?: boolean;
   /** Subir también a Supabase para el QR (si no, el QR usa Drive) */
@@ -121,6 +123,9 @@ export interface KioskCameraSettings {
   rotation?: number;
   /** Resolución pedida a la webcam ('auto' = la más alta que dé) */
   quality?: 'auto' | '1080' | '720' | '480';
+  /** Enfoque: automático, fijo lejos (no "busca" con poca luz) o fijo a mano (focusPos 0 = cerca, 1 = lejos) */
+  focus?: 'auto' | 'far' | 'manual';
+  focusPos?: number;
   /** Segundos de cuenta regresiva */
   timer?: number;
   [key: string]: unknown;

@@ -22,6 +22,8 @@ export interface LayoutOptions {
   guestName?: string;
   /** Imagen de fondo de la hoja (detrás de las fotos) */
   background?: string | null;
+  /** Varias fotos: 'full' = cada una entera con su forma (sin recortar); 'fill' = llenan su lugar (recorta) */
+  photoFit?: 'full' | 'fill';
 }
 
 const LONG = 1800;
@@ -36,23 +38,36 @@ function autoOrientation(imgs: HTMLImageElement[]): 'portrait' | 'landscape' {
   return wide ? 'landscape' : 'portrait';
 }
 
-/** Celdas de una cuadrícula para n fotos dentro de un área. */
-function grid(area: Rect, n: number, orientation: 'portrait' | 'landscape', gap: number): Rect[] {
+/**
+ * Celdas de una cuadrícula para n fotos dentro de un área. Con `aspect` (ancho/alto de
+ * la foto) las celdas toman la forma de la foto, así se ve entera sin recortar, y el
+ * bloque queda centrado (o arriba, con align 'start').
+ */
+function grid(area: Rect, n: number, orientation: 'portrait' | 'landscape' | 'column', gap: number, aspect?: number, align: 'center' | 'start' = 'center'): Rect[] {
   let cols = 1;
   let rows = 1;
-  if (n === 2 || n === 3) {
+  // Tira: siempre una debajo de la otra
+  if (orientation === 'column') rows = n;
+  else if (n === 2 || n === 3) {
     if (orientation === 'portrait') rows = n; else cols = n;
   } else if (n >= 4) {
     cols = 2;
     rows = Math.ceil(n / 2);
   }
-  const w = (area.w - gap * (cols - 1)) / cols;
-  const h = (area.h - gap * (rows - 1)) / rows;
+  let w = (area.w - gap * (cols - 1)) / cols;
+  let h = (area.h - gap * (rows - 1)) / rows;
+  let x0 = area.x;
+  let y0 = area.y;
+  if (aspect) {
+    if (w / h > aspect) w = h * aspect; else h = w / aspect;
+    x0 += (area.w - (cols * w + gap * (cols - 1))) / 2;
+    if (align === 'center') y0 += (area.h - (rows * h + gap * (rows - 1))) / 2;
+  }
   const cells: Rect[] = [];
   for (let i = 0; i < n; i++) {
     const c = i % cols;
     const r = Math.floor(i / cols);
-    cells.push({ x: area.x + c * (w + gap), y: area.y + r * (h + gap), w, h });
+    cells.push({ x: x0 + c * (w + gap), y: y0 + r * (h + gap), w, h });
   }
   return cells;
 }
@@ -66,7 +81,7 @@ interface PagePlan {
   captions: Rect[];
 }
 
-function planPage(n: number, orientation: 'portrait' | 'landscape', strips: boolean, caption: boolean, k = 1): PagePlan {
+function planPage(n: number, orientation: 'portrait' | 'landscape', strips: boolean, caption: boolean, k = 1, aspect?: number): PagePlan {
   const W = orientation === 'portrait' ? SHORT : LONG;
   const H = orientation === 'portrait' ? LONG : SHORT;
   const margin = 64 * k;
@@ -81,15 +96,20 @@ function planPage(n: number, orientation: 'portrait' | 'landscape', strips: bool
     const captions: Rect[] = [];
     for (let col = 0; col < 2; col++) {
       const area = { x: col * colW + margin * 0.6, y: margin * 0.8, w: colW - margin * 1.2, h: H - margin * 1.6 - capH - (caption ? gap : 0) };
-      grid(area, n, 'portrait', gap * 0.7).forEach((cell, i) => { slots.push(cell); photoIndex.push(i); });
-      if (caption) captions.push({ x: area.x, y: area.y + area.h + gap * 0.5, w: area.w, h: capH });
+      const cells = grid(area, n, aspect ? 'column' : 'portrait', gap * 0.7, aspect, 'start');
+      // Fotos enteras: las fotos y el nombre van juntos, centrados en la tira
+      const photosH = Math.max(...cells.map(c => c.y + c.h)) - area.y;
+      const groupH = photosH + (caption ? gap * 0.5 + capH : 0);
+      const shift = aspect ? (H - margin * 1.6 - groupH) / 2 : 0;
+      cells.forEach((cell, i) => { slots.push({ ...cell, y: cell.y + shift }); photoIndex.push(i); });
+      if (caption) captions.push({ x: area.x, y: aspect ? area.y + shift + photosH + gap * 0.5 : area.y + area.h + gap * 0.5, w: area.w, h: capH });
     }
     return { width: W, height: H, slots, photoIndex, captions };
   }
 
   const capH = caption ? (orientation === 'portrait' ? 300 : 230) * k : 0;
   const area = { x: margin, y: margin, w: W - margin * 2, h: H - margin * 2 - capH + (caption ? margin : 0) };
-  const slots = grid(area, n, orientation, gap);
+  const slots = grid(area, n, orientation, gap, aspect);
   const captions = caption ? [{ x: margin, y: H - capH, w: W - margin * 2, h: capH - margin * 0.4 }] : [];
   return { width: W, height: H, slots, photoIndex: slots.map((_, i) => i), captions };
 }
@@ -104,6 +124,8 @@ export async function composePhotos(photoSrcs: string[], options: LayoutOptions)
   if (!imgs.length) throw new Error('No hay fotos para armar');
   const n = imgs.length;
   const strips = !!options.strips && n > 1;
+  // Fotos enteras: las celdas toman la forma de la cámara (no con un marco PNG, que tiene sus ventanas)
+  const aspect = n > 1 && options.photoFit !== 'fill' ? imgs[0].width / imgs[0].height : undefined;
   const bgImg = options.background ? await loadPhoto(options.background).catch(() => null) : null;
   const subtitle = options.subtitle;
   // El nombre del invitado va como firma sobre la foto, igual con cualquier marco
@@ -115,7 +137,7 @@ export async function composePhotos(photoSrcs: string[], options: LayoutOptions)
     const orientation = strips ? 'portrait'
       : options.orientation && options.orientation !== 'auto' ? options.orientation : autoOrientation(imgs);
     const caption = !!(options.title || subtitle);
-    const plan = planPage(n, orientation, strips, caption);
+    const plan = planPage(n, orientation, strips, caption, 1, aspect);
     const canvas = await drawGlassPage(plan.photoIndex.map(i => imgs[i]), {
       width: plan.width,
       height: plan.height,
@@ -143,7 +165,7 @@ export async function composePhotos(photoSrcs: string[], options: LayoutOptions)
   if (bgImg) {
     // Fondo propio: las fotos van sobre la imagen; el PNG (si hay) encima de todo
     const caption = !frameImg && !!(options.title || subtitle);
-    const plan = planPage(n, orientation, strips, caption);
+    const plan = planPage(n, orientation, strips, caption, 1, frameImg ? undefined : aspect);
     const page = await drawGlassPage(plan.photoIndex.map(i => imgs[i]), {
       width: W, height: H, slots: plan.slots, captions: plan.captions,
       fit: n === 1 ? 'contain' : 'cover', background: bgImg,
@@ -194,7 +216,7 @@ export async function composePhotos(photoSrcs: string[], options: LayoutOptions)
   } else {
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, W, H);
-    const plan = planPage(n, orientation, strips, false);
+    const plan = planPage(n, orientation, strips, false, 1, frameImg ? undefined : aspect);
     plan.slots.forEach((slot, i) => drawCover(ctx, imgs[plan.photoIndex[i]], slot.x, slot.y, slot.w, slot.h));
     signArea = plan.slots.filter((_, i) => signatureSlots(plan.photoIndex, n).includes(i));
     if (!frameImg && (options.title || options.subtitle)) {

@@ -72,7 +72,7 @@ export default function PhotoLayoutPanel() {
         const landscape = rot !== 90 && rot !== 270;
         const photos = await Promise.all(SAMPLES.slice(0, shots).map(s => cameraLike(s, landscape)));
         const out = await composePhotos(photos, {
-          frame: getFrameUrl(), orientation, strips,
+          frame: getFrameUrl(), orientation, strips, photoFit: settings.photoFit === 'fill' ? 'fill' : 'full',
           guestName: settings.askGuestName ? 'Sofi y Juan' : undefined,
           background: settings.pageBackground ? await getPageBackground() : null,
           title: settings.eventTitle || undefined, subtitle: settings.frameSubtitle || undefined,
@@ -83,7 +83,7 @@ export default function PhotoLayoutPanel() {
       }
     }, 250);
     return () => { alive = false; window.clearTimeout(t); };
-  }, [shots, orientation, strips, settings.eventTitle, settings.frameSubtitle, settings.askGuestName, settings.pageBackground, bgName, frameVersion]);
+  }, [shots, orientation, strips, settings.photoFit, settings.eventTitle, settings.frameSubtitle, settings.askGuestName, settings.pageBackground, bgName, frameVersion]);
 
   return (
     <Panel title="Diseño de la foto" description="Cómo se arma la hoja de 10×15 en la experiencia Fotos. En automático, una foto apaisada usa la hoja horizontal y se ve entera; con la cámara girada (Ajustes → Cámara) la hoja queda vertical.">
@@ -103,6 +103,11 @@ export default function PhotoLayoutPanel() {
             <Choice label="Pausa entre fotos (para prepararse)" value={Number(settings.shotPause) || 10}
               options={[5, 10, 15, 20].map(v => ({ value: v, label: `${v} s` }))}
               onChange={shotPause => update({ shotPause })} />
+          )}
+          {shots > 1 && (
+            <Toggle label="Fotos enteras (sin recortar)"
+              hint={settings.photoFit === 'fill' ? 'Apagado: cada foto llena su lugar y se recortan los costados (parece más zoom).' : 'Se ve todo lo que toma la cámara; cada foto mantiene su forma. Con un marco PNG se usan las ventanas del marco.'}
+              checked={settings.photoFit !== 'fill'} onChange={v => update({ photoFit: v ? 'full' : 'fill' })} />
           )}
           {shots > 1 && (
             <Toggle label="Tira doble" hint="Dos tiras iguales con las fotos una debajo de otra: se corta al medio y se lleva una cada uno."

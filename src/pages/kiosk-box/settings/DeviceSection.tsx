@@ -5,7 +5,8 @@ import { QRCodeSVG } from 'qrcode.react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import {
-  checkinDevice, getAutostartStatus, getCachedDeviceState, openHomeAppSettings, openStartOnBootSettings,
+  calibrateTouch, canCalibrateTouch, checkinDevice, getAutostartStatus, getTapStabilize, isTouchCalibrated,
+  resetTouchCalibration, setTapStabilize, TOUCH_CALIBRATED_EVENT, getCachedDeviceState, openHomeAppSettings, openStartOnBootSettings,
   renameDevice, setBoxPin, type KioskDeviceState,
 } from '@/lib/kioskDevice';
 import { eventFolder } from '@/lib/kioskStorage';
@@ -92,6 +93,8 @@ export default function DeviceSection() {
       <BluetoothPanel />
 
       <RemoteControlPanel />
+
+      <TouchPanel />
 
       <LitePanel />
 
@@ -220,6 +223,43 @@ function AutostartPanel() {
           "Mostrar sobre otras apps" para EventPix Kiosco.
         </p>
       )}
+    </Panel>
+  );
+}
+
+/** Marco táctil infrarrojo: el toque se toma donde se apoya el dedo. */
+function TouchPanel() {
+  const [on, setOn] = useState(getTapStabilize);
+  const [calibrated, setCalibrated] = useState(isTouchCalibrated);
+  useEffect(() => {
+    const done = (e: Event) => {
+      setCalibrated(isTouchCalibrated());
+      if ((e as CustomEvent).detail) toast.success('Pantalla táctil calibrada');
+      else toast.error('No salió bien: probá de nuevo tocando justo el centro de cada cruz');
+    };
+    window.addEventListener(TOUCH_CALIBRATED_EVENT, done);
+    return () => window.removeEventListener(TOUCH_CALIBRATED_EVENT, done);
+  }, []);
+  if (on === null) return null;
+  return (
+    <Panel title="Marco táctil" description="Si el toque cae corrido, primero revisá que la tele no agrande la imagen (Imagen → Tamaño → Ajuste de pantalla / Just Scan / Píxel a píxel). Si sigue corrido, calibrá: aparece una cruz en cada esquina y tocás el centro de cada una.">
+      {canCalibrateTouch() && (
+        <>
+          <div className={`flex items-center gap-3 rounded-2xl px-5 py-4 ${calibrated ? 'bg-emerald-500/15 text-emerald-200' : 'bg-black/20 text-white/80'}`}>
+            <p className="text-lg font-semibold">{calibrated ? 'Calibrada' : 'Sin calibrar'}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <button onClick={calibrateTouch} className={primaryClass}>Calibrar pantalla táctil</button>
+            {calibrated && (
+              <button onClick={() => { resetTouchCalibration(); setCalibrated(false); toast.success('Calibración borrada'); }} className={buttonClass}>
+                Borrar calibración
+              </button>
+            )}
+          </div>
+        </>
+      )}
+      <Toggle label="Estabilizar toques" hint={on ? 'El toque se toma donde se apoyó el dedo y se ignoran los toques dobles (rebote del marco).' : 'Desactivado: los toques llegan tal cual.'}
+        checked={on} onChange={v => { setOn(v); setTapStabilize(v); }} />
     </Panel>
   );
 }
