@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { useSubmissions } from "@/hooks/use-submissions";
 import { useEventSettings } from "@/hooks/use-event-settings";
 import { useEvent } from "@/context/EventContext";
@@ -8,12 +8,15 @@ import { Play, Pause, Camera, MessageSquare, Repeat, QrCode, SkipForward } from 
 import { Button } from "@/components/ui/button";
 import confetti from 'canvas-confetti';
 import { supabase } from "@/lib/supabase";
+import { isAnonymousAuthor } from "@/lib/guestSubmissions";
 
 interface SlideshowTemplateProps {
     eventId?: string;
+    /** Pausa el carrusel mientras se destaca una foto nueva encima */
+    paused?: boolean;
 }
 
-export const SlideshowTemplate = ({ eventId }: SlideshowTemplateProps) => {
+export const SlideshowTemplate = ({ eventId, paused = false }: SlideshowTemplateProps) => {
     const { submissions } = useSubmissions(eventId);
     const { data: settings } = useEventSettings(eventId);
     const { event } = useEvent();
@@ -186,7 +189,7 @@ export const SlideshowTemplate = ({ eventId }: SlideshowTemplateProps) => {
 
     // Lógica del Carrusel
     useEffect(() => {
-        if (approvedContent.length > 0 && mode === 'carousel' && isPlaying) {
+        if (approvedContent.length > 0 && mode === 'carousel' && isPlaying && !paused) {
             // Cambiar animación al azar en cada cambio de foto
             const animations = ["animate-ken-burns-in", "animate-ken-burns-out", "animate-ken-burns-pan"];
             setAnimationClass(animations[Math.floor(Math.random() * animations.length)]);
@@ -212,7 +215,7 @@ export const SlideshowTemplate = ({ eventId }: SlideshowTemplateProps) => {
             }, intervalMs);
             return () => clearInterval(interval);
         }
-    }, [approvedContent.length, mode, maxLoops, intervalMs, isPlaying, isInfiniteLoop]);
+    }, [approvedContent.length, mode, maxLoops, intervalMs, isPlaying, isInfiniteLoop, paused]);
 
     // Auto-reinicio si llegan fotos nuevas
     useEffect(() => {
@@ -234,6 +237,19 @@ export const SlideshowTemplate = ({ eventId }: SlideshowTemplateProps) => {
     }
 
     const currentItem = approvedContent[currentIndex];
+
+    // Las fotos nuevas entran al principio de la lista y corren los índices:
+    // seguimos mostrando la misma foto en vez de saltar a otra de golpe.
+    const currentIdRef = useRef<string | undefined>(undefined);
+    useLayoutEffect(() => {
+        const id = currentIdRef.current;
+        if (!id) return;
+        const idx = approvedContent.findIndex(s => s.id === id);
+        if (idx !== -1 && idx !== currentIndex) setCurrentIndex(idx);
+    }, [approvedContent]); // eslint-disable-line react-hooks/exhaustive-deps
+    useEffect(() => {
+        currentIdRef.current = currentItem?.id;
+    }, [currentItem?.id]);
 
     // Construir URL correcta para el QR usando el slug del evento
     const appUrl = useMemo(() => {
@@ -275,11 +291,18 @@ export const SlideshowTemplate = ({ eventId }: SlideshowTemplateProps) => {
                             />
                         </div>
 
-                        {/* Autor de la foto - Estilo Flotante Minimalista */}
-                        {currentItem.author && (
-                            <div className="absolute bottom-8 right-8 z-30 bg-black/40 backdrop-blur-xl px-4 py-2 rounded-full border border-white/5 flex items-center gap-2 animate-fade-in shadow-lg group">
-                                <Camera className="w-4 h-4 text-white/80" />
-                                <span className="text-white/90 font-medium tracking-wide">{currentItem.author}</span>
+                        {/* Autor y dedicatoria - Estilo Flotante Minimalista */}
+                        {(!isAnonymousAuthor(currentItem.author) || currentItem.caption) && (
+                            <div className="absolute bottom-8 right-8 z-30 max-w-[60vw] bg-black/40 backdrop-blur-xl px-5 py-3 rounded-3xl border border-white/5 animate-fade-in shadow-lg group">
+                                {!isAnonymousAuthor(currentItem.author) && (
+                                    <div className="flex items-center gap-2">
+                                        <Camera className="w-5 h-5 text-white/80" />
+                                        <span className="text-white/90 text-xl font-semibold tracking-wide">{currentItem.author}</span>
+                                    </div>
+                                )}
+                                {currentItem.caption && (
+                                    <p className="mt-1 text-white/85 text-lg italic line-clamp-2">“{currentItem.caption}”</p>
+                                )}
                             </div>
                         )}
                     </div>
@@ -296,7 +319,7 @@ export const SlideshowTemplate = ({ eventId }: SlideshowTemplateProps) => {
                             <p className="text-4xl md:text-6xl lg:text-7xl font-serif text-white leading-tight drop-shadow-2xl font-medium italic">
                                 "{currentItem.content}"
                             </p>
-                            {currentItem.author && (
+                            {!isAnonymousAuthor(currentItem.author) && (
                                 <div className="mt-12 flex items-center justify-center gap-3 opacity-80">
                                     <div className="h-1 w-12 bg-violet-400 rounded-full"></div>
                                     <p className="text-2xl md:text-3xl text-violet-200 font-light tracking-widest uppercase">

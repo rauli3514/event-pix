@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { useState, useRef } from "react";
 import { Upload, X, Camera, CheckCircle2, Loader2 } from "lucide-react";
 import { useSubmissions } from "@/hooks/use-submissions";
+import { getGuestName, saveGuestName } from "@/lib/guestSubmissions";
 
 interface UploadModalProps {
     open: boolean;
@@ -25,6 +26,8 @@ export const UploadModal = ({ open, onOpenChange, eventId, onSuccess }: UploadMo
     const [file, setFile] = useState<File | null>(null);
     const [showSuccess, setShowSuccess] = useState(false);
     const [isCompressing, setIsCompressing] = useState(false);
+    const [name, setName] = useState(getGuestName);
+    const [caption, setCaption] = useState("");
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -108,12 +111,14 @@ export const UploadModal = ({ open, onOpenChange, eventId, onSuccess }: UploadMo
 
         // Guardar referencia local
         const uploadedPhotoUrl = preview;
+        saveGuestName(name);
 
         createSubmission.mutate({
             type: 'photo',
             content: preview,
             file: file || undefined,
-            author: 'Invitado'
+            author: name.trim() || undefined,
+            caption: caption.trim() || undefined
         }, {
             onSuccess: (data) => {
                 setShowSuccess(true);
@@ -127,12 +132,12 @@ export const UploadModal = ({ open, onOpenChange, eventId, onSuccess }: UploadMo
                     setShowSuccess(false);
                     setPreview(null);
                     setFile(null);
+                    setCaption("");
                     onOpenChange(false);
-                }, 2500);
+                }, 3500);
             },
             onError: (err: any) => {
                 console.error("Failed to submit photo", err);
-                toast.error(err.message || 'Error al enviar foto. Intenta otra vez o con otra foto.');
             }
         });
     };
@@ -148,8 +153,10 @@ export const UploadModal = ({ open, onOpenChange, eventId, onSuccess }: UploadMo
                                 <CheckCircle2 className="h-12 w-12 text-green-500" />
                             </div>
                             <div className="space-y-2">
-                                <h3 className="text-2xl font-bold text-foreground">¡Foto Enviada!</h3>
-                                <p className="text-muted-foreground">Tu foto aparecerá en pantalla pronto.</p>
+                                <h3 className="text-2xl font-bold text-foreground">¡Foto enviada! 🎉</h3>
+                                <p className="text-muted-foreground">
+                                    Apenas salga en la pantalla grande te avisamos acá. ¡Atento! 👀
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -200,6 +207,26 @@ export const UploadModal = ({ open, onOpenChange, eventId, onSuccess }: UploadMo
                                 />
                             </div>
 
+                            {preview && (
+                                <div className="grid gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                    <Input
+                                        value={name}
+                                        onChange={(e) => setName(e.target.value)}
+                                        placeholder="Tu nombre (sale en la pantalla)"
+                                        maxLength={40}
+                                        autoComplete="given-name"
+                                        className="h-12 text-base bg-white text-slate-900 placeholder:text-slate-400 border-slate-300"
+                                    />
+                                    <Input
+                                        value={caption}
+                                        onChange={(e) => setCaption(e.target.value)}
+                                        placeholder="Dedicatoria (opcional): ¡Felicidades Caro! 💖"
+                                        maxLength={80}
+                                        className="h-12 text-base bg-white text-slate-900 placeholder:text-slate-400 border-slate-300"
+                                    />
+                                </div>
+                            )}
+
                             <Button
                                 onClick={handleSubmit}
                                 disabled={!preview || isCompressing || createSubmission.isPending}
@@ -218,7 +245,7 @@ export const UploadModal = ({ open, onOpenChange, eventId, onSuccess }: UploadMo
                                 ) : (
                                     <>
                                         <Camera className="mr-2 h-5 w-5" />
-                                        Enviar Foto
+                                        Mandar a la pantalla
                                     </>
                                 )}
                             </Button>

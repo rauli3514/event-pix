@@ -6,6 +6,7 @@ export interface Submission {
     type: 'photo' | 'message' | 'audio';
     content: string;
     author?: string;
+    caption?: string | null;
     status: SubmissionStatus;
     in_album?: boolean;
     event_id?: string;

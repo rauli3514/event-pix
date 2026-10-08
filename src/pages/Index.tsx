@@ -9,6 +9,7 @@ import { TermsModal } from "@/components/TermsModal";
 import { ChallengeRoulette } from "@/components/ChallengeRoulette";
 import { SplashScreen } from "@/components/SplashScreen";
 import { PhotoBoothModal } from "@/components/PhotoBoothModal";
+import { OnScreenNotice } from "@/components/OnScreenNotice";
 import { TriviaGuestView } from "@/components/trivia/TriviaGuestView";
 import { PhotoBattleView } from "@/components/photovote/PhotoBattleView";
 import { useEventSettings } from "@/hooks/use-event-settings";
@@ -190,6 +191,7 @@ const Index = () => {
                     <MessageModal open={messageOpen} onOpenChange={setMessageOpen} eventId={event.id} />
                     <AudioRecorderModal open={audioOpen} onOpenChange={setAudioOpen} eventId={event.id} />
                     <ChallengeRoulette onOpenCamera={() => setUploadOpen(true)} />
+                    <OnScreenNotice eventId={event.id} />
 
                     {/* Photo Booth Modal */}
                     {uploadedPhotoUrl && (

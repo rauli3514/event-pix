@@ -48,6 +48,9 @@ export const SubmissionCard = ({ item }: SubmissionCardProps) => {
             </div>
 
             <CardContent className="p-4 space-y-3">
+                {item.caption && (
+                    <p className="text-sm text-slate-200 italic line-clamp-3">“{item.caption}”</p>
+                )}
                 <div className="flex items-center justify-between text-xs text-slate-500">
                     <span className="flex items-center gap-1">
                         <User className="w-3 h-3" />

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Bot, X, Send, Sparkles, AlertCircle } from 'lucide-react';
+import { Bot, X, Send, Sparkles } from 'lucide-react';
 import { useAIAssistant } from '@/hooks/useAIAssistant';
 import { AIActionCard } from './AIActionCard';
 import ReactMarkdown from 'react-markdown';
@@ -135,13 +135,6 @@ export function AIAssistantPanel({ isOpen, onClose }: AIAssistantPanelProps) {
                     </div>
                 )}
                 
-                {!import.meta.env.VITE_OPENAI_KEY_B64 && (
-                    <div className="mb-3 text-xs bg-rose-50 text-rose-600 p-2 rounded flex gap-2 items-start">
-                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                        <span>Para que el asistente funcione necesitas configurar una API Key de OpenAI (VITE_OPENAI_KEY_B64) en tus variables de entorno.</span>
-                    </div>
-                )}
-
                 <form onSubmit={handleSubmit} className="relative flex items-center">
                     <input
                         type="text"

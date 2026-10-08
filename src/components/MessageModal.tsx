@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { Send, CheckCircle2 } from "lucide-react";
 import { useSubmissions } from "@/hooks/use-submissions";
+import { getGuestName, saveGuestName } from "@/lib/guestSubmissions";
 
 interface MessageModalProps {
     open: boolean;
@@ -20,23 +21,23 @@ interface MessageModalProps {
 export const MessageModal = ({ open, onOpenChange, eventId }: MessageModalProps) => {
     const { createSubmission } = useSubmissions(eventId);
     const [message, setMessage] = useState("");
-    const [name, setName] = useState("");
+    const [name, setName] = useState(getGuestName);
     const [showSuccess, setShowSuccess] = useState(false);
 
     const handleSubmit = () => {
         if (!message.trim()) return;
 
+        saveGuestName(name);
         createSubmission.mutate({
             type: 'message',
             content: message,
-            author: name || 'Invitado'
+            author: name.trim() || undefined
         }, {
             onSuccess: () => {
                 setShowSuccess(true);
                 setTimeout(() => {
                     setShowSuccess(false);
                     setMessage("");
-                    setName("");
                     onOpenChange(false);
                 }, 2500);
             }
