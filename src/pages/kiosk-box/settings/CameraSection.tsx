@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Camera, RefreshCw } from 'lucide-react';
-import { describeStream, listCameras, openCameraStream, stopStream, type CameraOption } from '@/lib/kioskCamera';
+import { applyFocus, describeStream, focusSupport, listCameras, openCameraStream, stopStream, type CameraOption } from '@/lib/kioskCamera';
 import { getCameraSettings, getGeneralSettings, saveCameraSettings, saveGeneralSettings } from '@/lib/kioskSettings';
 import { useShutter } from '@/lib/kioskShutter';
 import { Choice, Panel, Toggle, primaryClass } from './ui';
@@ -12,6 +12,7 @@ export default function CameraSection() {
   const [searching, setSearching] = useState(false);
   const [live, setLive] = useState(false);
   const [info, setInfo] = useState<ReturnType<typeof describeStream>>(null);
+  const [focusCaps, setFocusCaps] = useState<ReturnType<typeof focusSupport>>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -28,6 +29,7 @@ export default function CameraSection() {
       if (videoRef.current) videoRef.current.srcObject = stream;
       setLive(true);
       setInfo(describeStream(stream));
+      setFocusCaps(focusSupport(stream));
       const found = await listCameras();
       setCameras(found);
       // Si no había ninguna elegida, queda la que se abrió
@@ -101,6 +103,34 @@ export default function CameraSection() {
         <p className="text-white/55 text-sm -mt-2">
           Si la imagen se ve borrosa o pixelada (pasa con la Logitech C920 en algunas TV box), elegí Full HD o HD y mirá arriba de la vista previa
           la resolución que da de verdad. Si se ve trabada, bajá a HD.
+        </p>
+        <Choice label="Enfoque" value={settings.focus ?? 'auto'}
+          options={[
+            { value: 'auto', label: 'Automático' },
+            { value: 'far', label: 'Fijo lejos' },
+            { value: 'manual', label: 'Fijo a mano' },
+          ]}
+          onChange={focus => {
+            const next = saveCameraSettings({ focus });
+            setSettings(next);
+            if (streamRef.current) void applyFocus(streamRef.current, next).catch(() => {});
+          }} />
+        {settings.focus === 'manual' && focusCaps?.manual && (
+          <div className="space-y-1">
+            <input type="range" min={0} max={100} value={Math.round((Number(settings.focusPos ?? 0.8)) * 100)}
+              onChange={e => {
+                const next = saveCameraSettings({ focusPos: Number(e.target.value) / 100 });
+                setSettings(next);
+                if (streamRef.current) void applyFocus(streamRef.current, next).catch(() => {});
+              }}
+              className="w-full accent-[#ff2e93]" />
+            <div className="flex justify-between text-white/50 text-sm"><span>Cerca</span><span>Lejos</span></div>
+          </div>
+        )}
+        <p className="text-white/55 text-sm -mt-2">
+          {!live ? 'Abrí la vista previa (Buscar cámaras) para ver si tu cámara permite fijar el enfoque.'
+            : focusCaps?.manual ? 'Si la foto sale desenfocada (con poca luz la cámara "busca"), usá Fijo lejos o ajustalo a mano mirando la vista previa a la distancia de los invitados.'
+              : 'Esta cámara no deja fijar el enfoque desde Android: lo maneja ella sola. Con más luz enfoca mejor.'}
         </p>
         <Choice label="Rotación (si la cámara está girada)" value={rotation}
           options={[0, 90, 180, 270].map(r => ({ value: r, label: `${r}°` }))}

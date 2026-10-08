@@ -58,7 +58,9 @@ export async function openCameraStream(deviceId?: string, quality: Quality = get
   let lastError: unknown;
   for (const video of attempts) {
     try {
-      return await navigator.mediaDevices.getUserMedia({ video, audio: false });
+      const stream = await navigator.mediaDevices.getUserMedia({ video, audio: false });
+      await applyFocus(stream).catch(() => { /* la cámara no lo permite */ });
+      return stream;
     } catch (err) {
       lastError = err;
       // Sin permiso no tiene sentido seguir probando
@@ -93,3 +95,35 @@ export async function listCameras(): Promise<CameraOption[]> {
 }
 
 export const stopStream = (stream: MediaStream | null) => stream?.getTracks().forEach(t => t.stop());
+
+// ─── Enfoque ─────────────────────────────────────────────────────────────────
+// Las webcams con autoenfoque (p. ej. C920) "buscan" con poca luz y la foto sale
+// desenfocada. Si la cámara lo permite, se fija el enfoque (lejos o a mano).
+
+interface FocusCaps { focusMode?: string[]; focusDistance?: { min: number; max: number; step?: number } }
+
+/** Qué deja hacer la cámara con el enfoque (null = nada: lo maneja sola). */
+export function focusSupport(stream: MediaStream | null) {
+  const track = stream?.getVideoTracks()[0];
+  const caps = (track?.getCapabilities?.() ?? {}) as FocusCaps;
+  const manual = !!caps.focusMode?.includes('manual') && !!caps.focusDistance;
+  return manual || caps.focusMode?.length ? { manual, modes: caps.focusMode ?? [] } : null;
+}
+
+/** Aplica el enfoque elegido en Ajustes → Cámara. */
+export async function applyFocus(stream: MediaStream, settings: KioskCameraSettings = getCameraSettings()) {
+  const track = stream.getVideoTracks()[0];
+  const caps = (track?.getCapabilities?.() ?? {}) as FocusCaps;
+  if (!track || !caps.focusMode?.length) return false;
+  const focus = settings.focus ?? 'auto';
+  if (focus === 'auto') {
+    if (!caps.focusMode.includes('continuous')) return false;
+    await track.applyConstraints({ advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet] });
+    return true;
+  }
+  if (!caps.focusMode.includes('manual') || !caps.focusDistance) return false;
+  const { min, max } = caps.focusDistance;
+  const pos = focus === 'far' ? 1 : Math.min(1, Math.max(0, Number(settings.focusPos ?? 0.8)));
+  await track.applyConstraints({ advanced: [{ focusMode: 'manual', focusDistance: min + (max - min) * pos } as MediaTrackConstraintSet] });
+  return true;
+}

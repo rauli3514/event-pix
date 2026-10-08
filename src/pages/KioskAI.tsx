@@ -731,6 +731,7 @@ export default function KioskAI() {
       frame,
       orientation: (generalSettings.photoOrientation as PageOrientation) || 'auto',
       strips: !!generalSettings.photoStrips,
+      photoFit: generalSettings.photoFit === 'fill' ? 'fill' : 'full',
       title: generalSettings.eventTitle || undefined,
       subtitle: generalSettings.frameSubtitle || undefined,
       guestName: mode === 'selfie' ? guestNameRef.current || undefined : undefined,
@@ -1347,7 +1348,8 @@ export default function KioskAI() {
             {/* QR a la vista: el invitado lo escanea y se lleva la foto al celular */}
             {showQrBlock && (
               <div className="flex items-center gap-5 rounded-3xl bg-white/95 p-4 shadow-[0_10px_40px_rgba(139,92,246,0.35)]">
-                <div className="w-36 h-36 shrink-0 rounded-2xl bg-white flex items-center justify-center overflow-hidden">
+                {/* Grande: se escanea desde un paso de distancia */}
+                <div className="w-[clamp(9rem,26vmin,17rem)] h-[clamp(9rem,26vmin,17rem)] shrink-0 rounded-2xl bg-white flex items-center justify-center overflow-hidden">
                   {qrUrl ? (
                     <motion.img src={qrUrl} alt="QR para descargar la foto" className="w-full h-full"
                       initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} />
@@ -1358,8 +1360,8 @@ export default function KioskAI() {
                   )}
                 </div>
                 <div className="text-slate-900">
-                  <p className="carlmarx-bold text-2xl leading-tight">{qrUrl ? 'Escaneá y llevátela' : uploading ? 'Preparando tu QR…' : 'QR no disponible'}</p>
-                  <p className="text-slate-500 text-sm mt-1">{qrUrl ? 'Bajala al celular y compartila por WhatsApp o Instagram' : uploading ? 'Un segundo' : 'La foto quedó guardada en el equipo'}</p>
+                  <p className="carlmarx-bold text-[clamp(1.5rem,3.6vmin,2.4rem)] leading-tight">{qrUrl ? 'Escaneá y llevátela' : uploading ? 'Preparando tu QR…' : 'QR no disponible'}</p>
+                  <p className="text-slate-500 text-[clamp(0.9rem,2vmin,1.2rem)] mt-1 max-w-[16rem]">{qrUrl ? 'Bajala al celular y compartila por WhatsApp o Instagram' : uploading ? 'Un segundo' : 'La foto quedó guardada en el equipo'}</p>
                   {!qrUrl && !uploading && (
                     <>
                       {qrError && <p className="text-red-600 text-xs mt-1 max-w-[16rem] break-words">{qrError}</p>}
