@@ -168,6 +168,58 @@ public class MainActivity extends BridgeActivity {
         return Math.min(m.widthPixels, m.heightPixels) * 0.04f;
     }
 
+    // Plan B del disparador: en muchas TV box el sistema se queda con las teclas de volumen
+    // y no llegan a la app. Mientras el kiosco espera el disparador se vigila el volumen:
+    // si cambia, cuenta como el botón y el volumen vuelve a donde estaba.
+    private android.content.BroadcastReceiver volumeReceiver;
+    private long ignoreVolumeUntil = 0;
+    private long lastVolumeShot = 0;
+
+    private void fireShutter() {
+        if (getBridge() == null || getBridge().getWebView() == null) return;
+        getBridge().getWebView().post(() -> getBridge().getWebView()
+                .evaluateJavascript("window.dispatchEvent(new Event('kiosk-shutter'))", null));
+    }
+
+    private void startVolumeWatch() {
+        if (volumeReceiver != null) return;
+        AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        if (am == null) return;
+        // Con el volumen al máximo (o en cero) apretar no lo cambia: se deja un paso de margen
+        int max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+        int cur = am.getStreamVolume(AudioManager.STREAM_MUSIC);
+        ignoreVolumeUntil = android.os.SystemClock.uptimeMillis() + 400;
+        if (cur >= max && max > 1) am.setStreamVolume(AudioManager.STREAM_MUSIC, max - 1, 0);
+        else if (cur <= 0) am.setStreamVolume(AudioManager.STREAM_MUSIC, 1, 0);
+        volumeReceiver = new android.content.BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (!captureShutter) return;
+                int stream = intent.getIntExtra("android.media.EXTRA_VOLUME_STREAM_TYPE", -1);
+                int now = intent.getIntExtra("android.media.EXTRA_VOLUME_STREAM_VALUE", -1);
+                int prev = intent.getIntExtra("android.media.EXTRA_PREV_VOLUME_STREAM_VALUE", -1);
+                if (stream < 0 || now < 0 || prev < 0 || now == prev) return;
+                long t = android.os.SystemClock.uptimeMillis();
+                if (t < ignoreVolumeUntil) return; // el cambio lo hizo la app al devolverlo
+                // Se devuelve el volumen y se saca la foto (una vez por apretada)
+                ignoreVolumeUntil = t + 300;
+                am.setStreamVolume(stream, prev, 0);
+                if (t - lastVolumeShot < 500) return;
+                lastVolumeShot = t;
+                fireShutter();
+            }
+        };
+        androidx.core.content.ContextCompat.registerReceiver(this, volumeReceiver,
+                new android.content.IntentFilter("android.media.VOLUME_CHANGED_ACTION"),
+                androidx.core.content.ContextCompat.RECEIVER_EXPORTED);
+    }
+
+    private void stopVolumeWatch() {
+        if (volumeReceiver == null) return;
+        try { unregisterReceiver(volumeReceiver); } catch (Exception ignored) { /* ya estaba */ }
+        volumeReceiver = null;
+    }
+
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         int code = event.getKeyCode();
@@ -175,8 +227,8 @@ public class MainActivity extends BridgeActivity {
                 || code == KeyEvent.KEYCODE_CAMERA;
         if (captureShutter && shutterKey && getBridge() != null && getBridge().getWebView() != null) {
             if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
-                getBridge().getWebView().post(() -> getBridge().getWebView()
-                        .evaluateJavascript("window.dispatchEvent(new Event('kiosk-shutter'))", null));
+                lastVolumeShot = android.os.SystemClock.uptimeMillis();
+                fireShutter();
             }
             return true;
         }
@@ -223,6 +275,7 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onDestroy() {
+        stopVolumeWatch();
         if (bluetoothServer != null) {
             bluetoothServer.stop();
         }
@@ -310,6 +363,7 @@ public class MainActivity extends BridgeActivity {
         @JavascriptInterface
         public void setShutterCapture(boolean on) {
             captureShutter = on;
+            runOnUiThread(() -> { if (on) startVolumeWatch(); else stopVolumeWatch(); });
         }
 
         /** Si esta app es la pantalla de inicio (lanzador) elegida del equipo. */
