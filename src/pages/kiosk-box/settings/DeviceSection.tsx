@@ -242,7 +242,7 @@ function TouchPanel() {
   }, []);
   if (on === null) return null;
   return (
-    <Panel title="Marco táctil" description="Si el toque cae en otro lugar (más arriba, más abajo o corrido), calibrá: aparece una cruz en cada esquina y tocás el centro de cada una. Queda guardado en el equipo.">
+    <Panel title="Marco táctil" description="Si el toque cae corrido, primero revisá que la tele no agrande la imagen (Imagen → Tamaño → Ajuste de pantalla / Just Scan / Píxel a píxel). Si sigue corrido, calibrá: aparece una cruz en cada esquina y tocás el centro de cada una.">
       {canCalibrateTouch() && (
         <>
           <div className={`flex items-center gap-3 rounded-2xl px-5 py-4 ${calibrated ? 'bg-emerald-500/15 text-emerald-200' : 'bg-black/20 text-white/80'}`}>
@@ -258,7 +258,7 @@ function TouchPanel() {
           </div>
         </>
       )}
-      <Toggle label="Estabilizar toques" hint={on ? 'El toque se toma donde se apoyó el dedo (el punto al levantar suele venir corrido).' : 'Desactivado: los toques llegan tal cual.'}
+      <Toggle label="Estabilizar toques" hint={on ? 'El toque se toma donde se apoyó el dedo y se ignoran los toques dobles (rebote del marco).' : 'Desactivado: los toques llegan tal cual.'}
         checked={on} onChange={v => { setOn(v); setTapStabilize(v); }} />
     </Panel>
   );

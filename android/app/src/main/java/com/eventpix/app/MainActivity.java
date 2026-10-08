@@ -42,6 +42,11 @@ public class MainActivity extends BridgeActivity {
     private volatile boolean tapStabilize = true;
     private boolean stabilizing = false;
     private float downX, downY;
+    // Anti-rebote: el marco a veces manda un toque como dos seguidos en el mismo lugar
+    private static final long BOUNCE_MS = 150;
+    private long lastUpTime = 0;
+    private float lastUpX, lastUpY;
+    private boolean dropping = false;
 
     // Calibración del marco táctil (Ajustes → Equipo → Marco táctil): corrección que lleva
     // cada toque al lugar real. Se aplica antes que todo lo demás.
@@ -63,6 +68,24 @@ public class MainActivity extends BridgeActivity {
     private boolean dispatchStabilized(MotionEvent ev) {
         if (!tapStabilize || calibrationView != null) return super.dispatchTouchEvent(ev);
         int action = ev.getActionMasked();
+        // Rebote: toque nuevo enseguida y casi en el mismo lugar que el anterior → se ignora entero
+        if (action == MotionEvent.ACTION_DOWN && ev.getEventTime() - lastUpTime < BOUNCE_MS
+                && Math.hypot(ev.getX() - lastUpX, ev.getY() - lastUpY) < slopPx() * 1.5f) {
+            dropping = true;
+            return true;
+        }
+        if (dropping) {
+            if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                dropping = false;
+                lastUpTime = ev.getEventTime();
+            }
+            return true;
+        }
+        if (action == MotionEvent.ACTION_UP) {
+            lastUpTime = ev.getEventTime();
+            lastUpX = downX;
+            lastUpY = downY;
+        }
         if (action == MotionEvent.ACTION_DOWN) {
             downX = ev.getX();
             downY = ev.getY();
