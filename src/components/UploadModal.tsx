@@ -21,7 +21,7 @@ interface UploadModalProps {
 }
 
 export const UploadModal = ({ open, onOpenChange, eventId, onSuccess }: UploadModalProps) => {
-    const { createSubmission } = useSubmissions(eventId);
+    const { createSubmission } = useSubmissions(eventId, { list: false });
     const [preview, setPreview] = useState<string | null>(null);
     const [file, setFile] = useState<File | null>(null);
     const [showSuccess, setShowSuccess] = useState(false);

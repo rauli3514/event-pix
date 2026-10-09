@@ -27,6 +27,11 @@
  * "Propiedades del script" → Agregar: nombre ADMIN_KEY, valor una clave larga
  * que inventes. Esa misma clave se carga una vez en el panel. Sin ADMIN_KEY el
  * script sigue recibiendo fotos pero no deja listarlas ni borrarlas.
+ *
+ * Álbum del muro de fotos ("Enviar álbum a Drive" en el panel del evento):
+ * usa la misma ADMIN_KEY. La primera vez que actualizás el script con esta
+ * versión, Google pide un permiso nuevo ("Conectarse a un servicio externo"):
+ * es para descargar las fotos del muro y guardarlas en la carpeta del evento.
  */
 function doPost(e) {
   try {
@@ -79,6 +84,7 @@ function admin(body) {
   var key = PropertiesService.getScriptProperties().getProperty('ADMIN_KEY');
   if (!key) return { ok: false, error: 'Falta configurar ADMIN_KEY en el script (Propiedades del script)' };
   if (body.adminKey !== key) return { ok: false, error: 'Clave del panel incorrecta' };
+  if (body.action === 'import') return importAlbum(body);
   var root = rootFolder(body.folderId);
 
   // Carpetas de eventos con la cantidad de fotos
@@ -142,6 +148,55 @@ function admin(body) {
   }
 
   return { ok: false, error: 'Acción desconocida: ' + body.action };
+}
+
+// ─── Álbum del muro de fotos (con ADMIN_KEY) ──────────────────────────
+// El panel manda tandas de { url, name } (links públicos de las fotos y audios
+// aprobados) y textos { name, content }. Todo va a la carpeta del evento, la
+// misma que usa el kiosco si tiene el mismo nombre. Si un archivo ya está, se
+// saltea: se puede reintentar sin duplicar.
+function importAlbum(body) {
+  var root;
+  if (body.folderId) {
+    root = DriveApp.getFolderById(body.folderId);
+  } else {
+    var def = DriveApp.getRootFolder().getFoldersByName('EventPix Kiosco');
+    root = def.hasNext() ? def.next() : DriveApp.getRootFolder().createFolder('EventPix Kiosco');
+  }
+  if (!body.folder) return { ok: false, error: 'Falta el nombre de la carpeta del evento' };
+  var found = root.getFoldersByName(body.folder);
+  var folder = found.hasNext() ? found.next() : root.createFolder(body.folder);
+
+  var saved = 0, skipped = 0, failed = [], todo = [];
+  (body.files || []).forEach(function (f) {
+    if (!f || !f.name || !/^https:\/\//.test(f.url || '')) { failed.push((f && f.name) || '?'); return; }
+    if (folder.getFilesByName(f.name).hasNext()) { skipped++; return; }
+    todo.push(f);
+  });
+  if (todo.length) {
+    var responses = UrlFetchApp.fetchAll(todo.map(function (f) { return { url: f.url, muteHttpExceptions: true }; }));
+    responses.forEach(function (res, i) {
+      if (res.getResponseCode() === 200) {
+        folder.createFile(res.getBlob().setName(todo[i].name));
+        saved++;
+      } else {
+        failed.push(todo[i].name);
+      }
+    });
+  }
+
+  (body.texts || []).forEach(function (t) {
+    var existing = folder.getFilesByName(t.name);
+    if (existing.hasNext()) existing.next().setContent(t.content);
+    else folder.createFile(t.name, t.content, MimeType.PLAIN_TEXT);
+  });
+
+  // Para mandarle el link al anfitrión sin que tenga que pedir acceso
+  var shared = false;
+  if (body.shareFolder) {
+    try { folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); shared = true; } catch (err) { /* cuenta que no lo permite */ }
+  }
+  return { ok: true, folderUrl: folder.getUrl(), saved: saved, skipped: skipped, failed: failed, shared: shared };
 }
 
 /** ¿La carpeta es la del kiosco o está adentro (hasta 3 niveles)? */

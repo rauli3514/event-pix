@@ -19,7 +19,7 @@ interface MessageModalProps {
 }
 
 export const MessageModal = ({ open, onOpenChange, eventId }: MessageModalProps) => {
-    const { createSubmission } = useSubmissions(eventId);
+    const { createSubmission } = useSubmissions(eventId, { list: false });
     const [message, setMessage] = useState("");
     const [name, setName] = useState(getGuestName);
     const [showSuccess, setShowSuccess] = useState(false);

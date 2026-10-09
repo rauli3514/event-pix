@@ -22,7 +22,7 @@ export const EventCard = ({ onUploadClick, onMessageClick, onAudioClick, eventId
     return (
         <div className="w-full max-w-md mx-auto space-y-6">
             {/* 1. Main Visual Card (Recuadro Grande) */}
-            <div className="relative w-full aspect-[4/3] rounded-[2rem] overflow-hidden shadow-2xl bg-slate-900 border border-white/10 group">
+            <div className="relative w-full aspect-[16/10] rounded-[2rem] overflow-hidden shadow-2xl bg-slate-900 border border-white/10 group">
                 {/* Theme Background */}
                 <div className="absolute inset-0 z-0">
                     <img
@@ -37,7 +37,7 @@ export const EventCard = ({ onUploadClick, onMessageClick, onAudioClick, eventId
                 {/* Content: Logo Circle + Title */}
                 <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-6 text-center">
                     {/* Circle Logo */}
-                    <div className="relative w-32 h-32 mb-4 rounded-full p-1.5 bg-black/30 backdrop-blur-sm border border-white/20 shadow-2xl ring-2 ring-white/10">
+                    <div className="relative w-28 h-28 mb-3 rounded-full p-1.5 bg-black/30 backdrop-blur-sm border border-white/20 shadow-2xl ring-2 ring-white/10">
                         {settings?.splash_logo_url ? (
                             <img
                                 src={settings.splash_logo_url}
@@ -61,46 +61,39 @@ export const EventCard = ({ onUploadClick, onMessageClick, onAudioClick, eventId
                 </div>
             </div>
 
-            {/* 2. Action Buttons (Two separated blocks) */}
-            <div className="grid grid-cols-2 gap-4">
-                <Button
-                    onClick={onUploadClick}
-                    className="h-16 bg-white hover:bg-slate-100 text-slate-900 font-bold text-lg rounded-2xl shadow-lg border-b-4 border-slate-300 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-2 group"
-                >
-                    <Camera className="w-6 h-6 group-hover:scale-110 transition-transform text-violet-600" />
-                    SELFIE
-                </Button>
-                <Button
-                    onClick={onMessageClick}
-                    className="h-16 bg-white hover:bg-slate-100 text-slate-900 font-bold text-lg rounded-2xl shadow-lg border-b-4 border-slate-300 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-2 group"
-                >
-                    <MessageSquare className="w-6 h-6 group-hover:scale-110 transition-transform text-violet-600" />
-                    MENSAJE
-                </Button>
-            </div>
-
-            {/* 3. Helper Text */}
-            <p className="text-center text-slate-300 text-sm font-medium px-4">
-                Comparte tus fotos y envía tus mensajes a la pantalla. <br />
-                <span className="text-violet-400">¡Vive la experiencia EventPix!</span>
+            {/* 2. Acción principal: una sola, bien grande */}
+            <Button
+                onClick={onUploadClick}
+                className="w-full h-20 rounded-3xl bg-gradient-to-r from-fuchsia-600 via-violet-600 to-indigo-600 hover:opacity-95 text-white text-xl font-extrabold shadow-2xl shadow-violet-900/50 ring-2 ring-white/20 active:scale-[0.98] transition-transform flex items-center justify-center gap-3 [&_svg]:size-7"
+            >
+                <Camera className="w-8 h-8" />
+                Subí tu foto a la pantalla
+            </Button>
+            <p className="-mt-3 text-center text-slate-300 text-sm font-medium">
+                Aparece en la pantalla gigante en segundos ✨
             </p>
 
-            {/* 4. Audio Button (Pill shape) */}
-            {(settings?.audio_messages_enabled ?? true) && (
-                <div
-                    className="relative h-16 rounded-full bg-slate-800/80 backdrop-blur-md border border-white/10 flex items-center pl-6 pr-2 cursor-pointer group hover:bg-slate-800 transition-colors shadow-lg"
-                    onClick={onAudioClick}
+            {/* 3. Acciones secundarias */}
+            <div className={`grid gap-3 ${(settings?.audio_messages_enabled ?? true) ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                <Button
+                    onClick={onMessageClick}
+                    variant="ghost"
+                    className="h-14 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-semibold border border-white/15 backdrop-blur-md flex items-center justify-center gap-2"
                 >
-                    <div className="flex-1 text-left">
-                        <span className="text-white/90 text-sm font-semibold">
-                            Envía un audio de recuerdo
-                        </span>
-                    </div>
-                    <div className="h-12 w-12 bg-red-500 rounded-full flex items-center justify-center shadow-lg shadow-red-500/30 group-hover:scale-110 transition-transform animate-pulse">
-                        <Mic className="text-white w-6 h-6" />
-                    </div>
-                </div>
-            )}
+                    <MessageSquare className="w-5 h-5 text-violet-300" />
+                    Dejá un mensaje
+                </Button>
+                {(settings?.audio_messages_enabled ?? true) && (
+                    <Button
+                        onClick={onAudioClick}
+                        variant="ghost"
+                        className="h-14 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-semibold border border-white/15 backdrop-blur-md flex items-center justify-center gap-2"
+                    >
+                        <Mic className="w-5 h-5 text-rose-300" />
+                        Mandá un audio
+                    </Button>
+                )}
+            </div>
 
             {/* 5. Extra Content (Reactions/Gallery) */}
             <div className="space-y-4 pt-4">

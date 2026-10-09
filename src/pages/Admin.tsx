@@ -21,6 +21,7 @@ import { useIsSuperAdmin } from "@/hooks/use-roles";
 import { ProvidersManagement } from "@/components/ProvidersManagement";
 import { ThemeSelector } from "@/components/admin/ThemeSelector";
 import { SubmissionCard } from "@/components/admin/SubmissionCard";
+import { DriveAlbumCard } from "@/components/admin/DriveAlbumCard";
 import { TriviaGameManager } from "@/components/trivia/TriviaGameManager";
 import { PhotoVoteManager } from "@/components/photovote/PhotoVoteManager";
 
@@ -1216,6 +1217,8 @@ const Admin = () => {
                 {
                     activeTab === 'downloads' && (
                         <div className="max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <DriveAlbumCard submissions={submissions} eventName={event?.name || settings?.title || 'Evento'} />
+
                             <Card className="bg-slate-900 border-slate-800 hover:border-blue-500/50 transition-all cursor-pointer group" onClick={handleDownloadApprovedPhotos}>
                                 <CardContent className="flex flex-col items-center justify-center py-12 gap-6">
                                     <div className="w-20 h-20 bg-blue-500/10 rounded-full flex items-center justify-center text-blue-500 group-hover:scale-110 transition-transform">

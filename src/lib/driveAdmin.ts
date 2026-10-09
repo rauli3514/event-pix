@@ -57,3 +57,13 @@ export const deleteDriveFolder = (folder: string) => call<object>({ action: 'del
 
 /** Descarga directa (con la sesión de Google del navegador). */
 export const driveDownloadUrl = (id: string) => `https://drive.google.com/uc?export=download&id=${id}`;
+
+export interface DriveImportResult { folderUrl: string; saved: number; skipped: number; failed: string[]; shared: boolean }
+
+/** Guarda archivos (por link público) y textos en la carpeta del evento. Ver importAlbum en el script. */
+export const importToDrive = (body: {
+  folder: string;
+  files: { url: string; name: string }[];
+  texts?: { name: string; content: string }[];
+  shareFolder?: boolean;
+}) => call<DriveImportResult>({ action: 'import', ...body });

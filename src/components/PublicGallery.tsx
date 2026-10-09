@@ -10,14 +10,62 @@ interface PublicGalleryProps {
     eventId: string;
 }
 
-export const PublicGallery = ({ eventId }: PublicGalleryProps) => {
+// Las fotos se piden solo mientras la galería está abierta (este componente vive
+// dentro del DialogContent, que no se monta cerrado): antes cada celular consultaba
+// todas las fotos cada 5 s aunque nadie mirara la galería.
+const GalleryPhotos = ({ eventId, onSelect }: { eventId: string; onSelect: (url: string) => void }) => {
     const { submissions, isLoading } = useSubmissions(eventId);
+    const photos = submissions.filter(s => s.status === 'approved' && s.type === 'photo');
+
+    return (
+        <>
+            <DialogHeader className="p-4 border-b border-slate-800 bg-slate-900/50 backdrop-blur">
+                <DialogTitle className="text-white flex items-center gap-2">
+                    <ImageIcon className="w-5 h-5 text-violet-400" />
+                    Galería del Evento
+                    <span className="ml-auto text-xs font-normal text-slate-400 bg-slate-800 px-2 py-1 rounded-full">
+                        {photos.length} fotos
+                    </span>
+                </DialogTitle>
+            </DialogHeader>
+
+            <div className="flex-1 overflow-y-auto p-4">
+                {isLoading ? (
+                    <div className="flex justify-center py-12">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-500"></div>
+                    </div>
+                ) : photos.length === 0 ? (
+                    <div className="text-center py-12 text-slate-500">
+                        <p>Aún no hay fotos aprobadas.</p>
+                        <p className="text-sm mt-2">¡Sé el primero en subir una!</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                        {photos.map((photo) => (
+                            <div
+                                key={photo.id}
+                                className="aspect-square relative group cursor-pointer overflow-hidden rounded-lg bg-slate-900"
+                                onClick={() => onSelect(photo.content)}
+                            >
+                                <img
+                                    src={photo.content}
+                                    alt="Foto del evento"
+                                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                    loading="lazy"
+                                />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </>
+    );
+};
+
+export const PublicGallery = ({ eventId }: PublicGalleryProps) => {
     const { data: settings } = useEventSettings(eventId);
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
-
-    // Filtrar solo aprobados y fotos (no mensajes de texto puros si no tienen imagen, aunque submissions actuales mezclan)
-    // Asumimos que content es la URL de la imagen
-    const photos = submissions?.filter(s => s.status === 'approved' && s.type === 'photo') || [];
 
     if (!settings?.public_gallery_enabled) return null;
 
@@ -37,46 +85,7 @@ export const PublicGallery = ({ eventId }: PublicGalleryProps) => {
                 </Button>
             </DialogTrigger>
             <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 bg-slate-950 border-slate-800">
-                <DialogHeader className="p-4 border-b border-slate-800 bg-slate-900/50 backdrop-blur">
-                    <DialogTitle className="text-white flex items-center gap-2">
-                        <ImageIcon className="w-5 h-5 text-violet-400" />
-                        Galería del Evento
-                        <span className="ml-auto text-xs font-normal text-slate-400 bg-slate-800 px-2 py-1 rounded-full">
-                            {photos.length} fotos
-                        </span>
-                    </DialogTitle>
-                </DialogHeader>
-
-                <div className="flex-1 overflow-y-auto p-4">
-                    {isLoading ? (
-                        <div className="flex justify-center py-12">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-500"></div>
-                        </div>
-                    ) : photos.length === 0 ? (
-                        <div className="text-center py-12 text-slate-500">
-                            <p>Aún no hay fotos aprobadas.</p>
-                            <p className="text-sm mt-2">¡Sé el primero en subir una!</p>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                            {photos.map((photo) => (
-                                <div
-                                    key={photo.id}
-                                    className="aspect-square relative group cursor-pointer overflow-hidden rounded-lg bg-slate-900"
-                                    onClick={() => setSelectedImage(photo.content)}
-                                >
-                                    <img
-                                        src={photo.content}
-                                        alt="Foto del evento"
-                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                                        loading="lazy"
-                                    />
-                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
+                <GalleryPhotos eventId={eventId} onSelect={setSelectedImage} />
             </DialogContent>
 
             {/* Modal de imagen completa */}
