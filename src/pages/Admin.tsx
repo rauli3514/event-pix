@@ -22,6 +22,7 @@ import { ProvidersManagement } from "@/components/ProvidersManagement";
 import { ThemeSelector } from "@/components/admin/ThemeSelector";
 import { SubmissionCard } from "@/components/admin/SubmissionCard";
 import { DriveAlbumCard } from "@/components/admin/DriveAlbumCard";
+import { buildGuestbookPdf } from "@/lib/guestbookPdf";
 import { TriviaGameManager } from "@/components/trivia/TriviaGameManager";
 import { PhotoVoteManager } from "@/components/photovote/PhotoVoteManager";
 
@@ -65,88 +66,22 @@ const Admin = () => {
         }
     }, [settings]);
 
-    // Filtrar contenido
-    const approvedMessages = submissions?.filter(s => s.type === 'message' && s.status === 'approved') || [];
 
-    // Función para generar PDF de mensajes
-    const downloadMessagesPDF = () => {
-        if (approvedMessages.length === 0) {
-            toast.error("No hay mensajes aprobados para descargar");
-            return;
-        }
-
-        const doc = new jsPDF();
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const margin = 20;
-        let y = 20;
-
-        // Título del Evento
-        doc.setFontSize(24);
-        doc.setTextColor(33, 33, 33);
-        doc.text(event?.name || "Libro de Firmas", pageWidth / 2, y, { align: "center" });
-        y += 10;
-
-        // Subtítulo / Fecha
-        doc.setFontSize(12);
-        doc.setTextColor(100, 100, 100);
-        const dateStr = event?.date ? new Date(event.date).toLocaleDateString() : new Date().toLocaleDateString();
-        doc.text(`EventPix - ${dateStr} `, pageWidth / 2, y, { align: "center" });
-        y += 20;
-
-        // Línea separadora
-        doc.setDrawColor(200, 200, 200);
-        doc.line(margin, y, pageWidth - margin, y);
-        y += 15;
-
-        // Mensajes
-        doc.setFontSize(12);
-
-        approvedMessages.forEach((msg) => {
-            // Verificar si necesitamos nueva página
-            if (y > 270) {
-                doc.addPage();
-                y = 20;
+    // Libro de firmas en PDF: mensajes + dedicatorias de las fotos (ver lib/guestbookPdf)
+    const downloadMessagesPDF = async () => {
+        const toastId = toast.loading("Armando el libro de firmas...");
+        try {
+            const doc = await buildGuestbookPdf({ submissions: submissions || [], eventName: event?.name || settings?.title || 'Libro de firmas', eventDate: event?.date });
+            if (!doc) {
+                toast.error("No hay mensajes ni dedicatorias aprobados", { id: toastId });
+                return;
             }
-
-            // Fondo de la tarjeta (gris muy suave)
-            doc.setFillColor(250, 250, 250);
-            doc.setDrawColor(230, 230, 230);
-
-            // Calcular altura del texto
-            const textLines = doc.splitTextToSize(msg.content, pageWidth - (margin * 2) - 10);
-            const cardHeight = (textLines.length * 7) + 20;
-
-            // Dibujar tarjeta
-            doc.roundedRect(margin, y, pageWidth - (margin * 2), cardHeight, 3, 3, 'FD');
-
-            // Texto del mensaje
-            doc.setTextColor(50, 50, 50);
-            doc.setFont("helvetica", "normal");
-            doc.text(textLines, margin + 5, y + 10);
-
-            // Autor
-            if (msg.author) {
-                doc.setFont("helvetica", "bold");
-                doc.setTextColor(100, 100, 100);
-                doc.setFontSize(10);
-                doc.text(`- ${msg.author} `, pageWidth - margin - 10, y + cardHeight - 7, { align: "right" });
-                doc.setFontSize(12); // Restaurar tamaño
-            }
-
-            y += cardHeight + 10;
-        });
-
-        // Pie de página
-        const pageCount = doc.getNumberOfPages();
-        for (let i = 1; i <= pageCount; i++) {
-            doc.setPage(i);
-            doc.setFontSize(8);
-            doc.setTextColor(150, 150, 150);
-            doc.text(`Página ${i} de ${pageCount} - Generado por EventPix`, pageWidth / 2, 290, { align: "center" });
+            doc.save(`Libro_Firmas_${event?.slug || 'evento'}.pdf`);
+            toast.success("Libro de firmas descargado", { id: toastId });
+        } catch (err) {
+            console.error(err);
+            toast.error("No se pudo armar el PDF", { id: toastId });
         }
-
-        doc.save(`Libro_Firmas_${event?.slug || 'evento'}.pdf`);
-        toast.success("Libro de firmas descargado correctamente");
     };
 
 
@@ -1217,7 +1152,7 @@ const Admin = () => {
                 {
                     activeTab === 'downloads' && (
                         <div className="max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-8">
-                            {event && <DriveAlbumCard eventId={event.id} submissions={submissions} eventName={event.name || settings?.title || 'Evento'} />}
+                            {event && <DriveAlbumCard eventId={event.id} eventDate={event.date} submissions={submissions} eventName={event.name || settings?.title || 'Evento'} />}
 
                             <Card className="bg-slate-900 border-slate-800 hover:border-blue-500/50 transition-all cursor-pointer group" onClick={handleDownloadApprovedPhotos}>
                                 <CardContent className="flex flex-col items-center justify-center py-12 gap-6">
@@ -1238,7 +1173,7 @@ const Admin = () => {
                                     </div>
                                     <div className="text-center">
                                         <h3 className="text-xl font-bold text-white mb-2">Libro de Firmas (PDF)</h3>
-                                        <p className="text-slate-400">Descarga un PDF elegante con los mensajes y saludos.</p>
+                                        <p className="text-slate-400">PDF con tapa, los mensajes y las dedicatorias de las fotos.</p>
                                     </div>
                                 </CardContent>
                             </Card>
