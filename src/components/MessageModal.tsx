@@ -46,7 +46,7 @@ export const MessageModal = ({ open, onOpenChange, eventId }: MessageModalProps)
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[425px] bg-card/95 backdrop-blur-xl border-white/10">
+            <DialogContent className="sm:max-w-[425px] bg-slate-900/95 backdrop-blur-xl border-white/10 text-white">
                 {showSuccess ? (
                     // Success View
                     <div className="py-8 px-4">
@@ -55,8 +55,8 @@ export const MessageModal = ({ open, onOpenChange, eventId }: MessageModalProps)
                                 <CheckCircle2 className="h-12 w-12 text-green-500" />
                             </div>
                             <div className="space-y-2">
-                                <h3 className="text-2xl font-bold text-secondary">¡Tu mensaje se envió!</h3>
-                                <p className="text-muted-foreground">
+                                <h3 className="text-2xl font-bold text-white">¡Tu mensaje se envió!</h3>
+                                <p className="text-slate-300">
                                     Gracias por participar 🥳
                                 </p>
                             </div>
@@ -66,7 +66,7 @@ export const MessageModal = ({ open, onOpenChange, eventId }: MessageModalProps)
                     // Normal Message View
                     <>
                         <DialogHeader>
-                            <DialogTitle className="text-2xl font-script text-center text-secondary">Dejar un Mensaje</DialogTitle>
+                            <DialogTitle className="text-2xl font-script text-center text-white">Dejar un Mensaje</DialogTitle>
                         </DialogHeader>
 
                         <div className="grid gap-4 py-4">
@@ -75,7 +75,7 @@ export const MessageModal = ({ open, onOpenChange, eventId }: MessageModalProps)
                                     placeholder="Tu nombre (opcional)"
                                     value={name}
                                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
-                                    className="bg-black/20 border-white/10 focus:border-secondary/50"
+                                    className="bg-white/10 border-white/15 text-white placeholder:text-slate-400 focus:border-violet-400"
                                 />
                             </div>
                             <div className="space-y-2">
@@ -83,14 +83,14 @@ export const MessageModal = ({ open, onOpenChange, eventId }: MessageModalProps)
                                     placeholder="Escribe tu mensaje aquí..."
                                     value={message}
                                     onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setMessage(e.target.value)}
-                                    className="min-h-[150px] bg-black/20 border-white/10 focus:border-secondary/50 resize-none"
+                                    className="min-h-[150px] bg-white/10 border-white/15 text-white placeholder:text-slate-400 focus:border-violet-400 resize-none"
                                 />
                             </div>
 
                             <Button
                                 onClick={handleSubmit}
                                 disabled={!message.trim() || createSubmission.isPending}
-                                className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground"
+                                className="w-full bg-violet-600 hover:bg-violet-500 text-white"
                             >
                                 {createSubmission.isPending ? (
                                     "Enviando..."

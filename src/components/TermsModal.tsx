@@ -21,15 +21,15 @@ export const TermsModal = () => {
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
-            <DialogContent className="sm:max-w-[425px] bg-card/95 backdrop-blur-xl border-white/10" onInteractOutside={(e: Event) => e.preventDefault()}>
+            <DialogContent className="sm:max-w-[425px] bg-slate-900/95 backdrop-blur-xl border-white/10 text-white" onInteractOutside={(e: Event) => e.preventDefault()}>
                 <DialogHeader>
-                    <DialogTitle className="text-2xl font-script text-primary">Bienvenido a EventPix</DialogTitle>
-                    <DialogDescription>
+                    <DialogTitle className="text-2xl font-script text-white">Bienvenido a EventPix</DialogTitle>
+                    <DialogDescription className="text-slate-300">
                         Por favor acepta los términos para continuar.
                     </DialogDescription>
                 </DialogHeader>
                 <ScrollArea className="h-[200px] w-full rounded-md border border-white/10 p-4">
-                    <div className="text-sm text-muted-foreground space-y-4">
+                    <div className="text-sm text-slate-300 space-y-4">
                         <p>
                             Al usar EventPix, aceptas compartir tu imagen y mensajes en la pantalla pública del evento.
                         </p>
@@ -42,7 +42,7 @@ export const TermsModal = () => {
                     </div>
                 </ScrollArea>
                 <div className="flex justify-end pt-4">
-                    <Button onClick={handleAccept} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                    <Button onClick={handleAccept} className="bg-violet-600 hover:bg-violet-500 text-white">
                         Aceptar y Continuar
                     </Button>
                 </div>

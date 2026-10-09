@@ -1,18 +1,18 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { CloudUpload, ExternalLink, Copy, Loader2, Settings2 } from "lucide-react";
+import { CloudUpload, ExternalLink, Copy, Loader2 } from "lucide-react";
 import { FaWhatsapp } from "react-icons/fa";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Submission } from "@/types";
-import { getDriveAdminConfig, saveDriveAdminConfig } from "@/lib/driveAdmin";
 import { buildAlbum, exportAlbumToDrive, type ExportResult } from "@/lib/driveAlbum";
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 interface DriveAlbumCardProps {
+    eventId: string;
     submissions: Submission[];
     eventName: string;
 }
@@ -20,11 +20,9 @@ interface DriveAlbumCardProps {
 /**
  * "Enviar álbum a Drive": copia lo aprobado del muro a la carpeta del evento
  * (la misma del kiosco si se llama igual) y deja el link listo para el anfitrión.
- * Usa la clave del panel de Drive, la misma que en Kioscos → Eventos.
+ * La conexión con Drive está configurada en Supabase (función drive-admin).
  */
-export const DriveAlbumCard = ({ submissions, eventName }: DriveAlbumCardProps) => {
-    const [config, setConfig] = useState(getDriveAdminConfig);
-    const [showConfig, setShowConfig] = useState(() => !getDriveAdminConfig().adminKey);
+export const DriveAlbumCard = ({ eventId, submissions, eventName }: DriveAlbumCardProps) => {
     const [folder, setFolder] = useState(eventName);
     const [shareFolder, setShareFolder] = useState(true);
     const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -35,20 +33,15 @@ export const DriveAlbumCard = ({ submissions, eventName }: DriveAlbumCardProps) 
     const empty = summary.files.length === 0 && !summary.text;
 
     const handleExport = async () => {
-        if (!config.adminKey.trim()) {
-            setShowConfig(true);
-            toast.error("Cargá la clave del panel de Drive (ADMIN_KEY del script)");
-            return;
-        }
         if (!folder.trim()) {
             toast.error("Poné el nombre de la carpeta del evento");
             return;
         }
-        saveDriveAdminConfig(config);
         setResult(null);
         setProgress({ done: 0, total: summary.files.length });
         try {
             const res = await exportAlbumToDrive({
+                eventId,
                 submissions,
                 eventName,
                 folder: folder.trim(),
@@ -81,31 +74,7 @@ export const DriveAlbumCard = ({ submissions, eventName }: DriveAlbumCardProps) 
                             nombre, queda todo junto en un solo link para el anfitrión.
                         </p>
                     </div>
-                    <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white" onClick={() => setShowConfig((v) => !v)} title="Configuración de Drive">
-                        <Settings2 className="w-5 h-5" />
-                    </Button>
                 </div>
-
-                {showConfig && (
-                    <div className="grid gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-                        <p className="text-xs text-slate-400">
-                            Es la misma configuración que en Kioscos → Eventos. Queda guardada en esta computadora.
-                        </p>
-                        <Input
-                            type="password"
-                            value={config.adminKey}
-                            onChange={(e) => setConfig({ ...config, adminKey: e.target.value })}
-                            placeholder="Clave del panel (ADMIN_KEY del script de Drive)"
-                            className="bg-slate-900 border-slate-700 text-white"
-                        />
-                        <Input
-                            value={config.folderLink}
-                            onChange={(e) => setConfig({ ...config, folderLink: e.target.value })}
-                            placeholder='Link de la carpeta principal (vacío = "EventPix Kiosco")'
-                            className="bg-slate-900 border-slate-700 text-white"
-                        />
-                    </div>
-                )}
 
                 <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
                     <Input

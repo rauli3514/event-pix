@@ -77,7 +77,7 @@ export const ChallengeRoulette = ({ onOpenCamera }: ChallengeRouletteProps) => {
             </div>
 
             <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent className="sm:max-w-md bg-white/95 backdrop-blur-xl border-violet-200">
+                <DialogContent className="sm:max-w-md bg-white/95 backdrop-blur-xl border-violet-200 text-slate-900">
                     <DialogHeader>
                         <DialogTitle className="text-center text-2xl font-bold text-violet-900 flex items-center justify-center gap-2">
                             <Sparkles className="text-yellow-500" />
@@ -95,7 +95,7 @@ export const ChallengeRoulette = ({ onOpenCamera }: ChallengeRouletteProps) => {
                                 ? "bg-violet-50 border-violet-400 scale-105 shadow-lg"
                                 : "bg-slate-50 border-slate-200"}
                         `}>
-                            <p className={`text-xl md:text-2xl font-medium transition-all ${isSpinning ? "blur-sm opacity-50" : "opacity-100"}`}>
+                            <p className={`text-xl md:text-2xl font-semibold text-violet-950 transition-all ${isSpinning ? "blur-sm opacity-50" : "opacity-100"}`}>
                                 {currentChallenge}
                             </p>
                         </div>

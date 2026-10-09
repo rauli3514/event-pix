@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,10 @@ const Login = () => {
     const [password, setPassword] = useState<string>("");
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+    const location = useLocation();
+    // Página que se quiso abrir antes de que pidiera el login (ver ProtectedRoute)
+    const from = (location.state as { from?: string } | null)?.from;
+    const safeFrom = from && from.startsWith('/') && !from.startsWith('//') && !from.startsWith('/login') ? from : null;
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -34,15 +38,15 @@ const Login = () => {
             toast.error(error.message);
         } else {
             toast.success("Bienvenido de nuevo");
-            navigate(await resolvePostLoginRoute(data.user?.id));
+            navigate(safeFrom || await resolvePostLoginRoute(data.user?.id));
         }
         setLoading(false);
     };
 
-    // Un super_admin va al hub de Cartelería (comportamiento actual).
+    // Sin página pedida: un super_admin va al panel de administración (/admin).
     // Un cliente de Intelligence sin ese rol va directo a su negocio.
     const resolvePostLoginRoute = async (userId?: string): Promise<string> => {
-        if (!userId) return "/admin/display";
+        if (!userId) return "/admin";
 
         const { data: profile } = await supabase
             .from("profiles")
@@ -51,7 +55,7 @@ const Login = () => {
             .maybeSingle();
 
         if (profile?.role === "super_admin") {
-            return "/admin/display";
+            return "/admin";
         }
 
         const { data: membership } = await supabase
@@ -61,7 +65,7 @@ const Login = () => {
             .limit(1)
             .maybeSingle();
 
-        return membership ? "/intelligence" : "/admin/display";
+        return membership ? "/intelligence" : "/admin";
     };
 
     return (
