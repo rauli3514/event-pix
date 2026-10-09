@@ -18,7 +18,7 @@ interface AudioRecorderModalProps {
 }
 
 export const AudioRecorderModal = ({ open, onOpenChange, eventId }: AudioRecorderModalProps) => {
-    const { createSubmission } = useSubmissions(eventId);
+    const { createSubmission } = useSubmissions(eventId, { list: false });
     const [isRecording, setIsRecording] = useState(false);
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
     const [audioUrl, setAudioUrl] = useState<string | null>(null);

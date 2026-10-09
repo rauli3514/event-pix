@@ -10,7 +10,15 @@ const MOCK_SUBMISSIONS: Submission[] = [
     { id: '3', type: 'photo', content: 'https://images.unsplash.com/photo-1511285560982-1351cdeb9821?auto=format&fit=crop&q=80', created_at: new Date(Date.now() - 1000 * 60 * 10).toISOString(), status: 'approved' },
 ];
 
-export const useSubmissions = (eventId?: string) => {
+interface UseSubmissionsOptions {
+    /**
+     * false = no pide la lista (solo se usan las acciones, ej. createSubmission).
+     * Así los celulares de los invitados no consultan todas las fotos cada 5 s.
+     */
+    list?: boolean;
+}
+
+export const useSubmissions = (eventId?: string, { list = true }: UseSubmissionsOptions = {}) => {
     const queryClient = useQueryClient();
 
     const { data: submissions, isLoading } = useQuery({
@@ -43,7 +51,7 @@ export const useSubmissions = (eventId?: string) => {
             return data as Submission[];
         },
         refetchInterval: 5000,
-        enabled: !!eventId || (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL?.includes('your_supabase_url')),
+        enabled: list && (!!eventId || (!import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL?.includes('your_supabase_url'))),
     });
 
     const updateStatus = useMutation({

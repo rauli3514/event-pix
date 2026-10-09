@@ -9,6 +9,24 @@ import { Button } from "@/components/ui/button";
 import confetti from 'canvas-confetti';
 import { supabase } from "@/lib/supabase";
 import { isAnonymousAuthor } from "@/lib/guestSubmissions";
+import { getWallStats, RankRow } from "@/lib/wallStats";
+import { CollageSlide, RankingSlide } from "@/components/display/WallSpecialSlides";
+import { Submission } from "@/types";
+
+// Cada cuántos cambios de foto se intercala un collage o el ranking
+const SPECIAL_EVERY = 8;
+const COLLAGE_SIZE = 12;
+
+type SpecialSlide = { kind: 'collage'; photos: Submission[] } | { kind: 'ranking'; rows: RankRow[] };
+
+const shuffle = <T,>(list: T[]) => {
+    const copy = [...list];
+    for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+};
 
 interface SlideshowTemplateProps {
     eventId?: string;
@@ -169,6 +187,37 @@ export const SlideshowTemplate = ({ eventId, paused = false }: SlideshowTemplate
 
     const prevContentLengthRef = useRef(approvedContent.length);
 
+    // Contador, collage y ranking (sobre todo lo aprobado, no solo las 50 del carrusel)
+    const stats = useMemo(() => getWallStats(submissions), [submissions]);
+    const allPhotos = useMemo(() => submissions.filter(s => s.status === 'approved' && s.type === 'photo'), [submissions]);
+    const [special, setSpecial] = useState<SpecialSlide | null>(null);
+    const specialRef = useRef(false);
+    const ticksRef = useRef(0);
+    const nextSpecialRef = useRef<'collage' | 'ranking'>('collage');
+    const liveRef = useRef({ photos: allPhotos, ranking: stats.ranking });
+    useEffect(() => {
+        liveRef.current = { photos: allPhotos, ranking: stats.ranking };
+    }, [allPhotos, stats.ranking]);
+
+    const pickSpecial = (): SpecialSlide | null => {
+        const { photos, ranking } = liveRef.current;
+        const collageOk = photos.length >= 6;
+        const rankingOk = ranking.length >= 3 && ranking[0].count >= 2;
+        const kind = nextSpecialRef.current === 'ranking'
+            ? (rankingOk ? 'ranking' : collageOk ? 'collage' : null)
+            : (collageOk ? 'collage' : rankingOk ? 'ranking' : null);
+        if (!kind) return null;
+        nextSpecialRef.current = kind === 'collage' ? 'ranking' : 'collage';
+        return kind === 'collage'
+            ? { kind, photos: shuffle(photos).slice(0, COLLAGE_SIZE) }
+            : { kind, rows: ranking };
+    };
+
+    const clearSpecial = () => {
+        specialRef.current = false;
+        setSpecial(null);
+    };
+
     const emptyMessages = [
         "¡La fiesta recién empieza! Subí tu foto 📸",
         "Escaneá el QR y aparecé en pantalla gigante 🚀",
@@ -195,6 +244,20 @@ export const SlideshowTemplate = ({ eventId, paused = false }: SlideshowTemplate
             setAnimationClass(animations[Math.floor(Math.random() * animations.length)]);
 
             const interval = setInterval(() => {
+                // Después de un collage/ranking se sigue con la foto que tocaba
+                if (specialRef.current) {
+                    clearSpecial();
+                    return;
+                }
+                ticksRef.current += 1;
+                if (ticksRef.current % SPECIAL_EVERY === 0) {
+                    const next = pickSpecial();
+                    if (next) {
+                        specialRef.current = true;
+                        setSpecial(next);
+                        return;
+                    }
+                }
                 setCurrentIndex((prev) => {
                     const next = prev + 1;
                     if (next >= approvedContent.length) {
@@ -293,7 +356,7 @@ export const SlideshowTemplate = ({ eventId, paused = false }: SlideshowTemplate
 
                         {/* Autor y dedicatoria - Estilo Flotante Minimalista */}
                         {(!isAnonymousAuthor(currentItem.author) || currentItem.caption) && (
-                            <div className="absolute bottom-8 right-8 z-30 max-w-[60vw] bg-black/40 backdrop-blur-xl px-5 py-3 rounded-3xl border border-white/5 animate-fade-in shadow-lg group">
+                            <div className="absolute bottom-8 right-32 z-30 max-w-[55vw] bg-black/40 backdrop-blur-xl px-5 py-3 rounded-3xl border border-white/5 animate-fade-in shadow-lg group">
                                 {!isAnonymousAuthor(currentItem.author) && (
                                     <div className="flex items-center gap-2">
                                         <Camera className="w-5 h-5 text-white/80" />
@@ -348,12 +411,21 @@ export const SlideshowTemplate = ({ eventId, paused = false }: SlideshowTemplate
                     </h1>
                 </div>
 
-                {/* QR Pequeño siempre visible (Opcional) */}
-                {mode === 'carousel' && (
-                    <div className="bg-white p-2 rounded-lg shadow-lg opacity-80 hover:opacity-100 transition-opacity">
-                        <QRCode value={appUrl} size={60} />
-                    </div>
-                )}
+                {/* QR siempre visible + contador en vivo */}
+                <div className="flex flex-col items-end gap-3">
+                    {mode === 'carousel' && (
+                        <div className="bg-white p-3 rounded-2xl shadow-2xl flex flex-col items-center gap-1.5">
+                            <QRCode value={appUrl} size={120} />
+                            <span className="text-black text-sm font-bold">📸 ¡Subí tu foto!</span>
+                        </div>
+                    )}
+                    {stats.photos > 0 && (
+                        <div className="bg-black/50 backdrop-blur-xl border border-white/15 rounded-full px-4 py-1.5 text-lg font-bold shadow-lg tabular-nums whitespace-nowrap">
+                            🔥 {stats.photos} {stats.photos === 1 ? 'foto' : 'fotos'}
+                            {stats.guests > 1 && <span className="text-white/80 font-semibold"> · {stats.guests} invitados</span>}
+                        </div>
+                    )}
+                </div>
             </header>
 
             {/* ========== MARCO ENVOLVENTE (FRAME) ========== */}
@@ -437,7 +509,13 @@ export const SlideshowTemplate = ({ eventId, paused = false }: SlideshowTemplate
                     ) : (
                         // Modo Carrusel (Super Muro)
                         <div className="w-full h-full">
-                            {renderContent()}
+                            {special?.kind === 'collage' ? (
+                                <CollageSlide key="collage" photos={special.photos} total={stats.photos} />
+                            ) : special?.kind === 'ranking' ? (
+                                <RankingSlide key="ranking" rows={special.rows} />
+                            ) : (
+                                renderContent()
+                            )}
                         </div>
                     )}
                 </div>
@@ -494,6 +572,7 @@ export const SlideshowTemplate = ({ eventId, paused = false }: SlideshowTemplate
                             variant="ghost"
                             size="icon"
                             onClick={() => {
+                                clearSpecial();
                                 setCurrentIndex((prev) => (prev + 1) % approvedContent.length);
                                 setIsPlaying(false);
                             }}
