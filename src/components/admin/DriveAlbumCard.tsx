@@ -13,6 +13,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 
 interface DriveAlbumCardProps {
     eventId: string;
+    eventDate?: string | null;
     submissions: Submission[];
     eventName: string;
 }
@@ -22,7 +23,7 @@ interface DriveAlbumCardProps {
  * (la misma del kiosco si se llama igual) y deja el link listo para el anfitrión.
  * La conexión con Drive está configurada en Supabase (función drive-admin).
  */
-export const DriveAlbumCard = ({ eventId, submissions, eventName }: DriveAlbumCardProps) => {
+export const DriveAlbumCard = ({ eventId, eventDate, submissions, eventName }: DriveAlbumCardProps) => {
     const [folder, setFolder] = useState(eventName);
     const [shareFolder, setShareFolder] = useState(true);
     const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -42,6 +43,7 @@ export const DriveAlbumCard = ({ eventId, submissions, eventName }: DriveAlbumCa
         try {
             const res = await exportAlbumToDrive({
                 eventId,
+                eventDate,
                 submissions,
                 eventName,
                 folder: folder.trim(),
@@ -70,7 +72,7 @@ export const DriveAlbumCard = ({ eventId, submissions, eventName }: DriveAlbumCa
                         <h3 className="text-xl font-bold text-white">Enviar álbum a Drive</h3>
                         <p className="text-slate-400 text-sm mt-1">
                             Copia {plural(summary.photos, 'foto', 'fotos')}, {plural(summary.audios, 'audio', 'audios')} y {plural(summary.messages, 'mensaje', 'mensajes')} aprobados
-                            (con nombres y dedicatorias) a la carpeta del evento. Si el kiosco usó una carpeta con el mismo
+                            (los mensajes y dedicatorias van en un Libro de firmas en PDF) a la carpeta del evento. Si el kiosco usó una carpeta con el mismo
                             nombre, queda todo junto en un solo link para el anfitrión.
                         </p>
                     </div>

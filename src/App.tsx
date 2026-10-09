@@ -48,7 +48,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 
 import { IntelligenceCanvasPage } from "./pages/intelligence/IntelligenceCanvasPage";
 import IntelligenceLogin from "./pages/intelligence/IntelligenceLogin";
-import { ThemeProvider } from "./components/theme-provider";
+import { ThemeProvider, ForceDark } from "./components/theme-provider";
 
 const queryClient = new QueryClient();
 
@@ -82,7 +82,7 @@ const App = () => (
 
             <Route element={<EventProvider><Outlet /></EventProvider>}>
               <Route element={<ProtectedRoute />}>
-                <Route path="/admin" element={<AdminDashboard />} />
+                <Route path="/admin" element={<ForceDark><AdminDashboard /></ForceDark>} />
                 <Route path="/admin/providers" element={<ProvidersList />} />
                 {/* El kiosco viejo (Kiosco IA Global) se reemplazó por el panel de kioscos */}
                 <Route path="/admin/kiosco-manager" element={<Navigate to="/admin/kioscos" replace />} />
@@ -113,7 +113,7 @@ const App = () => (
                 
                 <Route path="/admin/:slug" element={
                   <ErrorBoundary>
-                    <Admin />
+                    <ForceDark><Admin /></ForceDark>
                   </ErrorBoundary>
                 } />
               </Route>
@@ -122,8 +122,8 @@ const App = () => (
               <Route path="/tv-boot" element={<TvBootScreen />} />
               <Route path="/tv/:deviceCode" element={<TvPlayer />} />
 
-              <Route path="/:slug" element={<Index />} />
-              <Route path="/:slug/display" element={<Display />} />
+              <Route path="/:slug" element={<ForceDark><Index /></ForceDark>} />
+              <Route path="/:slug/display" element={<ForceDark><Display /></ForceDark>} />
             </Route>
 
             {/* 

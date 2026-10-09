@@ -1,6 +1,8 @@
 import { Submission } from '@/types';
 import { isAnonymousAuthor } from '@/lib/guestSubmissions';
 import { importToDrive, type DriveImportResult } from '@/lib/driveAdmin';
+import { buildGuestbookPdf, guestbookContent } from '@/lib/guestbookPdf';
+import { supabase } from '@/lib/supabase';
 
 // "Enviar álbum a Drive": lo aprobado del muro (fotos, audios, mensajes y
 // dedicatorias) va a la carpeta del evento en Drive, a través del Apps Script
@@ -65,16 +67,50 @@ export const buildAlbum = (submissions: Submission[], eventName: string) => {
 
 export interface ExportResult extends DriveImportResult { total: number }
 
+/**
+ * Arma el Libro de firmas en PDF y lo sube al almacenamiento de la app, para que
+ * el script de Drive lo copie como cualquier otra foto. El nombre lleva la
+ * cantidad de mensajes: si llegan más y se vuelve a enviar, se copia el nuevo.
+ */
+async function uploadGuestbook(opts: { eventId: string; submissions: Submission[]; eventName: string; eventDate?: string | null }): Promise<AlbumFile | null> {
+    const doc = await buildGuestbookPdf(opts);
+    if (!doc) return null;
+    const { messages, dedications } = guestbookContent(opts.submissions);
+    const path = `albums/${opts.eventId}/libro-de-firmas-${Date.now()}.pdf`;
+    const { error } = await supabase.storage.from('photos').upload(path, doc.output('blob'), { contentType: 'application/pdf' });
+    if (error) throw error;
+    const { data } = supabase.storage.from('photos').getPublicUrl(path);
+    const counts = [
+        messages.length ? `${messages.length} ${messages.length === 1 ? 'mensaje' : 'mensajes'}` : '',
+        dedications.length ? `${dedications.length} ${dedications.length === 1 ? 'dedicatoria' : 'dedicatorias'}` : '',
+    ].filter(Boolean).join(', ');
+    return { url: data.publicUrl, name: `Libro de firmas (${counts}).pdf` };
+}
+
 export async function exportAlbumToDrive(opts: {
     eventId: string;
     submissions: Submission[];
     eventName: string;
+    eventDate?: string | null;
     folder: string;
     shareFolder: boolean;
     onProgress?: (done: number, total: number) => void;
 }): Promise<ExportResult> {
     const { files, text } = buildAlbum(opts.submissions, opts.eventName);
-    const texts = text ? [{ name: MESSAGES_FILE, content: text }] : [];
+    let texts = text ? [{ name: MESSAGES_FILE, content: text }] : [];
+
+    // Mensajes y dedicatorias como Libro de firmas en PDF; si no se puede, queda el .txt
+    if (text) {
+        try {
+            const guestbook = await uploadGuestbook(opts);
+            if (guestbook) {
+                files.unshift(guestbook);
+                texts = [];
+            }
+        } catch (err) {
+            console.warn('No se pudo armar el Libro de firmas en PDF, va en texto:', err);
+        }
+    }
     const result: ExportResult = { folderUrl: '', saved: 0, skipped: 0, failed: [], shared: false, total: files.length };
 
     // Siempre al menos un pedido (aunque no haya archivos) para crear la carpeta y el texto
