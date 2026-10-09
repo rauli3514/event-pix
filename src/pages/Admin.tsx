@@ -1217,7 +1217,7 @@ const Admin = () => {
                 {
                     activeTab === 'downloads' && (
                         <div className="max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <DriveAlbumCard submissions={submissions} eventName={event?.name || settings?.title || 'Evento'} />
+                            {event && <DriveAlbumCard eventId={event.id} submissions={submissions} eventName={event.name || settings?.title || 'Evento'} />}
 
                             <Card className="bg-slate-900 border-slate-800 hover:border-blue-500/50 transition-all cursor-pointer group" onClick={handleDownloadApprovedPhotos}>
                                 <CardContent className="flex flex-col items-center justify-center py-12 gap-6">

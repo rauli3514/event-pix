@@ -144,7 +144,7 @@ export const UploadModal = ({ open, onOpenChange, eventId, onSuccess }: UploadMo
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[425px] bg-card/95 backdrop-blur-xl border-white/10">
+            <DialogContent className="sm:max-w-[425px] bg-slate-900/95 backdrop-blur-xl border-white/10 text-white">
                 {showSuccess ? (
                     // Success View
                     <div className="py-8 px-4">
@@ -153,8 +153,8 @@ export const UploadModal = ({ open, onOpenChange, eventId, onSuccess }: UploadMo
                                 <CheckCircle2 className="h-12 w-12 text-green-500" />
                             </div>
                             <div className="space-y-2">
-                                <h3 className="text-2xl font-bold text-foreground">¡Foto enviada! 🎉</h3>
-                                <p className="text-muted-foreground">
+                                <h3 className="text-2xl font-bold text-white">¡Foto enviada! 🎉</h3>
+                                <p className="text-slate-300">
                                     Apenas salga en la pantalla grande te avisamos acá. ¡Atento! 👀
                                 </p>
                             </div>
@@ -164,12 +164,12 @@ export const UploadModal = ({ open, onOpenChange, eventId, onSuccess }: UploadMo
                     // Upload View
                     <>
                         <DialogHeader>
-                            <DialogTitle className="text-center text-xl font-serif">Subir Foto</DialogTitle>
+                            <DialogTitle className="text-center text-xl font-serif text-white">Subir Foto</DialogTitle>
                         </DialogHeader>
 
                         <div className="grid gap-6 py-4">
                             <div
-                                className="relative aspect-video rounded-lg border-2 border-dashed border-muted-foreground/25 flex flex-col items-center justify-center gap-2 hover:bg-muted/50 transition-colors cursor-pointer overflow-hidden bg-muted/20"
+                                className="relative aspect-video rounded-lg border-2 border-dashed border-white/25 flex flex-col items-center justify-center gap-2 hover:bg-white/10 transition-colors cursor-pointer overflow-hidden bg-white/5"
                                 onClick={() => fileInputRef.current?.click()}
                             >
                                 {preview ? (
@@ -191,11 +191,11 @@ export const UploadModal = ({ open, onOpenChange, eventId, onSuccess }: UploadMo
                                     </>
                                 ) : (
                                     <>
-                                        <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-2">
-                                            <Upload className="h-6 w-6 text-primary" />
+                                        <div className="h-12 w-12 rounded-full bg-violet-500/20 flex items-center justify-center mb-2">
+                                            <Upload className="h-6 w-6 text-violet-300" />
                                         </div>
-                                        <p className="text-sm font-medium text-foreground">Toca para seleccionar</p>
-                                        <p className="text-xs text-muted-foreground">o toma una foto</p>
+                                        <p className="text-sm font-medium text-white">Toca para seleccionar</p>
+                                        <p className="text-xs text-slate-300">o toma una foto</p>
                                     </>
                                 )}
                                 <Input
@@ -215,14 +215,14 @@ export const UploadModal = ({ open, onOpenChange, eventId, onSuccess }: UploadMo
                                         placeholder="Tu nombre (sale en la pantalla)"
                                         maxLength={40}
                                         autoComplete="given-name"
-                                        className="h-12 text-base bg-white text-slate-900 placeholder:text-slate-400 border-slate-300"
+                                        className="h-12 text-base bg-white/10 text-white placeholder:text-slate-400 border-white/15"
                                     />
                                     <Input
                                         value={caption}
                                         onChange={(e) => setCaption(e.target.value)}
                                         placeholder="Dedicatoria (opcional): ¡Felicidades Caro! 💖"
                                         maxLength={80}
-                                        className="h-12 text-base bg-white text-slate-900 placeholder:text-slate-400 border-slate-300"
+                                        className="h-12 text-base bg-white/10 text-white placeholder:text-slate-400 border-white/15"
                                     />
                                 </div>
                             )}
@@ -230,7 +230,7 @@ export const UploadModal = ({ open, onOpenChange, eventId, onSuccess }: UploadMo
                             <Button
                                 onClick={handleSubmit}
                                 disabled={!preview || isCompressing || createSubmission.isPending}
-                                className="w-full h-12 text-lg font-medium"
+                                className="w-full h-12 text-lg font-semibold bg-violet-600 hover:bg-violet-500 text-white disabled:opacity-40"
                             >
                                 {isCompressing ? (
                                     <>

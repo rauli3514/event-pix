@@ -4,10 +4,10 @@ import { CheckSquare, Download, ExternalLink, FolderOpen, KeyRound, Plus, Refres
 import { supabase } from '@/lib/supabase';
 import { folderNameFor } from '@/lib/kioskStorage';
 import {
-  deleteDriveFolder, deleteDrivePhotos, driveDownloadUrl, getDriveAdminConfig, listDriveFolders, listDrivePhotos,
-  saveDriveAdminConfig, type DriveFolder, type DrivePhoto,
+  deleteDriveFolder, deleteDrivePhotos, driveDownloadUrl, listDriveFolders, listDrivePhotos,
+  type DriveFolder, type DrivePhoto,
 } from '@/lib/driveAdmin';
-import { btnDanger, btnGhost, btnPrimary, card, Field, input } from './ui';
+import { btnDanger, btnGhost, btnPrimary, card, input } from './ui';
 import type { KioskDeviceRow, KioskEventRow } from './types';
 
 // Eventos (kiosk_events) y sus fotos en Google Drive. Cada evento usa una carpeta
@@ -23,8 +23,6 @@ export default function EventsTab({ events, devices, onChange }: {
   devices: KioskDeviceRow[];
   onChange: () => void;
 }) {
-  const [config, setConfig] = useState(getDriveAdminConfig);
-  const [showConfig, setShowConfig] = useState(() => !getDriveAdminConfig().adminKey);
   const [folders, setFolders] = useState<DriveFolder[] | null>(null);
   const [rootUrl, setRootUrl] = useState('');
   const [driveError, setDriveError] = useState<string | null>(null);
@@ -34,7 +32,6 @@ export default function EventsTab({ events, devices, onChange }: {
   const [selected, setSelected] = useState<string | null>(null);
 
   const loadFolders = useCallback(async () => {
-    if (!getDriveAdminConfig().adminKey) return;
     setLoadingFolders(true);
     try {
       const res = await listDriveFolders();
@@ -51,12 +48,6 @@ export default function EventsTab({ events, devices, onChange }: {
     const t = window.setTimeout(loadFolders, 0);
     return () => window.clearTimeout(t);
   }, [loadFolders]);
-
-  const saveConfig = () => {
-    saveDriveAdminConfig(config);
-    setShowConfig(false);
-    void loadFolders();
-  };
 
   const createEvent = async () => {
     if (!newName.trim()) return;
@@ -86,31 +77,19 @@ export default function EventsTab({ events, devices, onChange }: {
 
   return (
     <div className="space-y-6">
-      {/* Conexión con Drive (clave del script) */}
+      {/* Conexión con Drive (configurada en Supabase: función drive-admin) */}
       <div className={`${card} space-y-3`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-sm">
             <KeyRound className="h-4 w-4 text-violet-300" />
             {driveError ? <span className="text-amber-300">Drive: {driveError}</span>
               : folders ? <span className="text-slate-300">Fotos en Drive conectadas{rootUrl && <> · <a href={rootUrl} target="_blank" rel="noreferrer" className="text-violet-300 hover:underline">abrir carpeta</a></>}</span>
-              : <span className="text-slate-400">Conectá Drive para ver las fotos.</span>}
+              : <span className="text-slate-400">Conectando con Drive…</span>}
           </div>
           <div className="flex gap-2">
-            <button onClick={loadFolders} disabled={loadingFolders || !config.adminKey} className={btnGhost}><RefreshCw className={`h-4 w-4 ${loadingFolders ? 'animate-spin' : ''}`} /> Actualizar</button>
-            <button onClick={() => setShowConfig(s => !s)} className={btnGhost}>Clave de Drive</button>
+            <button onClick={loadFolders} disabled={loadingFolders} className={btnGhost}><RefreshCw className={`h-4 w-4 ${loadingFolders ? 'animate-spin' : ''}`} /> Actualizar</button>
           </div>
         </div>
-        {showConfig && (
-          <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
-            <Field label="Clave del panel (ADMIN_KEY)" hint="La que pusiste en Propiedades del script de Drive. Queda guardada solo en esta computadora.">
-              <input className={input} type="password" value={config.adminKey} onChange={e => setConfig({ ...config, adminKey: e.target.value })} />
-            </Field>
-            <Field label="Carpeta principal (opcional)" hint='Vacío = "EventPix Kiosco" en tu Mi unidad, igual que los equipos.'>
-              <input className={input} value={config.folderLink} onChange={e => setConfig({ ...config, folderLink: e.target.value })} placeholder="https://drive.google.com/drive/folders/…" />
-            </Field>
-            <button onClick={saveConfig} className={btnPrimary}>Guardar</button>
-          </div>
-        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[340px_1fr]">

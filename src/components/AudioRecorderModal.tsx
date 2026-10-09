@@ -121,7 +121,7 @@ export const AudioRecorderModal = ({ open, onOpenChange, eventId }: AudioRecorde
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[425px] bg-card/95 backdrop-blur-xl border-white/10">
+            <DialogContent className="sm:max-w-[425px] bg-slate-900/95 backdrop-blur-xl border-white/10 text-white">
                 {showSuccess ? (
                     <div className="py-8 px-4">
                         <div className="flex flex-col items-center justify-center gap-4 text-center">
@@ -129,8 +129,8 @@ export const AudioRecorderModal = ({ open, onOpenChange, eventId }: AudioRecorde
                                 <CheckCircle2 className="h-12 w-12 text-green-500" />
                             </div>
                             <div className="space-y-2">
-                                <h3 className="text-2xl font-bold text-secondary">¡Audio enviado!</h3>
-                                <p className="text-muted-foreground">
+                                <h3 className="text-2xl font-bold text-white">¡Audio enviado!</h3>
+                                <p className="text-slate-300">
                                     Se escuchará genial 🎤
                                 </p>
                             </div>
@@ -139,7 +139,7 @@ export const AudioRecorderModal = ({ open, onOpenChange, eventId }: AudioRecorde
                 ) : (
                     <>
                         <DialogHeader>
-                            <DialogTitle className="text-2xl font-script text-center text-secondary">
+                            <DialogTitle className="text-2xl font-script text-center text-white">
                                 {isRecording ? "Grabando..." : audioBlob ? "Escuchar y Enviar" : "Grabar Mensaje"}
                             </DialogTitle>
                         </DialogHeader>
@@ -154,7 +154,7 @@ export const AudioRecorderModal = ({ open, onOpenChange, eventId }: AudioRecorde
                                         <span className="text-xl font-mono text-red-400">{formatTime(recordingTime)}</span>
                                     </div>
                                 ) : audioBlob ? (
-                                    <Play className="h-12 w-12 text-secondary ml-1" />
+                                    <Play className="h-12 w-12 text-violet-300 ml-1" />
                                 ) : (
                                     <Mic className="h-12 w-12 text-slate-500" />
                                 )}
@@ -173,7 +173,7 @@ export const AudioRecorderModal = ({ open, onOpenChange, eventId }: AudioRecorde
                                     ) : (
                                         <Button
                                             onClick={startRecording}
-                                            className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground h-12 text-lg rounded-xl"
+                                            className="w-full bg-violet-600 hover:bg-violet-500 text-white h-12 text-lg rounded-xl"
                                         >
                                             <Mic className="mr-2 h-5 w-5" /> Comenzar a Grabar
                                         </Button>
@@ -187,7 +187,7 @@ export const AudioRecorderModal = ({ open, onOpenChange, eventId }: AudioRecorde
                                             placeholder="Tu nombre (opcional)"
                                             value={name}
                                             onChange={(e) => setName(e.target.value)}
-                                            className="bg-black/20 border-white/10"
+                                            className="bg-white/10 border-white/15 text-white placeholder:text-slate-400"
                                         />
 
                                         <div className="grid grid-cols-2 gap-3">

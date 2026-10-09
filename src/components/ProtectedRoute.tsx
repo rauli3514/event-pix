@@ -56,6 +56,10 @@ export const ProtectedRoute = () => {
         return session ? <Outlet /> : <Navigate to="/intelligence/login" state={{ from: location.pathname }} replace />;
     }
 
-    const isDisplayUser = localStorage.getItem('display_user_mode') === 'true';
-    return session ? <Outlet /> : <Navigate to={isDisplayUser ? "/usuarios" : "/login"} replace />;
+    // Se recuerda a dónde quería ir para volver ahí después del login.
+    // El login de cartelería (/usuarios) solo para las páginas de cartelería: antes la
+    // marca display_user_mode, que queda guardada en el navegador, mandaba ahí todo /admin.
+    const from = location.pathname + location.search;
+    const isDisplayUser = localStorage.getItem('display_user_mode') === 'true' && location.pathname.startsWith('/admin/display');
+    return session ? <Outlet /> : <Navigate to={isDisplayUser ? "/usuarios" : "/login"} state={{ from }} replace />;
 };

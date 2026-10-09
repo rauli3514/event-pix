@@ -66,6 +66,7 @@ export const buildAlbum = (submissions: Submission[], eventName: string) => {
 export interface ExportResult extends DriveImportResult { total: number }
 
 export async function exportAlbumToDrive(opts: {
+    eventId: string;
     submissions: Submission[];
     eventName: string;
     folder: string;
@@ -86,6 +87,7 @@ export async function exportAlbumToDrive(opts: {
     for (let i = 0; i < batches.length; i++) {
         const last = i === batches.length - 1;
         const res = await importToDrive({
+            event_id: opts.eventId,
             folder: opts.folder,
             files: batches[i],
             // El texto y el permiso de la carpeta van en el último pedido

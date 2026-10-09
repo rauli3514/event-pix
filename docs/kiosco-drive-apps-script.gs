@@ -22,11 +22,16 @@
  * Cualquiera que tenga esa URL puede subir archivos a carpetas a las que tenga
  * acceso tu cuenta: no la publiques.
  *
- * Panel admin (ver y borrar fotos desde app.eventpix.com.ar/admin/kioscos):
+ * Panel admin (ver y borrar fotos del kiosco, "Enviar álbum a Drive"):
  * en el editor del script → "Configuración del proyecto" (engranaje) →
  * "Propiedades del script" → Agregar: nombre ADMIN_KEY, valor una clave larga
- * que inventes. Esa misma clave se carga una vez en el panel. Sin ADMIN_KEY el
- * script sigue recibiendo fotos pero no deja listarlas ni borrarlas.
+ * que inventes. Después, en Supabase → Edge Functions → Secrets, cargá una sola
+ * vez para toda la app:
+ *   DRIVE_SCRIPT_URL = la URL de este script (termina en /exec)
+ *   DRIVE_ADMIN_KEY  = la misma ADMIN_KEY
+ *   DRIVE_FOLDER     = (opcional) link de la carpeta principal
+ * y publicá la función drive-admin. El panel no pide ninguna clave. Sin
+ * ADMIN_KEY el script sigue recibiendo fotos pero no deja listarlas ni borrarlas.
  *
  * Álbum del muro de fotos ("Enviar álbum a Drive" en el panel del evento):
  * usa la misma ADMIN_KEY. La primera vez que actualizás el script con esta
