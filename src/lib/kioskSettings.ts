@@ -128,6 +128,8 @@ export interface KioskCameraSettings {
   focusPos?: number;
   /** Segundos de cuenta regresiva */
   timer?: number;
+  /** La pantalla se pone blanca al sacar la foto (da luz a la cara). Por defecto sí */
+  screenFlash?: boolean;
   [key: string]: unknown;
 }
 
