@@ -221,6 +221,7 @@ export interface KioskPrintSettings {
   /** % de agrandado para tapar la franja blanca sin bordes */
   bleed?: number;
   printFormat?: 'auto' | 'jpeg' | 'pwg';
+  paperType?: import('@/lib/nativePrint').PaperType;
   copies?: number;
   autoPrint?: boolean;
   imageAdjust?: 'cover' | 'contain' | 'fill';

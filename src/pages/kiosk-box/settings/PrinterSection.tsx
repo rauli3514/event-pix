@@ -3,10 +3,11 @@ import { toast } from 'sonner';
 import { Printer, RefreshCw } from 'lucide-react';
 import {
   connectWifiDirectPrinter, discoverNativePrinters, findUsbPrinters, isNativePrintAvailable, isPrintableDirect,
-  printErrorMessage, printImageNative, testUsbPrinter, usbPrinterToNative, PAPER_SIZES,
-  type NativePrinter, type PaperSize, type UsbPrinterInfo,
+  printErrorMessage, printImageNative, testUsbPrinter, usbPrinterToNative, PAPER_SIZES, PAPER_TYPES,
+  type NativePrinter, type PaperSize, type PaperType, type UsbPrinterInfo,
 } from '@/lib/nativePrint';
 import { getPrintSettings, savePrintSettings } from '@/lib/kioskSettings';
+import { buildPrintTestSheet } from '@/lib/printTestSheet';
 import { buttonClass, Choice, inputClass, Panel, primaryClass, Toggle } from './ui';
 
 export default function PrinterSection() {
@@ -66,7 +67,7 @@ export default function PrinterSection() {
 
   const testPrint = () => run('test', async () => {
     const res = await printImageNative({
-      image: '/ai-themes/jugador-seleccion.jpg',
+      image: buildPrintTestSheet(),
       printer: printer || null,
       paper: settings.paper || '4x6',
       orientation: settings.orientation || 'portrait',
@@ -76,11 +77,12 @@ export default function PrinterSection() {
       borderless: !!settings.borderless,
       bleed: Number(settings.bleed) || 0,
       format: settings.printFormat || 'auto',
+      paperType: settings.paperType || 'auto',
       jobName: 'EventPix - prueba',
     });
     if (res.mode === 'silent') {
       const fmt = res.format === 'image/pwg-raster' ? 'PWG raster' : res.format === 'image/jpeg' ? 'JPEG' : res.format;
-      toast.success(`Prueba enviada (${fmt}${res.dpi ? ` · ${res.dpi} dpi` : ''}${res.mediaType ? ` · ${res.mediaType}` : ''})`);
+      toast.success(`Prueba enviada (${fmt}${res.dpi ? ` · ${res.dpi} dpi` : ''}${res.resolution ? ` · ${res.resolution}` : ''}${res.mediaType ? ` · ${res.mediaType}` : ''})`);
       if (settings.borderless && res.borderlessSupported === false) {
         toast.warning('La impresora no anuncia impresión sin bordes con este papel: usá "Agrandar para tapar bordes".');
       }
@@ -150,6 +152,12 @@ export default function PrinterSection() {
         <Choice label="Tamaño" value={settings.paper || '4x6'}
           options={PAPER_SIZES.map(p => ({ value: p.value, label: p.label }))}
           onChange={(paper: PaperSize) => update({ paper })} />
+        <Choice label="Tipo de papel" value={settings.paperType || 'auto'}
+          options={PAPER_TYPES.map(p => ({ value: p.value, label: p.label }))}
+          onChange={(paperType: PaperType) => update({ paperType })} />
+        <p className="text-white/55 text-sm -mt-2">
+          Elegí el papel que está cargado: con papel fotográfico la impresora usa su modo foto (más tinta y más pasadas). Automático: fotográfico brillante en 10×15 y 13×18, común en A4 y Carta.
+        </p>
         <Toggle label="Sin bordes" hint="La foto ocupa toda la hoja, pero la impresora la agranda un poco y recorta los bordes. Apagado: queda un borde blanco fino y sale entera (logo y marco completos)."
           checked={!!settings.borderless} onChange={borderless => update({ borderless })} />
         {settings.borderless && (

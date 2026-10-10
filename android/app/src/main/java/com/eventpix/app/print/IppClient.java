@@ -81,6 +81,12 @@ public final class IppClient {
         /** "fill", "fit", "auto"... Null = no se envía. */
         public String printScaling;
         public boolean highQuality = true;
+        /** Resolución de impresión (valor crudo de printer-resolution-supported). Null = la de la impresora. */
+        public byte[] printResolution;
+        /** "photo"... Null = no se envía. */
+        public String contentOptimize;
+        /** "color"... Null = no se envía. */
+        public String colorMode;
     }
 
     /** Un valor de atributo IPP crudo (tag + bytes). */
@@ -227,15 +233,48 @@ public final class IppClient {
         return max > 0 ? max : preferredDpi;
     }
 
-    /** "photographic-glossy" si está; si no, el primer tipo fotográfico; si no, null. */
-    public static String pickPhotoMediaType(List<Value> values) {
-        String fallback = null;
+    /** La resolución más alta que anuncia la impresora (valor crudo), o null. */
+    public static byte[] pickBestResolution(List<Value> values) {
+        byte[] best = null;
+        long bestArea = 0;
+        for (Value v : values) {
+            if (v.tag != TAG_RESOLUTION || v.bytes.length != 9) continue;
+            long area = (long) readInt(v.bytes, 0) * readInt(v.bytes, 4);
+            if ((v.bytes[8] & 0xFF) != RESOLUTION_UNITS_DPI) area = Math.round(area * 6.45); // por cm → por pulgada
+            if (area > bestArea) {
+                bestArea = area;
+                best = v.bytes;
+            }
+        }
+        return best;
+    }
+
+    /** "1440x720" a partir del valor crudo de una resolución. */
+    public static String resolutionLabel(byte[] raw) {
+        if (raw == null || raw.length != 9) return null;
+        String unit = (raw[8] & 0xFF) == RESOLUTION_UNITS_DPI ? " dpi" : " dpcm";
+        return readInt(raw, 0) + "x" + readInt(raw, 4) + unit;
+    }
+
+    public static boolean hasKeyword(List<Value> values, String keyword) {
+        for (Value v : values) if (v.asString().equals(keyword)) return true;
+        return false;
+    }
+
+    /**
+     * Tipo de papel fotográfico: "glossy" busca brillante, "matte" mate; si no está el
+     * pedido, el primer tipo fotográfico; si no hay ninguno, null (papel de la impresora).
+     */
+    public static String pickPhotoMediaType(List<Value> values, String finish) {
+        String[] wanted = "matte".equals(finish)
+                ? new String[]{"photographic-matte", "matte"}
+                : new String[]{"photographic-glossy", "photographic-high-gloss", "photographic"};
+        for (String w : wanted) if (hasKeyword(values, w)) return w;
         for (Value v : values) {
             String type = v.asString();
-            if (type.equals("photographic-glossy")) return type;
-            if (fallback == null && type.startsWith("photographic")) fallback = type;
+            if (type.startsWith("photographic")) return type;
         }
-        return fallback;
+        return null;
     }
 
     static byte[] buildPrintJobRequest(String printerUri, String documentFormat, byte[] document,
@@ -259,6 +298,9 @@ public final class IppClient {
         out.writeByte(TAG_JOB_ATTRIBUTES);
         writeInt(out, TAG_INTEGER, "copies", Math.max(1, o.copies));
         if (o.highQuality) writeInt(out, TAG_ENUM, "print-quality", PRINT_QUALITY_HIGH);
+        if (o.printResolution != null) writeValue(out, TAG_RESOLUTION, "printer-resolution", o.printResolution);
+        if (o.contentOptimize != null) writeString(out, TAG_KEYWORD, "print-content-optimize", o.contentOptimize);
+        if (o.colorMode != null) writeString(out, TAG_KEYWORD, "print-color-mode", o.colorMode);
         if (o.printScaling != null) writeString(out, TAG_KEYWORD, "print-scaling", o.printScaling);
 
         if (o.mediaWidthHmm > 0 && o.mediaHeightHmm > 0) {

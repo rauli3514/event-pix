@@ -65,6 +65,8 @@ export interface NativePrintOptions {
   bleed?: number;
   /** Formato de envío: auto (PWG raster sin bordes si se puede), jpeg o pwg */
   format?: 'auto' | 'jpeg' | 'pwg';
+  /** Papel cargado: auto (fotográfico en 10×15 y 13×18), brillante, mate o común */
+  paperType?: PaperType;
   jobName?: string;
 }
 
@@ -74,6 +76,8 @@ export interface NativePrintResult {
   format?: string;
   dpi?: number;
   mediaType?: string;
+  /** Resolución pedida a la impresora, p. ej. "1440x720 dpi" */
+  resolution?: string;
   /** false = la impresora no anuncia márgenes en 0 (no hace sin bordes) */
   borderlessSupported?: boolean;
 }
@@ -94,6 +98,15 @@ export const PAPER_SIZES: { value: PaperSize; label: string }[] = [
   { value: '5x7', label: '13×18 cm (5×7")' },
   { value: 'a4', label: 'A4' },
   { value: 'letter', label: 'Carta' },
+];
+
+export type PaperType = 'auto' | 'glossy' | 'matte' | 'plain';
+
+export const PAPER_TYPES: { value: PaperType; label: string }[] = [
+  { value: 'auto', label: 'Automático' },
+  { value: 'glossy', label: 'Fotográfico brillante' },
+  { value: 'matte', label: 'Fotográfico mate' },
+  { value: 'plain', label: 'Común' },
 ];
 
 export const isNativePrintAvailable = () =>
