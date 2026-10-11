@@ -30,6 +30,7 @@ export const printKioskPhoto = async (photo: string) => {
       bleed: Number(cfg.bleed) || 0,
       format: cfg.printFormat || 'auto',
       paperType: cfg.paperType || 'auto',
+      quality: cfg.printQuality || 'normal',
       jobName: 'EventPix',
     };
     // Cola: si hay otra imprimiéndose, esta espera su turno (no se pierde)

@@ -80,6 +80,8 @@ export interface NativePrintOptions {
   format?: 'auto' | 'jpeg' | 'pwg';
   /** Papel cargado: auto (fotográfico en 10×15 y 13×18), brillante, mate o común */
   paperType?: PaperType;
+  /** Rápida (borrador), normal o alta (más lenta) */
+  quality?: PrintQuality;
   jobName?: string;
 }
 
@@ -89,6 +91,7 @@ export interface NativePrintResult {
   format?: string;
   dpi?: number;
   mediaType?: string;
+  quality?: PrintQuality;
   /** Resolución pedida a la impresora, p. ej. "1440x720 dpi" */
   resolution?: string;
   /** false = la impresora no anuncia márgenes en 0 (no hace sin bordes) */
@@ -114,6 +117,13 @@ export const PAPER_SIZES: { value: PaperSize; label: string }[] = [
 ];
 
 export type PaperType = 'auto' | 'glossy' | 'matte' | 'plain';
+export type PrintQuality = 'fast' | 'normal' | 'high';
+
+export const PRINT_QUALITIES: { value: PrintQuality; label: string }[] = [
+  { value: 'fast', label: 'Rápida' },
+  { value: 'normal', label: 'Normal' },
+  { value: 'high', label: 'Alta' },
+];
 
 export const PAPER_TYPES: { value: PaperType; label: string }[] = [
   { value: 'auto', label: 'Automático' },

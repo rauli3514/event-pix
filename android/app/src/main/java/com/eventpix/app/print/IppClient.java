@@ -58,7 +58,9 @@ public final class IppClient {
     private static final int OP_PRINT_JOB = 0x0002;
     private static final int OP_GET_PRINTER_ATTRIBUTES = 0x000B;
     private static final int RESOLUTION_UNITS_DPI = 3;
-    private static final int PRINT_QUALITY_HIGH = 5;
+    public static final int PRINT_QUALITY_DRAFT = 3;
+    public static final int PRINT_QUALITY_NORMAL = 4;
+    public static final int PRINT_QUALITY_HIGH = 5;
 
     private static final int CONNECT_TIMEOUT_MS = 5000;
     private static final int READ_TIMEOUT_MS = 90000;
@@ -80,7 +82,8 @@ public final class IppClient {
         public boolean borderless;
         /** "fill", "fit", "auto"... Null = no se envía. */
         public String printScaling;
-        public boolean highQuality = true;
+        /** print-quality: 3 rápida, 4 normal, 5 alta. 0 = no se envía. */
+        public int printQuality = PRINT_QUALITY_HIGH;
         /** Resolución de impresión (valor crudo de printer-resolution-supported). Null = la de la impresora. */
         public byte[] printResolution;
         /** "photo"... Null = no se envía. */
@@ -297,7 +300,7 @@ public final class IppClient {
 
         out.writeByte(TAG_JOB_ATTRIBUTES);
         writeInt(out, TAG_INTEGER, "copies", Math.max(1, o.copies));
-        if (o.highQuality) writeInt(out, TAG_ENUM, "print-quality", PRINT_QUALITY_HIGH);
+        if (o.printQuality > 0) writeInt(out, TAG_ENUM, "print-quality", o.printQuality);
         if (o.printResolution != null) writeValue(out, TAG_RESOLUTION, "printer-resolution", o.printResolution);
         if (o.contentOptimize != null) writeString(out, TAG_KEYWORD, "print-content-optimize", o.contentOptimize);
         if (o.colorMode != null) writeString(out, TAG_KEYWORD, "print-color-mode", o.colorMode);

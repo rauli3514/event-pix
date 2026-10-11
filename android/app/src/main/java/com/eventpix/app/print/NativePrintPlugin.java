@@ -312,6 +312,8 @@ public class NativePrintPlugin extends Plugin {
         String preferredFormat = call.getString("format", "auto");
         // Papel: auto (fotográfico en 10x15 y 13x18), glossy, matte o plain (común)
         String paperType = call.getString("paperType", "auto");
+        // Calidad: fast (más rápida), normal o high (más lenta)
+        String quality = call.getString("quality", "normal");
         String jobName = call.getString("jobName", "EventPix");
 
         executor.execute(() -> {
@@ -331,11 +333,11 @@ public class NativePrintPlugin extends Plugin {
                             // Epson sin IPP por USB (p. ej. L1250): su idioma, ESC/P-R
                             page = composePage(source, paper, totalRotation, scaleMode, EscprEncoder.DPI, bleed, borderless);
                             source.recycle();
-                            printEscpr(call, target.usb, page, paper, paperType, copies, borderless, jobName);
+                            printEscpr(call, target.usb, page, paper, paperType, quality, copies, borderless, jobName);
                             page.recycle();
                             return;
                         }
-                        Capabilities caps = capabilitiesFor(target, paper, preferredFormat, borderless, paperType);
+                        Capabilities caps = capabilitiesFor(target, paper, preferredFormat, borderless, paperType, quality);
                         page = composePage(source, paper, totalRotation, scaleMode, caps.dpi, bleed, borderless);
                         source.recycle();
                         printSilently(call, target, page, paper, caps, copies, borderless, jobName);
@@ -346,7 +348,7 @@ public class NativePrintPlugin extends Plugin {
                 } else if (printer != null && (printer.has("host") || printer.has("wifiDirect"))) {
                     session = openWifiDirect(printer);
                     Target target = targetFor(printer, session);
-                    Capabilities caps = capabilitiesFor(target, paper, preferredFormat, borderless, paperType);
+                    Capabilities caps = capabilitiesFor(target, paper, preferredFormat, borderless, paperType, quality);
                     page = composePage(source, paper, totalRotation, scaleMode, caps.dpi, bleed, borderless);
                     source.recycle();
                     printSilently(call, target, page, paper, caps, copies, borderless, jobName);
@@ -392,13 +394,15 @@ public class NativePrintPlugin extends Plugin {
 
     /** Imprime por cable en ESC/P-R (Epson sin IPP por USB). */
     private void printEscpr(PluginCall call, UsbPrinterLink link, Bitmap page, Paper paper, String paperType,
-                            int copies, boolean borderless, String jobName) throws IOException {
+                            String quality, int copies, boolean borderless, String jobName) throws IOException {
         EscprEncoder.Job job = new EscprEncoder.Job();
         job.paperWidthHmm = paper.widthHmm;
         job.paperHeightHmm = paper.heightHmm;
         job.borderless = borderless;
         job.copies = copies;
         job.name = jobName;
+        job.quality = "fast".equals(quality) ? EscprEncoder.QUALITY_DRAFT
+                : "high".equals(quality) ? EscprEncoder.QUALITY_HIGH : EscprEncoder.QUALITY_NORMAL;
         boolean photo = "glossy".equals(paperType) || "matte".equals(paperType)
                 || (!"plain".equals(paperType) && paper.isPhoto());
         job.mediaType = !photo ? EscprEncoder.MEDIA_PLAIN
@@ -414,6 +418,7 @@ public class NativePrintPlugin extends Plugin {
         ret.put("mode", "silent");
         ret.put("format", "ESC/P-R");
         ret.put("dpi", EscprEncoder.DPI);
+        ret.put("quality", quality);
         ret.put("mediaType", job.mediaType == EscprEncoder.MEDIA_PLAIN ? "común"
                 : job.mediaType == EscprEncoder.MEDIA_MATTE ? "fotográfico mate" : "fotográfico brillante");
         call.resolve(ret);
@@ -579,6 +584,7 @@ public class NativePrintPlugin extends Plugin {
         String mediaType;
         /** Máxima resolución que anuncia (valor crudo IPP), foto optimizada y color forzado */
         byte[] printResolution;
+        int printQuality = IppClient.PRINT_QUALITY_NORMAL;
         boolean photoOptimize;
         boolean forceColor;
         /** Formatos que acepta (para reintentar con otro si rechaza el elegido) */
@@ -588,7 +594,7 @@ public class NativePrintPlugin extends Plugin {
     }
 
     private static Capabilities capabilitiesFor(Target target, Paper paper, String preferred, boolean borderless,
-                                                String paperType) throws IOException {
+                                                String paperType, String quality) throws IOException {
         IppClient.Result attrs = null;
         IOException queryError = null;
         try {
@@ -615,6 +621,8 @@ public class NativePrintPlugin extends Plugin {
 
         Capabilities caps = new Capabilities();
         caps.supported = pdl;
+        caps.printQuality = "fast".equals(quality) ? IppClient.PRINT_QUALITY_DRAFT
+                : "high".equals(quality) ? IppClient.PRINT_QUALITY_HIGH : IppClient.PRINT_QUALITY_NORMAL;
         boolean pwgOk = pdl.contains("image/pwg-raster") && attrs != null;
         if ("pwg".equals(preferred) && pwgOk) {
             caps.format = "image/pwg-raster";
@@ -664,9 +672,9 @@ public class NativePrintPlugin extends Plugin {
         else if ("plain".equals(paperType) && IppClient.hasKeyword(attrs.get("media-type-supported"), "stationery")) {
             caps.mediaType = "stationery";
         }
-        // Calidad de foto: la resolución más alta (en raster la da la página misma),
-        // contenido "foto" y color
-        if (!caps.format.equals("image/pwg-raster")) {
+        // Calidad alta: la resolución más alta (en raster la da la página misma; es más
+        // lenta, por eso solo en alta). Siempre contenido "foto" y color
+        if (caps.printQuality == IppClient.PRINT_QUALITY_HIGH && !caps.format.equals("image/pwg-raster")) {
             caps.printResolution = IppClient.pickBestResolution(attrs.get("printer-resolution-supported"));
         }
         caps.photoOptimize = IppClient.hasKeyword(attrs.get("print-content-optimize-supported"), "photo");
@@ -711,6 +719,7 @@ public class NativePrintPlugin extends Plugin {
         String scaling = borderless ? "fill" : "fit";
         options.printScaling = format.equals("image/pwg-raster") ? null : scaling;
         options.printResolution = caps.printResolution;
+        options.printQuality = caps.printQuality;
         options.contentOptimize = caps.photoOptimize ? "photo" : null;
         options.colorMode = caps.forceColor ? "color" : null;
 
@@ -741,6 +750,8 @@ public class NativePrintPlugin extends Plugin {
         ret.put("format", format);
         ret.put("dpi", caps.dpi);
         if (caps.mediaType != null) ret.put("mediaType", caps.mediaType);
+        ret.put("quality", caps.printQuality == IppClient.PRINT_QUALITY_DRAFT ? "fast"
+                : caps.printQuality == IppClient.PRINT_QUALITY_HIGH ? "high" : "normal");
         String resolution = IppClient.resolutionLabel(options.printResolution);
         if (resolution != null) ret.put("resolution", resolution);
         if (caps.borderlessSupported != null) ret.put("borderlessSupported", caps.borderlessSupported);

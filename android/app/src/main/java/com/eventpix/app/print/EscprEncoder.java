@@ -31,13 +31,17 @@ final class EscprEncoder {
     static final int MEDIA_MATTE = 5;
     static final int MEDIA_PREMIUM_GLOSSY = 11;
 
-    private static final int QUALITY_HIGH = 2;
+    // Calidad (MQID): borrador, normal, alta
+    static final int QUALITY_DRAFT = 0;
+    static final int QUALITY_NORMAL = 1;
+    static final int QUALITY_HIGH = 2;
 
     static final class Job {
         /** Papel en centésimas de mm */
         int paperWidthHmm;
         int paperHeightHmm;
         int mediaType = MEDIA_PREMIUM_GLOSSY;
+        int quality = QUALITY_NORMAL;
         boolean borderless;
         int copies = 1;
         String name = "EventPix";
@@ -89,8 +93,8 @@ final class EscprEncoder {
         out.write(new byte[]{0x1B, '(', 'R', 0x06, 0x00, 0x00});
         out.write(ascii("ESCPR"));
 
-        // Calidad: tipo de papel, alta, color, sin ajustes, RGB de 24 bits, sin paleta
-        command(out, 'q', "setq", new byte[]{(byte) job.mediaType, QUALITY_HIGH, 0, 0, 0, 0, 0, 0, 0});
+        // Calidad: tipo de papel, calidad, color, sin ajustes, RGB de 24 bits, sin paleta
+        command(out, 'q', "setq", new byte[]{(byte) job.mediaType, (byte) job.quality, 0, 0, 0, 0, 0, 0, 0});
 
         // Trabajo: papel, márgenes, zona imprimible, 360 dpi, en los dos sentidos
         byte[] setj = new byte[22];

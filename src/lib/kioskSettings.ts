@@ -224,6 +224,8 @@ export interface KioskPrintSettings {
   bleed?: number;
   printFormat?: 'auto' | 'jpeg' | 'pwg';
   paperType?: import('@/lib/nativePrint').PaperType;
+  /** Calidad de impresión: por defecto normal (buena foto y más rápida que alta) */
+  printQuality?: import('@/lib/nativePrint').PrintQuality;
   copies?: number;
   autoPrint?: boolean;
   imageAdjust?: 'cover' | 'contain' | 'fill';
