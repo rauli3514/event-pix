@@ -329,27 +329,50 @@ final class UsbPrinterLink implements Closeable, IppClient.Transport {
             }
 
             private void flushBuffer() throws IOException {
-                int offset = 0;
-                long stalledSince = 0;
-                while (offset < len) {
-                    byte[] chunk = offset == 0 ? buf : Arrays.copyOfRange(buf, offset, len);
-                    int sent = connection.bulkTransfer(out, chunk, len - offset, 20000);
-                    if (sent > 0) {
-                        offset += sent;
-                        stalledSince = 0;
-                        continue;
-                    }
-                    long now = System.currentTimeMillis();
-                    if (stalledSince == 0) stalledSince = now;
-                    else if (now - stalledSince > RAW_STALL_MS) {
-                        throw new IOException("La impresora USB dejó de recibir (¿sin papel, tapa abierta o desenchufada?)");
-                    }
-                }
+                if (len == 0) return;
+                sendWhole(buf, len);
                 len = 0;
                 // Lo que la impresora contesta (estado) se descarta para que no se le llene
                 if (++chunks % 32 == 0) drain();
             }
         };
+    }
+
+    /**
+     * Manda un bloque entero. Nunca se reenvía: si la impresora deja de aceptar datos un
+     * rato (termina la foto anterior, calienta, limpia cabezales) se sigue esperando el
+     * mismo envío. Con bulkTransfer, un envío que vence puede haber pasado a medias y
+     * reenviarlo duplica bytes: la impresora pierde el hilo (sale una hoja en blanco y
+     * se cuelga).
+     */
+    private void sendWhole(byte[] data, int len) throws IOException {
+        if (Build.VERSION.SDK_INT >= 26) {
+            android.hardware.usb.UsbRequest request = new android.hardware.usb.UsbRequest();
+            if (!request.initialize(connection, out)) throw new IOException("No se pudo preparar el envío a la impresora USB");
+            try {
+                if (!request.queue(java.nio.ByteBuffer.wrap(data, 0, len))) {
+                    throw new IOException("No se pudo mandar a la impresora USB");
+                }
+                long start = System.currentTimeMillis();
+                while (true) {
+                    try {
+                        android.hardware.usb.UsbRequest done = connection.requestWait(20000);
+                        if (done == null) throw new IOException("Se cortó el envío a la impresora USB");
+                        return;
+                    } catch (java.util.concurrent.TimeoutException e) {
+                        if (System.currentTimeMillis() - start > RAW_STALL_MS) {
+                            request.cancel();
+                            throw new IOException("La impresora USB dejó de recibir (¿sin papel, tapa abierta o desenchufada?)");
+                        }
+                    }
+                }
+            } finally {
+                request.close();
+            }
+        }
+        // Android viejo: un solo intento largo, sin reenviar
+        int sent = connection.bulkTransfer(out, data, len, RAW_STALL_MS);
+        if (sent != len) throw new IOException("La impresora USB dejó de recibir (¿sin papel, tapa abierta o desenchufada?)");
     }
 
     /** Descarta restos de una respuesta anterior (el cable es una sola conversación). */
