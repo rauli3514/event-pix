@@ -12,7 +12,7 @@ export interface NativePrinter {
   pdl: string;
   /** Si está, se imprime conectándose a la red Wi-Fi Direct de la impresora (sin router) */
   wifiDirect?: WifiDirectConfig;
-  /** Si está, se imprime por cable USB (IPP por USB); es el nombre del dispositivo */
+  /** Si está, se imprime por cable USB (IPP por USB o, en Epson, ESC/P-R); es el nombre del dispositivo */
   usb?: string;
 }
 
@@ -21,9 +21,22 @@ export interface UsbPrinterInfo {
   name: string;
   vendorId: number;
   productId: number;
-  /** Si acepta IPP por USB (lo que usa la app para imprimir por cable) */
+  /** Si acepta IPP por USB */
   ippUsb: boolean;
+  /** Epson sin IPP por USB: se le imprime en su idioma (ESC/P-R) */
+  escpr?: boolean;
   protocols: number[];
+}
+
+export interface UsbPrinterTest {
+  name: string;
+  /** Formatos (IPP) o idiomas que anuncia la impresora (cable común) */
+  formats: string;
+  model?: string;
+  /** Cable común: si la impresora dice que entiende ESC/P-R */
+  escpr?: boolean;
+  /** Identificación IEEE 1284 completa (cable común) */
+  deviceId?: string;
 }
 
 export interface WifiDirectConfig {
@@ -65,6 +78,10 @@ export interface NativePrintOptions {
   bleed?: number;
   /** Formato de envío: auto (PWG raster sin bordes si se puede), jpeg o pwg */
   format?: 'auto' | 'jpeg' | 'pwg';
+  /** Papel cargado: auto (fotográfico en 10×15 y 13×18), brillante, mate o común */
+  paperType?: PaperType;
+  /** Rápida (borrador), normal o alta (más lenta) */
+  quality?: PrintQuality;
   jobName?: string;
 }
 
@@ -74,6 +91,9 @@ export interface NativePrintResult {
   format?: string;
   dpi?: number;
   mediaType?: string;
+  quality?: PrintQuality;
+  /** Resolución pedida a la impresora, p. ej. "1440x720 dpi" */
+  resolution?: string;
   /** false = la impresora no anuncia márgenes en 0 (no hace sin bordes) */
   borderlessSupported?: boolean;
 }
@@ -84,7 +104,7 @@ interface NativePrintPlugin {
   printImage(options: NativePrintOptions): Promise<NativePrintResult>;
   connectWifiDirect(options: WifiDirectConfig): Promise<WifiDirectResult>;
   findUsbPrinters(): Promise<{ printers: UsbPrinterInfo[] }>;
-  testUsbPrinter(options: { usb: string }): Promise<{ name: string; formats: string; model?: string }>;
+  testUsbPrinter(options: { usb: string }): Promise<UsbPrinterTest>;
 }
 
 const NativePrint = registerPlugin<NativePrintPlugin>('NativePrint');
@@ -94,6 +114,22 @@ export const PAPER_SIZES: { value: PaperSize; label: string }[] = [
   { value: '5x7', label: '13×18 cm (5×7")' },
   { value: 'a4', label: 'A4' },
   { value: 'letter', label: 'Carta' },
+];
+
+export type PaperType = 'auto' | 'glossy' | 'matte' | 'plain';
+export type PrintQuality = 'fast' | 'normal' | 'high';
+
+export const PRINT_QUALITIES: { value: PrintQuality; label: string }[] = [
+  { value: 'fast', label: 'Rápida' },
+  { value: 'normal', label: 'Normal' },
+  { value: 'high', label: 'Alta' },
+];
+
+export const PAPER_TYPES: { value: PaperType; label: string }[] = [
+  { value: 'auto', label: 'Automático' },
+  { value: 'glossy', label: 'Fotográfico brillante' },
+  { value: 'matte', label: 'Fotográfico mate' },
+  { value: 'plain', label: 'Común' },
 ];
 
 export const isNativePrintAvailable = () =>

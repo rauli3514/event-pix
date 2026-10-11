@@ -258,6 +258,20 @@ public class NativePrintPlugin extends Plugin {
             Target target = new Target();
             try {
                 target.usb = UsbPrinterLink.open(getContext(), usb);
+                if (target.usb.raw) {
+                    // Cable común: se lee la identificación de la impresora (modelo e idiomas)
+                    String id = target.usb.deviceId();
+                    JSObject ret = new JSObject();
+                    ret.put("name", target.usb.name);
+                    String model = UsbPrinterLink.deviceIdField(id, "MDL", "MODEL");
+                    String cmd = UsbPrinterLink.deviceIdField(id, "CMD", "COMMAND SET");
+                    if (model != null) ret.put("model", model);
+                    ret.put("formats", cmd != null ? cmd : "");
+                    ret.put("escpr", cmd == null || cmd.toUpperCase(Locale.ROOT).contains("ESCPR"));
+                    if (id != null) ret.put("deviceId", id);
+                    call.resolve(ret);
+                    return;
+                }
                 IppClient.Result attrs = IppClient.getPrinterAttributes(target.transport(), target.uri(), target.rp,
                         "printer-make-and-model", "document-format-supported", "printer-state");
                 JSObject ret = new JSObject();
@@ -296,6 +310,10 @@ public class NativePrintPlugin extends Plugin {
         // (solo sin bordes: con bordes la foto entra entera, sin recortar nada)
         float bleed = borderless ? Math.max(0f, Math.min(8f, call.getFloat("bleed", 0f))) / 100f : 0f;
         String preferredFormat = call.getString("format", "auto");
+        // Papel: auto (fotográfico en 10x15 y 13x18), glossy, matte o plain (común)
+        String paperType = call.getString("paperType", "auto");
+        // Calidad: fast (más rápida), normal o high (más lenta)
+        String quality = call.getString("quality", "normal");
         String jobName = call.getString("jobName", "EventPix");
 
         executor.execute(() -> {
@@ -306,12 +324,20 @@ public class NativePrintPlugin extends Plugin {
                 int totalRotation = rotation + ("landscape".equals(orientation) ? 90 : 0);
 
                 if (printer != null && printer.has("usb")) {
-                    // Por cable USB (IPP por USB)
+                    // Por cable USB (IPP por USB, o ESC/P-R en las Epson sin IPP)
                     Target target = new Target();
                     target.name = printer.getString("name", "");
-                    target.usb = UsbPrinterLink.open(getContext(), printer.getString("usb"));
+                    target.usb = openUsb(printer.getString("usb"));
                     try {
-                        Capabilities caps = capabilitiesFor(target, paper, preferredFormat, borderless);
+                        if (target.usb.raw) {
+                            // Epson sin IPP por USB (p. ej. L1250): su idioma, ESC/P-R
+                            page = composePage(source, paper, totalRotation, scaleMode, EscprEncoder.DPI, bleed, borderless);
+                            source.recycle();
+                            printEscpr(call, target.usb, page, paper, paperType, quality, copies, borderless, jobName);
+                            page.recycle();
+                            return;
+                        }
+                        Capabilities caps = capabilitiesFor(target, paper, preferredFormat, borderless, paperType, quality);
                         page = composePage(source, paper, totalRotation, scaleMode, caps.dpi, bleed, borderless);
                         source.recycle();
                         printSilently(call, target, page, paper, caps, copies, borderless, jobName);
@@ -322,7 +348,7 @@ public class NativePrintPlugin extends Plugin {
                 } else if (printer != null && (printer.has("host") || printer.has("wifiDirect"))) {
                     session = openWifiDirect(printer);
                     Target target = targetFor(printer, session);
-                    Capabilities caps = capabilitiesFor(target, paper, preferredFormat, borderless);
+                    Capabilities caps = capabilitiesFor(target, paper, preferredFormat, borderless, paperType, quality);
                     page = composePage(source, paper, totalRotation, scaleMode, caps.dpi, bleed, borderless);
                     source.recycle();
                     printSilently(call, target, page, paper, caps, copies, borderless, jobName);
@@ -339,6 +365,63 @@ public class NativePrintPlugin extends Plugin {
                 if (session != null) session.close();
             }
         });
+    }
+
+    /**
+     * Abre la impresora USB. Si recién se terminó otro trabajo o se reconectó el cable
+     * puede estar ocupada un momento: se reintenta un par de veces.
+     */
+    private UsbPrinterLink openUsb(String usb) throws IOException {
+        IOException last = null;
+        for (int attempt = 0; attempt < 3; attempt++) {
+            try {
+                return UsbPrinterLink.open(getContext(), usb);
+            } catch (IOException e) {
+                last = e;
+                String msg = e.getMessage() != null ? e.getMessage() : "";
+                // Sin impresora, sin permiso o no compatible: reintentar no sirve
+                if (msg.contains("permiso") || msg.contains("compatible") || msg.contains("No hay ninguna")) throw e;
+                try {
+                    Thread.sleep(1500);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw e;
+                }
+            }
+        }
+        throw last;
+    }
+
+    /** Imprime por cable en ESC/P-R (Epson sin IPP por USB). */
+    private void printEscpr(PluginCall call, UsbPrinterLink link, Bitmap page, Paper paper, String paperType,
+                            String quality, int copies, boolean borderless, String jobName) throws IOException {
+        EscprEncoder.Job job = new EscprEncoder.Job();
+        job.paperWidthHmm = paper.widthHmm;
+        job.paperHeightHmm = paper.heightHmm;
+        job.borderless = borderless;
+        job.copies = copies;
+        job.name = jobName;
+        job.quality = "fast".equals(quality) ? EscprEncoder.QUALITY_DRAFT
+                : "high".equals(quality) ? EscprEncoder.QUALITY_HIGH : EscprEncoder.QUALITY_NORMAL;
+        boolean photo = "glossy".equals(paperType) || "matte".equals(paperType)
+                || (!"plain".equals(paperType) && paper.isPhoto());
+        job.mediaType = !photo ? EscprEncoder.MEDIA_PLAIN
+                : "matte".equals(paperType) ? EscprEncoder.MEDIA_MATTE : EscprEncoder.MEDIA_PREMIUM_GLOSSY;
+        int width = page.getWidth();
+        int height = page.getHeight();
+        // La página puede tener un punto menos que el papel del trabajo (redondeo): lo que falta, blanco
+        EscprEncoder.write(link.rawOutput(), job, (y, out) -> {
+            java.util.Arrays.fill(out, 0xFFFFFFFF);
+            if (y < height) page.getPixels(out, 0, width, 0, y, Math.min(width, out.length), 1);
+        });
+        JSObject ret = new JSObject();
+        ret.put("mode", "silent");
+        ret.put("format", "ESC/P-R");
+        ret.put("dpi", EscprEncoder.DPI);
+        ret.put("quality", quality);
+        ret.put("mediaType", job.mediaType == EscprEncoder.MEDIA_PLAIN ? "común"
+                : job.mediaType == EscprEncoder.MEDIA_MATTE ? "fotográfico mate" : "fotográfico brillante");
+        call.resolve(ret);
     }
 
     // ─── Wi-Fi Direct ───────────────────────────────────────────────
@@ -499,13 +582,19 @@ public class NativePrintPlugin extends Plugin {
         int dpi = DPI;
         boolean color = true;
         String mediaType;
+        /** Máxima resolución que anuncia (valor crudo IPP), foto optimizada y color forzado */
+        byte[] printResolution;
+        int printQuality = IppClient.PRINT_QUALITY_NORMAL;
+        boolean photoOptimize;
+        boolean forceColor;
         /** Formatos que acepta (para reintentar con otro si rechaza el elegido) */
         String supported = "";
         /** null = no se sabe; false = la impresora no anuncia márgenes en 0 */
         Boolean borderlessSupported;
     }
 
-    private static Capabilities capabilitiesFor(Target target, Paper paper, String preferred, boolean borderless) throws IOException {
+    private static Capabilities capabilitiesFor(Target target, Paper paper, String preferred, boolean borderless,
+                                                String paperType, String quality) throws IOException {
         IppClient.Result attrs = null;
         IOException queryError = null;
         try {
@@ -514,6 +603,9 @@ public class NativePrintPlugin extends Plugin {
                     "pwg-raster-document-resolution-supported",
                     "pwg-raster-document-type-supported",
                     "media-type-supported",
+                    "printer-resolution-supported",
+                    "print-content-optimize-supported",
+                    "print-color-mode-supported",
                     "media-left-margin-supported", "media-right-margin-supported",
                     "media-top-margin-supported", "media-bottom-margin-supported");
         } catch (IOException e) {
@@ -529,6 +621,8 @@ public class NativePrintPlugin extends Plugin {
 
         Capabilities caps = new Capabilities();
         caps.supported = pdl;
+        caps.printQuality = "fast".equals(quality) ? IppClient.PRINT_QUALITY_DRAFT
+                : "high".equals(quality) ? IppClient.PRINT_QUALITY_HIGH : IppClient.PRINT_QUALITY_NORMAL;
         boolean pwgOk = pdl.contains("image/pwg-raster") && attrs != null;
         if ("pwg".equals(preferred) && pwgOk) {
             caps.format = "image/pwg-raster";
@@ -572,7 +666,19 @@ public class NativePrintPlugin extends Plugin {
             else if (!srgb) throw new IOException("La impresora no acepta PWG raster sRGB de 8 bits");
         }
 
-        if (paper.isPhoto()) caps.mediaType = IppClient.pickPhotoMediaType(attrs.get("media-type-supported"));
+        boolean photoPaper = "glossy".equals(paperType) || "matte".equals(paperType)
+                || (!"plain".equals(paperType) && paper.isPhoto());
+        if (photoPaper) caps.mediaType = IppClient.pickPhotoMediaType(attrs.get("media-type-supported"), paperType);
+        else if ("plain".equals(paperType) && IppClient.hasKeyword(attrs.get("media-type-supported"), "stationery")) {
+            caps.mediaType = "stationery";
+        }
+        // Calidad alta: la resolución más alta (en raster la da la página misma; es más
+        // lenta, por eso solo en alta). Siempre contenido "foto" y color
+        if (caps.printQuality == IppClient.PRINT_QUALITY_HIGH && !caps.format.equals("image/pwg-raster")) {
+            caps.printResolution = IppClient.pickBestResolution(attrs.get("printer-resolution-supported"));
+        }
+        caps.photoOptimize = IppClient.hasKeyword(attrs.get("print-content-optimize-supported"), "photo");
+        caps.forceColor = caps.color && IppClient.hasKeyword(attrs.get("print-color-mode-supported"), "color");
         boolean zero = true;
         boolean any = false;
         for (String side : new String[]{"left", "right", "top", "bottom"}) {
@@ -612,9 +718,21 @@ public class NativePrintPlugin extends Plugin {
         // imprimible en vez de recortar el logo o el marco
         String scaling = borderless ? "fill" : "fit";
         options.printScaling = format.equals("image/pwg-raster") ? null : scaling;
+        options.printResolution = caps.printResolution;
+        options.printQuality = caps.printQuality;
+        options.contentOptimize = caps.photoOptimize ? "photo" : null;
+        options.colorMode = caps.forceColor ? "color" : null;
 
         IppClient.Result result = IppClient.printJob(target.transport(), target.uri(), target.rp,
                 format, document, options);
+        boolean extras = options.printResolution != null || options.contentOptimize != null || options.colorMode != null;
+        if (!result.isSuccess() && extras) {
+            // Alguna impresora rechaza la combinación: se reintenta con sus valores de fábrica
+            options.printResolution = null;
+            options.contentOptimize = null;
+            options.colorMode = null;
+            result = IppClient.printJob(target.transport(), target.uri(), target.rp, format, document, options);
+        }
         if (!result.isSuccess() && format.equals("image/pwg-raster") && caps.supported.contains("image/jpeg")) {
             // Rechazó el raster: se reintenta en JPEG
             format = "image/jpeg";
@@ -632,6 +750,10 @@ public class NativePrintPlugin extends Plugin {
         ret.put("format", format);
         ret.put("dpi", caps.dpi);
         if (caps.mediaType != null) ret.put("mediaType", caps.mediaType);
+        ret.put("quality", caps.printQuality == IppClient.PRINT_QUALITY_DRAFT ? "fast"
+                : caps.printQuality == IppClient.PRINT_QUALITY_HIGH ? "high" : "normal");
+        String resolution = IppClient.resolutionLabel(options.printResolution);
+        if (resolution != null) ret.put("resolution", resolution);
         if (caps.borderlessSupported != null) ret.put("borderlessSupported", caps.borderlessSupported);
         call.resolve(ret);
     }

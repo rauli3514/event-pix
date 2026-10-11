@@ -87,6 +87,8 @@ const SELFIE_PHRASES = [
 
 // Pantalla "¡Boom! Estamos procesando tu foto": cuánto dura antes de mostrar la foto
 const FLASH_RESULT_MS = 5000;
+/** Cuánto está la pantalla en blanco antes de sacar la foto */
+const SCREEN_FLASH_MS = 350;
 
 // ---- Corner decoration ----
 const Corners = () => (
@@ -132,6 +134,8 @@ export default function KioskAI() {
   const [step, setStep] = useState<Step>('splash');
   const [mode, setMode] = useState<Mode>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
+  // Flash con la pantalla: blanco a pleno justo antes de sacar la foto
+  const [screenFlash, setScreenFlash] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const capturedImageState = capturedImage;
   const [lastPublicUrl, setLastPublicUrl] = useState<string | null>(null);
@@ -442,7 +446,16 @@ export default function KioskAI() {
         window.clearInterval(countdownTimerRef.current!);
         countdownTimerRef.current = null;
         setCountdown(null);
-        capturePhoto();
+        if (cameraSettings.screenFlash === false) {
+          capturePhoto();
+          return;
+        }
+        // La pantalla blanca tarda un poco en iluminar y la cámara en mandar el cuadro
+        setScreenFlash(true);
+        window.setTimeout(() => {
+          capturePhoto();
+          setScreenFlash(false);
+        }, SCREEN_FLASH_MS);
       } else {
         setCountdown(left);
       }
@@ -1048,6 +1061,7 @@ export default function KioskAI() {
         </div>
       )}
       <Corners />
+      {screenFlash && <div className="fixed inset-0 z-[100] bg-white" />}
     </div>
   );
 
@@ -1353,7 +1367,7 @@ export default function KioskAI() {
 
             {/* QR a la vista: el invitado lo escanea y se lleva la foto al celular */}
             {showQrBlock && (
-              <div className="flex items-center gap-5 rounded-3xl bg-white/95 p-4 shadow-[0_10px_40px_rgba(139,92,246,0.35)]">
+              <div className="flex flex-col items-center gap-3 rounded-3xl bg-white/95 p-4 text-center shadow-[0_10px_40px_rgba(139,92,246,0.35)]">
                 {/* Grande: se escanea desde un paso de distancia */}
                 <div className="w-[clamp(9rem,26vmin,17rem)] h-[clamp(9rem,26vmin,17rem)] shrink-0 rounded-2xl bg-white flex items-center justify-center overflow-hidden">
                   {qrUrl ? (
@@ -1365,12 +1379,12 @@ export default function KioskAI() {
                     <QrCode className="w-12 h-12 text-slate-300" />
                   )}
                 </div>
-                <div className="text-slate-900">
+                <div className="text-slate-900 min-w-0 w-full">
                   <p className="carlmarx-bold text-[clamp(1.5rem,3.6vmin,2.4rem)] leading-tight">{qrUrl ? 'Escaneá y llevátela' : uploading ? 'Preparando tu QR…' : 'QR no disponible'}</p>
-                  <p className="text-slate-500 text-[clamp(0.9rem,2vmin,1.2rem)] mt-1 max-w-[16rem]">{qrUrl ? 'Bajala al celular y compartila por WhatsApp o Instagram' : uploading ? 'Un segundo' : 'La foto quedó guardada en el equipo'}</p>
+                  <p className="text-slate-500 text-[clamp(0.9rem,2vmin,1.2rem)] mt-1">{qrUrl ? 'Bajala al celular y compartila por WhatsApp o Instagram' : uploading ? 'Un segundo' : 'La foto quedó guardada en el equipo'}</p>
                   {!qrUrl && !uploading && (
                     <>
-                      {qrError && <p className="text-red-600 text-xs mt-1 max-w-[16rem] break-words">{qrError}</p>}
+                      {qrError && <p className="text-red-600 text-xs mt-1 break-words">{qrError}</p>}
                       <button onClick={retryQr} className="mt-2 px-4 py-2 rounded-full bg-violet-600 text-white text-sm font-bold">Reintentar</button>
                     </>
                   )}

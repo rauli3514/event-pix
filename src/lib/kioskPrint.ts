@@ -6,6 +6,9 @@ import { toPortraitForPrint } from '@/lib/photoLayout';
 // (en la app: directo a la impresora o diálogo de Android; en la web: servidor
 // local o diálogo del navegador). La usan el resultado y la galería.
 
+/** Fotos mandadas a la impresora que todavía no terminaron (la app las imprime de a una, en orden) */
+let pendingPrints = 0;
+
 export const printKioskPhoto = async (photo: string) => {
   // El papel 10×15 entra vertical: una hoja horizontal se gira antes de imprimir
   const imageUrl = await toPortraitForPrint(photo).catch(() => photo);
@@ -26,8 +29,13 @@ export const printKioskPhoto = async (photo: string) => {
       borderless: !!cfg.borderless,
       bleed: Number(cfg.bleed) || 0,
       format: cfg.printFormat || 'auto',
+      paperType: cfg.paperType || 'auto',
+      quality: cfg.printQuality || 'normal',
       jobName: 'EventPix',
     };
+    // Cola: si hay otra imprimiéndose, esta espera su turno (no se pierde)
+    toast.info(pendingPrints > 0 ? `Foto en cola de impresión (${pendingPrints} antes)` : 'Imprimiendo…');
+    pendingPrints++;
     try {
       const res = await printImageNative({ ...options, printer: cfg.nativePrinter || null });
       if (res.mode === 'silent') toast.success("Impresión enviada correctamente");
@@ -35,6 +43,8 @@ export const printKioskPhoto = async (photo: string) => {
       // Con impresora elegida no se abre el diálogo de Android: en la TV box no hay
       // servicios de impresión y solo aparece "Todas las impresoras" vacío
       toast.error(`No se pudo imprimir: ${printErrorMessage(err)}. Probá "Imprimir de nuevo".`);
+    } finally {
+      pendingPrints--;
     }
     return;
   }

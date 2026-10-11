@@ -128,6 +128,8 @@ export interface KioskCameraSettings {
   focusPos?: number;
   /** Segundos de cuenta regresiva */
   timer?: number;
+  /** La pantalla se pone blanca al sacar la foto (da luz a la cara). Por defecto sí */
+  screenFlash?: boolean;
   [key: string]: unknown;
 }
 
@@ -221,6 +223,9 @@ export interface KioskPrintSettings {
   /** % de agrandado para tapar la franja blanca sin bordes */
   bleed?: number;
   printFormat?: 'auto' | 'jpeg' | 'pwg';
+  paperType?: import('@/lib/nativePrint').PaperType;
+  /** Calidad de impresión: por defecto normal (buena foto y más rápida que alta) */
+  printQuality?: import('@/lib/nativePrint').PrintQuality;
   copies?: number;
   autoPrint?: boolean;
   imageAdjust?: 'cover' | 'contain' | 'fill';

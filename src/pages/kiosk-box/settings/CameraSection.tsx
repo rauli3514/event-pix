@@ -141,6 +141,8 @@ export default function CameraSection() {
         <Choice label="Segundos antes de sacar la foto" value={settings.timer || 5}
           options={[3, 5, 10].map(t => ({ value: t, label: `${t} s` }))}
           onChange={t => update({ timer: t })} />
+        <Toggle label="Flash con la pantalla" hint="Al sacar la foto la pantalla se pone toda blanca un instante: ilumina la cara con poca luz."
+          checked={settings.screenFlash !== false} onChange={screenFlash => update({ screenFlash })} />
       </Panel>
 
       <ShutterPanel />

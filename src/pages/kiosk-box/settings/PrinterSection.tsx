@@ -3,10 +3,11 @@ import { toast } from 'sonner';
 import { Printer, RefreshCw } from 'lucide-react';
 import {
   connectWifiDirectPrinter, discoverNativePrinters, findUsbPrinters, isNativePrintAvailable, isPrintableDirect,
-  printErrorMessage, printImageNative, testUsbPrinter, usbPrinterToNative, PAPER_SIZES,
-  type NativePrinter, type PaperSize, type UsbPrinterInfo,
+  printErrorMessage, printImageNative, testUsbPrinter, usbPrinterToNative, PAPER_SIZES, PAPER_TYPES, PRINT_QUALITIES,
+  type NativePrinter, type PaperSize, type PaperType, type PrintQuality, type UsbPrinterInfo,
 } from '@/lib/nativePrint';
 import { getPrintSettings, savePrintSettings } from '@/lib/kioskSettings';
+import { buildPrintTestSheet } from '@/lib/printTestSheet';
 import { buttonClass, Choice, inputClass, Panel, primaryClass, Toggle } from './ui';
 
 export default function PrinterSection() {
@@ -49,13 +50,16 @@ export default function PrinterSection() {
   });
 
   const chooseUsb = (u: UsbPrinterInfo) => run('usb', async () => {
-    if (!u.ippUsb) {
-      toast.error(`${u.name} no tiene "IPP por USB": por cable todavía no es compatible. Usá WiFi o Wi-Fi Direct.`);
+    if (!u.ippUsb && !u.escpr) {
+      toast.error(`${u.name} no tiene "IPP por USB" y no es Epson: por cable no es compatible. Usá WiFi o Wi-Fi Direct.`);
       return;
     }
     const res = await testUsbPrinter(u.usb);
     choosePrinter(usbPrinterToNative({ ...u, name: res.model || u.name }));
     toast.success(`Conectada por cable: ${res.model || u.name}`);
+    if (u.escpr && res.escpr === false) {
+      toast.warning(`La impresora no anuncia ESC/P-R (${res.formats || 'sin datos'}). Probá "Imprimir prueba"; si no sale, usá WiFi.`);
+    }
   });
 
   const scan = () => run('scan', async () => {
@@ -66,7 +70,7 @@ export default function PrinterSection() {
 
   const testPrint = () => run('test', async () => {
     const res = await printImageNative({
-      image: '/ai-themes/jugador-seleccion.jpg',
+      image: buildPrintTestSheet(),
       printer: printer || null,
       paper: settings.paper || '4x6',
       orientation: settings.orientation || 'portrait',
@@ -76,11 +80,13 @@ export default function PrinterSection() {
       borderless: !!settings.borderless,
       bleed: Number(settings.bleed) || 0,
       format: settings.printFormat || 'auto',
+      paperType: settings.paperType || 'auto',
+      quality: settings.printQuality || 'normal',
       jobName: 'EventPix - prueba',
     });
     if (res.mode === 'silent') {
       const fmt = res.format === 'image/pwg-raster' ? 'PWG raster' : res.format === 'image/jpeg' ? 'JPEG' : res.format;
-      toast.success(`Prueba enviada (${fmt}${res.dpi ? ` · ${res.dpi} dpi` : ''}${res.mediaType ? ` · ${res.mediaType}` : ''})`);
+      toast.success(`Prueba enviada (${fmt}${res.dpi ? ` · ${res.dpi} dpi` : ''}${res.resolution ? ` · ${res.resolution}` : ''}${res.mediaType ? ` · ${res.mediaType}` : ''}${res.quality ? ` · calidad ${PRINT_QUALITIES.find(q => q.value === res.quality)?.label.toLowerCase() || res.quality}` : ''})`);
       if (settings.borderless && res.borderlessSupported === false) {
         toast.warning('La impresora no anuncia impresión sin bordes con este papel: usá "Agrandar para tapar bordes".');
       }
@@ -118,7 +124,9 @@ export default function PrinterSection() {
             className={`w-full text-left rounded-2xl px-6 py-4 text-lg focus:outline-none focus:ring-4 focus:ring-[#00d4ff] ${printer?.usb === u.usb ? 'bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7]' : 'bg-white/10 hover:bg-white/20'}`}>
             {u.name}
             <span className="block text-sm text-white/60">
-              {u.ippUsb ? 'Compatible por cable (IPP por USB)' : `Sin IPP por USB (protocolos ${u.protocols.join(', ')}): por cable no es compatible todavía`}
+              {u.ippUsb ? 'Compatible por cable (IPP por USB)'
+                : u.escpr ? 'Compatible por cable (Epson, idioma ESC/P-R)'
+                : `Sin IPP por USB (protocolos ${u.protocols.join(', ')}): por cable no es compatible`}
             </span>
           </button>
         ))}
@@ -150,6 +158,18 @@ export default function PrinterSection() {
         <Choice label="Tamaño" value={settings.paper || '4x6'}
           options={PAPER_SIZES.map(p => ({ value: p.value, label: p.label }))}
           onChange={(paper: PaperSize) => update({ paper })} />
+        <Choice label="Calidad de impresión" value={settings.printQuality || 'normal'}
+          options={PRINT_QUALITIES.map(q => ({ value: q.value, label: q.label }))}
+          onChange={(printQuality: PrintQuality) => update({ printQuality })} />
+        <p className="text-white/55 text-sm -mt-2">
+          Normal: buena foto y bastante más rápida que Alta (recomendada para eventos con fila). Alta: la mejor calidad, tarda más por foto. Rápida: modo borrador, solo si hay mucha gente esperando (se nota en la foto).
+        </p>
+        <Choice label="Tipo de papel" value={settings.paperType || 'auto'}
+          options={PAPER_TYPES.map(p => ({ value: p.value, label: p.label }))}
+          onChange={(paperType: PaperType) => update({ paperType })} />
+        <p className="text-white/55 text-sm -mt-2">
+          Elegí el papel que está cargado: con papel fotográfico la impresora usa su modo foto (más tinta y más pasadas). Automático: fotográfico brillante en 10×15 y 13×18, común en A4 y Carta.
+        </p>
         <Toggle label="Sin bordes" hint="La foto ocupa toda la hoja, pero la impresora la agranda un poco y recorta los bordes. Apagado: queda un borde blanco fino y sale entera (logo y marco completos)."
           checked={!!settings.borderless} onChange={borderless => update({ borderless })} />
         {settings.borderless && (
