@@ -392,6 +392,9 @@ public class NativePrintPlugin extends Plugin {
         throw last;
     }
 
+    /** Trabajos ESC/P-R mandados desde que abrió la app (cada uno con su número) */
+    private static int escprJobs = 1;
+
     /** Imprime por cable en ESC/P-R (Epson sin IPP por USB). */
     private void printEscpr(PluginCall call, UsbPrinterLink link, Bitmap page, Paper paper, String paperType,
                             String quality, int copies, boolean borderless, String jobName) throws IOException {
@@ -401,6 +404,7 @@ public class NativePrintPlugin extends Plugin {
         job.borderless = borderless;
         job.copies = copies;
         job.name = jobName;
+        job.jobId = escprJobs++;
         job.quality = "fast".equals(quality) ? EscprEncoder.QUALITY_DRAFT
                 : "high".equals(quality) ? EscprEncoder.QUALITY_HIGH : EscprEncoder.QUALITY_NORMAL;
         boolean photo = "glossy".equals(paperType) || "matte".equals(paperType)

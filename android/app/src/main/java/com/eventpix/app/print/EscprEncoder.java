@@ -45,6 +45,8 @@ final class EscprEncoder {
         boolean borderless;
         int copies = 1;
         String name = "EventPix";
+        /** Número de trabajo (distinto en cada uno, como el driver) */
+        int jobId;
     }
 
     /** Puntos a DPI de una medida en centésimas de mm (como el driver: hacia arriba). */
@@ -83,6 +85,7 @@ final class EscprEncoder {
         remote(out, "JS", new byte[]{0, 0, 0});
         byte[] name = ascii(job.name.length() > 32 ? job.name.substring(0, 32) : job.name);
         byte[] header = new byte[5 + name.length];
+        putInt(header, 1, job.jobId);
         System.arraycopy(name, 0, header, 5, name.length);
         remote(out, "JH", header);
         remote(out, "HD", new byte[]{3, 4});
