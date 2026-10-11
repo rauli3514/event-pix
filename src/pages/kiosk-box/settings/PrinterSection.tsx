@@ -69,6 +69,7 @@ export default function PrinterSection() {
   });
 
   const testPrint = () => run('test', async () => {
+    const started = Date.now();
     const res = await printImageNative({
       image: buildPrintTestSheet(),
       printer: printer || null,
@@ -86,7 +87,7 @@ export default function PrinterSection() {
     });
     if (res.mode === 'silent') {
       const fmt = res.format === 'image/pwg-raster' ? 'PWG raster' : res.format === 'image/jpeg' ? 'JPEG' : res.format;
-      toast.success(`Prueba enviada (${fmt}${res.dpi ? ` · ${res.dpi} dpi` : ''}${res.resolution ? ` · ${res.resolution}` : ''}${res.mediaType ? ` · ${res.mediaType}` : ''}${res.quality ? ` · calidad ${PRINT_QUALITIES.find(q => q.value === res.quality)?.label.toLowerCase() || res.quality}` : ''})`);
+      toast.success(`Prueba enviada (${fmt}${res.dpi ? ` · ${res.dpi} dpi` : ''}${res.resolution ? ` · ${res.resolution}` : ''}${res.mediaType ? ` · ${res.mediaType}` : ''}${res.quality ? ` · calidad ${PRINT_QUALITIES.find(q => q.value === res.quality)?.label.toLowerCase() || res.quality}` : ''} · ${Math.round((Date.now() - started) / 1000)} s)`);
       if (settings.borderless && res.borderlessSupported === false) {
         toast.warning('La impresora no anuncia impresión sin bordes con este papel: usá "Agrandar para tapar bordes".');
       }
@@ -168,7 +169,7 @@ export default function PrinterSection() {
           options={PAPER_TYPES.map(p => ({ value: p.value, label: p.label }))}
           onChange={(paperType: PaperType) => update({ paperType })} />
         <p className="text-white/55 text-sm -mt-2">
-          Elegí el papel que está cargado: con papel fotográfico la impresora usa su modo foto (más tinta y más pasadas). Automático: fotográfico brillante en 10×15 y 13×18, común en A4 y Carta.
+          El tipo de papel es lo que más cambia la velocidad: la impresora decide cuántas pasadas hace según el papel (con Brillante premium ignora la calidad Rápida). Brillante estándar suele ser más rápido; Común es lo más rápido pero en papel brillante la tinta tarda en secar. Automático: brillante premium en 10×15 y 13×18, común en A4 y Carta. La prueba muestra cuántos segundos tardó.
         </p>
         <Toggle label="Sin bordes" hint="La foto ocupa toda la hoja, pero la impresora la agranda un poco y recorta los bordes. Apagado: queda un borde blanco fino y sale entera (logo y marco completos)."
           checked={!!settings.borderless} onChange={borderless => update({ borderless })} />

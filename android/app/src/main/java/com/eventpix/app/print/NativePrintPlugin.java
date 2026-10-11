@@ -310,7 +310,7 @@ public class NativePrintPlugin extends Plugin {
         // (solo sin bordes: con bordes la foto entra entera, sin recortar nada)
         float bleed = borderless ? Math.max(0f, Math.min(8f, call.getFloat("bleed", 0f))) / 100f : 0f;
         String preferredFormat = call.getString("format", "auto");
-        // Papel: auto (fotográfico en 10x15 y 13x18), glossy, matte o plain (común)
+        // Papel: auto (fotográfico en 10x15 y 13x18), glossy, glossyStd, matte o plain (común)
         String paperType = call.getString("paperType", "auto");
         // Calidad: fast (más rápida), normal o high (más lenta)
         String quality = call.getString("quality", "normal");
@@ -407,10 +407,13 @@ public class NativePrintPlugin extends Plugin {
         job.jobId = escprJobs++;
         job.quality = "fast".equals(quality) ? EscprEncoder.QUALITY_DRAFT
                 : "high".equals(quality) ? EscprEncoder.QUALITY_HIGH : EscprEncoder.QUALITY_NORMAL;
-        boolean photo = "glossy".equals(paperType) || "matte".equals(paperType)
+        // La Epson elige cuántas pasadas hace según el papel (con Premium Glossy ignora la
+        // calidad rápida): el tipo de papel es lo que más cambia la velocidad
+        boolean photo = "glossy".equals(paperType) || "glossyStd".equals(paperType) || "matte".equals(paperType)
                 || (!"plain".equals(paperType) && paper.isPhoto());
         job.mediaType = !photo ? EscprEncoder.MEDIA_PLAIN
-                : "matte".equals(paperType) ? EscprEncoder.MEDIA_MATTE : EscprEncoder.MEDIA_PREMIUM_GLOSSY;
+                : "matte".equals(paperType) ? EscprEncoder.MEDIA_MATTE
+                : "glossyStd".equals(paperType) ? EscprEncoder.MEDIA_PHOTO_GLOSSY : EscprEncoder.MEDIA_PREMIUM_GLOSSY;
         int width = page.getWidth();
         int height = page.getHeight();
         // La página puede tener un punto menos que el papel del trabajo (redondeo): lo que falta, blanco
@@ -424,7 +427,8 @@ public class NativePrintPlugin extends Plugin {
         ret.put("dpi", EscprEncoder.DPI);
         ret.put("quality", quality);
         ret.put("mediaType", job.mediaType == EscprEncoder.MEDIA_PLAIN ? "común"
-                : job.mediaType == EscprEncoder.MEDIA_MATTE ? "fotográfico mate" : "fotográfico brillante");
+                : job.mediaType == EscprEncoder.MEDIA_MATTE ? "fotográfico mate"
+                : job.mediaType == EscprEncoder.MEDIA_PHOTO_GLOSSY ? "brillante estándar" : "brillante premium");
         call.resolve(ret);
     }
 
@@ -670,7 +674,7 @@ public class NativePrintPlugin extends Plugin {
             else if (!srgb) throw new IOException("La impresora no acepta PWG raster sRGB de 8 bits");
         }
 
-        boolean photoPaper = "glossy".equals(paperType) || "matte".equals(paperType)
+        boolean photoPaper = "glossy".equals(paperType) || "glossyStd".equals(paperType) || "matte".equals(paperType)
                 || (!"plain".equals(paperType) && paper.isPhoto());
         if (photoPaper) caps.mediaType = IppClient.pickPhotoMediaType(attrs.get("media-type-supported"), paperType);
         else if ("plain".equals(paperType) && IppClient.hasKeyword(attrs.get("media-type-supported"), "stationery")) {
