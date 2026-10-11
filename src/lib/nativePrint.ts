@@ -12,7 +12,7 @@ export interface NativePrinter {
   pdl: string;
   /** Si está, se imprime conectándose a la red Wi-Fi Direct de la impresora (sin router) */
   wifiDirect?: WifiDirectConfig;
-  /** Si está, se imprime por cable USB (IPP por USB); es el nombre del dispositivo */
+  /** Si está, se imprime por cable USB (IPP por USB o, en Epson, ESC/P-R); es el nombre del dispositivo */
   usb?: string;
 }
 
@@ -21,9 +21,22 @@ export interface UsbPrinterInfo {
   name: string;
   vendorId: number;
   productId: number;
-  /** Si acepta IPP por USB (lo que usa la app para imprimir por cable) */
+  /** Si acepta IPP por USB */
   ippUsb: boolean;
+  /** Epson sin IPP por USB: se le imprime en su idioma (ESC/P-R) */
+  escpr?: boolean;
   protocols: number[];
+}
+
+export interface UsbPrinterTest {
+  name: string;
+  /** Formatos (IPP) o idiomas que anuncia la impresora (cable común) */
+  formats: string;
+  model?: string;
+  /** Cable común: si la impresora dice que entiende ESC/P-R */
+  escpr?: boolean;
+  /** Identificación IEEE 1284 completa (cable común) */
+  deviceId?: string;
 }
 
 export interface WifiDirectConfig {
@@ -88,7 +101,7 @@ interface NativePrintPlugin {
   printImage(options: NativePrintOptions): Promise<NativePrintResult>;
   connectWifiDirect(options: WifiDirectConfig): Promise<WifiDirectResult>;
   findUsbPrinters(): Promise<{ printers: UsbPrinterInfo[] }>;
-  testUsbPrinter(options: { usb: string }): Promise<{ name: string; formats: string; model?: string }>;
+  testUsbPrinter(options: { usb: string }): Promise<UsbPrinterTest>;
 }
 
 const NativePrint = registerPlugin<NativePrintPlugin>('NativePrint');

@@ -28,17 +28,23 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Impresora por cable USB (con hub en la TV box) usando "IPP por USB" (clase 7,
- * subclase 1, protocolo 4): es el mismo IPP que por WiFi, pero por el cable,
- * así que sirve todo lo demás (PWG raster, sin bordes, papel fotográfico).
- * Las impresoras sin IPP por USB (solo protocolo 1/2) necesitarían el idioma
- * propio de la marca y por ahora se informan como no compatibles.
+ * Impresora por cable USB (con hub en la TV box). Dos formas:
+ * - "IPP por USB" (clase 7, subclase 1, protocolo 4): el mismo IPP que por WiFi,
+ *   pero por el cable (PWG raster, sin bordes, papel fotográfico).
+ * - Cable "común" (protocolo 1 o 2): se le manda el idioma propio de la impresora.
+ *   Las Epson (p. ej. la L1250, que no tiene IPP por USB) entienden ESC/P-R, ver
+ *   EscprEncoder.
  */
 final class UsbPrinterLink implements Closeable, IppClient.Transport {
 
     private static final String ACTION_PERMISSION = "com.eventpix.app.USB_PRINTER_PERMISSION";
     private static final int USB_CLASS_PRINTER = 7;
     private static final int PROTOCOL_IPP_USB = 4;
+    private static final int PROTOCOL_UNIDIRECTIONAL = 1;
+    private static final int PROTOCOL_BIDIRECTIONAL = 2;
+    static final int VENDOR_EPSON = 0x04B8;
+    /** Cuánto se espera a que la impresora acepte más datos (calienta, limpia cabezales…) */
+    private static final int RAW_STALL_MS = 180000;
     private static final int TIMEOUT_MS = 30000;
     private static final int CHUNK = 16384;
 
@@ -48,12 +54,19 @@ final class UsbPrinterLink implements Closeable, IppClient.Transport {
     private final UsbEndpoint out;
     final String name;
 
-    private UsbPrinterLink(UsbDeviceConnection connection, UsbInterface iface, UsbEndpoint in, UsbEndpoint out, String name) {
+    /** true = cable común (sin IPP): se le manda el idioma de la impresora */
+    final boolean raw;
+    final int vendorId;
+
+    private UsbPrinterLink(UsbDeviceConnection connection, UsbInterface iface, UsbEndpoint in, UsbEndpoint out,
+                           String name, boolean raw, int vendorId) {
         this.connection = connection;
         this.iface = iface;
         this.in = in;
         this.out = out;
         this.name = name;
+        this.raw = raw;
+        this.vendorId = vendorId;
     }
 
     // ─── Búsqueda ───────────────────────────────────────────────────
@@ -85,6 +98,23 @@ final class UsbPrinterLink implements Closeable, IppClient.Transport {
         return null;
     }
 
+    /** Interfaz de impresora común (bidireccional si hay; si no, la de solo ida). */
+    private static UsbInterface rawInterface(UsbDevice d) {
+        UsbInterface uni = null;
+        for (int i = 0; i < d.getInterfaceCount(); i++) {
+            UsbInterface it = d.getInterface(i);
+            if (it.getInterfaceClass() != USB_CLASS_PRINTER) continue;
+            if (it.getInterfaceProtocol() == PROTOCOL_BIDIRECTIONAL) return it;
+            if (it.getInterfaceProtocol() == PROTOCOL_UNIDIRECTIONAL && uni == null) uni = it;
+        }
+        return uni;
+    }
+
+    /** Se puede imprimir por cable: IPP por USB, o una Epson con cable común (ESC/P-R). */
+    static boolean printable(UsbDevice d) {
+        return hasIppUsb(d) || (d.getVendorId() == VENDOR_EPSON && rawInterface(d) != null);
+    }
+
     static String displayName(UsbDevice d) {
         String manufacturer = null;
         String product = null;
@@ -104,6 +134,7 @@ final class UsbPrinterLink implements Closeable, IppClient.Transport {
         o.put("vendorId", d.getVendorId());
         o.put("productId", d.getProductId());
         o.put("ippUsb", hasIppUsb(d));
+        o.put("escpr", !hasIppUsb(d) && d.getVendorId() == VENDOR_EPSON && rawInterface(d) != null);
         JSArray protocols = new JSArray();
         for (int i = 0; i < d.getInterfaceCount(); i++) {
             UsbInterface it = d.getInterface(i);
@@ -167,8 +198,13 @@ final class UsbPrinterLink implements Closeable, IppClient.Transport {
             device = all.get(0);
         }
         UsbInterface iface = ippInterface(device);
+        boolean raw = false;
+        if (iface == null && device.getVendorId() == VENDOR_EPSON) {
+            iface = rawInterface(device);
+            raw = iface != null;
+        }
         if (iface == null) {
-            throw new IOException(displayName(device) + " no tiene IPP por USB: por cable no es compatible todavía (usá WiFi)");
+            throw new IOException(displayName(device) + " no tiene IPP por USB ni es Epson: por cable no es compatible (usá WiFi)");
         }
         if (!ensurePermission(context, device)) throw new IOException("No se dio permiso para usar la impresora USB");
 
@@ -187,12 +223,13 @@ final class UsbPrinterLink implements Closeable, IppClient.Transport {
             if (ep.getDirection() == UsbConstants.USB_DIR_IN) epIn = ep;
             else epOut = ep;
         }
-        if (epIn == null || epOut == null) {
+        // El cable común de solo ida no tiene canal de vuelta
+        if (epOut == null || (epIn == null && !raw)) {
             conn.releaseInterface(iface);
             conn.close();
             throw new IOException("La impresora USB no tiene los canales esperados");
         }
-        UsbPrinterLink link = new UsbPrinterLink(conn, iface, epIn, epOut, displayName(device));
+        UsbPrinterLink link = new UsbPrinterLink(conn, iface, epIn, epOut, displayName(device), raw, device.getVendorId());
         link.drain();
         return link;
     }
@@ -229,8 +266,95 @@ final class UsbPrinterLink implements Closeable, IppClient.Transport {
         }
     }
 
+    // ─── Cable común (idioma de la impresora) ───────────────────────
+
+    /**
+     * Identificación IEEE 1284 que da la impresora, p. ej.
+     * "MFG:EPSON;CMD:ESCPL2,BDC,D4,D4PX,ESCPR1;MDL:L1250 Series;…". Null si no contesta.
+     */
+    String deviceId() {
+        byte[] b = new byte[1024];
+        int index = (iface.getId() << 8) | (iface.getAlternateSetting() & 0xFF);
+        int n = connection.controlTransfer(0xA1, 0, 0, index, b, b.length, 5000);
+        if (n < 2) return null;
+        int len = Math.min(n, ((b[0] & 0xFF) << 8) | (b[1] & 0xFF));
+        if (len <= 2) return null;
+        return new String(b, 2, len - 2, StandardCharsets.US_ASCII).trim();
+    }
+
+    /** Un campo de la identificación IEEE 1284 ("MDL", "CMD"…), o null. */
+    static String deviceIdField(String deviceId, String... keys) {
+        if (deviceId == null) return null;
+        for (String part : deviceId.split(";")) {
+            int colon = part.indexOf(':');
+            if (colon <= 0) continue;
+            String key = part.substring(0, colon).trim();
+            for (String k : keys) if (key.equalsIgnoreCase(k)) return part.substring(colon + 1).trim();
+        }
+        return null;
+    }
+
+    /**
+     * Salida para mandar el trabajo tal cual por el cable. La impresora recibe al ritmo
+     * que imprime: si deja de aceptar datos un rato (calienta, limpia cabezales) se
+     * espera hasta RAW_STALL_MS antes de dar error.
+     */
+    java.io.OutputStream rawOutput() {
+        return new java.io.OutputStream() {
+            private final byte[] buf = new byte[CHUNK];
+            private int len;
+            private int chunks;
+
+            @Override
+            public void write(int b) throws IOException {
+                if (len == buf.length) flushBuffer();
+                buf[len++] = (byte) b;
+            }
+
+            @Override
+            public void write(byte[] b, int off, int n) throws IOException {
+                while (n > 0) {
+                    if (len == buf.length) flushBuffer();
+                    int k = Math.min(n, buf.length - len);
+                    System.arraycopy(b, off, buf, len, k);
+                    len += k;
+                    off += k;
+                    n -= k;
+                }
+            }
+
+            @Override
+            public void flush() throws IOException {
+                flushBuffer();
+            }
+
+            private void flushBuffer() throws IOException {
+                int offset = 0;
+                long stalledSince = 0;
+                while (offset < len) {
+                    byte[] chunk = offset == 0 ? buf : Arrays.copyOfRange(buf, offset, len);
+                    int sent = connection.bulkTransfer(out, chunk, len - offset, 20000);
+                    if (sent > 0) {
+                        offset += sent;
+                        stalledSince = 0;
+                        continue;
+                    }
+                    long now = System.currentTimeMillis();
+                    if (stalledSince == 0) stalledSince = now;
+                    else if (now - stalledSince > RAW_STALL_MS) {
+                        throw new IOException("La impresora USB dejó de recibir (¿sin papel, tapa abierta o desenchufada?)");
+                    }
+                }
+                len = 0;
+                // Lo que la impresora contesta (estado) se descarta para que no se le llene
+                if (++chunks % 32 == 0) drain();
+            }
+        };
+    }
+
     /** Descarta restos de una respuesta anterior (el cable es una sola conversación). */
     private void drain() {
+        if (in == null) return;
         byte[] b = new byte[CHUNK];
         for (int i = 0; i < 20; i++) {
             if (connection.bulkTransfer(in, b, b.length, 50) <= 0) return;

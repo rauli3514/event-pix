@@ -258,6 +258,20 @@ public class NativePrintPlugin extends Plugin {
             Target target = new Target();
             try {
                 target.usb = UsbPrinterLink.open(getContext(), usb);
+                if (target.usb.raw) {
+                    // Cable común: se lee la identificación de la impresora (modelo e idiomas)
+                    String id = target.usb.deviceId();
+                    JSObject ret = new JSObject();
+                    ret.put("name", target.usb.name);
+                    String model = UsbPrinterLink.deviceIdField(id, "MDL", "MODEL");
+                    String cmd = UsbPrinterLink.deviceIdField(id, "CMD", "COMMAND SET");
+                    if (model != null) ret.put("model", model);
+                    ret.put("formats", cmd != null ? cmd : "");
+                    ret.put("escpr", cmd == null || cmd.toUpperCase(Locale.ROOT).contains("ESCPR"));
+                    if (id != null) ret.put("deviceId", id);
+                    call.resolve(ret);
+                    return;
+                }
                 IppClient.Result attrs = IppClient.getPrinterAttributes(target.transport(), target.uri(), target.rp,
                         "printer-make-and-model", "document-format-supported", "printer-state");
                 JSObject ret = new JSObject();
@@ -308,11 +322,19 @@ public class NativePrintPlugin extends Plugin {
                 int totalRotation = rotation + ("landscape".equals(orientation) ? 90 : 0);
 
                 if (printer != null && printer.has("usb")) {
-                    // Por cable USB (IPP por USB)
+                    // Por cable USB (IPP por USB, o ESC/P-R en las Epson sin IPP)
                     Target target = new Target();
                     target.name = printer.getString("name", "");
-                    target.usb = UsbPrinterLink.open(getContext(), printer.getString("usb"));
+                    target.usb = openUsb(printer.getString("usb"));
                     try {
+                        if (target.usb.raw) {
+                            // Epson sin IPP por USB (p. ej. L1250): su idioma, ESC/P-R
+                            page = composePage(source, paper, totalRotation, scaleMode, EscprEncoder.DPI, bleed, borderless);
+                            source.recycle();
+                            printEscpr(call, target.usb, page, paper, paperType, copies, borderless, jobName);
+                            page.recycle();
+                            return;
+                        }
                         Capabilities caps = capabilitiesFor(target, paper, preferredFormat, borderless, paperType);
                         page = composePage(source, paper, totalRotation, scaleMode, caps.dpi, bleed, borderless);
                         source.recycle();
@@ -341,6 +363,60 @@ public class NativePrintPlugin extends Plugin {
                 if (session != null) session.close();
             }
         });
+    }
+
+    /**
+     * Abre la impresora USB. Si recién se terminó otro trabajo o se reconectó el cable
+     * puede estar ocupada un momento: se reintenta un par de veces.
+     */
+    private UsbPrinterLink openUsb(String usb) throws IOException {
+        IOException last = null;
+        for (int attempt = 0; attempt < 3; attempt++) {
+            try {
+                return UsbPrinterLink.open(getContext(), usb);
+            } catch (IOException e) {
+                last = e;
+                String msg = e.getMessage() != null ? e.getMessage() : "";
+                // Sin impresora, sin permiso o no compatible: reintentar no sirve
+                if (msg.contains("permiso") || msg.contains("compatible") || msg.contains("No hay ninguna")) throw e;
+                try {
+                    Thread.sleep(1500);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw e;
+                }
+            }
+        }
+        throw last;
+    }
+
+    /** Imprime por cable en ESC/P-R (Epson sin IPP por USB). */
+    private void printEscpr(PluginCall call, UsbPrinterLink link, Bitmap page, Paper paper, String paperType,
+                            int copies, boolean borderless, String jobName) throws IOException {
+        EscprEncoder.Job job = new EscprEncoder.Job();
+        job.paperWidthHmm = paper.widthHmm;
+        job.paperHeightHmm = paper.heightHmm;
+        job.borderless = borderless;
+        job.copies = copies;
+        job.name = jobName;
+        boolean photo = "glossy".equals(paperType) || "matte".equals(paperType)
+                || (!"plain".equals(paperType) && paper.isPhoto());
+        job.mediaType = !photo ? EscprEncoder.MEDIA_PLAIN
+                : "matte".equals(paperType) ? EscprEncoder.MEDIA_MATTE : EscprEncoder.MEDIA_PREMIUM_GLOSSY;
+        int width = page.getWidth();
+        int height = page.getHeight();
+        // La página puede tener un punto menos que el papel del trabajo (redondeo): lo que falta, blanco
+        EscprEncoder.write(link.rawOutput(), job, (y, out) -> {
+            java.util.Arrays.fill(out, 0xFFFFFFFF);
+            if (y < height) page.getPixels(out, 0, width, 0, y, Math.min(width, out.length), 1);
+        });
+        JSObject ret = new JSObject();
+        ret.put("mode", "silent");
+        ret.put("format", "ESC/P-R");
+        ret.put("dpi", EscprEncoder.DPI);
+        ret.put("mediaType", job.mediaType == EscprEncoder.MEDIA_PLAIN ? "común"
+                : job.mediaType == EscprEncoder.MEDIA_MATTE ? "fotográfico mate" : "fotográfico brillante");
+        call.resolve(ret);
     }
 
     // ─── Wi-Fi Direct ───────────────────────────────────────────────

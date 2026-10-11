@@ -50,13 +50,16 @@ export default function PrinterSection() {
   });
 
   const chooseUsb = (u: UsbPrinterInfo) => run('usb', async () => {
-    if (!u.ippUsb) {
-      toast.error(`${u.name} no tiene "IPP por USB": por cable todavía no es compatible. Usá WiFi o Wi-Fi Direct.`);
+    if (!u.ippUsb && !u.escpr) {
+      toast.error(`${u.name} no tiene "IPP por USB" y no es Epson: por cable no es compatible. Usá WiFi o Wi-Fi Direct.`);
       return;
     }
     const res = await testUsbPrinter(u.usb);
     choosePrinter(usbPrinterToNative({ ...u, name: res.model || u.name }));
     toast.success(`Conectada por cable: ${res.model || u.name}`);
+    if (u.escpr && res.escpr === false) {
+      toast.warning(`La impresora no anuncia ESC/P-R (${res.formats || 'sin datos'}). Probá "Imprimir prueba"; si no sale, usá WiFi.`);
+    }
   });
 
   const scan = () => run('scan', async () => {
@@ -120,7 +123,9 @@ export default function PrinterSection() {
             className={`w-full text-left rounded-2xl px-6 py-4 text-lg focus:outline-none focus:ring-4 focus:ring-[#00d4ff] ${printer?.usb === u.usb ? 'bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7]' : 'bg-white/10 hover:bg-white/20'}`}>
             {u.name}
             <span className="block text-sm text-white/60">
-              {u.ippUsb ? 'Compatible por cable (IPP por USB)' : `Sin IPP por USB (protocolos ${u.protocols.join(', ')}): por cable no es compatible todavía`}
+              {u.ippUsb ? 'Compatible por cable (IPP por USB)'
+                : u.escpr ? 'Compatible por cable (Epson, idioma ESC/P-R)'
+                : `Sin IPP por USB (protocolos ${u.protocols.join(', ')}): por cable no es compatible`}
             </span>
           </button>
         ))}
