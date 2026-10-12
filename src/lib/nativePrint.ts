@@ -116,7 +116,7 @@ export const PAPER_SIZES: { value: PaperSize; label: string }[] = [
   { value: 'letter', label: 'Carta' },
 ];
 
-export type PaperType = 'auto' | 'glossy' | 'glossyStd' | 'matte' | 'plain';
+export type PaperType = 'auto' | 'glossy' | 'matte' | 'plain';
 export type PrintQuality = 'fast' | 'normal' | 'high';
 
 export const PRINT_QUALITIES: { value: PrintQuality; label: string }[] = [
@@ -127,8 +127,7 @@ export const PRINT_QUALITIES: { value: PrintQuality; label: string }[] = [
 
 export const PAPER_TYPES: { value: PaperType; label: string }[] = [
   { value: 'auto', label: 'Automático' },
-  { value: 'glossy', label: 'Brillante premium' },
-  { value: 'glossyStd', label: 'Brillante estándar' },
+  { value: 'glossy', label: 'Fotográfico brillante' },
   { value: 'matte', label: 'Fotográfico mate' },
   { value: 'plain', label: 'Común' },
 ];

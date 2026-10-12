@@ -165,11 +165,11 @@ export default function PrinterSection() {
         <p className="text-white/55 text-sm -mt-2">
           Normal: buena foto y bastante más rápida que Alta (recomendada para eventos con fila). Alta: la mejor calidad, tarda más por foto. Rápida: modo borrador, solo si hay mucha gente esperando (se nota en la foto).
         </p>
-        <Choice label="Tipo de papel" value={settings.paperType || 'auto'}
+        <Choice label="Tipo de papel" value={(settings.paperType as string) === 'glossyStd' ? 'glossy' : settings.paperType || 'auto'}
           options={PAPER_TYPES.map(p => ({ value: p.value, label: p.label }))}
           onChange={(paperType: PaperType) => update({ paperType })} />
         <p className="text-white/55 text-sm -mt-2">
-          El tipo de papel es lo que más cambia la velocidad: la impresora decide cuántas pasadas hace según el papel (con Brillante premium ignora la calidad Rápida). Brillante estándar suele ser más rápido; Común es lo más rápido pero en papel brillante la tinta tarda en secar. Automático: brillante premium en 10×15 y 13×18, común en A4 y Carta. La prueba muestra cuántos segundos tardó.
+          Elegí el papel que está cargado. Con papel fotográfico la impresora usa su modo foto (más pasadas, la mejor calidad). Común es más rápido pero en papel brillante la tinta tarda en secar. Automático: fotográfico brillante en 10×15 y 13×18, común en A4 y Carta. La prueba muestra cuántos segundos tardó.
         </p>
         <Toggle label="Sin bordes" hint="La foto ocupa toda la hoja, pero la impresora la agranda un poco y recorta los bordes. Apagado: queda un borde blanco fino y sale entera (logo y marco completos)."
           checked={!!settings.borderless} onChange={borderless => update({ borderless })} />
