@@ -76,6 +76,15 @@ const Register = () => {
     setLoading(true);
 
     try {
+      // Se genera ACÁ (antes del signUp) para poder guardarlo en los
+      // metadatos del usuario. Si el proyecto de Supabase exige confirmar
+      // el mail, signUp() no deja una sesión activa todavía y el negocio no
+      // se puede crear del lado de Supabase en este mismo paso — queda
+      // pendiente hasta el primer login real, pero con el MISMO id sin
+      // importar desde qué dispositivo se complete (ver
+      // finalizePendingBusinessRegistration).
+      const pendingBusinessId = crypto.randomUUID();
+
       // 1. Registro de usuario en Supabase Auth
       let userId = `user_${Date.now()}`;
       try {
@@ -87,7 +96,9 @@ const Register = () => {
               name: contactName || commerceName,
               commerce_name: commerceName,
               niche,
-              account_type: 'business'
+              instagram_handle: instagramHandle.trim().startsWith('@') ? instagramHandle.trim() : `@${instagramHandle.trim()}`,
+              account_type: 'business',
+              pending_business_id: pendingBusinessId
             }
           }
         });
@@ -100,6 +111,7 @@ const Register = () => {
 
       // 2. Registrar el nuevo comercio en IntelligenceStorageService
       const newBusiness = await IntelligenceStorageService.registerClientAccount({
+        id: pendingBusinessId,
         name: commerceName.trim(),
         instagramHandle: instagramHandle.trim(),
         niche,

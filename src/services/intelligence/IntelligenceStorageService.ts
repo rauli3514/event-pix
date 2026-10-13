@@ -43,6 +43,12 @@ export interface NewClientRegistrationParams {
   phone?: string;
   metaToken?: string;
   instagramAccountId?: string;
+  // Id pre-generado opcional: lo usa el self-signup público (/register) para
+  // que, si Supabase exige confirmación de mail y todavía no hay sesión al
+  // momento del registro, el mismo id quede guardado en los metadatos del
+  // usuario y se pueda terminar de crear en Supabase (y vincular al dueño)
+  // en el primer login real, sin importar desde qué dispositivo entre.
+  id?: string;
 }
 
 export class IntelligenceStorageService {
@@ -171,7 +177,7 @@ export class IntelligenceStorageService {
     // abajo): el negocio nunca se creaba de verdad en la base, solo vivía
     // en localStorage. Un UUID real es indispensable para que el negocio
     // exista de verdad y el webhook de WhatsApp/Instagram pueda encontrarlo.
-    const newBizId = crypto.randomUUID();
+    const newBizId = params.id || crypto.randomUUID();
     const newBiz: IntelligenceBusiness = {
       id: newBizId,
       user_id: `user_${Date.now()}`,
@@ -261,6 +267,87 @@ export class IntelligenceStorageService {
     this.setActiveBusinessId(newBiz.id);
 
     return newBiz;
+  }
+
+  /**
+   * Termina de crear en Supabase un negocio que se registró en /register
+   * mientras Supabase todavía no tenía sesión activa (proyecto con "Confirm
+   * email" obligatorio: signUp() no deja sesión hasta que el usuario
+   * confirma su mail). En ese caso registerClientAccount cae al branch sin
+   * sesión y el negocio queda viviendo SOLO en el localStorage de ESE
+   * navegador — nunca se crea en Supabase ni se vincula a su dueño, así que
+   * un login posterior desde otro dispositivo (o el webhook de
+   * WhatsApp/Instagram) nunca lo encuentra.
+   *
+   * Se llama en cada login: si el usuario ya tiene una fila en
+   * intelligence_business_users no hace nada; si no la tiene pero su
+   * user_metadata (guardado en el signUp original) trae un negocio
+   * pendiente, ahora SÍ hay sesión real para completar el alta —vía la
+   * misma función RPC que usa el flujo con sesión— y deja ese negocio
+   * activo también en este dispositivo.
+   */
+  static async finalizePendingBusinessRegistration(user: {
+    id: string;
+    email?: string;
+    user_metadata?: Record<string, any>;
+  }): Promise<string | null> {
+    const meta = user.user_metadata || {};
+    if (meta.account_type !== 'business' || !meta.pending_business_id) return null;
+
+    const isSupa = await this.testSupabase();
+    if (!isSupa) return null;
+
+    try {
+      const { data: existingMembership } = await supabase
+        .from('intelligence_business_users')
+        .select('business_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+      if (existingMembership?.business_id) return existingMembership.business_id;
+
+      const { error: rpcError } = await supabase.rpc('register_intelligence_business', {
+        p_id: meta.pending_business_id,
+        p_name: meta.commerce_name || 'Mi Comercio',
+        p_instagram_handle: meta.instagram_handle || null,
+        p_niche: meta.niche || null,
+        p_target_audience: null,
+        p_brand_tone: null
+      });
+      if (rpcError) {
+        console.warn('Error completando alta pendiente de negocio:', rpcError);
+        return null;
+      }
+
+      await supabase.from('display_commerces').upsert({
+        id: meta.pending_business_id,
+        name: meta.commerce_name || 'Mi Comercio',
+        email: user.email || undefined
+      });
+
+      // Reflejar en la lista local de este dispositivo (puede ser uno nuevo
+      // que nunca tuvo este negocio en su localStorage).
+      const currentList = await this.listBusinesses();
+      if (!currentList.some(b => b.id === meta.pending_business_id)) {
+        const recovered: IntelligenceBusiness = {
+          id: meta.pending_business_id,
+          user_id: user.id,
+          name: meta.commerce_name || 'Mi Comercio',
+          niche: meta.niche || 'Comercio Local & Servicios',
+          target_audience: `Clientes y público objetivo de ${meta.commerce_name || 'este negocio'}`,
+          brand_tone: 'cercano',
+          instagram_handle: meta.instagram_handle || '',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        localStorage.setItem(LOCAL_STORAGE_KEYS.BUSINESSES_LIST, JSON.stringify([recovered, ...currentList]));
+      }
+
+      return meta.pending_business_id as string;
+    } catch (err) {
+      console.warn('Error completando alta pendiente de negocio:', err);
+      return null;
+    }
   }
 
   /**
