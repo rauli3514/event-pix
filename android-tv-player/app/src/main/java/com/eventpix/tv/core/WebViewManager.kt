@@ -2,6 +2,7 @@ package com.eventpix.tv.core
 
 import android.annotation.SuppressLint
 import android.util.Log
+import android.view.ViewGroup
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -10,7 +11,12 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import java.io.InputStream
 
-class WebViewManager(private val webView: WebView) {
+class WebViewManager(
+    private val webView: WebView,
+    // Se llama cuando el proceso de render del WebView murió (OOM o crash):
+    // la Activity tiene que crear uno nuevo o la pantalla queda en negro.
+    private val onRendererGone: () -> Unit
+) {
 
     @SuppressLint("SetJavaScriptEnabled")
     fun initializeWebView() {
@@ -74,9 +80,14 @@ class WebViewManager(private val webView: WebView) {
             }
 
             override fun onRenderProcessGone(view: WebView?, detail: android.webkit.RenderProcessGoneDetail?): Boolean {
-                Log.e("WebViewManager", "Render process gone (OOM or crash). Reloading WebView...")
-                view?.destroy()
-                // Let the activity handle the recreation if needed, or we just return true to prevent app crash
+                Log.e("WebViewManager", "Render process gone (OOM or crash). Recreating WebView...")
+                // Un WebView cuyo renderer murió no se puede volver a usar: sacarlo de la
+                // vista, destruirlo y pedirle a la Activity que arme uno nuevo.
+                view?.let {
+                    (it.parent as? ViewGroup)?.removeView(it)
+                    it.destroy()
+                }
+                onRendererGone()
                 return true
             }
         }
