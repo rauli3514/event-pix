@@ -1008,10 +1008,10 @@ export default defineConfig({
             type: 'image/png'
           },
           {
-            src: 'pwa-512x512.png',
+            src: 'pwa-maskable-512x512.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable'
+            purpose: 'maskable'
           }
         ]
       },
@@ -1019,7 +1019,7 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         clientsClaim: true,
         skipWaiting: true,
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}', 'assets/eventpix-logo-*.webp'],
         // El bundle legacy (target navegadores viejos) ronda los 4 MB;
         // el límite anterior (4.000.000 bytes) estaba pegado a ese
         // tamaño real, así que una variación mínima entre entornos

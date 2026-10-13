@@ -30,8 +30,6 @@ final class EscprEncoder {
     static final int MEDIA_PLAIN = 0;
     static final int MEDIA_MATTE = 5;
     static final int MEDIA_PREMIUM_GLOSSY = 11;
-    /** "Photo Paper Glossy" de Epson: menos pasadas que Premium Glossy */
-    static final int MEDIA_PHOTO_GLOSSY = 43;
 
     // Calidad (MQID): borrador, normal, alta
     static final int QUALITY_DRAFT = 0;
