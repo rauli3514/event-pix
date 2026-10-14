@@ -69,7 +69,7 @@ class TvBridge(private val activity: MainActivity) {
 
     @JavascriptInterface
     fun setAutoBoot(enabled: Boolean) {
-        Log.d("TvBridge", "setAutoBoot: \$enabled")
+        Log.d("TvBridge", "setAutoBoot: $enabled")
         prefs.edit().putBoolean("autoBoot", enabled).apply()
     }
 
@@ -80,7 +80,7 @@ class TvBridge(private val activity: MainActivity) {
 
     @JavascriptInterface
     fun setWatchdog(enabled: Boolean) {
-        Log.d("TvBridge", "setWatchdog: \$enabled")
+        Log.d("TvBridge", "setWatchdog: $enabled")
         prefs.edit().putBoolean("watchdogEnabled", enabled).apply()
     }
     
@@ -91,7 +91,7 @@ class TvBridge(private val activity: MainActivity) {
 
     @JavascriptInterface
     fun setKeepAwake(enabled: Boolean) {
-        Log.d("TvBridge", "setKeepAwake: \$enabled")
+        Log.d("TvBridge", "setKeepAwake: $enabled")
         prefs.edit().putBoolean("keepAwake", enabled).apply()
         activity.runOnUiThread {
             if (enabled) {
@@ -109,7 +109,7 @@ class TvBridge(private val activity: MainActivity) {
 
     @JavascriptInterface
     fun setOrientation(landscape: Boolean) {
-        Log.d("TvBridge", "setOrientation landscape: \$landscape")
+        Log.d("TvBridge", "setOrientation landscape: $landscape")
         prefs.edit().putBoolean("landscape", landscape).apply()
         activity.runOnUiThread {
             activity.requestedOrientation = if (landscape) {
@@ -127,7 +127,7 @@ class TvBridge(private val activity: MainActivity) {
 
     @JavascriptInterface
     fun scheduleDailyRestart(hour: Int, minute: Int) {
-        Log.d("TvBridge", "scheduleDailyRestart at \$hour:\$minute")
+        Log.d("TvBridge", "scheduleDailyRestart at $hour:$minute")
         prefs.edit().putInt("rebootHour", hour).putInt("rebootMinute", minute).apply()
         
         val alarmManager = activity.getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -164,7 +164,7 @@ class TvBridge(private val activity: MainActivity) {
             pendingIntent
         )
         
-        Log.d("TvBridge", "Alarm scheduled for \${calendar.time}")
+        Log.d("TvBridge", "Alarm scheduled for ${calendar.time}")
     }
     
     @JavascriptInterface
@@ -192,6 +192,12 @@ class TvBridge(private val activity: MainActivity) {
     
     @JavascriptInterface
     fun connectToWifi(ssid: String, psk: String): Boolean {
+        // Android 10+ no deja que una app agregue redes ni cambie de red sola
+        // (addNetwork devuelve -1). Se avisa en el log en vez de fallar en silencio.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            Log.w("TvBridge", "connectToWifi no soportado en Android 10+ (SDK ${Build.VERSION.SDK_INT})")
+            return false
+        }
         try {
             Log.d("TvBridge", "Attempting to connect to WiFi: $ssid")
             val wifiManager = activity.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager

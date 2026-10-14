@@ -1,6 +1,10 @@
 package com.eventpix.tv.core
 
 import android.annotation.SuppressLint
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.os.Build
 import android.util.Log
 import android.view.ViewGroup
 import android.webkit.WebResourceError
@@ -24,7 +28,10 @@ class WebViewManager(
             javaScriptEnabled = true
             domStorageEnabled = true
             mediaPlaybackRequiresUserGesture = false
-            cacheMode = WebSettings.LOAD_CACHE_ELSE_NETWORK
+            // Con red: caché normal (respeta los headers), así las TVs toman cada
+            // versión nueva de la web. Sin red: lo que haya en caché, para arrancar
+            // igual y seguir reproduciendo el último contenido.
+            cacheMode = if (isOnline()) WebSettings.LOAD_DEFAULT else WebSettings.LOAD_CACHE_ELSE_NETWORK
             // Optimizations for TV & 60fps GPU CSS Transitions
             useWideViewPort = true
             loadWithOverviewMode = true
@@ -90,6 +97,21 @@ class WebViewManager(
                 onRendererGone()
                 return true
             }
+        }
+    }
+
+    private fun isOnline(): Boolean {
+        return try {
+            val cm = webView.context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val capabilities = cm.getNetworkCapabilities(cm.activeNetwork)
+                capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+            } else {
+                @Suppress("DEPRECATION")
+                cm.activeNetworkInfo?.isConnected == true
+            }
+        } catch (e: Exception) {
+            false
         }
     }
 
