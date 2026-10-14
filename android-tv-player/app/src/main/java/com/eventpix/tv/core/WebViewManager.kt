@@ -2,6 +2,7 @@ package com.eventpix.tv.core
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.net.Uri
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
@@ -17,10 +18,40 @@ import java.io.InputStream
 
 class WebViewManager(
     private val webView: WebView,
+    // Script que deja el token del puente (TvBridge) en la página. Se ejecuta
+    // solo en el frame principal y solo en páginas nuestras (isTrustedUrl).
+    private val bridgeTokenScript: () -> String,
     // Se llama cuando el proceso de render del WebView murió (OOM o crash):
     // la Activity tiene que crear uno nuevo o la pantalla queda en negro.
     private val onRendererGone: () -> Unit
 ) {
+
+    companion object {
+        private const val APP_HOST = "app.event-pix.com.ar"
+
+        // Páginas en las que confiamos: la web de EventPix y las del APK.
+        fun isTrustedUrl(url: String?): Boolean {
+            if (url.isNullOrEmpty()) return false
+            if (url.startsWith("file:///android_asset/")) return true
+            val uri = Uri.parse(url)
+            return uri.scheme == "https" && uri.host == APP_HOST
+        }
+    }
+
+    private fun injectBridgeToken(view: WebView?, url: String?) {
+        if (view != null && isTrustedUrl(url)) {
+            view.evaluateJavascript(bridgeTokenScript(), null)
+        }
+    }
+
+    // El frame principal no puede salir de nuestras páginas: si no, un iframe
+    // podría redirigir toda la TV a otro sitio (top.location) y ese sitio
+    // recibiría el token del puente al cargar.
+    private fun blockUntrustedNavigation(url: String?): Boolean {
+        if (isTrustedUrl(url)) return false
+        Log.w("WebViewManager", "Navegación bloqueada fuera de la app: $url")
+        return true
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     fun initializeWebView() {
@@ -69,6 +100,29 @@ class WebViewManager(
                 }
                 
                 return super.shouldInterceptRequest(view, request)
+            }
+
+            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                if (request?.isForMainFrame != true) return false
+                return blockUntrustedNavigation(request.url?.toString())
+            }
+
+            // Android < 7 usa esta variante (solo navegaciones del frame principal).
+            @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
+            override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+                return blockUntrustedNavigation(url)
+            }
+
+            // El token se inyecta en cuanto la página es visible y otra vez al
+            // terminar de cargar (por si la primera llegó antes que el JS de la app).
+            override fun onPageCommitVisible(view: WebView?, url: String?) {
+                super.onPageCommitVisible(view, url)
+                injectBridgeToken(view, url)
+            }
+
+            override fun onPageFinished(view: WebView?, url: String?) {
+                super.onPageFinished(view, url)
+                injectBridgeToken(view, url)
             }
 
             override fun onReceivedError(

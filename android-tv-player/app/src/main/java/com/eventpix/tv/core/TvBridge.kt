@@ -21,12 +21,38 @@ import android.util.DisplayMetrics
 import java.io.File
 import java.net.InetAddress
 import java.net.NetworkInterface
+import java.security.MessageDigest
+import java.security.SecureRandom
 
+// Puente entre la web (React) y Android.
+//
+// addJavascriptInterface inyecta este objeto en TODOS los frames del WebView,
+// incluidos los iframes de webs externas que muestra la TV. Por eso los
+// métodos de abajo no están expuestos a JavaScript: lo están solo los de la
+// sección "API para JavaScript" al final, que exigen un token de sesión. La
+// app inyecta el token únicamente en el frame principal y solo si la página es
+// la nuestra (ver WebViewManager), así que un iframe de otro origen no lo tiene.
 class TvBridge(private val activity: MainActivity) {
     
     private val prefs: SharedPreferences = activity.getSharedPreferences("TvSettings", Context.MODE_PRIVATE)
 
-    @JavascriptInterface
+    // Token aleatorio por sesión (128 bits); cambia cada vez que se crea la Activity.
+    private val sessionToken: String = ByteArray(16)
+        .also { SecureRandom().nextBytes(it) }
+        .joinToString("") { "%02x".format(it) }
+
+    // Script que el WebViewManager ejecuta en el frame principal de nuestras páginas.
+    fun tokenInjectionScript(): String =
+        "(function(){window.__tvBridgeToken='$sessionToken';" +
+        "window.dispatchEvent(new Event('tvbridgeready'));})();"
+
+    private fun authorized(token: String?): Boolean {
+        val ok = token != null &&
+            MessageDigest.isEqual(token.toByteArray(Charsets.UTF_8), sessionToken.toByteArray(Charsets.UTF_8))
+        if (!ok) Log.w("TvBridge", "Llamada al puente rechazada: token inválido")
+        return ok
+    }
+
     fun exitApp() {
         Log.d("TvBridge", "exitApp called from JS")
         activity.runOnUiThread {
@@ -34,7 +60,6 @@ class TvBridge(private val activity: MainActivity) {
         }
     }
 
-    @JavascriptInterface
     fun openWifiSettings() {
         try {
             val intent = Intent(android.provider.Settings.ACTION_WIFI_SETTINGS)
@@ -45,7 +70,6 @@ class TvBridge(private val activity: MainActivity) {
         }
     }
 
-    @JavascriptInterface
     fun openSettings() {
         try {
             val intent = Intent(android.provider.Settings.ACTION_SETTINGS)
@@ -56,7 +80,6 @@ class TvBridge(private val activity: MainActivity) {
         }
     }
 
-    @JavascriptInterface
     fun getDeviceCode(): String {
         var deviceId = prefs.getString("device_id", null)
         if (deviceId.isNullOrEmpty()) {
@@ -67,29 +90,24 @@ class TvBridge(private val activity: MainActivity) {
         return deviceId
     }
 
-    @JavascriptInterface
     fun setAutoBoot(enabled: Boolean) {
         Log.d("TvBridge", "setAutoBoot: $enabled")
         prefs.edit().putBoolean("autoBoot", enabled).apply()
     }
 
-    @JavascriptInterface
     fun getAutoBoot(): Boolean {
         return prefs.getBoolean("autoBoot", true) // Default is true for Kiosk
     }
 
-    @JavascriptInterface
     fun setWatchdog(enabled: Boolean) {
         Log.d("TvBridge", "setWatchdog: $enabled")
         prefs.edit().putBoolean("watchdogEnabled", enabled).apply()
     }
     
-    @JavascriptInterface
     fun getWatchdog(): Boolean {
         return prefs.getBoolean("watchdogEnabled", true)
     }
 
-    @JavascriptInterface
     fun setKeepAwake(enabled: Boolean) {
         Log.d("TvBridge", "setKeepAwake: $enabled")
         prefs.edit().putBoolean("keepAwake", enabled).apply()
@@ -102,12 +120,10 @@ class TvBridge(private val activity: MainActivity) {
         }
     }
     
-    @JavascriptInterface
     fun getKeepAwake(): Boolean {
         return prefs.getBoolean("keepAwake", true)
     }
 
-    @JavascriptInterface
     fun setOrientation(landscape: Boolean) {
         Log.d("TvBridge", "setOrientation landscape: $landscape")
         prefs.edit().putBoolean("landscape", landscape).apply()
@@ -120,12 +136,10 @@ class TvBridge(private val activity: MainActivity) {
         }
     }
     
-    @JavascriptInterface
     fun getOrientation(): Boolean {
         return prefs.getBoolean("landscape", true)
     }
 
-    @JavascriptInterface
     fun scheduleDailyRestart(hour: Int, minute: Int) {
         Log.d("TvBridge", "scheduleDailyRestart at $hour:$minute")
         prefs.edit().putInt("rebootHour", hour).putInt("rebootMinute", minute).apply()
@@ -167,17 +181,14 @@ class TvBridge(private val activity: MainActivity) {
         Log.d("TvBridge", "Alarm scheduled for ${calendar.time}")
     }
     
-    @JavascriptInterface
     fun getRebootHour(): Int {
         return prefs.getInt("rebootHour", 3) // Default 3 AM
     }
     
-    @JavascriptInterface
     fun getRebootMinute(): Int {
         return prefs.getInt("rebootMinute", 0)
     }
 
-    @JavascriptInterface
     fun setVolume(volumePercent: Int) {
         try {
             val audioManager = activity.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -190,7 +201,6 @@ class TvBridge(private val activity: MainActivity) {
         }
     }
     
-    @JavascriptInterface
     fun connectToWifi(ssid: String, psk: String): Boolean {
         // Android 10+ no deja que una app agregue redes ni cambie de red sola
         // (addNetwork devuelve -1). Se avisa en el log en vez de fallar en silencio.
@@ -256,7 +266,6 @@ class TvBridge(private val activity: MainActivity) {
         return "Unknown"
     }
 
-    @JavascriptInterface
     fun getTelemetry(): String {
         val bootCount = prefs.getInt("bootCount", 0)
         val crashCount = prefs.getInt("crashCount", 0)
@@ -351,11 +360,80 @@ class TvBridge(private val activity: MainActivity) {
         return json
     }
     
-    @JavascriptInterface
     fun resetTelemetry() {
         prefs.edit()
             .putInt("bootCount", 0)
             .putInt("crashCount", 0)
             .apply()
     }
+
+    // -------------------------------------------------------------------------
+    // API para JavaScript: mismos nombres que antes, con el token como primer
+    // argumento. Sin token válido no hacen nada y los getters devuelven el valor
+    // por defecto. (src/lib/tvBridge.ts agrega el token solo.)
+    // -------------------------------------------------------------------------
+
+    // Única llamada sin token: le indica a la web que esta app exige token.
+    @JavascriptInterface
+    fun getApiVersion(): Int = 2
+
+    @JavascriptInterface
+    fun exitApp(token: String) { if (authorized(token)) exitApp() }
+
+    @JavascriptInterface
+    fun openWifiSettings(token: String) { if (authorized(token)) openWifiSettings() }
+
+    @JavascriptInterface
+    fun openSettings(token: String) { if (authorized(token)) openSettings() }
+
+    @JavascriptInterface
+    fun getDeviceCode(token: String): String = if (authorized(token)) getDeviceCode() else ""
+
+    @JavascriptInterface
+    fun setAutoBoot(token: String, enabled: Boolean) { if (authorized(token)) setAutoBoot(enabled) }
+
+    @JavascriptInterface
+    fun getAutoBoot(token: String): Boolean = if (authorized(token)) getAutoBoot() else true
+
+    @JavascriptInterface
+    fun setWatchdog(token: String, enabled: Boolean) { if (authorized(token)) setWatchdog(enabled) }
+
+    @JavascriptInterface
+    fun getWatchdog(token: String): Boolean = if (authorized(token)) getWatchdog() else true
+
+    @JavascriptInterface
+    fun setKeepAwake(token: String, enabled: Boolean) { if (authorized(token)) setKeepAwake(enabled) }
+
+    @JavascriptInterface
+    fun getKeepAwake(token: String): Boolean = if (authorized(token)) getKeepAwake() else true
+
+    @JavascriptInterface
+    fun setOrientation(token: String, landscape: Boolean) { if (authorized(token)) setOrientation(landscape) }
+
+    @JavascriptInterface
+    fun getOrientation(token: String): Boolean = if (authorized(token)) getOrientation() else true
+
+    @JavascriptInterface
+    fun scheduleDailyRestart(token: String, hour: Int, minute: Int) {
+        if (authorized(token)) scheduleDailyRestart(hour, minute)
+    }
+
+    @JavascriptInterface
+    fun getRebootHour(token: String): Int = if (authorized(token)) getRebootHour() else 3
+
+    @JavascriptInterface
+    fun getRebootMinute(token: String): Int = if (authorized(token)) getRebootMinute() else 0
+
+    @JavascriptInterface
+    fun setVolume(token: String, volumePercent: Int) { if (authorized(token)) setVolume(volumePercent) }
+
+    @JavascriptInterface
+    fun connectToWifi(token: String, ssid: String, psk: String): Boolean =
+        authorized(token) && connectToWifi(ssid, psk)
+
+    @JavascriptInterface
+    fun getTelemetry(token: String): String = if (authorized(token)) getTelemetry() else "{}"
+
+    @JavascriptInterface
+    fun resetTelemetry(token: String) { if (authorized(token)) resetTelemetry() }
 }

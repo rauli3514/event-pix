@@ -4,6 +4,7 @@ import { CampaignItem } from '@/types/display';
 import { useCacheManager } from './useCacheManager';
 import { findActiveScheduleEvent, pickActiveAssignment } from '@/lib/displaySchedule';
 import { getOrCreateCommandSecret, openSignedCommand, registerCommandSecret } from '@/lib/displayCommands';
+import { callTvBridge, hasTvBridgeMethod } from '@/lib/tvBridge';
 
 type PlayerStatus = 'loading' | 'playing' | 'offline_playing' | 'no_content' | 'error';
 
@@ -300,15 +301,15 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
                     [cacheKey(deviceCode), assignmentCacheKey(deviceCode), ...legacyCacheKeys(deviceCode)].forEach(key => localStorage.removeItem(key));
                     window.location.reload();
                 } else if (command.action === 'reset_telemetry') {
-                    if ((window as any).TvBridge && typeof (window as any).TvBridge.resetTelemetry === 'function') {
-                        (window as any).TvBridge.resetTelemetry();
+                    if (hasTvBridgeMethod('resetTelemetry')) {
+                        callTvBridge('resetTelemetry');
                         forceHeartbeat();
                     }
                 } else if (command.action === 'set_volume') {
                     const vol = command.volume;
                     if (typeof vol === 'number' && vol >= 0 && vol <= 100) {
-                        if ((window as any).TvBridge && typeof (window as any).TvBridge.setVolume === 'function') {
-                            (window as any).TvBridge.setVolume(vol);
+                        if (hasTvBridgeMethod('setVolume')) {
+                            callTvBridge('setVolume', vol);
                         } else if ((window as any).AndroidKiosk) {
                             (window as any).AndroidKiosk.setVolume(vol);
                         } else {
@@ -320,8 +321,8 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
                     }
                 } else if (command.action === 'connect_wifi') {
                     const { ssid, password } = command;
-                    if (ssid && password && (window as any).TvBridge && typeof (window as any).TvBridge.connectToWifi === 'function') {
-                        (window as any).TvBridge.connectToWifi(ssid, password);
+                    if (ssid && password && hasTvBridgeMethod('connectToWifi')) {
+                        callTvBridge('connectToWifi', ssid, password);
                         // Wait a few seconds for network to reconnect then heartbeat
                         setTimeout(() => forceHeartbeat(), 5000);
                     }

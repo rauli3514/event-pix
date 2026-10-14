@@ -5,6 +5,7 @@ import { useTelemetry } from './useTelemetry';
 import { useSyncEngine } from './useSyncEngine';
 import { MediaRenderer } from './MediaRenderer';
 import { usePlaylistRotation } from '@/hooks/use-playlist-rotation';
+import { callTvBridge, hasTvBridgeMethod, onTvBridgeReady } from '@/lib/tvBridge';
 
 // --- Master Watchdog Error Boundary ---
 class WatchdogBoundary extends Component<{children: ReactNode}, {hasError: boolean}> {
@@ -114,14 +115,18 @@ const TvPlayerCore = () => {
 
     // Lock native orientation & apply rotation when orientation setting changes from Web Admin
     useEffect(() => {
+        let cancelBridge = () => {};
         if (deviceSettings.orientation !== undefined && deviceSettings.orientation !== null) {
             let degreeStr = String(deviceSettings.orientation);
             if (degreeStr === 'portrait') degreeStr = '90';
             if (degreeStr === 'landscape') degreeStr = '0';
             const degree = parseInt(degreeStr, 10) || 0;
 
-            if ((window as any).TvBridge?.setOrientation) {
-                (window as any).TvBridge.setOrientation(degree === 90 || degree === 270 ? false : true);
+            if (hasTvBridgeMethod('setOrientation')) {
+                // Con la app nueva el puente recién está listo al terminar de cargar la página.
+                cancelBridge = onTvBridgeReady(() => {
+                    callTvBridge('setOrientation', degree === 90 || degree === 270 ? false : true);
+                });
             } else if ((window as any).AndroidKiosk?.setOrientation) {
                 (window as any).AndroidKiosk.setOrientation(degree);
             }
@@ -134,6 +139,7 @@ const TvPlayerCore = () => {
                 else ScreenOrientation.lock({ orientation: 'landscape-primary' });
             }
         }
+        return cancelBridge;
     }, [deviceSettings.orientation]);
 
     // 4. Media Rotation Logic (los videos nunca se cortan: ver usePlaylistRotation)
