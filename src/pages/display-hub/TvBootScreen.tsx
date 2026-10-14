@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
+import { sendDeviceHeartbeat } from '@/lib/displayDeviceApi';
 import { Wifi, Bluetooth, Power } from 'lucide-react';
 
 export default function TvBootScreen() {
@@ -37,9 +38,7 @@ export default function TvBootScreen() {
           ]).select().single();
         } else {
           // Update last seen if exists
-          await supabase.from('display_devices')
-            .update({ last_seen: new Date().toISOString() })
-            .eq('device_id', deviceId);
+          await sendDeviceHeartbeat(deviceId);
         }
         
         setPin(deviceId);

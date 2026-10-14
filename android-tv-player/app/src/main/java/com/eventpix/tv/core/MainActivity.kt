@@ -61,7 +61,14 @@ class MainActivity : AppCompatActivity() {
         diagnosticPanel = findViewById(R.id.diagnosticPanel)
         
         playerManager = PlayerManager(this, playerView)
-        webViewManager = WebViewManager(webView)
+        webViewManager = WebViewManager(webView) {
+            runOnUiThread {
+                val crashPrefs = getSharedPreferences("TvSettings", Context.MODE_PRIVATE)
+                crashPrefs.edit().putInt("crashCount", crashPrefs.getInt("crashCount", 0) + 1).apply()
+                // Vuelve a ejecutar onCreate: layout nuevo, WebView nuevo y carga de /tv-boot.
+                recreate()
+            }
+        }
         
         webViewManager.initializeWebView()
         
