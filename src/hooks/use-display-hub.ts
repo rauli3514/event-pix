@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { DisplayDevice, DisplayAssignment, DisplayGroup, DisplayCampaign } from "@/types/display";
 import { linkDisplayDevice, LinkDeviceParams } from "@/lib/displayDeviceApi";
+import { pickActiveAssignment } from "@/lib/displaySchedule";
 
 export type DeviceDerivedStatus = 'pending' | 'online' | 'offline';
 
@@ -288,13 +289,8 @@ export const useDisplayDevices = (commerceId?: string | null) => {
                     }
                 }
 
-                // Find assignment: first check direct device_id match, then group_id match
-                let activeAssignment = null;
-                if (allAssignments) {
-                    const directMatch = allAssignments.find(a => a.device_id === device.id);
-                    const groupMatch = device.group_id ? allAssignments.find(a => a.group_id === device.group_id) : null;
-                    activeAssignment = directMatch || groupMatch || null;
-                }
+                // Misma regla que el reproductor: primero la asignación directa, después la del grupo.
+                const activeAssignment = pickActiveAssignment(allAssignments, device.id, device.group_id);
 
                 return { 
                     ...device, 

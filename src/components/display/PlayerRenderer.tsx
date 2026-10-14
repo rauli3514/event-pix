@@ -16,9 +16,16 @@ interface PlayerRendererProps {
     isPrev?: boolean;
     commerceId?: string;
     defaultTransition?: string;
+    // Videos: repetir con el loop nativo (sin corte) cuando es el único item.
+    nativeLoop?: boolean;
+    // Videos: al terminar una vuelta. Devuelve true si la rotación se encargó;
+    // false para volver a reproducirlo. Sin callback se repite salvo loop === false.
+    onVideoEnded?: () => boolean;
+    onVideoError?: () => void;
+    onVideoDuration?: (seconds: number) => void;
 }
 
-export const PlayerRenderer = ({ item, isActive, isPrev, commerceId, defaultTransition }: PlayerRendererProps) => {
+export const PlayerRenderer = ({ item, isActive, isPrev, commerceId, defaultTransition, nativeLoop, onVideoEnded, onVideoError, onVideoDuration }: PlayerRendererProps) => {
     // Attempt to fetch live media to keep apps synchronized with recent edits without reloading the playlist
     const { data: mediaList = [] } = useDisplayMedia(commerceId || '');
 
@@ -37,8 +44,15 @@ export const PlayerRenderer = ({ item, isActive, isPrev, commerceId, defaultTran
     useEffect(() => {
         if ((item.type === 'video' || item.type === 'video_ad') && videoRef.current) {
             if (isActive) {
-                videoRef.current.currentTime = 0;
-                videoRef.current.play().catch(() => {});
+                const video = videoRef.current;
+                // Si falló o ya cargó mientras se precargaba, avisar ahora que es el activo.
+                if (video.error) {
+                    onVideoError?.();
+                    return;
+                }
+                if (Number.isFinite(video.duration)) onVideoDuration?.(video.duration);
+                video.currentTime = 0;
+                video.play().catch(() => {});
             } else {
                 videoRef.current.pause();
             }
@@ -347,15 +361,18 @@ export const PlayerRenderer = ({ item, isActive, isPrev, commerceId, defaultTran
                             src={item.url} 
                             style={{ width: '100%', height: '100%', objectFit: objectFitValue, pointerEvents: 'none' }}
                             muted={item.mute !== false}
-                            loop={item.loop !== false}
+                            loop={!!nativeLoop}
                             playsInline
                             preload="auto"
                             disablePictureInPicture
                             controls={false}
                             poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                             className="[&::-webkit-media-controls-play-button]:hidden [&::-webkit-media-controls-start-playback-button]:hidden [&::-webkit-media-controls]:hidden"
+                            onLoadedMetadata={(e) => onVideoDuration?.((e.target as HTMLVideoElement).duration)}
+                            onError={() => { if (isActive) onVideoError?.(); }}
                             onEnded={(e) => {
-                                if (item.loop !== false) {
+                                const handled = onVideoEnded ? onVideoEnded() : item.loop === false;
+                                if (!handled) {
                                     const video = e.target as HTMLVideoElement;
                                     video.currentTime = 0;
                                     video.play().catch(() => {});
