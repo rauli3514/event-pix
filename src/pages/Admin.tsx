@@ -1069,6 +1069,35 @@ const Admin = () => {
                                 </CardContent>
                             </Card>
 
+                            {/* Qué se muestra en el muro */}
+                            <Card className="bg-slate-900 border-slate-800 border-l-4 border-l-fuchsia-500 text-slate-100">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2 text-slate-100">
+                                        <span className="text-2xl">✨</span> Momentos en pantalla
+                                    </CardTitle>
+                                    <p className="text-sm text-slate-400">Para un evento más sobrio (por ejemplo, corporativo) apagá lo que no quieras mostrar.</p>
+                                </CardHeader>
+                                <CardContent className="divide-y divide-slate-800">
+                                    {([
+                                        ['wall_spotlight_enabled', 'Destacar fotos nuevas', 'Cada foto aprobada aparece en grande con "¡NUEVA FOTO!", el nombre y la dedicatoria, y el invitado recibe el aviso en el celular.'],
+                                        ['wall_collage_enabled', 'Collage de fotos', 'Cada 8 fotos se muestra un collage con 12 fotos de la noche.'],
+                                        ['wall_ranking_enabled', 'Ranking de fotógrafos', 'Cada tanto se muestra quiénes subieron más fotos.'],
+                                        ['wall_counter_enabled', 'Contador de fotos e invitados', 'Arriba a la derecha, junto al QR: "🔥 214 fotos · 63 invitados".'],
+                                    ] as const).map(([key, label, hint]) => (
+                                        <div key={key} className="flex items-center justify-between gap-6 py-4 first:pt-0 last:pb-0">
+                                            <div>
+                                                <p className="font-medium text-slate-100">{label}</p>
+                                                <p className="text-sm text-slate-400">{hint}</p>
+                                            </div>
+                                            <Switch
+                                                checked={settings?.[key] !== false}
+                                                onCheckedChange={(c) => updateSettings.mutate({ id: settings?.id, [key]: c } as any)}
+                                            />
+                                        </div>
+                                    ))}
+                                </CardContent>
+                            </Card>
+
                             {/* DJ Mode */}
                             <Card className="bg-slate-900 border-slate-800 border-l-4 border-l-amber-500 text-slate-100">
                                 <CardHeader>
@@ -1224,6 +1253,7 @@ const Admin = () => {
                                         <Button onClick={handleSettingsSubmit} disabled={updateSettings.isPending}>Guardar Cambios</Button>
                                     </div>
 
+                                    {isSuperAdmin && (
                                     <div className="pt-8 border-t mt-8">
                                         <h3 className="text-blue-400 font-medium mb-4">Herramientas de Prueba</h3>
                                         <Button type="button" variant="outline" className="w-full border-blue-500/50 text-blue-400 hover:bg-blue-500/10" onClick={simulateParty}>
@@ -1233,20 +1263,28 @@ const Admin = () => {
                                             Genera fotos y mensajes falsos para probar el carrusel.
                                         </p>
                                     </div>
+                                    )}
                                 </CardContent>
                             </Card>
 
+                            {/* Solo el super admin: un cliente podía borrar el evento sin querer */}
+                            {isSuperAdmin && (
                             <div className="mt-8 p-6 border border-red-900/30 bg-red-900/10 rounded-xl">
                                 <h3 className="text-red-400 font-bold mb-2">Zona de Peligro</h3>
                                 <div className="space-y-4">
                                     <Button variant="destructive" className="w-full justify-start" onClick={handleClearApproved}>
                                         <Trash2 className="w-4 h-4 mr-2" /> Vaciar Aprobados
                                     </Button>
-                                    <Button variant="destructive" className="w-full justify-start" onClick={async () => { await resetAll.mutateAsync(); toast.success("Reset completo"); }}>
+                                    <Button variant="destructive" className="w-full justify-start" onClick={async () => {
+                                        if (!confirm("¿Borrar TODO el contenido del evento (fotos, mensajes y audios, aprobados y pendientes)? No se puede deshacer. Descargalo o envialo a Drive antes.")) return;
+                                        await resetAll.mutateAsync();
+                                        toast.success("Reset completo");
+                                    }}>
                                         <Trash2 className="w-4 h-4 mr-2" /> Reiniciar Evento (Borrar Todo)
                                     </Button>
                                 </div>
                             </div>
+                            )}
                         </div>
                     )
                 }

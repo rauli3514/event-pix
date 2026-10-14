@@ -191,7 +191,8 @@ const Index = () => {
                     <MessageModal open={messageOpen} onOpenChange={setMessageOpen} eventId={event.id} />
                     <AudioRecorderModal open={audioOpen} onOpenChange={setAudioOpen} eventId={event.id} />
                     <ChallengeRoulette onOpenCamera={() => setUploadOpen(true)} />
-                    <OnScreenNotice eventId={event.id} />
+                    {/* Con el destacado apagado la foto no sale "ahora mismo": no se avisa */}
+                    {settings?.wall_spotlight_enabled !== false && <OnScreenNotice eventId={event.id} />}
 
                     {/* Photo Booth Modal */}
                     {uploadedPhotoUrl && (
