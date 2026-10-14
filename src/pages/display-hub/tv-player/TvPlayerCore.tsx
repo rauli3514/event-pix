@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef, Component, ErrorInfo, ReactNode } from 'react';
+import { useState, useEffect, Component, ErrorInfo, ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
 import { TvSettingsMenu } from '@/components/display/TvSettingsMenu';
 import { useTelemetry } from './useTelemetry';
 import { useSyncEngine } from './useSyncEngine';
 import { MediaRenderer } from './MediaRenderer';
+import { usePlaylistRotation } from '@/hooks/use-playlist-rotation';
 
 // --- Master Watchdog Error Boundary ---
 class WatchdogBoundary extends Component<{children: ReactNode}, {hasError: boolean}> {
@@ -37,9 +38,7 @@ class WatchdogBoundary extends Component<{children: ReactNode}, {hasError: boole
 // --- Core Player Component ---
 const TvPlayerCore = () => {
     const { deviceCode } = useParams<{ deviceCode: string }>();
-    const [currentIndex, setCurrentIndex] = useState(0);
     const [localRotation, setLocalRotation] = useState<number | null>(null);
-    const rotationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // 1. Telemetry Engine
     const { sendHeartbeat } = useTelemetry(deviceCode);
@@ -53,7 +52,8 @@ const TvPlayerCore = () => {
         deviceName,
         deviceCommerceId,
         preloadProgress,
-        fetchCampaign
+        fetchCampaign,
+        contentKey
     } = useSyncEngine(deviceCode, sendHeartbeat);
 
     // 3. System Events (Rotation, Online status & Secret Exit)
@@ -135,29 +135,12 @@ const TvPlayerCore = () => {
         }
     }, [deviceSettings.orientation]);
 
-    // 4. Media Rotation Logic
-    useEffect(() => {
-        if (items.length === 0 || (status !== 'playing' && status !== 'offline_playing')) return;
-
-        if (rotationTimeoutRef.current) clearTimeout(rotationTimeoutRef.current);
-
-        const currentItem = items[currentIndex];
-        if (!currentItem) {
-            setCurrentIndex(0);
-            return;
-        }
-        
-        const durationMs = (currentItem.duration && currentItem.duration > 0 ? currentItem.duration : 10) * 1000;
-
-        rotationTimeoutRef.current = setTimeout(() => {
-            setCurrentIndex((prevIndex) => (prevIndex + 1) % items.length);
-        }, durationMs);
-
-        return () => {
-            if (rotationTimeoutRef.current) clearTimeout(rotationTimeoutRef.current);
-        };
-    }, [currentIndex, items, status]);
-
+    // 4. Media Rotation Logic (los videos nunca se cortan: ver usePlaylistRotation)
+    const { currentIndex, onVideoEnded, onVideoError, onVideoDuration } = usePlaylistRotation(
+        items,
+        status === 'playing' || status === 'offline_playing',
+        contentKey
+    );
 
     // --- UI Renders ---
     
@@ -269,6 +252,9 @@ const TvPlayerCore = () => {
                 items={items} 
                 currentIndex={currentIndex} 
                 deviceCommerceId={deviceCommerceId} 
+                onVideoEnded={onVideoEnded}
+                onVideoError={onVideoError}
+                onVideoDuration={onVideoDuration}
             />
             <TvSettingsMenu deviceCode={deviceCode!} onRefresh={() => fetchCampaign()} />
         </div>

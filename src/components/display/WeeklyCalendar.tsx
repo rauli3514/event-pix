@@ -1,7 +1,9 @@
 
+import { Fragment } from 'react';
 import { Calendar, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getIconForType } from '@/pages/display-hub/WorkspaceMedia';
+import { getEventWindow } from '@/lib/displaySchedule';
 
 interface WeeklyCalendarProps {
     schedule: any;
@@ -10,17 +12,7 @@ interface WeeklyCalendarProps {
 }
 
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-// JS Date.getDay() gives 0 for Sunday, 1 for Monday.
-// We want Monday=0, Sunday=6 for our grid.
-const JS_DAY_TO_GRID_COL = {
-    1: 0, // Mon
-    2: 1, // Tue
-    3: 2, // Wed
-    4: 3, // Thu
-    5: 4, // Fri
-    6: 5, // Sat
-    0: 6, // Sun
-};
+// Columnas Lunes..Domingo; JS Date.getDay() da 0 para el domingo (columna 6).
 
 const PIXELS_PER_HOUR = 60; // 60px per hour
 const HOURS = Array.from({ length: 24 }, (_, i) => `${i.toString().padStart(2, '0')}:00`);
@@ -57,13 +49,17 @@ export const WeeklyCalendar = ({ schedule, onSlotClick, onEventClick }: WeeklyCa
         return `${h.toString().padStart(2, '0')}:${mStr} ${ampmStr}`;
     };
 
-    const renderEventBlock = (event: any, dayIndex: number) => {
-        const startDecimal = parseTimeToDecimal(event.start_time);
-        const endDecimal = parseTimeToDecimal(event.end_time);
-        let duration = endDecimal - startDecimal;
-        
-        // Handle midnight wrap-around loosely
-        if (duration < 0) duration += 24;
+    // segment: 'start' = día en que empieza; 'continuation' = madrugada del día
+    // siguiente para eventos que cruzan la medianoche (ej. 22:00–02:00).
+    const renderEventBlock = (event: any, dayIndex: number, segment: 'start' | 'continuation' = 'start') => {
+        const win = getEventWindow(event);
+        let startDecimal = win ? win.start / 60 : parseTimeToDecimal(event.start_time);
+        let endDecimal = win ? win.end / 60 : parseTimeToDecimal(event.end_time);
+        if (win?.crossesMidnight) {
+            if (segment === 'start') endDecimal = 24;
+            else startDecimal = 0;
+        }
+        const duration = Math.max(endDecimal - startDecimal, 0.25);
 
         const top = startDecimal * PIXELS_PER_HOUR;
         const height = duration * PIXELS_PER_HOUR;
@@ -80,7 +76,7 @@ export const WeeklyCalendar = ({ schedule, onSlotClick, onEventClick }: WeeklyCa
 
         return (
             <div 
-                key={`${event.id}-${dayIndex}`}
+                key={`${event.id}-${dayIndex}-${segment}`}
                 className={cn("absolute left-1 right-1 rounded-md shadow-sm border border-white/20 p-2 overflow-hidden flex flex-col group transition-all cursor-pointer hover:ring-2 hover:ring-indigo-500/50 hover:z-10", bgClass, "text-white")}
                 style={{ top: `${top}px`, height: `${height}px` }}
                 onClick={(e) => {
@@ -179,10 +175,15 @@ export const WeeklyCalendar = ({ schedule, onSlotClick, onEventClick }: WeeklyCa
                                     </div>
                                 ))}
                                 {schedule.events?.map((ev: any) => {
-                                    if (ev.days_of_week && ev.days_of_week.includes(Object.keys(JS_DAY_TO_GRID_COL).find(k => (JS_DAY_TO_GRID_COL as any)[k] === colIndex) ? parseInt(Object.keys(JS_DAY_TO_GRID_COL).find(k => (JS_DAY_TO_GRID_COL as any)[k] === colIndex)!) : -1)) {
-                                        return renderEventBlock(ev, ev.days_of_week[0]); 
-                                    }
-                                    return null;
+                                    const jsDay = colIndex === 6 ? 0 : colIndex + 1;
+                                    const previousJsDay = (jsDay + 6) % 7;
+                                    const days: number[] = ev.days_of_week || [];
+                                    return (
+                                        <Fragment key={ev.id}>
+                                            {days.includes(jsDay) && renderEventBlock(ev, jsDay, 'start')}
+                                            {getEventWindow(ev)?.crossesMidnight && days.includes(previousJsDay) && renderEventBlock(ev, jsDay, 'continuation')}
+                                        </Fragment>
+                                    );
                                 })}
                             </div>
                         ))}

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
+import { usePlaylistRotation } from '@/hooks/use-playlist-rotation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Play, MonitorPlay } from 'lucide-react';
 import { PlayerRenderer } from '@/components/display/PlayerRenderer';
@@ -10,41 +11,12 @@ interface PlaylistPreviewModalProps {
 }
 
 export const PlaylistPreviewModal: React.FC<PlaylistPreviewModalProps> = ({ isOpen, onClose, items }) => {
-    const [currentIndex, setCurrentIndex] = useState(0);
-    const rotationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const { currentIndex, setCurrentIndex, onVideoEnded, onVideoError, onVideoDuration } = usePlaylistRotation(items, isOpen);
 
     // Reiniciar al abrir
     useEffect(() => {
-        if (isOpen) {
-            setCurrentIndex(0);
-        } else {
-            if (rotationTimeoutRef.current) clearTimeout(rotationTimeoutRef.current);
-        }
-    }, [isOpen]);
-
-    // Lógica de rotación automática
-    useEffect(() => {
-        if (!isOpen || items.length === 0) return;
-
-        if (rotationTimeoutRef.current) clearTimeout(rotationTimeoutRef.current);
-
-        const currentItem = items[currentIndex];
-        if (!currentItem) {
-            setCurrentIndex(0);
-            return;
-        }
-
-        // Default a 10s si no hay duración válida
-        const durationMs = (currentItem.duration && currentItem.duration > 0 ? currentItem.duration : 10) * 1000;
-
-        rotationTimeoutRef.current = setTimeout(() => {
-            setCurrentIndex((prevIndex) => (prevIndex + 1) % items.length);
-        }, durationMs);
-
-        return () => {
-            if (rotationTimeoutRef.current) clearTimeout(rotationTimeoutRef.current);
-        };
-    }, [currentIndex, items, isOpen]);
+        if (isOpen) setCurrentIndex(0);
+    }, [isOpen, setCurrentIndex]);
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -75,6 +47,10 @@ export const PlaylistPreviewModal: React.FC<PlaylistPreviewModalProps> = ({ isOp
                                     item={item} 
                                     isActive={isActive} 
                                     isPrev={isPrev}
+                                    nativeLoop={items.length === 1 && item.loop !== false}
+                                    onVideoEnded={() => onVideoEnded(index)}
+                                    onVideoError={() => onVideoError(index)}
+                                    onVideoDuration={(seconds) => onVideoDuration(index, seconds)}
                                 />
                             );
                         })

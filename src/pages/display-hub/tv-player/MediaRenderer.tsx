@@ -6,6 +6,9 @@ interface Props {
     items: CampaignItem[];
     currentIndex: number;
     deviceCommerceId: string;
+    onVideoEnded: (index: number) => boolean;
+    onVideoError: (index: number) => void;
+    onVideoDuration: (index: number, seconds: number) => void;
 }
 
 interface State {
@@ -36,7 +39,7 @@ export class MediaErrorBoundary extends Component<{children: ReactNode, onError:
     }
 }
 
-export function MediaRenderer({ items, currentIndex, deviceCommerceId }: Props) {
+export function MediaRenderer({ items, currentIndex, deviceCommerceId, onVideoEnded, onVideoError, onVideoDuration }: Props) {
     if (!items || items.length === 0) return null;
 
     const prevIndex = items.length > 1 ? (currentIndex - 1 + items.length) % items.length : -1;
@@ -66,6 +69,10 @@ export function MediaRenderer({ items, currentIndex, deviceCommerceId }: Props) 
                             isActive={isActive} 
                             isPrev={isPrev}
                             commerceId={deviceCommerceId}
+                            nativeLoop={items.length === 1 && (item as any).loop !== false}
+                            onVideoEnded={() => onVideoEnded(index)}
+                            onVideoError={() => onVideoError(index)}
+                            onVideoDuration={(seconds) => onVideoDuration(index, seconds)}
                         />
                     </MediaErrorBoundary>
                 );

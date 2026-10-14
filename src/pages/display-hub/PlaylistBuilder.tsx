@@ -431,7 +431,12 @@ const PlaylistBuilder = () => {
                                                         value={item.duration}
                                                         onChange={e => handleUpdateItem(item.id, { duration: parseInt(e.target.value) || 10 })}
                                                     />
-                                                    <span className="text-[10px] md:text-xs text-muted-foreground font-medium">segs</span>
+                                                    <span
+                                                        className="text-[10px] md:text-xs text-muted-foreground font-medium"
+                                                        title={item.type === 'video' ? 'Los videos nunca se cortan: si duran más, se ven completos; si duran menos, se repiten hasta cumplir este tiempo.' : undefined}
+                                                    >
+                                                        {item.type === 'video' ? 'segs mín.' : 'segs'}
+                                                    </span>
                                                 </div>
                                                 <Button variant="ghost" size="sm" onClick={() => handleRemoveItem(item.id)} className="h-8 sm:h-7 text-destructive hover:text-destructive hover:bg-destructive/10">
                                                     <Trash2 className="w-3.5 h-3.5 sm:mr-1" /> <span className="sm:inline hidden">Quitar</span>
