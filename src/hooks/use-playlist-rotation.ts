@@ -18,22 +18,78 @@ interface RotationItem {
 
 const isVideo = (item: RotationItem | undefined) => item?.type === 'video' || item?.type === 'video_ad';
 
+// Orden de una vuelta: 0..n-1, o mezclado. first fija el item con el que
+// empieza; avoidFirst evita repetir al empezar la vuelta el mismo item con el
+// que terminó la anterior.
+function buildOrder(count: number, shuffle: boolean, opts: { first?: number; avoidFirst?: number } = {}): number[] {
+    const order = Array.from({ length: count }, (_, i) => i);
+    if (!shuffle || count < 2) return order;
+    for (let i = count - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [order[i], order[j]] = [order[j], order[i]];
+    }
+    if (opts.first !== undefined && order.includes(opts.first)) {
+        order.splice(order.indexOf(opts.first), 1);
+        order.unshift(opts.first);
+    } else if (opts.avoidFirst !== undefined && order[0] === opts.avoidFirst) {
+        [order[0], order[1]] = [order[1], order[0]];
+    }
+    return order;
+}
+
 // Rotación de una playlist. La duración de cada item es un mínimo para los
 // videos: nunca se cortan a la mitad. Un video más largo que su tiempo se ve
 // completo; uno más corto se repite hasta cumplirlo, terminando la vuelta en curso.
-// contentKey: cuando cambia (otra playlist, otra franja horaria) se arranca desde el primer item.
-export function usePlaylistRotation(items: RotationItem[], enabled: boolean, contentKey?: string | null) {
-    const [currentIndex, setCurrentIndex] = useState(0);
-    const [lastContentKey, setLastContentKey] = useState(contentKey);
-    if (contentKey !== lastContentKey) {
-        setLastContentKey(contentKey);
-        setCurrentIndex(0);
+// contentKey: cuando cambia (otra playlist, otra franja horaria) se arranca de nuevo.
+// shuffle: "Orden aleatorio" de la playlist; se mezcla de nuevo en cada vuelta.
+export function usePlaylistRotation(items: RotationItem[], enabled: boolean, contentKey?: string | null, shuffle = false) {
+    // current = item en pantalla; prev = el que sale (transición); next = el que se precarga.
+    const [position, setPosition] = useState({ current: 0, prev: -1, next: -1 });
+    const currentIndex = position.current;
+
+    // Contenido nuevo (otra playlist o franja, otra cantidad de items, cambio de
+    // aleatorio): se vuelve al primer item durante el render, así nunca se pinta
+    // un item de la playlist anterior.
+    const resetKey = `${contentKey ?? ''}|${items.length}|${shuffle}`;
+    const [lastResetKey, setLastResetKey] = useState(resetKey);
+    if (resetKey !== lastResetKey) {
+        setLastResetKey(resetKey);
+        setPosition({ current: 0, prev: -1, next: -1 });
     }
 
     const itemsRef = useRef(items);
+    const shuffleRef = useRef(shuffle);
     useLayoutEffect(() => {
         itemsRef.current = items;
-    }, [items]);
+        shuffleRef.current = shuffle;
+    }, [items, shuffle]);
+
+    // Orden de la vuelta actual y de la siguiente (para saber qué precargar).
+    const orderRef = useRef<{ order: number[]; nextOrder: number[] }>({ order: [], nextOrder: [] });
+
+    const peekNext = (current: number) => {
+        const { order, nextOrder } = orderRef.current;
+        const pos = order.indexOf(current);
+        if (order.length < 2) return -1;
+        return pos !== -1 && pos < order.length - 1 ? order[pos + 1] : nextOrder[0];
+    };
+
+    // Arma el orden de la vuelta empezando por el item actual. Corre antes de
+    // pintar (layout effect), así el siguiente a precargar ya es el correcto.
+    const buildCycles = useCallback((first: number) => {
+        const count = itemsRef.current.length;
+        const order = buildOrder(count, shuffleRef.current, { first });
+        orderRef.current = { order, nextOrder: buildOrder(count, shuffleRef.current, { avoidFirst: order[count - 1] }) };
+    }, []);
+
+    useLayoutEffect(() => {
+        buildCycles(0);
+        setPosition(p => ({ ...p, next: peekNext(p.current) }));
+    }, [lastResetKey, buildCycles]);
+
+    const setCurrentIndex = useCallback((index: number) => {
+        setPosition(p => ({ current: index, prev: p.current !== index ? p.current : -1, next: peekNext(index) }));
+    }, []);
 
     // Estado del item en pantalla. Se reinicia en un layout effect (no en un
     // useEffect) porque los efectos del video (hijo) corren antes que los de este
@@ -50,15 +106,30 @@ export function usePlaylistRotation(items: RotationItem[], enabled: boolean, con
 
     const advance = useCallback(() => {
         const count = itemsRef.current.length;
-        setCurrentIndex(i => (count > 0 ? (i + 1) % count : 0));
-    }, []);
+        if (count === 0) return;
+        const current = itemStateRef.current.index;
+
+        if (orderRef.current.order.length !== count) buildCycles(current);
+        const { order, nextOrder } = orderRef.current;
+        const pos = order.indexOf(current);
+
+        let next: number;
+        if (pos !== -1 && pos < order.length - 1) {
+            next = order[pos + 1];
+        } else {
+            // Fin de la vuelta: empieza la siguiente (mezclada de nuevo si corresponde).
+            orderRef.current = { order: nextOrder, nextOrder: buildOrder(count, shuffleRef.current, { avoidFirst: nextOrder[count - 1] }) };
+            next = nextOrder[0];
+        }
+        setPosition({ current: next, prev: count > 1 ? current : -1, next: peekNext(next) });
+    }, [buildCycles]);
 
     useEffect(() => {
         if (!enabled || items.length === 0) return;
 
         const item = items[currentIndex];
         if (!item) {
-            setCurrentIndex(0);
+            setPosition({ current: 0, prev: -1, next: -1 });
             return;
         }
 
@@ -123,5 +194,13 @@ export function usePlaylistRotation(items: RotationItem[], enabled: boolean, con
         }
     }, []);
 
-    return { currentIndex, setCurrentIndex, onVideoEnded, onVideoError, onVideoDuration };
+    return {
+        currentIndex,
+        prevIndex: position.prev,
+        nextIndex: position.next,
+        setCurrentIndex,
+        onVideoEnded,
+        onVideoError,
+        onVideoDuration,
+    };
 }

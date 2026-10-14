@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { sendDeviceHeartbeat } from '@/lib/displayDeviceApi';
+import { registerCommandSecret } from '@/lib/displayCommands';
 import { Wifi, Bluetooth, Power } from 'lucide-react';
 
 export default function TvBootScreen() {
@@ -36,6 +37,8 @@ export default function TvBootScreen() {
           await supabase.from('display_devices').insert([
             { device_id: deviceId, pairing_status: 'pending' }
           ]).select().single();
+          // Registrar la clave de comandos remotos apenas existe la pantalla.
+          registerCommandSecret(deviceId).catch(() => {});
         } else {
           // Update last seen if exists
           await sendDeviceHeartbeat(deviceId);

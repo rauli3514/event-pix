@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { CampaignItem } from '@/types/display';
 import { useCacheManager } from './useCacheManager';
 import { findActiveScheduleEvent, pickActiveAssignment } from '@/lib/displaySchedule';
+import { getOrCreateCommandSecret, openSignedCommand, registerCommandSecret } from '@/lib/displayCommands';
 
 type PlayerStatus = 'loading' | 'playing' | 'offline_playing' | 'no_content' | 'error';
 
@@ -15,6 +16,9 @@ const assignmentCacheKey = (deviceCode: string) => `tv_assignment_${deviceCode}_
 
 // Cada cuánto se revisa si cambió la franja horaria de la programación.
 const SCHEDULE_TICK_MS = 30 * 1000;
+
+// Cada cuánto la TV vuelve a registrar su clave de comandos.
+const COMMAND_SECRET_RETRY_MS = 5 * 60 * 1000;
 
 // Agrupa ráfagas de cambios (ej.: guardar una playlist toca varias filas) en una sola consulta.
 const REFETCH_DEBOUNCE_MS = 1500;
@@ -51,6 +55,7 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
     const assignmentRef = useRef<any>(null);
     const activeContentKeyRef = useRef<string | null>(null);
     const [contentKey, setContentKey] = useState<string | null>(null);
+    const [shuffle, setShuffle] = useState(false);
     const offlineRef = useRef(false);
 
     // Arma la playlist de lo que toca mostrar ahora según la asignación y la publica.
@@ -73,6 +78,7 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
         activeContentKeyRef.current = contentKey;
 
         let compiledItems: any[] = [];
+        let playlistShuffle = false;
         if (activeContent) {
             if (activeContent.campaign && activeContent.campaign.commerce_id) {
                 setDeviceCommerceId(prev => prev || activeContent!.campaign.commerce_id);
@@ -80,7 +86,10 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
 
             if (activeContent.campaign && activeContent.campaign.items_json) {
                 const rawItems = activeContent.campaign.items_json;
-                const campaignDefaultTransition = activeContent.campaign.settings?.transition || 'fade';
+                // La configuración de la playlist (editor V2) vive dentro de items_json.settings.
+                const playlistSettings = rawItems?.settings || activeContent.campaign.settings || {};
+                const campaignDefaultTransition = playlistSettings.transition || 'fade';
+                playlistShuffle = !!playlistSettings.shuffle;
                 
                 if (rawItems.version === '2.0' && Array.isArray(rawItems.zones) && rawItems.zones.length > 0) {
                     compiledItems = rawItems.zones[0].playlist || [];
@@ -129,6 +138,7 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
 
         // Siempre actualizar el estado de items en React para aplicar cambios de transición y duración
         setContentKey(contentKey);
+        setShuffle(playlistShuffle);
         setItems(compiledItems);
         setStatus(offlineRef.current ? 'offline_playing' : 'playing');
     };
@@ -269,21 +279,33 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
         window.addEventListener('online', handleOnline);
 
         const commandChannel = supabase.channel(`device:${deviceCode}`)
-            .on('broadcast', { event: 'command' }, (payload) => {
-                if (payload.payload?.action === 'reload') {
+            .on('broadcast', { event: 'command' }, async (message) => {
+                const raw = message.payload;
+                // Pedidos inofensivos (solo vuelven a consultar el contenido): se aceptan sin firma.
+                if (raw?.action === 'sync' || raw?.action === 'rotate_screen') {
+                    scheduleFetch();
+                    return;
+                }
+
+                // Todo lo demás tiene que venir cifrado y firmado por el panel (ver displayCommands.ts).
+                const command = await openSignedCommand(raw, deviceCode, getOrCreateCommandSecret(deviceCode));
+                if (!command) {
+                    console.warn('Comando remoto descartado: no está firmado para esta pantalla.');
+                    return;
+                }
+
+                if (command.action === 'reload') {
                     window.location.reload();
-                } else if (payload.payload?.action === 'clear_cache') {
+                } else if (command.action === 'clear_cache') {
                     [cacheKey(deviceCode), assignmentCacheKey(deviceCode), ...legacyCacheKeys(deviceCode)].forEach(key => localStorage.removeItem(key));
                     window.location.reload();
-                } else if (payload.payload?.action === 'rotate_screen') {
-                    fetchRef.current();
-                } else if (payload.payload?.action === 'reset_telemetry') {
+                } else if (command.action === 'reset_telemetry') {
                     if ((window as any).TvBridge && typeof (window as any).TvBridge.resetTelemetry === 'function') {
                         (window as any).TvBridge.resetTelemetry();
                         forceHeartbeat();
                     }
-                } else if (payload.payload?.action === 'set_volume') {
-                    const vol = payload.payload?.volume;
+                } else if (command.action === 'set_volume') {
+                    const vol = command.volume;
                     if (typeof vol === 'number' && vol >= 0 && vol <= 100) {
                         if ((window as any).TvBridge && typeof (window as any).TvBridge.setVolume === 'function') {
                             (window as any).TvBridge.setVolume(vol);
@@ -296,16 +318,13 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
                         }
                         forceHeartbeat();
                     }
-                } else if (payload.payload?.action === 'connect_wifi') {
-                    const ssid = payload.payload?.ssid;
-                    const password = payload.payload?.password;
+                } else if (command.action === 'connect_wifi') {
+                    const { ssid, password } = command;
                     if (ssid && password && (window as any).TvBridge && typeof (window as any).TvBridge.connectToWifi === 'function') {
                         (window as any).TvBridge.connectToWifi(ssid, password);
                         // Wait a few seconds for network to reconnect then heartbeat
                         setTimeout(() => forceHeartbeat(), 5000);
                     }
-                } else if (payload.payload?.action === 'sync') {
-                    fetchRef.current();
                 }
             })
             // Solo los cambios de ESTA pantalla, y solo si cambia algo que afecte lo que se ve
@@ -338,6 +357,22 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
             if (debounceRef.current) clearTimeout(debounceRef.current);
         };
     }, [deviceCode]); // Removed 'status' dependency to prevent constant resubscription loops
+
+    // Clave de comandos remotos: se registra al arrancar y se reintenta cada tanto
+    // (por si no había red, o si alguien la restableció desde el panel).
+    useEffect(() => {
+        if (!deviceCode) return;
+        const register = () => {
+            registerCommandSecret(deviceCode)
+                .then(ok => {
+                    if (!ok) console.warn('Esta pantalla tiene otra clave de comandos registrada: restablecela desde el panel.');
+                })
+                .catch(() => { /* sin red o migración pendiente: se reintenta */ });
+        };
+        register();
+        const interval = setInterval(register, COMMAND_SECRET_RETRY_MS);
+        return () => clearInterval(interval);
+    }, [deviceCode]);
 
     // Cambio de franja horaria: se evalúa localmente (también sin internet) en vez de
     // esperar a la próxima consulta al servidor, que puede tardar hasta 10 minutos.
@@ -404,6 +439,7 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
         deviceCommerceId,
         preloadProgress,
         fetchCampaign,
-        contentKey
+        contentKey,
+        shuffle
     };
 }

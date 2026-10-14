@@ -5,6 +5,9 @@ import { CampaignItem } from '@/types/display';
 interface Props {
     items: CampaignItem[];
     currentIndex: number;
+    // Con orden aleatorio el anterior/siguiente no son ±1: los decide la rotación.
+    prevIndex?: number;
+    nextIndex?: number;
     deviceCommerceId: string;
     onVideoEnded: (index: number) => boolean;
     onVideoError: (index: number) => void;
@@ -39,11 +42,11 @@ export class MediaErrorBoundary extends Component<{children: ReactNode, onError:
     }
 }
 
-export function MediaRenderer({ items, currentIndex, deviceCommerceId, onVideoEnded, onVideoError, onVideoDuration }: Props) {
+export function MediaRenderer({ items, currentIndex, prevIndex: prevProp, nextIndex: nextProp, deviceCommerceId, onVideoEnded, onVideoError, onVideoDuration }: Props) {
     if (!items || items.length === 0) return null;
 
-    const prevIndex = items.length > 1 ? (currentIndex - 1 + items.length) % items.length : -1;
-    const nextIndex = items.length > 1 ? (currentIndex + 1) % items.length : -1;
+    const prevIndex = prevProp ?? (items.length > 1 ? (currentIndex - 1 + items.length) % items.length : -1);
+    const nextIndex = nextProp ?? (items.length > 1 ? (currentIndex + 1) % items.length : -1);
 
     return (
         <div className="relative w-full h-full overflow-hidden bg-black">

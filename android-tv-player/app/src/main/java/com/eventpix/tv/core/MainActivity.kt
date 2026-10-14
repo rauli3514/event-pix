@@ -29,6 +29,7 @@ class MainActivity : AppCompatActivity() {
     
     private lateinit var playerManager: PlayerManager
     private lateinit var webViewManager: WebViewManager
+    private var watchdog: WatchdogService? = null
     
     private val scope = CoroutineScope(Dispatchers.Main + Job())
 
@@ -79,6 +80,9 @@ class MainActivity : AppCompatActivity() {
         // Ensure daily restart is scheduled on boot based on saved settings
         tvBridge.scheduleDailyRestart(tvBridge.getRebootHour(), tvBridge.getRebootMinute())
 
+        // Vigila que el hilo de la UI no quede bloqueado (antes nunca se iniciaba).
+        watchdog = WatchdogService(this, playerManager, webViewManager).also { it.start() }
+
         setImmersiveMode()
         startBootSequence()
     }
@@ -126,6 +130,7 @@ class MainActivity : AppCompatActivity() {
     
     override fun onDestroy() {
         super.onDestroy()
+        watchdog?.stop()
         playerManager.releasePlayer()
         scope.cancel()
     }
