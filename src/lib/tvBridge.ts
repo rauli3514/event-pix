@@ -51,3 +51,48 @@ export function onTvBridgeReady(cb: () => void): () => void {
     window.addEventListener(READY_EVENT, handler, { once: true });
     return () => window.removeEventListener(READY_EVENT, handler);
 }
+
+// ---------------------------------------------------------------------------
+// Acciones de Android compartidas por la app TV (TvBridge) y la del kiosco
+// (window.AndroidKiosk, app Capacitor). Prueban primero la de TV. Devuelven
+// false si ninguna está disponible (por ejemplo, en un navegador).
+// ---------------------------------------------------------------------------
+
+const androidKiosk = () => (window as unknown as { AndroidKiosk?: Record<string, (() => void) | undefined> }).AndroidKiosk;
+
+function runAndroidAction(tvMethods: string[], kioskMethods: string[]): boolean {
+    for (const method of tvMethods) {
+        if (hasTvBridgeMethod(method)) {
+            callTvBridge(method);
+            return true;
+        }
+    }
+    const kiosk = androidKiosk();
+    for (const method of kioskMethods) {
+        const fn = kiosk?.[method];
+        if (typeof fn === 'function') {
+            fn.call(kiosk);
+            return true;
+        }
+    }
+    return false;
+}
+
+export const openWifiSettings = () =>
+    runAndroidAction(['openWifiSettings', 'openSettings'], ['openWifiSettings', 'openSettings']);
+
+export const openHomeSettings = () =>
+    runAndroidAction(['openHomeSettings', 'openSettings'], ['openHomeSettings', 'openSettings']);
+
+export const exitAndroidApp = () => runAndroidAction(['exitApp'], ['exitApp']);
+
+// Versión del APK de la TV (la informa la telemetría nativa), o null.
+export function getTvAppVersion(): string | null {
+    const raw = callTvBridge<string>('getTelemetry');
+    if (!raw) return null;
+    try {
+        return JSON.parse(raw).app_version || null;
+    } catch {
+        return null;
+    }
+}

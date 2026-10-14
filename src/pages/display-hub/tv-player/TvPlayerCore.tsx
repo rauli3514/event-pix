@@ -7,6 +7,18 @@ import { MediaRenderer } from './MediaRenderer';
 import { usePlaylistRotation } from '@/hooks/use-playlist-rotation';
 import { callTvBridge, hasTvBridgeMethod, onTvBridgeReady } from '@/lib/tvBridge';
 
+// Identidad de Display Digital para las pantallas de espera de la TV. En la app
+// Android el logo sale del APK (WebViewManager intercepta /edm-assets/).
+const BRAND_LOGO = '/edm-assets/logo.PNG';
+const BRAND_BACKGROUND: React.CSSProperties = {
+    // Centro del mismo tono que el fondo del logo (#020f28) para que se funda.
+    background: 'radial-gradient(ellipse at center, #031533 0%, #020f28 30%, #01040f 85%)',
+};
+// El logo trae su propio fondo azul: se difuminan los bordes para que no se vea
+// el rectángulo sobre el degradado (-webkit- para WebViews viejos).
+const LOGO_FADE = 'radial-gradient(ellipse at center, #000 63%, transparent 73%)';
+const BRAND_LOGO_STYLE: React.CSSProperties = { maskImage: LOGO_FADE, WebkitMaskImage: LOGO_FADE };
+
 // --- Master Watchdog Error Boundary ---
 class WatchdogBoundary extends Component<{children: ReactNode}, {hasError: boolean}> {
     state = { hasError: false };
@@ -205,34 +217,43 @@ const TvPlayerCore = () => {
 
     if (status === 'loading') {
         return (
-            <div className="fixed inset-0 w-full h-full bg-[#111] flex flex-col items-center justify-center font-sans">
-                {preloadProgress && (
-                    <div className="absolute bottom-12 w-[600px] max-w-[80vw]">
-                        <div className="text-[1.2vw] text-zinc-400 mb-2 font-light">
-                            Descargando {preloadProgress.current} de {preloadProgress.total} activos
-                        </div>
-                        <div className="h-1 w-full bg-zinc-800 rounded-full overflow-hidden">
-                            <div 
-                                className="h-full bg-[#3b82f6] transition-all duration-300"
-                                style={{ width: `${(preloadProgress.current / preloadProgress.total) * 100}%` }}
-                            ></div>
-                        </div>
-                    </div>
-                )}
+            <div className="fixed inset-0 w-full h-full flex flex-col items-center justify-center font-sans" style={BRAND_BACKGROUND}>
+                <img src={BRAND_LOGO} alt="Display Digital" className="w-[22vw] max-w-[420px] animate-pulse" style={BRAND_LOGO_STYLE} />
+                <div className="absolute bottom-[8vh] w-[40vw] max-w-[640px]">
+                    {preloadProgress ? (
+                        <>
+                            <div className="text-[1.1vw] text-slate-400 mb-3 font-light text-center">
+                                Descargando contenido · {preloadProgress.current} de {preloadProgress.total}
+                            </div>
+                            <div className="h-[3px] w-full bg-slate-800 rounded-full overflow-hidden">
+                                <div
+                                    className="h-full bg-gradient-to-r from-orange-500 to-amber-400 transition-all duration-300"
+                                    style={{ width: `${(preloadProgress.current / preloadProgress.total) * 100}%` }}
+                                ></div>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="text-[1.1vw] text-slate-500 font-light text-center tracking-wide">Conectando…</div>
+                    )}
+                </div>
             </div>
         );
     }
 
     if (status === 'no_content') {
         return (
-            <div className="fixed inset-0 w-full h-full bg-[#333333] flex flex-col items-center justify-center font-sans">
-                <div className="flex-1 flex items-center justify-center">
-                    <p className="text-[14vw] font-light tracking-wide text-[#00C4CC] drop-shadow-sm">Paired</p>
+            <div className="fixed inset-0 w-full h-full flex flex-col items-center justify-center font-sans text-center" style={BRAND_BACKGROUND}>
+                <img src={BRAND_LOGO} alt="Display Digital" className="w-[18vw] max-w-[360px] mb-[4vh]" style={BRAND_LOGO_STYLE} />
+                <div className="flex items-center gap-[0.8vw] text-emerald-400 text-[1.6vw] font-medium mb-[1.5vh]">
+                    <span className="inline-block w-[0.9vw] h-[0.9vw] rounded-full bg-emerald-400 animate-pulse" />
+                    Pantalla vinculada
                 </div>
-                <div className="mb-16 text-center">
-                    <p className="text-[2.5vw] text-white mb-2 tracking-wide font-light">app.event-pix.com.ar</p>
-                    <p className="text-[1.5vw] text-zinc-400 font-light tracking-wide">para asignar contenido • Pantalla: {deviceName || deviceCode}</p>
-                </div>
+                <p className="text-[3vw] text-white font-semibold tracking-tight">{deviceName || `Pantalla ${deviceCode}`}</p>
+                <p className="text-[1.5vw] text-slate-400 font-light mt-[2vh] max-w-[60vw]">
+                    Todavía no tiene contenido asignado. Elegí qué mostrar desde{' '}
+                    <span className="text-orange-400 font-medium whitespace-nowrap">app.event-pix.com.ar</span>
+                </p>
+                <p className="absolute bottom-[5vh] text-[1vw] text-slate-600 font-mono tracking-widest">CÓDIGO {deviceCode}</p>
                 <TvSettingsMenu deviceCode={deviceCode!} onRefresh={() => fetchCampaign()} />
             </div>
         );
