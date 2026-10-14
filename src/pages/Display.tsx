@@ -55,7 +55,9 @@ const Display = () => {
             {template === 'masonry' && <MasonryTemplate eventId={event.id} />}
 
             {/* Foto o mensaje recién aprobado, en grande (queda debajo de los juegos) */}
-            <NewPhotoSpotlight eventId={event.id} onActiveChange={setSpotlightActive} />
+            {settings?.wall_spotlight_enabled !== false && (
+                <NewPhotoSpotlight eventId={event.id} onActiveChange={setSpotlightActive} />
+            )}
 
             {/* Overlays para juegos dinámicos */}
             <PhotoVoteDisplayOverlay eventId={event.id} />

@@ -195,14 +195,23 @@ export const SlideshowTemplate = ({ eventId, paused = false }: SlideshowTemplate
     const ticksRef = useRef(0);
     const nextSpecialRef = useRef<'collage' | 'ranking'>('collage');
     const liveRef = useRef({ photos: allPhotos, ranking: stats.ranking });
+    // Interruptores del panel (Pantalla): sin el dato (base vieja) queda prendido
+    const togglesRef = useRef({ collage: true, ranking: true });
+    useEffect(() => {
+        togglesRef.current = {
+            collage: settings?.wall_collage_enabled !== false,
+            ranking: settings?.wall_ranking_enabled !== false,
+        };
+    }, [settings?.wall_collage_enabled, settings?.wall_ranking_enabled]);
     useEffect(() => {
         liveRef.current = { photos: allPhotos, ranking: stats.ranking };
     }, [allPhotos, stats.ranking]);
 
     const pickSpecial = (): SpecialSlide | null => {
         const { photos, ranking } = liveRef.current;
-        const collageOk = photos.length >= 6;
-        const rankingOk = ranking.length >= 3 && ranking[0].count >= 2;
+        const { collage: collageOn, ranking: rankingOn } = togglesRef.current;
+        const collageOk = collageOn && photos.length >= 6;
+        const rankingOk = rankingOn && ranking.length >= 3 && ranking[0].count >= 2;
         const kind = nextSpecialRef.current === 'ranking'
             ? (rankingOk ? 'ranking' : collageOk ? 'collage' : null)
             : (collageOk ? 'collage' : rankingOk ? 'ranking' : null);
@@ -419,7 +428,7 @@ export const SlideshowTemplate = ({ eventId, paused = false }: SlideshowTemplate
                             <span className="text-black text-sm font-bold">📸 ¡Subí tu foto!</span>
                         </div>
                     )}
-                    {stats.photos > 0 && (
+                    {stats.photos > 0 && settings?.wall_counter_enabled !== false && (
                         <div className="bg-black/50 backdrop-blur-xl border border-white/15 rounded-full px-4 py-1.5 text-lg font-bold shadow-lg tabular-nums whitespace-nowrap">
                             🔥 {stats.photos} {stats.photos === 1 ? 'foto' : 'fotos'}
                             {stats.guests > 1 && <span className="text-white/80 font-semibold"> · {stats.guests} invitados</span>}
