@@ -13,7 +13,6 @@ import kotlin.system.exitProcess
 
 class WatchdogService(
     private val mainActivity: MainActivity,
-    private val playerManager: PlayerManager,
     private val webViewManager: WebViewManager
 ) {
     private val scope = CoroutineScope(Dispatchers.Default + Job())
