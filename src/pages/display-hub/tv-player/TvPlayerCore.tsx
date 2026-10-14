@@ -53,7 +53,8 @@ const TvPlayerCore = () => {
         deviceCommerceId,
         preloadProgress,
         fetchCampaign,
-        contentKey
+        contentKey,
+        shuffle
     } = useSyncEngine(deviceCode, sendHeartbeat);
 
     // 3. System Events (Rotation, Online status & Secret Exit)
@@ -136,10 +137,11 @@ const TvPlayerCore = () => {
     }, [deviceSettings.orientation]);
 
     // 4. Media Rotation Logic (los videos nunca se cortan: ver usePlaylistRotation)
-    const { currentIndex, onVideoEnded, onVideoError, onVideoDuration } = usePlaylistRotation(
+    const { currentIndex, prevIndex, nextIndex, onVideoEnded, onVideoError, onVideoDuration } = usePlaylistRotation(
         items,
         status === 'playing' || status === 'offline_playing',
-        contentKey
+        contentKey,
+        shuffle
     );
 
     // --- UI Renders ---
@@ -251,6 +253,8 @@ const TvPlayerCore = () => {
             <MediaRenderer 
                 items={items} 
                 currentIndex={currentIndex} 
+                prevIndex={prevIndex}
+                nextIndex={nextIndex}
                 deviceCommerceId={deviceCommerceId} 
                 onVideoEnded={onVideoEnded}
                 onVideoError={onVideoError}
