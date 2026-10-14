@@ -2,12 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Settings, RefreshCw, Unlink, Trash2, X, Info, Power, Monitor, Clock, ShieldCheck, Zap } from 'lucide-react';
 
-// Declare TvBridge for TypeScript
-declare global {
-    interface Window {
-        TvBridge?: any;
-    }
-}
+import { callTvBridge, onTvBridgeReady } from '@/lib/tvBridge';
 
 interface TvSettingsMenuProps {
     deviceCode: string;
@@ -29,18 +24,22 @@ export const TvSettingsMenu = ({ deviceCode, onRefresh }: TvSettingsMenuProps) =
     const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
     useEffect(() => {
-        if (isOpen && window.TvBridge) {
-            setAutoBoot(window.TvBridge.getAutoBoot());
-            setWatchdog(window.TvBridge.getWatchdog());
-            setKeepAwake(window.TvBridge.getKeepAwake());
-            setRebootHour(window.TvBridge.getRebootHour());
-            window.TvBridge.setOrientation(true); // Force hardware to landscape
+        let cancelBridge = () => {};
+        if (isOpen) {
+            cancelBridge = onTvBridgeReady(() => {
+                setAutoBoot(callTvBridge<boolean>('getAutoBoot') ?? true);
+                setWatchdog(callTvBridge<boolean>('getWatchdog') ?? true);
+                setKeepAwake(callTvBridge<boolean>('getKeepAwake') ?? true);
+                setRebootHour(callTvBridge<number>('getRebootHour') ?? 3);
+                callTvBridge('setOrientation', true); // Force hardware to landscape
+            });
         }
         
         const stored = localStorage.getItem('local_rotation');
         if (stored !== null) {
             setLocalRotation(parseInt(stored, 10));
         }
+        return cancelBridge;
     }, [isOpen]);
 
     useEffect(() => {
@@ -69,7 +68,7 @@ export const TvSettingsMenu = ({ deviceCode, onRefresh }: TvSettingsMenuProps) =
             action: () => {
                 const newVal = !autoBoot;
                 setAutoBoot(newVal);
-                window.TvBridge?.setAutoBoot(newVal);
+                callTvBridge('setAutoBoot', newVal);
             }
         },
         {
@@ -79,7 +78,7 @@ export const TvSettingsMenu = ({ deviceCode, onRefresh }: TvSettingsMenuProps) =
             action: () => {
                 const newVal = !watchdog;
                 setWatchdog(newVal);
-                window.TvBridge?.setWatchdog(newVal);
+                callTvBridge('setWatchdog', newVal);
             }
         },
         {
@@ -89,7 +88,7 @@ export const TvSettingsMenu = ({ deviceCode, onRefresh }: TvSettingsMenuProps) =
             action: () => {
                 const newVal = !keepAwake;
                 setKeepAwake(newVal);
-                window.TvBridge?.setKeepAwake(newVal);
+                callTvBridge('setKeepAwake', newVal);
             }
         },
         {
@@ -101,7 +100,7 @@ export const TvSettingsMenu = ({ deviceCode, onRefresh }: TvSettingsMenuProps) =
                 setLocalRotation(nextRotation);
                 localStorage.setItem('local_rotation', String(nextRotation));
                 window.dispatchEvent(new CustomEvent('local_rotation_changed', { detail: nextRotation }));
-                window.TvBridge?.setOrientation(true); // Force hardware to landscape
+                callTvBridge('setOrientation', true); // Force hardware to landscape
             }
         },
         {
@@ -111,7 +110,7 @@ export const TvSettingsMenu = ({ deviceCode, onRefresh }: TvSettingsMenuProps) =
             action: () => {
                 const nextHour = (rebootHour + 1) % 24;
                 setRebootHour(nextHour);
-                window.TvBridge?.scheduleDailyRestart(nextHour, 0);
+                callTvBridge('scheduleDailyRestart', nextHour, 0);
             }
         },
         {
@@ -119,7 +118,9 @@ export const TvSettingsMenu = ({ deviceCode, onRefresh }: TvSettingsMenuProps) =
             label: 'Limpiar Caché',
             icon: <Trash2 className="w-5 h-5" />,
             action: () => {
-                localStorage.removeItem(`tv_cache_${deviceCode}`);
+                // Mismas claves que usa el reproductor (useSyncEngine).
+                [`tv_cache_${deviceCode}_v3`, `tv_assignment_${deviceCode}_v1`, `tv_cache_${deviceCode}_v2`, `tv_cache_${deviceCode}`]
+                    .forEach(key => localStorage.removeItem(key));
                 window.location.reload();
             }
         },

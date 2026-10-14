@@ -322,6 +322,10 @@ export const PlayerRenderer = ({ item, isActive, isPrev, commerceId, defaultTran
                             src={normalizedUrl} 
                             style={{ width: '100%', height: '100%', border: 0 }}
                             allow="autoplay; fullscreen"
+                            // Sin allow-top-navigation: la web embebida no puede llevarse la
+                            // TV a otro sitio (en la app TV, el frame principal recibe el
+                            // token del puente nativo).
+                            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
                             title={item.title || item.content}
                         />
                     ) : (

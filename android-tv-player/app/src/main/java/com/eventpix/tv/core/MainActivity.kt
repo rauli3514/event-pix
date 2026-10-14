@@ -62,7 +62,12 @@ class MainActivity : AppCompatActivity() {
         diagnosticPanel = findViewById(R.id.diagnosticPanel)
         
         playerManager = PlayerManager(this, playerView)
-        webViewManager = WebViewManager(webView) {
+
+        // Puente con la web. Solo expone métodos que exigen el token de sesión,
+        // que WebViewManager inyecta únicamente en nuestras páginas.
+        val tvBridge = TvBridge(this)
+
+        webViewManager = WebViewManager(webView, { tvBridge.tokenInjectionScript() }) {
             runOnUiThread {
                 val crashPrefs = getSharedPreferences("TvSettings", Context.MODE_PRIVATE)
                 crashPrefs.edit().putInt("crashCount", crashPrefs.getInt("crashCount", 0) + 1).apply()
@@ -74,7 +79,6 @@ class MainActivity : AppCompatActivity() {
         webViewManager.initializeWebView()
         
         // Expose Javascript Interface to React
-        val tvBridge = TvBridge(this)
         webView.addJavascriptInterface(tvBridge, "TvBridge")
         
         // Ensure daily restart is scheduled on boot based on saved settings
