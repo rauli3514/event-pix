@@ -118,6 +118,10 @@ class TvBridge(private val activity: MainActivity) {
         openSettings()
     }
 
+    fun getAppVersionCode(): Int = AppUpdater.versionCodeOf(
+        activity.packageManager.getPackageInfo(activity.packageName, 0)
+    ).toInt()
+
     fun getDeviceCode(): String {
         var deviceId = prefs.getString("device_id", null)
         if (deviceId.isNullOrEmpty()) {
@@ -391,6 +395,7 @@ class TvBridge(private val activity: MainActivity) {
                 "model": "${Build.MANUFACTURER} ${Build.MODEL}"
             },
             "app_version": "$appVersionName",
+            "app_version_code": ${getAppVersionCode()},
             "android_version": "$androidVersion (SDK $sdkVersion)"
         }
         """.trimIndent()
@@ -432,6 +437,16 @@ class TvBridge(private val activity: MainActivity) {
 
     @JavascriptInterface
     fun openAutoStartSettings(token: String) { if (authorized(token)) openAutoStartSettings() }
+
+    // Actualización de la app (ver AppUpdater). El resultado llega como evento 'tvupdate'.
+    @JavascriptInterface
+    fun checkForUpdate(token: String) { if (authorized(token)) activity.appUpdater.check() }
+
+    @JavascriptInterface
+    fun startUpdate(token: String) { if (authorized(token)) activity.appUpdater.start() }
+
+    @JavascriptInterface
+    fun getAppVersionCode(token: String): Int = if (authorized(token)) getAppVersionCode() else 0
 
     @JavascriptInterface
     fun getDeviceCode(token: String): String = if (authorized(token)) getDeviceCode() else ""

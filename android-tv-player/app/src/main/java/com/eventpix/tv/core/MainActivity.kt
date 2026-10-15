@@ -19,9 +19,20 @@ import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import android.util.Log
 import kotlinx.coroutines.*
+import org.json.JSONObject
+import java.lang.ref.WeakReference
 import com.eventpix.tv.player.R
 
 class MainActivity : AppCompatActivity() {
+
+    companion object {
+        // Para avisarle a la web desde receivers (ej. resultado de la actualización).
+        private var current: WeakReference<MainActivity>? = null
+
+        fun emitToWebFromAnywhere(event: String, detail: JSONObject) {
+            current?.get()?.emitToWeb(event, detail)
+        }
+    }
 
     private lateinit var webView: WebView
     private lateinit var logoImageView: ImageView
@@ -30,6 +41,8 @@ class MainActivity : AppCompatActivity() {
     
     private lateinit var webViewManager: WebViewManager
     private lateinit var tvBridge: TvBridge
+    lateinit var appUpdater: AppUpdater
+        private set
     private var watchdog: WatchdogService? = null
     
     private val scope = CoroutineScope(Dispatchers.Main + Job())
@@ -68,7 +81,9 @@ class MainActivity : AppCompatActivity() {
 
         // Puente con la web. Solo expone métodos que exigen el token de sesión,
         // que WebViewManager inyecta únicamente en nuestras páginas.
+        appUpdater = AppUpdater(this) { state, extra -> emitToWeb("tvupdate", extra.put("state", state)) }
         tvBridge = TvBridge(this)
+        current = WeakReference(this)
 
         webViewManager = WebViewManager(webView, { tvBridge.tokenInjectionScript() }) {
             runOnUiThread {
@@ -151,7 +166,24 @@ class MainActivity : AppCompatActivity() {
         statusTextView.text = message
     }
     
+    // Dispara un CustomEvent en la página, solo si es nuestra (igual que el token del puente).
+    fun emitToWeb(event: String, detail: JSONObject) {
+        runOnUiThread {
+            try {
+                if (::webView.isInitialized && WebViewManager.isTrustedUrl(webView.url)) {
+                    webView.evaluateJavascript(
+                        "window.dispatchEvent(new CustomEvent(${JSONObject.quote(event)},{detail:$detail}));",
+                        null
+                    )
+                }
+            } catch (e: Exception) {
+                Log.w("MainActivity", "No se pudo avisar a la web ($event)", e)
+            }
+        }
+    }
+
     override fun onDestroy() {
+        if (current?.get() === this) current = null
         super.onDestroy()
         watchdog?.stop()
         scope.cancel()

@@ -8,6 +8,8 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Android 10+: necesario para abrirse sola al prender el equipo (si no es el launcher). -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- Actualizarse desde la TV (Android pide confirmar cada instalación). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     
     <!-- Android TV requirements -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
@@ -49,12 +51,18 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </receiver>
 
         <receiver
             android:name="com.eventpix.tv.core.AppRestartReceiver"
+            android:exported="false">
+        </receiver>
+
+        <receiver
+            android:name="com.eventpix.tv.core.UpdateStatusReceiver"
             android:exported="false">
         </receiver>
 
