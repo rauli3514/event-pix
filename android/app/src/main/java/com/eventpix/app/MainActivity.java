@@ -19,16 +19,21 @@ import com.eventpix.app.net.KioskNetPlugin;
 import com.eventpix.app.print.NativePrintPlugin;
 import com.eventpix.app.screen.KioskScreenPlugin;
 import com.eventpix.app.storage.KioskStoragePlugin;
+import com.eventpix.app.update.KioskUpdater;
 import com.getcapacitor.BridgeActivity;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.lang.ref.WeakReference;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 public class MainActivity extends BridgeActivity {
+    /** La pantalla abierta, para avisarle a la página desde receptores (p. ej. el instalador) */
+    private static WeakReference<MainActivity> current = new WeakReference<>(null);
+    private KioskUpdater updater;
     private BluetoothServer bluetoothServer;
     private BluetoothClient bluetoothClient;
     // Disparador Bluetooth: mientras el kiosco lo pide, Volumen +/- y Cámara sacan la foto
@@ -257,6 +262,8 @@ public class MainActivity extends BridgeActivity {
             KioskScreenPlugin.apply(getBridge().getWebView(), KioskScreenPlugin.savedRotation(this));
         }
         bluetoothServer = new BluetoothServer(this);
+        current = new WeakReference<>(this);
+        updater = new KioskUpdater(this, detail -> emitToPage("kioskupdate", detail));
         // Los puentes con la página se registran ya, antes de que termine de cargar: si se
         // registraban recién en onResume, con un arranque rápido (p. ej. al prender el equipo)
         // la página podía cargarse antes y quedarse sin ellos (Ajustes decía "versión 2")
@@ -280,6 +287,18 @@ public class MainActivity extends BridgeActivity {
         getBridge().getWebView().addJavascriptInterface(bluetoothClient, "AndroidBluetoothClient");
     }
 
+    /**
+     * Manda un evento a la página: window.dispatchEvent(new CustomEvent(event, {detail})).
+     * Se puede llamar desde cualquier hilo; si no hay pantalla abierta no hace nada.
+     */
+    public static void emitToPage(String event, JSONObject detail) {
+        MainActivity activity = current.get();
+        if (activity == null || activity.getBridge() == null || activity.getBridge().getWebView() == null) return;
+        android.webkit.WebView web = activity.getBridge().getWebView();
+        String js = "window.dispatchEvent(new CustomEvent(" + JSONObject.quote(event) + ",{detail:" + detail.toString() + "}))";
+        web.post(() -> web.evaluateJavascript(js, null));
+    }
+
     /** Recargas por falta del puente (una sola vez por apertura de la app). */
     private static boolean bridgeReloaded = false;
 
@@ -301,6 +320,7 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onDestroy() {
+        if (current.get() == this) current = new WeakReference<>(null);
         stopVolumeWatch();
         if (bluetoothServer != null) {
             bluetoothServer.stop();
@@ -422,6 +442,42 @@ public class MainActivity extends BridgeActivity {
                 // Lo que se pudo juntar
             }
             return out.toString();
+        }
+
+        /** Si esta app se puede actualizar desde el equipo (solo el kiosco). */
+        @JavascriptInterface
+        public boolean canSelfUpdate() {
+            return KioskUpdater.manifestUrl(context) != null;
+        }
+
+        /** Busca una versión nueva; el resultado llega como evento 'kioskupdate'. */
+        @JavascriptInterface
+        public void checkForUpdate() {
+            if (updater != null) updater.check();
+        }
+
+        /** Descarga, verifica y abre la instalación de la versión nueva ('kioskupdate'). */
+        @JavascriptInterface
+        public void startUpdate() {
+            if (updater != null) updater.start();
+        }
+
+        /** Si Android ya permite que esta app instale actualizaciones ("orígenes desconocidos"). */
+        @JavascriptInterface
+        public boolean canInstallUpdates() {
+            return Build.VERSION.SDK_INT < 26 || context.getPackageManager().canRequestPackageInstalls();
+        }
+
+        /** Abre el permiso "Instalar apps desconocidas" de esta app. */
+        @JavascriptInterface
+        public void openInstallPermission() {
+            try {
+                Intent intent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + context.getPackageName()));
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(intent);
+            } catch (Exception e) {
+                openSettings();
+            }
         }
 
         /** El kiosco pide (o suelta) las teclas del disparador Bluetooth. */

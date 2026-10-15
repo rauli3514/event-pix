@@ -183,6 +183,11 @@ interface AndroidKioskBridge {
   resetTouchCalibration?: () => void;
   isTouchCalibrated?: () => boolean;
   getDiagnostics?: () => string;
+  canSelfUpdate?: () => boolean;
+  checkForUpdate?: () => void;
+  startUpdate?: () => void;
+  canInstallUpdates?: () => boolean;
+  openInstallPermission?: () => void;
 }
 
 const bridge = () => (window as unknown as { AndroidKiosk?: AndroidKioskBridge }).AndroidKiosk;
@@ -247,6 +252,33 @@ export const getDiagnostics = (): DeviceDiagnostics | null => {
   if (!raw) return null;
   try { return JSON.parse(raw); } catch { return null; }
 };
+
+/**
+ * Actualización desde el equipo (APK 3.0+): la app busca en GitHub la última versión
+ * publicada, la descarga, verifica su huella y abre el instalador de Android (hay que
+ * tocar "Instalar"). El estado llega como evento 'kioskupdate'.
+ */
+export const KIOSK_UPDATE_EVENT = 'kioskupdate';
+export interface KioskVersion { code: number; name: string }
+export interface KioskUpdateStatus {
+  state: 'idle' | 'checking' | 'available' | 'up_to_date' | 'downloading' | 'installing' | 'confirm' | 'error';
+  current?: KioskVersion;
+  latest?: KioskVersion;
+  progress?: number;
+  message?: string;
+}
+export const canSelfUpdate = () => {
+  try { return !!bridge()?.canSelfUpdate?.(); } catch { return false; }
+};
+export const checkForUpdate = () => bridge()?.checkForUpdate?.();
+export const startUpdate = () => bridge()?.startUpdate?.();
+/** Si Android ya deja que la app instale su actualización (null = no se sabe). */
+export const canInstallUpdates = (): boolean | null => {
+  const b = bridge();
+  if (!b?.canInstallUpdates) return null;
+  try { return !!b.canInstallUpdates(); } catch { return null; }
+};
+export const openInstallPermission = () => bridge()?.openInstallPermission?.();
 
 /** Estabilizador de toques para marcos táctiles infrarrojos (APK 2.6+). null = no disponible. */
 export const getTapStabilize = (): boolean | null => {
