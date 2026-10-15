@@ -23,6 +23,12 @@ import Login from "./pages/Login";
 import DisplayUserLogin from "./pages/DisplayUserLogin";
 import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
+
+/** Abre una página estática de public/ (la app no la dibuja). */
+const StaticPage = ({ href }: { href: string }) => {
+  window.location.replace(href + window.location.search + window.location.hash);
+  return null;
+};
 import DisplayHubMain from "./pages/display-hub/DisplayHubMain";
 import DisplayHubList from "./pages/display-hub/DisplayHubList";
 import DisplayDeviceDetail from "./pages/display-hub/DisplayDeviceDetail";
@@ -68,6 +74,10 @@ const App = () => (
             <Route path="/intelligence/login" element={<IntelligenceLogin />} />
 
             <Route path="/kiosco" element={<KioskAI />} />
+            {/* Landing del espejo mágico: es una página aparte (public/espejo-magico/index.html).
+                Si igual llega acá (caché de la app o el servidor), se la abre directo */}
+            <Route path="/espejo-magico" element={<StaticPage href="/espejo-magico/index.html" />} />
+            <Route path="/espejo" element={<StaticPage href="/espejo-magico/index.html" />} />
             {/* App dedicada de la TV box (sin login; ajustes con PIN en el equipo) */}
             <Route path="/box" element={<KioskBox />} />
             <Route path="/box/ajustes" element={<KioskBoxSettings />} />

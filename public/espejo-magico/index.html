@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Espejo Mágico con IA · EventPix</title>
+<meta name="description" content="Tus invitados se sacan la foto, la inteligencia artificial los transforma y se la llevan impresa al instante y en el celular. Casamientos, 15 años, cumpleaños y empresas." />
+<meta name="theme-color" content="#07051a" />
+<link rel="icon" href="/favicon.png" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<link rel="canonical" href="https://app.event-pix.com.ar/espejo-magico/" />
+<meta property="og:type" content="website" />
+<meta property="og:locale" content="es_AR" />
+<meta property="og:title" content="Espejo Mágico con IA · EventPix" />
+<meta property="og:description" content="La foto que todos quieren llevarse: impresa al instante, con QR y transformada con inteligencia artificial." />
+<meta property="og:url" content="https://app.event-pix.com.ar/espejo-magico/" />
+<meta property="og:image" content="https://app.event-pix.com.ar/espejo-magico/og.jpg" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<style>
+@font-face { font-family: 'CarlMarx'; src: url('/CarlMarx-Bold.ttf') format('truetype'); font-weight: 700; font-display: swap; }
+:root {
+  --bg: #07051a; --bg2: #110c2e; --card: #16103a; --line: rgba(255,255,255,.1);
+  --text: #f4f2ff; --muted: #b9b3d9; --pink: #ff2e93; --violet: #7b2ff7; --cyan: #00d4ff; --gold: #ffd23f;
+  --grad: linear-gradient(120deg, var(--pink), var(--violet) 50%, var(--cyan));
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font: 16px/1.55 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+img { display: block; max-width: 100%; }
+a { color: inherit; }
+h1, h2, h3, .brand { font-family: 'CarlMarx', system-ui, sans-serif; font-weight: 700; line-height: 1.05; letter-spacing: .01em; }
+.wrap { width: min(1120px, 100% - 32px); margin-inline: auto; }
+.grad-text { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+section { padding: 72px 0; }
+.eyebrow { display: inline-block; font-size: .78rem; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--cyan); margin-bottom: 12px; }
+h2 { font-size: clamp(2rem, 6vw, 3.2rem); margin-bottom: 14px; }
+.lead { color: var(--muted); font-size: 1.08rem; max-width: 640px; }
+
+/* Botones */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 54px; padding: 0 26px; border-radius: 999px; font-weight: 700; font-size: 1.02rem; text-decoration: none; transition: transform .15s ease, box-shadow .15s ease; }
+.btn:active { transform: scale(.97); }
+.btn-wa { background: #25d366; color: #052e16; box-shadow: 0 10px 30px rgba(37,211,102,.35); }
+.btn-wa:hover { box-shadow: 0 14px 40px rgba(37,211,102,.5); }
+.btn-ghost { border: 1.5px solid var(--line); background: rgba(255,255,255,.04); color: var(--text); }
+.btn-ghost:hover { border-color: rgba(255,255,255,.35); }
+.btn svg { width: 22px; height: 22px; flex: none; }
+
+/* Encabezado */
+.top { position: sticky; top: 0; z-index: 30; background: rgba(7,5,26,.78); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
+.top .wrap { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+.logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.logo img { width: 38px; height: 38px; }
+.logo span { font-size: 1.35rem; }
+.top .btn { min-height: 42px; padding: 0 18px; font-size: .92rem; }
+.top .nav-b2b { display: none; color: var(--muted); text-decoration: none; font-weight: 600; font-size: .92rem; margin-right: 18px; }
+@media (min-width: 760px) { .top .nav-b2b { display: inline; } }
+
+/* Portada */
+.hero { position: relative; padding: 48px 0 64px; overflow: hidden; }
+.hero::before { content: ''; position: absolute; inset: -20% -10% auto; height: 120%; background: radial-gradient(40% 50% at 15% 20%, rgba(255,46,147,.35), transparent 70%), radial-gradient(40% 50% at 90% 60%, rgba(0,212,255,.25), transparent 70%), radial-gradient(50% 50% at 50% 0%, rgba(123,47,247,.35), transparent 70%); pointer-events: none; }
+.hero .wrap { position: relative; display: grid; gap: 40px; align-items: center; }
+@media (min-width: 900px) { .hero .wrap { grid-template-columns: 1.05fr .95fr; } }
+.pill { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 999px; background: rgba(255,210,63,.12); border: 1px solid rgba(255,210,63,.35); color: var(--gold); font-weight: 700; font-size: .85rem; margin-bottom: 18px; }
+.pill i { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 0 0 rgba(255,210,63,.7); animation: pulse 1.8s infinite; }
+@keyframes pulse { 70% { box-shadow: 0 0 0 10px rgba(255,210,63,0); } 100% { box-shadow: 0 0 0 0 rgba(255,210,63,0); } }
+.hero h1 { font-size: clamp(2.7rem, 9vw, 4.6rem); margin-bottom: 18px; }
+.hero p { color: var(--muted); font-size: clamp(1.05rem, 2.6vw, 1.25rem); max-width: 560px; margin-bottom: 28px; }
+.ctas { display: flex; flex-wrap: wrap; gap: 12px; }
+.trust { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 26px; color: var(--muted); font-size: .92rem; }
+.trust b { color: var(--text); }
+
+/* Antes / después */
+.compare { position: relative; width: min(420px, 100%); margin-inline: auto; aspect-ratio: 2 / 3; border-radius: 26px; overflow: hidden; box-shadow: 0 30px 80px rgba(123,47,247,.45), 0 0 0 1px rgba(255,255,255,.12); user-select: none; touch-action: pan-y; background: #000; }
+.compare img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.compare .after { clip-path: inset(0 0 0 var(--cut, 50%)); }
+.compare .bar { position: absolute; top: 0; bottom: 0; left: var(--cut, 50%); width: 3px; margin-left: -1.5px; background: #fff; box-shadow: 0 0 12px rgba(0,0,0,.5); }
+.compare .knob { position: absolute; top: 50%; left: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; background: #fff; color: var(--violet); display: grid; place-items: center; font-weight: 900; box-shadow: 0 6px 20px rgba(0,0,0,.4); }
+.compare .tag { position: absolute; top: 14px; padding: 5px 12px; border-radius: 999px; font-size: .78rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; background: rgba(0,0,0,.55); backdrop-filter: blur(6px); }
+.compare .tag.l { left: 14px; } .compare .tag.r { right: 14px; background: var(--grad); }
+.compare input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: ew-resize; margin: 0; }
+.hint { text-align: center; color: var(--muted); font-size: .85rem; margin-top: 12px; }
+
+/* Pasos */
+.steps { display: grid; gap: 16px; margin-top: 34px; }
+@media (min-width: 760px) { .steps { grid-template-columns: repeat(3, 1fr); } }
+.step { background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 26px; }
+.step .n { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; background: var(--grad); font-family: 'CarlMarx', sans-serif; font-size: 1.4rem; margin-bottom: 16px; }
+.step h3 { font-size: 1.45rem; margin-bottom: 8px; }
+.step p { color: var(--muted); }
+
+/* Experiencias */
+.modes { display: grid; gap: 16px; margin-top: 34px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.mode { position: relative; border-radius: 22px; overflow: hidden; background: var(--card); border: 1px solid var(--line); }
+.mode img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; }
+.mode div { padding: 18px 20px 22px; }
+.mode h3 { font-size: 1.35rem; margin-bottom: 6px; }
+.mode p { color: var(--muted); font-size: .95rem; }
+.mode.star { border: 1.5px solid transparent; background: linear-gradient(var(--card), var(--card)) padding-box, var(--grad) border-box; }
+.mode .badge { position: absolute; top: 12px; left: 12px; padding: 5px 12px; border-radius: 999px; background: var(--gold); color: #2a1a00; font-size: .76rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+
+/* Galería de temáticas */
+.gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 34px; }
+@media (min-width: 640px) { .gallery { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 980px) { .gallery { grid-template-columns: repeat(6, 1fr); } }
+.gallery img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 16px; border: 1px solid var(--line); }
+.more { margin-top: 18px; color: var(--muted); }
+
+/* Incluye */
+.feats { display: grid; gap: 14px; margin-top: 34px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.feat { display: flex; gap: 14px; align-items: flex-start; background: rgba(255,255,255,.03); border: 1px solid var(--line); border-radius: 18px; padding: 18px; }
+.feat .ic { flex: none; width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; font-size: 1.3rem; background: rgba(123,47,247,.22); }
+.feat h3 { font-family: system-ui, sans-serif; font-size: 1.02rem; font-weight: 800; margin-bottom: 3px; }
+.feat p { color: var(--muted); font-size: .93rem; }
+
+/* Eventos */
+.chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
+.chip { padding: 10px 18px; border-radius: 999px; background: rgba(255,255,255,.05); border: 1px solid var(--line); font-weight: 600; }
+
+/* Presupuesto */
+.quote { position: relative; border-radius: 30px; padding: 44px 26px; text-align: center; overflow: hidden; background: radial-gradient(60% 80% at 20% 0%, rgba(255,46,147,.35), transparent 70%), radial-gradient(60% 80% at 100% 100%, rgba(0,212,255,.3), transparent 70%), var(--bg2); border: 1px solid var(--line); }
+.quote h2 { margin-bottom: 12px; }
+.quote .lead { margin: 0 auto 26px; }
+.opts { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-bottom: 28px; }
+.opts span { padding: 8px 16px; border-radius: 999px; background: rgba(0,0,0,.35); border: 1px solid var(--line); font-size: .92rem; }
+.urg { margin-top: 18px; color: var(--gold); font-weight: 700; font-size: .95rem; }
+
+/* Negocios */
+.b2b { background: linear-gradient(180deg, transparent, rgba(123,47,247,.12) 30%, transparent); }
+.b2b-grid { display: grid; gap: 16px; margin-top: 34px; }
+@media (min-width: 860px) { .b2b-grid { grid-template-columns: repeat(3, 1fr); } }
+.plan { display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--line); border-radius: 24px; padding: 26px; }
+.plan.hl { border: 1.5px solid transparent; background: linear-gradient(var(--card), var(--card)) padding-box, var(--grad) border-box; }
+.plan .k { font-size: .78rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--cyan); margin-bottom: 8px; }
+.plan h3 { font-size: 1.6rem; margin-bottom: 10px; }
+.plan p { color: var(--muted); margin-bottom: 16px; }
+.plan ul { list-style: none; display: grid; gap: 9px; margin-bottom: 22px; flex: 1; }
+.plan li { padding-left: 28px; position: relative; font-size: .95rem; }
+.plan li::before { content: '✓'; position: absolute; left: 0; top: 0; width: 20px; height: 20px; border-radius: 50%; background: rgba(0,212,255,.18); color: var(--cyan); font-size: .75rem; font-weight: 900; display: grid; place-items: center; }
+.plan .btn { width: 100%; }
+
+/* Preguntas */
+.faq { margin-top: 30px; display: grid; gap: 10px; }
+details { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 0 20px; }
+summary { cursor: pointer; list-style: none; padding: 18px 0; font-weight: 700; display: flex; justify-content: space-between; gap: 16px; }
+summary::-webkit-details-marker { display: none; }
+summary::after { content: '+'; color: var(--cyan); font-size: 1.4rem; line-height: 1; }
+details[open] summary::after { content: '–'; }
+details p { color: var(--muted); padding-bottom: 18px; }
+
+/* Pie */
+footer { border-top: 1px solid var(--line); padding: 40px 0 120px; color: var(--muted); font-size: .92rem; }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; justify-content: space-between; }
+footer a { text-decoration: none; }
+footer a:hover { color: var(--text); }
+
+/* Botón fijo de WhatsApp en el celular */
+.float { position: fixed; left: 16px; right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 40; transform: translateY(140%); transition: transform .3s ease; }
+.float.show { transform: none; }
+.float .btn { width: 100%; }
+@media (min-width: 760px) { .float { left: auto; right: 24px; bottom: 24px; } .float .btn { width: auto; } }
+
+.reveal { opacity: 0; transform: translateY(18px); transition: opacity .6s ease, transform .6s ease; }
+.reveal.in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } .pill i { animation: none; } html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="logo" href="#inicio" aria-label="EventPix"><img src="/pwa-192x192.png" alt="" width="38" height="38" /><span class="brand">EventPix</span></a>
+    <div>
+      <a class="nav-b2b" href="#negocios">Para negocios</a>
+      <a class="btn btn-wa" data-wa="cliente" href="#">Consultar fecha</a>
+    </div>
+  </div>
+</header>
+
+<main id="inicio">
+  <!-- Portada -->
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <span class="pill"><i></i>Se reserva por fecha: un evento por noche</span>
+        <h1>La foto que <span class="grad-text">todos</span> quieren llevarse</h1>
+        <p>Espejo mágico con inteligencia artificial: tus invitados se sacan la foto, la IA los transforma en estrellas de cine, superhéroes o tapa de revista, y se la llevan <b>impresa al instante</b> y en el celular.</p>
+        <div class="ctas">
+          <a class="btn btn-wa" data-wa="cliente" href="#"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.8-1.4a.5.5 0 0 0 0-.5l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.8 11.9 11.9 0 0 0 4.6 4c1.7.7 2.4.8 3.2.7a2.8 2.8 0 0 0 1.8-1.3 2.3 2.3 0 0 0 .2-1.3c-.1-.1-.3-.2-.5-.3z"/></svg>Consultá disponibilidad</a>
+          <a class="btn btn-ghost" href="#experiencias">Ver qué hace</a>
+        </div>
+        <div class="trust">
+          <span>📸 <b>Impresión 10×15</b> en papel fotográfico</span>
+          <span>📱 <b>QR</b> para descargarla</span>
+          <span>✨ <b>+30 temáticas</b> con IA</span>
+        </div>
+      </div>
+      <div>
+        <div class="compare" id="compare" style="--cut:50%">
+          <img src="/modes/portada-foto.jpg" alt="La foto que sacó el espejo" />
+          <img class="after" src="/modes/portada.jpg" alt="La misma foto convertida en tapa de revista" />
+          <span class="tag l">La foto</span><span class="tag r">Con IA</span>
+          <div class="bar"><div class="knob">⇆</div></div>
+          <input type="range" min="0" max="100" value="50" aria-label="Comparar la foto original con la versión con IA" />
+        </div>
+        <p class="hint">Deslizá para ver la magia 👆</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Cómo funciona -->
+  <section class="reveal">
+    <div class="wrap">
+      <span class="eyebrow">Así de simple</span>
+      <h2>Posan, la IA hace el resto</h2>
+      <p class="lead">Sin filas eternas ni complicaciones: el espejo guía a cada invitado con la pantalla táctil y frases divertidas.</p>
+      <div class="steps">
+        <div class="step"><div class="n">1</div><h3>Se paran frente al espejo</h3><p>Eligen la experiencia, posan y la cuenta regresiva hace el resto. ¡Con flash y todo!</p></div>
+        <div class="step"><div class="n">2</div><h3>La magia ocurre</h3><p>Marco con los nombres y la fecha de tu evento, o una transformación con inteligencia artificial.</p></div>
+        <div class="step"><div class="n">3</div><h3>Se la llevan</h3><p>Impresa al instante en papel fotográfico y en el celular escaneando el QR. Lista para compartir.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Experiencias -->
+  <section id="experiencias" class="reveal">
+    <div class="wrap">
+      <span class="eyebrow">Experiencias</span>
+      <h2>Mucho más que <span class="grad-text">una foto</span></h2>
+      <p class="lead">Cada invitado elige cómo quiere salir. Vos elegís cuáles se ofrecen en tu evento.</p>
+      <div class="modes">
+        <article class="mode star"><span class="badge">El favorito</span><img src="/modes/retrato.jpg" alt="Retratos mágicos con IA" loading="lazy" /><div><h3>Retrato Mágico IA</h3><p>Reyes, vikingos, magos, piratas o estrellas de cine. La IA los transforma y siguen siendo ellos.</p></div></article>
+        <article class="mode"><img src="/modes/selfie.jpg" alt="Fotos con marco del evento" loading="lazy" /><div><h3>Fotos con marco</h3><p>El clásico que nunca falla: una o varias fotos con el diseño, los nombres y la fecha de tu evento.</p></div></article>
+        <article class="mode"><img src="/modes/portada.jpg" alt="Tapa de revista" loading="lazy" style="object-position:center top" /><div><h3>Tapa de revista</h3><p>Cada invitado es la portada de la noche, con titulares y su nombre.</p></div></article>
+        <article class="mode"><img src="/modes/caricatura.jpg" alt="Caricatura animada" loading="lazy" /><div><h3>Caricatura animada</h3><p>Personajes de dibujo animado y estilo película 3D. Los chicos (y no tan chicos) lo aman.</p></div></article>
+      </div>
+    </div>
+  </section>
+
+  <!-- Temáticas -->
+  <section class="reveal">
+    <div class="wrap">
+      <span class="eyebrow">Temáticas con IA</span>
+      <h2>¿Cómo te gustaría salir?</h2>
+      <p class="lead">Algunas de las más de 30 temáticas. También armamos temáticas a medida de tu evento.</p>
+      <div class="gallery">
+        <img src="/ai-themes/estudiante-de-magia.jpg" alt="Estudiantes de magia" loading="lazy" />
+        <img src="/ai-themes/gala-alfombra-roja.jpg" alt="Gala de alfombra roja" loading="lazy" />
+        <img src="/ai-themes/caricatura-simpson.jpg" alt="Caricatura amarilla" loading="lazy" />
+        <img src="/ai-themes/realeza-fantasia-epica.jpg" alt="Realeza de fantasía" loading="lazy" />
+        <img src="/ai-themes/princesa-de-cuento.jpg" alt="Princesa de cuento" loading="lazy" />
+        <img src="/ai-themes/guerrero-vikingo.jpg" alt="Guerrero vikingo" loading="lazy" />
+        <img src="/ai-themes/heroe-comic-retro.jpg" alt="Heroína de cómic" loading="lazy" />
+        <img src="/ai-themes/fiesta-disco-70s.jpg" alt="Fiesta disco de los 70" loading="lazy" />
+        <img src="/ai-themes/toon-3d.jpg" alt="Personaje animado 3D" loading="lazy" />
+        <img src="/ai-themes/peaky-blinders.jpg" alt="Estilo gángster" loading="lazy" />
+        <img src="/ai-themes/gaucho-argentino.jpg" alt="Gauchos argentinos" loading="lazy" />
+        <img src="/ai-themes/jugador-seleccion.jpg" alt="Jugador de la Selección" loading="lazy" />
+      </div>
+    </div>
+  </section>
+
+  <!-- Qué incluye -->
+  <section class="reveal">
+    <div class="wrap">
+      <span class="eyebrow">Qué incluye</span>
+      <h2>Todo listo, vos solo disfrutá</h2>
+      <div class="feats">
+        <div class="feat"><div class="ic">🖨️</div><div><h3>Fotos impresas al instante</h3><p>10×15 en papel fotográfico de alta calidad. Se imprimen en orden, sin frenar a nadie.</p></div></div>
+        <div class="feat"><div class="ic">📲</div><div><h3>QR para el celular</h3><p>Cada invitado escanea y se lleva su foto para subirla a Instagram o WhatsApp.</p></div></div>
+        <div class="feat"><div class="ic">💍</div><div><h3>Diseño personalizado</h3><p>Marco con los nombres, la fecha y los colores de tu evento.</p></div></div>
+        <div class="feat"><div class="ic">👆</div><div><h3>Pantalla táctil gigante</h3><p>Fácil para todas las edades. También se puede disparar con botón a distancia.</p></div></div>
+        <div class="feat"><div class="ic">✨</div><div><h3>Inteligencia artificial</h3><p>Transformaciones que sorprenden: el momento más comentado de la noche.</p></div></div>
+        <div class="feat"><div class="ic">🙋</div><div><h3>Con o sin recepcionista</h3><p>Podés sumar una persona que anime y ayude a los invitados.</p></div></div>
+      </div>
+      <div class="chips">
+        <span class="chip">💒 Casamientos</span><span class="chip">👑 15 años</span><span class="chip">🎂 Cumpleaños</span><span class="chip">🎓 Egresados</span><span class="chip">🏢 Eventos de empresa</span><span class="chip">🎄 Fiestas de fin de año</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Presupuesto -->
+  <section class="reveal" id="presupuesto">
+    <div class="wrap">
+      <div class="quote">
+        <span class="eyebrow">Presupuesto a medida</span>
+        <h2>Contanos tu evento y <span class="grad-text">te pasamos el precio</span></h2>
+        <p class="lead">Cada fiesta es distinta: armamos el presupuesto según lo que necesites.</p>
+        <div class="opts"><span>⏱️ 2 horas o más</span><span>🙋 Con o sin recepcionista</span><span>✨ Con o sin fotos IA</span><span>🖨️ Fotos impresas</span></div>
+        <a class="btn btn-wa" data-wa="cliente" href="#"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2z"/></svg>Pedir presupuesto por WhatsApp</a>
+        <p class="urg">⚡ Tenemos un solo espejo por noche: las fechas de temporada se van rápido.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Negocios -->
+  <section class="b2b reveal" id="negocios">
+    <div class="wrap">
+      <span class="eyebrow">Para negocios</span>
+      <h2>¿Tenés un espejo mágico o querés <span class="grad-text">empezar con uno</span>?</h2>
+      <p class="lead">El mismo sistema que usamos en nuestros eventos, para que vos lo ofrezcas con tu marca. La inteligencia artificial es lo que hoy piden todos los clientes: sumala y cobrá más por cada evento.</p>
+      <div class="b2b-grid">
+        <div class="plan">
+          <span class="k">Software</span>
+          <h3>Sistema EventPix</h3>
+          <p>Para tu espejo o cabina con TV box Android.</p>
+          <ul>
+            <li>Todas las experiencias: marcos, revista, IA</li>
+            <li>Impresión directa por cable USB, sin PC</li>
+            <li>QR para que el invitado baje su foto</li>
+            <li>Funciona sin internet para fotos impresas</li>
+            <li>Control desde una tablet</li>
+          </ul>
+          <a class="btn btn-ghost" data-wa="sistema" href="#">Quiero el sistema</a>
+        </div>
+        <div class="plan hl">
+          <span class="k">Llave en mano</span>
+          <h3>Equipo completo</h3>
+          <p>Todo armado, configurado y probado para salir a trabajar.</p>
+          <ul>
+            <li>Espejo / pantalla vertical táctil</li>
+            <li>TV box, cámara e impresora fotográfica</li>
+            <li>Sistema EventPix instalado y configurado</li>
+            <li>Capacitación para tu primer evento</li>
+            <li>Fotos IA listas para vender</li>
+          </ul>
+          <a class="btn btn-wa" data-wa="equipo" href="#">Quiero el equipo completo</a>
+        </div>
+        <div class="plan">
+          <span class="k">Créditos</span>
+          <h3>Paquetes de fotos IA</h3>
+          <p>Cargá fotos con inteligencia artificial y usalas en tus eventos.</p>
+          <ul>
+            <li>Más de 30 temáticas listas</li>
+            <li>Retratos, revista, caricaturas y más</li>
+            <li>Recargás cuando quieras</li>
+            <li>Un extra que tus clientes pagan</li>
+          </ul>
+          <a class="btn btn-ghost" data-wa="ia" href="#">Ver paquetes de IA</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Preguntas -->
+  <section class="reveal">
+    <div class="wrap">
+      <span class="eyebrow">Preguntas frecuentes</span>
+      <h2>Lo que siempre nos preguntan</h2>
+      <div class="faq">
+        <details><summary>¿Necesita internet en el salón?</summary><p>Para sacar e imprimir fotos, no. Para las fotos con IA y el QR del celular sí; si el salón no tiene WiFi lo resolvemos con datos móviles.</p></details>
+        <details><summary>¿Cuánto tarda la foto impresa?</summary><p>Alrededor de un minuto y medio por foto. Las fotos se imprimen en orden mientras los demás invitados siguen sacándose.</p></details>
+        <details><summary>¿Se puede personalizar?</summary><p>Sí: el marco lleva los nombres, la fecha y los colores de tu evento, y elegís qué experiencias y temáticas de IA se ofrecen.</p></details>
+        <details><summary>¿Cómo reservo?</summary><p>Escribinos por WhatsApp con la fecha, el horario y el lugar. Te confirmamos disponibilidad y te pasamos el presupuesto. La fecha queda reservada con una seña.</p></details>
+        <details><summary>Tengo un espejo mágico, ¿puedo usar el sistema?</summary><p>Sí. Funciona en TV box Android con cámara USB e impresora. Escribinos y vemos qué equipo tenés.</p></details>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <a class="logo" href="#inicio"><img src="/pwa-192x192.png" alt="" width="32" height="32" /><span class="brand">EventPix</span></a>
+    <div style="display:flex;gap:18px;flex-wrap:wrap">
+      <a data-wa="cliente" href="#">WhatsApp</a>
+      <a id="ig" href="#" target="_blank" rel="noopener">Instagram</a>
+      <a href="https://event-pix.com.ar" target="_blank" rel="noopener">Todos nuestros servicios</a>
+    </div>
+  </div>
+</footer>
+
+<div class="float" id="float"><a class="btn btn-wa" data-wa="cliente" href="#"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2z"/></svg>Consultá disponibilidad</a></div>
+
+<script>
+// ─── Datos de contacto (cambiar acá) ───────────────────────────────────────
+var WHATSAPP = '5493624055257';            // número con 549 + característica, sin espacios
+var INSTAGRAM = 'https://instagram.com/eventpix';
+var MENSAJES = {
+  cliente: '¡Hola! Vi el Espejo Mágico con IA y quiero consultar disponibilidad. Fecha del evento: ',
+  sistema: '¡Hola! Tengo un espejo mágico y me interesa el sistema EventPix.',
+  equipo: '¡Hola! Me interesa el equipo completo de espejo mágico con EventPix.',
+  ia: '¡Hola! Quiero info de los paquetes de fotos con IA para mi espejo mágico.'
+};
+// ───────────────────────────────────────────────────────────────────────────
+
+// Si el link vino con ?ref=… (p. ej. de un reel), se agrega al mensaje para saber de dónde llegó
+var ref = new URLSearchParams(location.search).get('ref');
+document.querySelectorAll('[data-wa]').forEach(function (a) {
+  var text = MENSAJES[a.getAttribute('data-wa')] || MENSAJES.cliente;
+  if (ref) text += ' (vi el link en: ' + ref + ')';
+  a.href = 'https://wa.me/' + WHATSAPP + '?text=' + encodeURIComponent(text);
+  a.target = '_blank';
+  a.rel = 'noopener';
+});
+document.getElementById('ig').href = INSTAGRAM;
+
+// Antes / después
+var cmp = document.getElementById('compare');
+var range = cmp.querySelector('input');
+range.addEventListener('input', function () { cmp.style.setProperty('--cut', range.value + '%'); });
+// Al entrar se mueve solo una vez para que se note que se puede deslizar
+var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+if (!reduce) {
+  var t0 = null, touched = false;
+  range.addEventListener('pointerdown', function () { touched = true; });
+  function demo(t) {
+    if (touched) return;
+    if (!t0) t0 = t;
+    var p = Math.min(1, (t - t0) / 2600);
+    var v = 50 + 38 * Math.sin(p * Math.PI * 2);
+    range.value = v; cmp.style.setProperty('--cut', v + '%');
+    if (p < 1) requestAnimationFrame(demo);
+  }
+  setTimeout(function () { requestAnimationFrame(demo); }, 900);
+}
+
+// Aparición al bajar y botón fijo de WhatsApp después de la portada
+// Seguridad: si la animación no se dispara (navegador viejo, captura), todo se ve igual
+var reveals = document.querySelectorAll('.reveal');
+function showAll() { reveals.forEach(function (el) { el.classList.add('in'); }); }
+var io = 'IntersectionObserver' in window ? new IntersectionObserver(function (es) {
+  es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+}, { threshold: 0, rootMargin: '0px 0px -8% 0px' }) : null;
+if (io) reveals.forEach(function (el) { io.observe(el); }); else showAll();
+setTimeout(showAll, 2500);
+var fl = document.getElementById('float');
+var hero = document.querySelector('.hero');
+window.addEventListener('scroll', function () {
+  fl.classList.toggle('show', hero.getBoundingClientRect().bottom < 0);
+}, { passive: true });
+</script>
+</body>
+</html>
