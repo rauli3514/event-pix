@@ -7,28 +7,29 @@ import android.content.Intent
 import android.content.SharedPreferences
 
 import android.net.Uri
+import android.content.pm.ApplicationInfo
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.View
 import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.TextView
 import android.webkit.WebView
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import android.util.Log
 import kotlinx.coroutines.*
-import androidx.media3.ui.PlayerView
 import com.eventpix.tv.player.R
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var playerView: PlayerView
     private lateinit var webView: WebView
     private lateinit var logoImageView: ImageView
     private lateinit var statusTextView: TextView
     private lateinit var diagnosticPanel: View
     
-    private lateinit var playerManager: PlayerManager
     private lateinit var webViewManager: WebViewManager
+    private lateinit var tvBridge: TvBridge
     private var watchdog: WatchdogService? = null
     
     private val scope = CoroutineScope(Dispatchers.Main + Job())
@@ -55,17 +56,19 @@ class MainActivity : AppCompatActivity() {
 
         setContentView(R.layout.activity_main)
         
-        playerView = findViewById(R.id.playerView)
         webView = findViewById(R.id.webView)
         logoImageView = findViewById(R.id.logoImageView)
         statusTextView = findViewById(R.id.statusTextView)
         diagnosticPanel = findViewById(R.id.diagnosticPanel)
         
-        playerManager = PlayerManager(this, playerView)
+        // Depuración remota de la web (chrome://inspect en la PC) solo en APKs de prueba.
+        if ((applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
+            WebView.setWebContentsDebuggingEnabled(true)
+        }
 
         // Puente con la web. Solo expone métodos que exigen el token de sesión,
         // que WebViewManager inyecta únicamente en nuestras páginas.
-        val tvBridge = TvBridge(this)
+        tvBridge = TvBridge(this)
 
         webViewManager = WebViewManager(webView, { tvBridge.tokenInjectionScript() }) {
             runOnUiThread {
@@ -85,8 +88,9 @@ class MainActivity : AppCompatActivity() {
         tvBridge.scheduleDailyRestart(tvBridge.getRebootHour(), tvBridge.getRebootMinute())
 
         // Vigila que el hilo de la UI no quede bloqueado (antes nunca se iniciaba).
-        watchdog = WatchdogService(this, playerManager, webViewManager).also { it.start() }
+        watchdog = WatchdogService(this, webViewManager).also { it.start() }
 
+        setupBackHandling()
         setImmersiveMode()
         startBootSequence()
     }
@@ -109,15 +113,30 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    override fun onBackPressed() {
-        // Block back button to prevent exiting kiosk mode
-        // super.onBackPressed() 
+    // ATRÁS no cierra la app (modo kiosco). 5 veces seguidas abre los Ajustes de
+    // Android: es la salida de emergencia que indican las pantallas de la TV.
+    // (La web no recibe la tecla ATRÁS: la consume la Activity.)
+    private var backPressCount = 0
+    private var lastBackPressAt = 0L
+
+    private fun setupBackHandling() {
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                val now = SystemClock.uptimeMillis()
+                backPressCount = if (now - lastBackPressAt > 1500) 1 else backPressCount + 1
+                lastBackPressAt = now
+                if (backPressCount >= 5) {
+                    backPressCount = 0
+                    Log.d("MainActivity", "5x ATRÁS: abriendo Ajustes de Android")
+                    tvBridge.openSettings()
+                }
+            }
+        })
     }
     
     private fun startBootSequence() {
         // Transition to WebView for the actual Display App UI immediately
         diagnosticPanel.visibility = View.GONE
-        playerView.visibility = View.GONE
         logoImageView.visibility = View.GONE
         webView.visibility = View.VISIBLE
         
@@ -135,7 +154,6 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         watchdog?.stop()
-        playerManager.releasePlayer()
         scope.cancel()
     }
     

@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { sendDeviceHeartbeat } from '@/lib/displayDeviceApi';
 import { registerCommandSecret } from '@/lib/displayCommands';
+import { openHomeSettings, openWifiSettings } from '@/lib/tvBridge';
 import { Wifi, Bluetooth, Power } from 'lucide-react';
 
 export default function TvBootScreen() {
   const [pin, setPin] = useState<string>('');
+  const hasBluetoothPairing = typeof (window as any).AndroidKiosk?.startBluetoothServer === 'function';
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -177,25 +179,26 @@ export default function TvBootScreen() {
           </span>
         </div>
 
-        <div className="space-y-2 text-sm text-zinc-400">
-          <div className="flex items-center justify-center gap-2">
-            <Bluetooth className="w-5 h-5 text-blue-400 shrink-0" />
-            <span>Dispositivo Bluetooth: <strong className="text-white font-mono">EventPix-TV-{pin}</strong></span>
+        {/* Solo la app del kiosco tiene servidor Bluetooth; la app TV se vincula con el código. */}
+        {hasBluetoothPairing ? (
+          <div className="space-y-2 text-sm text-zinc-400">
+            <div className="flex items-center justify-center gap-2">
+              <Bluetooth className="w-5 h-5 text-blue-400 shrink-0" />
+              <span>Dispositivo Bluetooth: <strong className="text-white font-mono">EventPix-TV-{pin}</strong></span>
+            </div>
+            <p className="text-xs text-zinc-500">
+              Conéctate desde la App Móvil para enviar Wi-Fi y vincular automáticamente.
+            </p>
           </div>
-          <p className="text-xs text-zinc-500">
-            Conéctate desde la App Móvil para enviar Wi-Fi y vincular automáticamente.
+        ) : (
+          <p className="text-sm text-zinc-400">
+            Ingresá este código en <strong className="text-white">app.event-pix.com.ar</strong> → Pantallas → Vincular.
           </p>
-        </div>
+        )}
 
         <div className="w-full grid grid-cols-2 gap-3 mt-2">
           <button
-            onClick={() => {
-              if ((window as any).AndroidKiosk?.openWifiSettings) {
-                (window as any).AndroidKiosk.openWifiSettings();
-              } else if ((window as any).AndroidKiosk?.openSettings) {
-                (window as any).AndroidKiosk.openSettings();
-              }
-            }}
+            onClick={() => { openWifiSettings(); }}
             className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-zinc-300 text-xs font-medium transition-all border border-zinc-700/50"
           >
             <Wifi className="w-4 h-4 text-cyan-400" />
@@ -204,11 +207,7 @@ export default function TvBootScreen() {
 
           <button
             onClick={() => {
-              if ((window as any).AndroidKiosk?.openHomeSettings) {
-                (window as any).AndroidKiosk.openHomeSettings();
-              } else if ((window as any).AndroidKiosk?.openSettings) {
-                (window as any).AndroidKiosk.openSettings();
-              } else {
+              if (!openHomeSettings()) {
                 import('@capacitor/app').then(({ App }) => App.exitApp()).catch(console.error);
               }
             }}

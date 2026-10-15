@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Settings, RefreshCw, Unlink, Trash2, X, Info, Power, Monitor, Clock, ShieldCheck, Zap } from 'lucide-react';
 
-import { callTvBridge, onTvBridgeReady } from '@/lib/tvBridge';
+import { callTvBridge, exitAndroidApp, getTvAppVersion, hasTvBridgeMethod, onTvBridgeReady, openHomeSettings, openWifiSettings } from '@/lib/tvBridge';
 
 interface TvSettingsMenuProps {
     deviceCode: string;
@@ -20,6 +20,8 @@ export const TvSettingsMenu = ({ deviceCode, onRefresh }: TvSettingsMenuProps) =
     const [keepAwake, setKeepAwake] = useState(true);
     const [localRotation, setLocalRotation] = useState<number>(0);
     const [rebootHour, setRebootHour] = useState(3);
+    // null = esta app no maneja el permiso (navegador, kiosco o Android viejo).
+    const [canAutoStart, setCanAutoStart] = useState<boolean | null>(null);
 
     const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
@@ -31,6 +33,7 @@ export const TvSettingsMenu = ({ deviceCode, onRefresh }: TvSettingsMenuProps) =
                 setWatchdog(callTvBridge<boolean>('getWatchdog') ?? true);
                 setKeepAwake(callTvBridge<boolean>('getKeepAwake') ?? true);
                 setRebootHour(callTvBridge<number>('getRebootHour') ?? 3);
+                setCanAutoStart(hasTvBridgeMethod('canAutoStart') ? !!callTvBridge<boolean>('canAutoStart') : null);
                 callTvBridge('setOrientation', true); // Force hardware to landscape
             });
         }
@@ -71,6 +74,17 @@ export const TvSettingsMenu = ({ deviceCode, onRefresh }: TvSettingsMenuProps) =
                 callTvBridge('setAutoBoot', newVal);
             }
         },
+        // Android 10+: sin el permiso "mostrar sobre otras apps", la app no puede
+        // abrirse sola al prender el equipo (salvo que sea el launcher).
+        ...(canAutoStart === null ? [] : [{
+            id: 'autostart_permission',
+            label: canAutoStart ? 'Arranque automático: permitido ✓' : 'Arranque automático: falta permiso (activar)',
+            icon: <ShieldCheck className={`w-5 h-5 ${canAutoStart ? 'text-emerald-400' : 'text-amber-400'}`} />,
+            action: () => {
+                callTvBridge('openAutoStartSettings');
+                setIsOpen(false);
+            }
+        }]),
         {
             id: 'watchdog',
             label: `Reinicio ante fallos: ${watchdog ? 'ON' : 'OFF'}`,
@@ -140,7 +154,7 @@ export const TvSettingsMenu = ({ deviceCode, onRefresh }: TvSettingsMenuProps) =
             label: 'Información del Sistema',
             icon: <Info className="w-5 h-5" />,
             action: () => {
-                alert(`Device ID: ${deviceCode}\nVersión: 2.1.0 (Kiosk)\nResolución: ${window.innerWidth}x${window.innerHeight}`);
+                alert(`Device ID: ${deviceCode}\nApp TV: ${getTvAppVersion() ?? 'no disponible'}\nResolución: ${window.innerWidth}x${window.innerHeight}`);
             }
         },
         {
@@ -148,13 +162,7 @@ export const TvSettingsMenu = ({ deviceCode, onRefresh }: TvSettingsMenuProps) =
             label: 'Configurar Wi-Fi (Android)',
             icon: <Zap className="w-5 h-5 text-cyan-400" />,
             action: () => {
-                if ((window as any).AndroidKiosk?.openWifiSettings) {
-                    (window as any).AndroidKiosk.openWifiSettings();
-                } else if ((window as any).AndroidKiosk?.openSettings) {
-                    (window as any).AndroidKiosk.openSettings();
-                } else {
-                    alert('Solo disponible en Android.');
-                }
+                if (!openWifiSettings()) alert('Solo disponible en Android.');
             }
         },
         {
@@ -162,13 +170,7 @@ export const TvSettingsMenu = ({ deviceCode, onRefresh }: TvSettingsMenuProps) =
             label: 'Cambiar Launcher / Salir a Android',
             icon: <Power className="w-5 h-5 text-amber-400" />,
             action: () => {
-                if ((window as any).AndroidKiosk?.openHomeSettings) {
-                    (window as any).AndroidKiosk.openHomeSettings();
-                } else if ((window as any).AndroidKiosk?.openSettings) {
-                    (window as any).AndroidKiosk.openSettings();
-                } else {
-                    alert('Solo disponible en Android.');
-                }
+                if (!openHomeSettings()) alert('Solo disponible en Android.');
             }
         },
         {
@@ -176,9 +178,7 @@ export const TvSettingsMenu = ({ deviceCode, onRefresh }: TvSettingsMenuProps) =
             label: 'Salir de la App',
             icon: <Power className="w-5 h-5 text-red-500" />,
             action: () => {
-                if ((window as any).AndroidKiosk?.exitApp) {
-                    (window as any).AndroidKiosk.exitApp();
-                } else {
+                if (!exitAndroidApp()) {
                     import('@capacitor/app').then(({ App }) => {
                         App.exitApp();
                     }).catch(() => {

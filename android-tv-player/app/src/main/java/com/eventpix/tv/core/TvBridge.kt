@@ -16,6 +16,7 @@ import android.net.wifi.WifiConfiguration
 import android.media.AudioManager
 import android.os.SystemClock
 import android.os.Build
+import android.net.Uri
 import android.app.ActivityManager
 import android.util.DisplayMetrics
 import java.io.File
@@ -78,6 +79,43 @@ class TvBridge(private val activity: MainActivity) {
         } catch (e: Exception) {
             Log.e("TvBridge", "Failed to open settings", e)
         }
+    }
+
+    // Ajustes de "app de inicio" (launcher), para poner o sacar EventPix como inicio.
+    fun openHomeSettings() {
+        try {
+            val intent = Intent(android.provider.Settings.ACTION_HOME_SETTINGS)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            activity.startActivity(intent)
+        } catch (e: Exception) {
+            openSettings()
+        }
+    }
+
+    // Desde Android 10 una app no puede abrirse sola al arrancar el equipo salvo
+    // que sea el launcher o tenga el permiso "mostrar sobre otras apps".
+    fun canAutoStart(): Boolean {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
+            android.provider.Settings.canDrawOverlays(activity)
+    }
+
+    fun openAutoStartSettings() {
+        val pkg = Uri.parse("package:${activity.packageName}")
+        val attempts = listOf(
+            Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, pkg),
+            // Algunas Google TV esconden la pantalla anterior: ficha de la app.
+            Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, pkg)
+        )
+        for (intent in attempts) {
+            try {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                activity.startActivity(intent)
+                return
+            } catch (e: Exception) {
+                Log.w("TvBridge", "No se pudo abrir ${intent.action}", e)
+            }
+        }
+        openSettings()
     }
 
     fun getDeviceCode(): String {
@@ -385,6 +423,15 @@ class TvBridge(private val activity: MainActivity) {
 
     @JavascriptInterface
     fun openSettings(token: String) { if (authorized(token)) openSettings() }
+
+    @JavascriptInterface
+    fun openHomeSettings(token: String) { if (authorized(token)) openHomeSettings() }
+
+    @JavascriptInterface
+    fun canAutoStart(token: String): Boolean = authorized(token) && canAutoStart()
+
+    @JavascriptInterface
+    fun openAutoStartSettings(token: String) { if (authorized(token)) openAutoStartSettings() }
 
     @JavascriptInterface
     fun getDeviceCode(token: String): String = if (authorized(token)) getDeviceCode() else ""
