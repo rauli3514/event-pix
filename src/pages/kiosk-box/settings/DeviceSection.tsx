@@ -5,7 +5,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import {
-  calibrateTouch, canCalibrateTouch, checkinDevice, getAutostartStatus, getTapStabilize, isTouchCalibrated,
+  calibrateTouch, canCalibrateTouch, checkinDevice, getAutostartStatus, getDiagnostics, getTapStabilize, isTouchCalibrated,
   resetTouchCalibration, setTapStabilize, TOUCH_CALIBRATED_EVENT, getCachedDeviceState, openHomeAppSettings, openStartOnBootSettings,
   renameDevice, setBoxPin, type KioskDeviceState,
 } from '@/lib/kioskDevice';
@@ -95,6 +95,8 @@ export default function DeviceSection() {
       <RemoteControlPanel />
 
       <TouchPanel />
+
+      <DiagnosticsPanel />
 
       <LitePanel />
 
@@ -192,7 +194,7 @@ function AutostartPanel() {
   if (!status) {
     return (
       <Panel title="Arranque automático" description="Que el kiosco se abra solo al prender el equipo.">
-        <p className="text-white/60">Se configura en la app del equipo (versión 2 o más nueva).</p>
+        <p className="text-white/60">No se pudo leer el estado. Cerrá y volvé a abrir la app; si sigue igual, actualizala a la última versión.</p>
       </Panel>
     );
   }
@@ -223,6 +225,52 @@ function AutostartPanel() {
           "Mostrar sobre otras apps" para EventPix Kiosco.
         </p>
       )}
+    </Panel>
+  );
+}
+
+// Motivos de cierre de Android (ApplicationExitInfo.REASON_*)
+const EXIT_REASONS: Record<number, string> = {
+  0: 'Motivo desconocido', 1: 'La app se cerró sola', 2: 'El sistema la cerró', 3: 'Falta de memoria',
+  4: 'Error de la app', 5: 'Error interno (nativo)', 6: 'Se colgó (no respondía)', 7: 'No pudo arrancar',
+  8: 'Cambio de permisos', 9: 'Usó demasiados recursos', 10: 'La cerró una persona', 11: 'La detuvo una persona',
+  12: 'Se cerró otro proceso del que dependía', 13: 'Otro motivo', 14: 'Congelada por el sistema', 15: 'Se reinició el equipo',
+};
+
+const ago = (ms: number) => {
+  const min = Math.round(ms / 60000);
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  return h < 48 ? `${h} h ${min % 60} min` : `${Math.floor(h / 24)} días`;
+};
+
+/** Reinicios: cuánto hace que está prendido el equipo y por qué se cerró la app. */
+function DiagnosticsPanel() {
+  const [diag, setDiag] = useState(getDiagnostics);
+  if (!diag) return null;
+  return (
+    <Panel title="Diagnóstico" description="Si el equipo o la app se reinician solos, esto ayuda a saber por qué. Sacale una foto y mandala al soporte.">
+      <div className="grid grid-cols-3 gap-4">
+        <Info label="Equipo prendido hace" value={ago(diag.uptimeMs)} />
+        <Info label="App abierta hace" value={ago(diag.appUptimeMs)} />
+        <Info label="Memoria libre" value={diag.memAvailMb != null ? `${diag.memAvailMb} de ${diag.memTotalMb} MB${diag.lowMemory ? ' (¡poca!)' : ''}` : '—'} />
+      </div>
+      {diag.exits.length > 0 ? (
+        <div className="space-y-2">
+          <p className="text-white/60">Últimos cierres de la app:</p>
+          {diag.exits.map((e, i) => (
+            <div key={i} className="rounded-xl bg-white/5 px-4 py-3">
+              <p className="font-semibold">{new Date(e.time).toLocaleString('es-AR')} · {EXIT_REASONS[e.reason] ?? `Motivo ${e.reason}`}</p>
+              {(e.description || e.pssMb > 0) && (
+                <p className="text-white/50 text-sm break-words">{e.description}{e.pssMb > 0 ? ` · memoria usada ${e.pssMb} MB` : ''}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-white/50">Sin cierres registrados.</p>
+      )}
+      <button onClick={() => setDiag(getDiagnostics())} className={buttonClass}><RefreshCw className="w-5 h-5" /> Actualizar</button>
     </Panel>
   );
 }

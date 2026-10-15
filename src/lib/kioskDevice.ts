@@ -182,6 +182,7 @@ interface AndroidKioskBridge {
   calibrateTouch?: () => void;
   resetTouchCalibration?: () => void;
   isTouchCalibrated?: () => boolean;
+  getDiagnostics?: () => string;
 }
 
 const bridge = () => (window as unknown as { AndroidKiosk?: AndroidKioskBridge }).AndroidKiosk;
@@ -228,6 +229,24 @@ export const openHomeAppSettings = () => {
   else b?.openSettings?.();
 };
 export const openStartOnBootSettings = () => bridge()?.openOverlaySettings?.();
+
+/** Por qué se cerró la app (Android 11+, ApplicationExitInfo) */
+export interface AppExit { reason: number; time: number; description: string; status: number; pssMb: number }
+export interface DeviceDiagnostics {
+  uptimeMs: number;
+  appUptimeMs: number;
+  bootCount: number;
+  memAvailMb?: number;
+  memTotalMb?: number;
+  lowMemory?: boolean;
+  exits: AppExit[];
+}
+/** Diagnóstico del equipo (APK 3.0+). null = no disponible. */
+export const getDiagnostics = (): DeviceDiagnostics | null => {
+  const raw = bridge()?.getDiagnostics?.();
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
+};
 
 /** Estabilizador de toques para marcos táctiles infrarrojos (APK 2.6+). null = no disponible. */
 export const getTapStabilize = (): boolean | null => {

@@ -257,20 +257,46 @@ public class MainActivity extends BridgeActivity {
             KioskScreenPlugin.apply(getBridge().getWebView(), KioskScreenPlugin.savedRotation(this));
         }
         bluetoothServer = new BluetoothServer(this);
-        // BluetoothClient se inicializa después del Bridge (webview disponible)
+        // Los puentes con la página se registran ya, antes de que termine de cargar: si se
+        // registraban recién en onResume, con un arranque rápido (p. ej. al prender el equipo)
+        // la página podía cargarse antes y quedarse sin ellos (Ajustes decía "versión 2")
+        registerJsInterfaces();
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        if (getBridge() != null && getBridge().getWebView() != null) {
-            getBridge().getWebView().addJavascriptInterface(new AndroidKioskInterface(this), "AndroidKiosk");
-            // Inicializar cliente Bluetooth con acceso al WebView para callbacks
-            if (bluetoothClient == null) {
-                bluetoothClient = new BluetoothClient(this, getBridge().getWebView());
-            }
-            getBridge().getWebView().addJavascriptInterface(bluetoothClient, "AndroidBluetoothClient");
+        registerJsInterfaces();
+        ensureBridgeLoaded();
+    }
+
+    private void registerJsInterfaces() {
+        if (getBridge() == null || getBridge().getWebView() == null) return;
+        getBridge().getWebView().addJavascriptInterface(new AndroidKioskInterface(this), "AndroidKiosk");
+        // Cliente Bluetooth con acceso al WebView para callbacks
+        if (bluetoothClient == null) {
+            bluetoothClient = new BluetoothClient(this, getBridge().getWebView());
         }
+        getBridge().getWebView().addJavascriptInterface(bluetoothClient, "AndroidBluetoothClient");
+    }
+
+    /** Recargas por falta del puente (una sola vez por apertura de la app). */
+    private static boolean bridgeReloaded = false;
+
+    /**
+     * Seguridad: si igual la página quedó sin el puente (se cargó antes de registrarlo), se
+     * recarga una vez. Solo si ya está en el kiosco (no en una página en blanco cargando).
+     */
+    private void ensureBridgeLoaded() {
+        if (bridgeReloaded || getBridge() == null || getBridge().getWebView() == null) return;
+        android.webkit.WebView web = getBridge().getWebView();
+        web.postDelayed(() -> web.evaluateJavascript(
+                "(document.readyState === 'complete' && location.protocol !== 'about:') ? typeof window.AndroidKiosk : 'wait'",
+                value -> {
+                    if (bridgeReloaded || !"\"undefined\"".equals(value)) return;
+                    bridgeReloaded = true;
+                    web.reload();
+                }), 4000);
     }
 
     @Override
@@ -357,6 +383,45 @@ public class MainActivity extends BridgeActivity {
         @JavascriptInterface
         public boolean isTouchCalibrated() {
             return touchMatrix != null;
+        }
+
+        /**
+         * Diagnóstico para Ajustes: cuánto hace que está prendido el equipo y abierta la app,
+         * cuántas veces arrancó el equipo y por qué se cerró la app las últimas veces
+         * (Android 11+ lo guarda: falla, falta de memoria, se colgó…).
+         */
+        @JavascriptInterface
+        public String getDiagnostics() {
+            JSONObject out = new JSONObject();
+            try {
+                out.put("uptimeMs", android.os.SystemClock.elapsedRealtime());
+                out.put("appUptimeMs", android.os.SystemClock.elapsedRealtime() - android.os.Process.getStartElapsedRealtime());
+                out.put("bootCount", Settings.Global.getInt(context.getContentResolver(), Settings.Global.BOOT_COUNT, -1));
+                android.app.ActivityManager am = (android.app.ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+                if (am != null) {
+                    android.app.ActivityManager.MemoryInfo mem = new android.app.ActivityManager.MemoryInfo();
+                    am.getMemoryInfo(mem);
+                    out.put("memAvailMb", mem.availMem / (1024 * 1024));
+                    out.put("memTotalMb", mem.totalMem / (1024 * 1024));
+                    out.put("lowMemory", mem.lowMemory);
+                }
+                JSONArray exits = new JSONArray();
+                if (Build.VERSION.SDK_INT >= 30 && am != null) {
+                    for (android.app.ApplicationExitInfo e : am.getHistoricalProcessExitReasons(context.getPackageName(), 0, 8)) {
+                        JSONObject o = new JSONObject();
+                        o.put("reason", e.getReason());
+                        o.put("time", e.getTimestamp());
+                        o.put("description", e.getDescription() != null ? e.getDescription() : "");
+                        o.put("status", e.getStatus());
+                        o.put("pssMb", e.getPss() / 1024);
+                        exits.put(o);
+                    }
+                }
+                out.put("exits", exits);
+            } catch (Exception ignored) {
+                // Lo que se pudo juntar
+            }
+            return out.toString();
         }
 
         /** El kiosco pide (o suelta) las teclas del disparador Bluetooth. */
