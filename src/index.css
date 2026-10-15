@@ -193,6 +193,17 @@
   animation: ken-burns-pan 20s ease-out infinite alternate;
 }
 
+/* Muro social (Mosaico): la columna va dos veces, sube media altura y vuelve a empezar */
+@keyframes wall-scroll {
+  from { transform: translateY(0); }
+  to { transform: translateY(-50%); }
+}
+
+.animate-wall-scroll {
+  animation: wall-scroll 60s linear infinite;
+  will-change: transform;
+}
+
 /* Animaciones para Splash Screen */
 @keyframes fade-in-up {
   0% {

@@ -50,7 +50,7 @@ const Display = () => {
 
     return (
         <div className="absolute inset-0 w-full h-full bg-slate-950 text-white overflow-hidden">
-            {template === 'grid' && <GridTemplate eventId={event.id} />}
+            {template === 'grid' && <GridTemplate eventId={event.id} paused={spotlightActive} />}
             {template === 'slideshow' && <SlideshowTemplate eventId={event.id} paused={spotlightActive} />}
             {template === 'masonry' && <MasonryTemplate eventId={event.id} />}
 

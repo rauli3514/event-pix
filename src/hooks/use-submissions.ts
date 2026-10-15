@@ -18,6 +18,9 @@ interface UseSubmissionsOptions {
     list?: boolean;
 }
 
+// Mientras carga se devuelve siempre la misma lista vacía (así no cambia en cada render)
+const NO_SUBMISSIONS: Submission[] = [];
+
 export const useSubmissions = (eventId?: string, { list = true }: UseSubmissionsOptions = {}) => {
     const queryClient = useQueryClient();
 
@@ -260,7 +263,7 @@ export const useSubmissions = (eventId?: string, { list = true }: UseSubmissions
     });
 
     return {
-        submissions: submissions || [],
+        submissions: submissions ?? NO_SUBMISSIONS,
         isLoading,
         /** true recién cuando llegó la primera respuesta real (no la lista vacía de carga) */
         hasLoaded: submissions !== undefined,
