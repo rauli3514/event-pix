@@ -72,14 +72,14 @@ h2 { font-size: clamp(2rem, 6vw, 3.2rem); margin-bottom: 14px; }
 .trust b { color: var(--text); }
 
 /* Antes / después */
-.compare { position: relative; width: min(420px, 100%); margin-inline: auto; aspect-ratio: 2 / 3; border-radius: 26px; overflow: hidden; box-shadow: 0 30px 80px rgba(123,47,247,.45), 0 0 0 1px rgba(255,255,255,.12); user-select: none; touch-action: pan-y; background: #000; }
-.compare img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.compare .after { clip-path: inset(0 0 0 var(--cut, 50%)); }
-.compare .bar { position: absolute; top: 0; bottom: 0; left: var(--cut, 50%); width: 3px; margin-left: -1.5px; background: #fff; box-shadow: 0 0 12px rgba(0,0,0,.5); }
-.compare .knob { position: absolute; top: 50%; left: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; background: #fff; color: var(--violet); display: grid; place-items: center; font-weight: 900; box-shadow: 0 6px 20px rgba(0,0,0,.4); }
-.compare .tag { position: absolute; top: 14px; padding: 5px 12px; border-radius: 999px; font-size: .78rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; background: rgba(0,0,0,.55); backdrop-filter: blur(6px); }
-.compare .tag.l { left: 14px; } .compare .tag.r { right: 14px; background: var(--grad); }
-.compare input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: ew-resize; margin: 0; }
+.ba { position: relative; width: min(400px, 88%); margin: 0 auto 0 auto; }
+.ba .after { width: 100%; height: auto; aspect-ratio: 864 / 1184; object-fit: cover; border-radius: 26px; box-shadow: 0 30px 80px rgba(123,47,247,.45), 0 0 0 1px rgba(255,255,255,.12); }
+.ba .tag { position: absolute; top: 14px; right: 14px; padding: 6px 14px; border-radius: 999px; font-size: .8rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; background: var(--grad); box-shadow: 0 6px 18px rgba(0,0,0,.35); }
+.ba .before { position: absolute; left: -9%; bottom: 7%; width: 40%; margin: 0; padding: 6px 6px 0; background: #fff; border-radius: 10px; box-shadow: 0 18px 40px rgba(0,0,0,.55); transform: rotate(-6deg); animation: float 5s ease-in-out infinite; }
+.ba .before img { width: 100%; height: auto; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 5px; }
+.ba .before figcaption { color: #222; font-weight: 800; font-size: .78rem; text-align: center; padding: 5px 0 7px; text-transform: uppercase; letter-spacing: .08em; }
+.ba .arrow { position: absolute; left: 24%; bottom: 47%; width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; background: #fff; color: var(--violet); font-size: 1.5rem; font-weight: 900; box-shadow: 0 8px 22px rgba(0,0,0,.45); }
+@keyframes float { 50% { transform: rotate(-4deg) translateY(-8px); } }
 .hint { text-align: center; color: var(--muted); font-size: .85rem; margin-top: 12px; }
 
 /* Fotos reales */
@@ -147,7 +147,7 @@ h2 { font-size: clamp(2rem, 6vw, 3.2rem); margin-bottom: 14px; }
 /* Negocios */
 .b2b { background: linear-gradient(180deg, transparent, rgba(123,47,247,.12) 30%, transparent); }
 .b2b-grid { display: grid; gap: 16px; margin-top: 34px; }
-@media (min-width: 860px) { .b2b-grid { grid-template-columns: 1.15fr 1fr; max-width: 900px; } }
+@media (min-width: 860px) { .b2b-grid { grid-template-columns: repeat(3, 1fr); } }
 .plan { display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--line); border-radius: 24px; padding: 26px; }
 .plan.hl { border: 1.5px solid transparent; background: linear-gradient(var(--card), var(--card)) padding-box, var(--grad) border-box; }
 .plan .k { font-size: .78rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--cyan); margin-bottom: 8px; }
@@ -181,7 +181,7 @@ footer a:hover { color: var(--text); }
 
 .reveal { opacity: 0; transform: translateY(18px); transition: opacity .6s ease, transform .6s ease; }
 .reveal.in { opacity: 1; transform: none; }
-@media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } .pill i { animation: none; } html { scroll-behavior: auto; } }
+@media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } .pill i, .ba .before { animation: none; } html { scroll-behavior: auto; } }
 </style>
 </head>
 <body>
@@ -190,7 +190,7 @@ footer a:hover { color: var(--text); }
   <div class="wrap">
     <a class="logo" href="#inicio" aria-label="EventPix"><img src="/pwa-192x192.png" alt="" width="38" height="38" /><span class="brand">EventPix</span></a>
     <div>
-      <a class="nav-b2b" href="#negocios">Para negocios</a>
+      <a class="nav-b2b" href="#negocios">Para emprendedores</a>
       <a class="btn btn-wa" data-wa="cliente" href="#">Consultar fecha</a>
     </div>
   </div>
@@ -215,14 +215,13 @@ footer a:hover { color: var(--text); }
         </div>
       </div>
       <div>
-        <div class="compare" id="compare" style="--cut:50%">
-          <img src="/modes/portada-foto.jpg" alt="La foto que sacó el espejo" />
-          <img class="after" src="/modes/portada.jpg" alt="La misma foto convertida en tapa de revista" />
-          <span class="tag l">La foto</span><span class="tag r">Con IA</span>
-          <div class="bar"><div class="knob">⇆</div></div>
-          <input type="range" min="0" max="100" value="50" aria-label="Comparar la foto original con la versión con IA" />
+        <div class="ba">
+          <img class="after" src="/espejo-magico/img/ia-espartano.webp" alt="Retrato con IA: un invitado convertido en guerrero espartano" width="864" height="1184" />
+          <span class="tag">Con IA</span>
+          <figure class="before"><img src="/espejo-magico/img/ia-espartano-antes.webp" alt="La foto original del invitado" width="480" height="640" /><figcaption>La foto</figcaption></figure>
+          <span class="arrow" aria-hidden="true">➜</span>
         </div>
-        <p class="hint">Deslizá para ver la magia 👆</p>
+        <p class="hint">De una selfie a un guerrero espartano, en segundos ⚡</p>
       </div>
     </div>
   </section>
@@ -334,30 +333,41 @@ footer a:hover { color: var(--text); }
   <!-- Negocios -->
   <section class="b2b reveal" id="negocios">
     <div class="wrap">
-      <span class="eyebrow">Para negocios</span>
-      <h2>¿Querés tu propio <span class="grad-text">espejo mágico con IA</span>?</h2>
-      <p class="lead">Te vendemos el mismo equipo que usamos en nuestros eventos: completo, configurado y listo para salir a trabajar. La inteligencia artificial es lo que hoy piden todos los clientes; con ella cobrás más por cada evento. Enviamos a todo el país.</p>
+      <span class="eyebrow">Para emprendedores</span>
+      <h2>Arrancá tu negocio de <span class="grad-text">espejo mágico con IA</span></h2>
+      <p class="lead">El Kiosco Box es el corazón del espejo: el mismo sistema que usamos en nuestros eventos, listo para conectar y salir a trabajar. La inteligencia artificial es lo que hoy piden todos los clientes; con ella cobrás más por cada evento. Enviamos a todo el país.</p>
       <div class="b2b-grid">
         <div class="plan hl">
-          <div class="photo"><img src="/espejo-magico/img/espejo-led-azul.webp" alt="Equipo completo de espejo mágico EventPix" loading="lazy" /></div>
-          <span class="k">Llave en mano</span>
-          <h3>Equipo completo</h3>
-          <p>Todo armado, probado y con el sistema EventPix instalado.</p>
+          <span class="k">Producto principal</span>
+          <h3>Kiosco Box</h3>
+          <p>Con el sistema EventPix instalado y configurado. Lo conectás a tu pantalla o espejo, cámara e impresora y empezás a trabajar.</p>
           <ul>
-            <li>Espejo / pantalla vertical táctil</li>
-            <li>TV box, cámara e impresora fotográfica</li>
+            <li>Ideal para emprendedores: arrancás con una inversión baja</li>
             <li>Todas las experiencias: marcos, revista, caricaturas e IA</li>
             <li>Impresión directa por cable, sin PC y sin internet</li>
             <li>QR para que cada invitado baje su foto</li>
             <li>Control desde una tablet</li>
             <li>Capacitación y actualizaciones constantes</li>
           </ul>
-          <a class="btn btn-wa" data-wa="equipo" href="#">Quiero el equipo completo</a>
+          <a class="btn btn-wa" data-wa="box" href="#">Quiero el Kiosco Box</a>
         </div>
         <div class="plan">
-          <span class="k">Para tu equipo</span>
+          <div class="photo"><img src="/espejo-magico/img/espejo-led-azul.webp" alt="Espejo mágico completo con Kiosco Box EventPix" loading="lazy" /></div>
+          <span class="k">Opcional · llave en mano</span>
+          <h3>Espejo completo</h3>
+          <p>Si preferís no armar nada: te lo entregamos todo listo y probado.</p>
+          <ul>
+            <li>Kiosco Box con el sistema EventPix</li>
+            <li>Espejo / pantalla vertical táctil con luces LED</li>
+            <li>Cámara e impresora fotográfica</li>
+            <li>Capacitación y actualizaciones constantes</li>
+          </ul>
+          <a class="btn btn-ghost" data-wa="equipo" href="#">Quiero el espejo completo</a>
+        </div>
+        <div class="plan">
+          <span class="k">El mejor precio del mercado</span>
           <h3>Paquetes de fotos IA</h3>
-          <p>Con el equipo cargás paquetes de fotos con inteligencia artificial y los usás en tus eventos.</p>
+          <p>Cargás paquetes de fotos con inteligencia artificial en tu Kiosco Box y los usás en tus eventos. El mejor precio del mercado.</p>
           <ul>
             <li>Más de 30 temáticas listas</li>
             <li>Retratos, revista, caricaturas y más</li>
@@ -382,7 +392,7 @@ footer a:hover { color: var(--text); }
         <details><summary>¿Se puede personalizar?</summary><p>Sí: el marco lleva los nombres, la fecha y los colores de tu evento, y elegís qué experiencias y temáticas de IA se ofrecen.</p></details>
         <details><summary>¿Cómo reservo?</summary><p>Escribinos por WhatsApp con la fecha, el horario y el lugar. Te confirmamos disponibilidad y te pasamos el presupuesto. La fecha queda reservada con una seña.</p></details>
         <details><summary>¿Trabajan en mi ciudad?</summary><p>Trabajamos en todo el país. Escribinos con la ciudad y la fecha de tu evento y te confirmamos.</p></details>
-        <details><summary>¿Venden el espejo mágico?</summary><p>Sí, vendemos el equipo completo listo para trabajar, con el sistema EventPix, capacitación y actualizaciones constantes. Enviamos a todo el país.</p></details>
+        <details><summary>¿Qué es el Kiosco Box?</summary><p>Es el equipo con el sistema EventPix instalado y configurado: lo conectás a tu pantalla o espejo, cámara e impresora y ya tenés tu espejo mágico con IA. Incluye capacitación y actualizaciones constantes, y lo enviamos a todo el país. Si preferís, también vendemos el espejo completo armado.</p></details>
       </div>
     </div>
   </section>
@@ -407,8 +417,9 @@ var WHATSAPP = '5493624547382';            // número con 549 + característica,
 var INSTAGRAM = 'https://www.instagram.com/tecno_eventos_arg/';
 var MENSAJES = {
   cliente: '¡Hola! Vi el Espejo Mágico con IA y quiero consultar disponibilidad. Fecha del evento: ',
-  equipo: '¡Hola! Me interesa el equipo completo de espejo mágico con EventPix.',
-  ia: '¡Hola! Quiero info de los paquetes de fotos con IA para el equipo de espejo mágico.'
+  box: '¡Hola! Me interesa el Kiosco Box para arrancar con el espejo mágico.',
+  equipo: '¡Hola! Me interesa el espejo mágico completo con el Kiosco Box.',
+  ia: '¡Hola! Quiero info de los paquetes de fotos con IA para el Kiosco Box.'
 };
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -422,26 +433,6 @@ document.querySelectorAll('[data-wa]').forEach(function (a) {
   a.rel = 'noopener';
 });
 document.getElementById('ig').href = INSTAGRAM;
-
-// Antes / después
-var cmp = document.getElementById('compare');
-var range = cmp.querySelector('input');
-range.addEventListener('input', function () { cmp.style.setProperty('--cut', range.value + '%'); });
-// Al entrar se mueve solo una vez para que se note que se puede deslizar
-var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-if (!reduce) {
-  var t0 = null, touched = false;
-  range.addEventListener('pointerdown', function () { touched = true; });
-  function demo(t) {
-    if (touched) return;
-    if (!t0) t0 = t;
-    var p = Math.min(1, (t - t0) / 2600);
-    var v = 50 + 38 * Math.sin(p * Math.PI * 2);
-    range.value = v; cmp.style.setProperty('--cut', v + '%');
-    if (p < 1) requestAnimationFrame(demo);
-  }
-  setTimeout(function () { requestAnimationFrame(demo); }, 900);
-}
 
 // Aparición al bajar y botón fijo de WhatsApp después de la portada
 // Seguridad: si la animación no se dispara (navegador viejo, captura), todo se ve igual
