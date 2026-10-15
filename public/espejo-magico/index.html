@@ -147,7 +147,7 @@ h2 { font-size: clamp(2rem, 6vw, 3.2rem); margin-bottom: 14px; }
 /* Negocios */
 .b2b { background: linear-gradient(180deg, transparent, rgba(123,47,247,.12) 30%, transparent); }
 .b2b-grid { display: grid; gap: 16px; margin-top: 34px; }
-@media (min-width: 860px) { .b2b-grid { grid-template-columns: 1.15fr 1fr; max-width: 900px; } }
+@media (min-width: 860px) { .b2b-grid { grid-template-columns: repeat(3, 1fr); } }
 .plan { display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--line); border-radius: 24px; padding: 26px; }
 .plan.hl { border: 1.5px solid transparent; background: linear-gradient(var(--card), var(--card)) padding-box, var(--grad) border-box; }
 .plan .k { font-size: .78rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--cyan); margin-bottom: 8px; }
@@ -190,7 +190,7 @@ footer a:hover { color: var(--text); }
   <div class="wrap">
     <a class="logo" href="#inicio" aria-label="EventPix"><img src="/pwa-192x192.png" alt="" width="38" height="38" /><span class="brand">EventPix</span></a>
     <div>
-      <a class="nav-b2b" href="#negocios">Para negocios</a>
+      <a class="nav-b2b" href="#negocios">Para emprendedores</a>
       <a class="btn btn-wa" data-wa="cliente" href="#">Consultar fecha</a>
     </div>
   </div>
@@ -334,30 +334,41 @@ footer a:hover { color: var(--text); }
   <!-- Negocios -->
   <section class="b2b reveal" id="negocios">
     <div class="wrap">
-      <span class="eyebrow">Para negocios</span>
-      <h2>¿Querés tu propio <span class="grad-text">espejo mágico con IA</span>?</h2>
-      <p class="lead">Te vendemos el mismo equipo que usamos en nuestros eventos: completo, configurado y listo para salir a trabajar. La inteligencia artificial es lo que hoy piden todos los clientes; con ella cobrás más por cada evento. Enviamos a todo el país.</p>
+      <span class="eyebrow">Para emprendedores</span>
+      <h2>Arrancá tu negocio de <span class="grad-text">espejo mágico con IA</span></h2>
+      <p class="lead">El Kiosco Box es el corazón del espejo: el mismo sistema que usamos en nuestros eventos, listo para conectar y salir a trabajar. La inteligencia artificial es lo que hoy piden todos los clientes; con ella cobrás más por cada evento. Enviamos a todo el país.</p>
       <div class="b2b-grid">
         <div class="plan hl">
-          <div class="photo"><img src="/espejo-magico/img/espejo-led-azul.webp" alt="Equipo completo de espejo mágico EventPix" loading="lazy" /></div>
-          <span class="k">Llave en mano</span>
-          <h3>Equipo completo</h3>
-          <p>Todo armado, probado y con el sistema EventPix instalado.</p>
+          <span class="k">Producto principal</span>
+          <h3>Kiosco Box</h3>
+          <p>Con el sistema EventPix instalado y configurado. Lo conectás a tu pantalla o espejo, cámara e impresora y empezás a trabajar.</p>
           <ul>
-            <li>Espejo / pantalla vertical táctil</li>
-            <li>TV box, cámara e impresora fotográfica</li>
+            <li>Ideal para emprendedores: arrancás con una inversión baja</li>
             <li>Todas las experiencias: marcos, revista, caricaturas e IA</li>
             <li>Impresión directa por cable, sin PC y sin internet</li>
             <li>QR para que cada invitado baje su foto</li>
             <li>Control desde una tablet</li>
             <li>Capacitación y actualizaciones constantes</li>
           </ul>
-          <a class="btn btn-wa" data-wa="equipo" href="#">Quiero el equipo completo</a>
+          <a class="btn btn-wa" data-wa="box" href="#">Quiero el Kiosco Box</a>
         </div>
         <div class="plan">
-          <span class="k">Para tu equipo</span>
+          <div class="photo"><img src="/espejo-magico/img/espejo-led-azul.webp" alt="Espejo mágico completo con Kiosco Box EventPix" loading="lazy" /></div>
+          <span class="k">Opcional · llave en mano</span>
+          <h3>Espejo completo</h3>
+          <p>Si preferís no armar nada: te lo entregamos todo listo y probado.</p>
+          <ul>
+            <li>Kiosco Box con el sistema EventPix</li>
+            <li>Espejo / pantalla vertical táctil con luces LED</li>
+            <li>Cámara e impresora fotográfica</li>
+            <li>Capacitación y actualizaciones constantes</li>
+          </ul>
+          <a class="btn btn-ghost" data-wa="equipo" href="#">Quiero el espejo completo</a>
+        </div>
+        <div class="plan">
+          <span class="k">El mejor precio del mercado</span>
           <h3>Paquetes de fotos IA</h3>
-          <p>Con el equipo cargás paquetes de fotos con inteligencia artificial y los usás en tus eventos.</p>
+          <p>Cargás paquetes de fotos con inteligencia artificial en tu Kiosco Box y los usás en tus eventos. El mejor precio del mercado.</p>
           <ul>
             <li>Más de 30 temáticas listas</li>
             <li>Retratos, revista, caricaturas y más</li>
@@ -382,7 +393,7 @@ footer a:hover { color: var(--text); }
         <details><summary>¿Se puede personalizar?</summary><p>Sí: el marco lleva los nombres, la fecha y los colores de tu evento, y elegís qué experiencias y temáticas de IA se ofrecen.</p></details>
         <details><summary>¿Cómo reservo?</summary><p>Escribinos por WhatsApp con la fecha, el horario y el lugar. Te confirmamos disponibilidad y te pasamos el presupuesto. La fecha queda reservada con una seña.</p></details>
         <details><summary>¿Trabajan en mi ciudad?</summary><p>Trabajamos en todo el país. Escribinos con la ciudad y la fecha de tu evento y te confirmamos.</p></details>
-        <details><summary>¿Venden el espejo mágico?</summary><p>Sí, vendemos el equipo completo listo para trabajar, con el sistema EventPix, capacitación y actualizaciones constantes. Enviamos a todo el país.</p></details>
+        <details><summary>¿Qué es el Kiosco Box?</summary><p>Es el equipo con el sistema EventPix instalado y configurado: lo conectás a tu pantalla o espejo, cámara e impresora y ya tenés tu espejo mágico con IA. Incluye capacitación y actualizaciones constantes, y lo enviamos a todo el país. Si preferís, también vendemos el espejo completo armado.</p></details>
       </div>
     </div>
   </section>
@@ -407,8 +418,9 @@ var WHATSAPP = '5493624547382';            // número con 549 + característica,
 var INSTAGRAM = 'https://www.instagram.com/tecno_eventos_arg/';
 var MENSAJES = {
   cliente: '¡Hola! Vi el Espejo Mágico con IA y quiero consultar disponibilidad. Fecha del evento: ',
-  equipo: '¡Hola! Me interesa el equipo completo de espejo mágico con EventPix.',
-  ia: '¡Hola! Quiero info de los paquetes de fotos con IA para el equipo de espejo mágico.'
+  box: '¡Hola! Me interesa el Kiosco Box para arrancar con el espejo mágico.',
+  equipo: '¡Hola! Me interesa el espejo mágico completo con el Kiosco Box.',
+  ia: '¡Hola! Quiero info de los paquetes de fotos con IA para el Kiosco Box.'
 };
 // ───────────────────────────────────────────────────────────────────────────
 
