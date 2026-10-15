@@ -11,6 +11,8 @@ export interface Theme {
     font: string;
     fontName: string;
     frameUrl?: string; // Marco Decorativo Opcional
+    /** Color del evento que se pone al elegir el tema (ver lib/wallAccent) */
+    accent?: string;
     variants: ThemeVariant[];
 }
 
@@ -31,6 +33,7 @@ export const THEME_CATEGORIES: ThemeCategory[] = [
                 description: 'Lujo clásico con detalles dorados.',
                 font: 'font-serif', // Playfair Display
                 fontName: 'Playfair Display',
+                accent: '#d4af37',
                 frameUrl: 'https://png.pngtree.com/png-clipart/20220131/original/pngtree-golden-particles-abstract-light-effect-png-image_7259468.png',
                 variants: [
                     { id: 'boda_1', imageUrl: '/themes/boda/aaron-burden-FHWgqOniOSY-unsplash.jpg' },
@@ -45,6 +48,7 @@ export const THEME_CATEGORIES: ThemeCategory[] = [
                 description: 'La pureza del blanco en tu boda.',
                 font: 'font-wedding', // Great Vibes
                 fontName: 'Great Vibes',
+                accent: '#e8b4b8',
                 frameUrl: 'https://png.pngtree.com/png-clipart/20220604/original/pngtree-rose-petals-falling-png-image_7904033.png',
                 variants: [
                     { id: 'boda_5', imageUrl: '/themes/boda/ben-rosett-nYugmV-SY6s-unsplash.jpg' },
@@ -65,6 +69,7 @@ export const THEME_CATEGORIES: ThemeCategory[] = [
                 description: 'Momentos mágicos e inolvidables.',
                 font: 'font-serif', // Playfair
                 fontName: 'Playfair Display',
+                accent: '#ec4899',
                 frameUrl: 'https://png.pngtree.com/png-clipart/20221223/original/pngtree-rose-gold-stardust-light-effect-transparent-background-png-image_8797931.png',
                 variants: [
                     { id: '15_1', imageUrl: '/themes/quince/a-l-ya631mqQ7Ng-unsplash.jpg' },
@@ -79,6 +84,7 @@ export const THEME_CATEGORIES: ThemeCategory[] = [
                 description: 'Diversión y estilo moderno.',
                 font: 'font-modern', // Montserrat
                 fontName: 'Montserrat',
+                accent: '#a855f7',
                 frameUrl: 'https://png.pngtree.com/png-clipart/20230131/original/pngtree-geometric-frame-design-png-image_8941088.png',
                 variants: [
                     { id: '15_5', imageUrl: '/themes/quince/benjamin-wong-WoViiJWKLik-unsplash.jpg' },
@@ -100,6 +106,7 @@ export const THEME_CATEGORIES: ThemeCategory[] = [
                 description: 'Madera, luces cálidas y naturaleza.',
                 font: 'font-hand', // Fredoka
                 fontName: 'Fredoka',
+                accent: '#c2843f',
                 frameUrl: 'https://png.pngtree.com/png-clipart/20221227/original/pngtree-hanging-polaroid-photo-frame-with-tape-png-image_8813233.png',
                 variants: [
                     { id: 'rustic_custom_1', imageUrl: '/themes/rustic/rustic-wood.jpg' },
@@ -123,6 +130,7 @@ export const THEME_CATEGORIES: ThemeCategory[] = [
                 description: 'Luces, láser y mucha energía.',
                 font: 'font-neon', // Orbitron
                 fontName: 'Orbitron',
+                accent: '#22d3ee',
                 frameUrl: 'https://png.pngtree.com/png-clipart/20230401/original/pngtree-neon-light-effect-particles-border-png-image_9013892.png',
                 variants: [
                     { id: 'neon_1', imageUrl: '/themes/neon/abdul-salam-afsal-m-a-xtMxlUIj-AY-unsplash.jpg' },
@@ -145,6 +153,7 @@ export const THEME_CATEGORIES: ThemeCategory[] = [
                 description: 'Colores y alegría para los peques.',
                 font: 'font-modern', // Montserrat
                 fontName: 'Montserrat',
+                accent: '#f59e0b',
                 frameUrl: 'https://png.pngtree.com/png-clipart/20220926/original/pngtree-colorful-confetti-border-png-image_8631481.png',
                 variants: [
                     { id: 'kids_1', imageUrl: '/themes/infantil/adi-goldstein-Hli3R6LKibo-unsplash.jpg' },
@@ -166,6 +175,7 @@ export const THEME_CATEGORIES: ThemeCategory[] = [
                 description: 'Diseños abstractos y futuristas.',
                 font: 'font-neon', // Orbitron
                 fontName: 'Orbitron',
+                accent: '#3b82f6',
                 frameUrl: 'https://png.pngtree.com/png-clipart/20220615/original/pngtree-blue-technology-glowing-border-png-image_8033789.png',
                 variants: [
                     { id: 'tecno_1', imageUrl: '/themes/tecno /aleksandr-popov-2XKAUkbq218-unsplash.jpg' },
@@ -187,6 +197,7 @@ export const THEME_CATEGORIES: ThemeCategory[] = [
                 description: 'Gradientes modernos y relajantes.',
                 font: 'font-modern', // Montserrat
                 fontName: 'Montserrat',
+                accent: '#8b5cf6',
                 frameUrl: '',
                 variants: [
                     { id: 'gradient_1', imageUrl: 'https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=2029&auto=format&fit=crop' }, // Blue/Purple
@@ -202,6 +213,7 @@ export const THEME_CATEGORIES: ThemeCategory[] = [
                 description: 'Fondos oscuros para resaltar las fotos.',
                 font: 'font-sans',
                 fontName: 'Inter',
+                accent: '#d1d5db',
                 frameUrl: '',
                 variants: [
                     { id: 'dark_1', imageUrl: 'https://images.unsplash.com/photo-1478760329108-5c3ed9d495a0?q=80&w=2074&auto=format&fit=crop' }, // Dark texture

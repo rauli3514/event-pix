@@ -2,13 +2,15 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { useSubmissions } from "@/hooks/use-submissions";
 import { useEventSettings } from "@/hooks/use-event-settings";
 import { useEvent } from "@/context/EventContext";
+import { useWallEffects } from "@/hooks/use-wall-effects";
+import { useGuestUrl } from "@/hooks/use-wall";
 import { RouletteModal } from "@/components/display/RouletteModal";
+import { WallBackground, WallHeader } from "@/components/display/WallChrome";
 import QRCode from "react-qr-code";
 import { Play, Pause, Camera, MessageSquare, Repeat, QrCode, SkipForward } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import confetti from 'canvas-confetti';
-import { supabase } from "@/lib/supabase";
 import { isAnonymousAuthor } from "@/lib/guestSubmissions";
+import { accentVars } from "@/lib/wallAccent";
 import { getWallStats, RankRow } from "@/lib/wallStats";
 import { CollageSlide, RankingSlide } from "@/components/display/WallSpecialSlides";
 import { Submission } from "@/types";
@@ -39,131 +41,8 @@ export const SlideshowTemplate = ({ eventId, paused = false }: SlideshowTemplate
     const { data: settings } = useEventSettings(eventId);
     const { event } = useEvent();
 
-    // Escuchar reacciones en tiempo real
-    useEffect(() => {
-        if (!eventId || settings?.reactions_enabled === false) return;
-
-        console.log("🔌 Iniciando conexión Realtime para reacciones...", { eventId, enabled: settings?.reactions_enabled });
-
-        const channel = supabase
-            .channel('public:reactions')
-            .on(
-                'postgres_changes',
-                {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'reactions',
-                    filter: `event_id=eq.${eventId}`
-                },
-                (payload) => {
-                    console.log("🎉 Reacción recibida!", payload.new);
-                    const newReaction = payload.new as { emoji: string };
-                    triggerReaction(newReaction.emoji);
-                }
-            )
-            .subscribe((status) => {
-                console.log("📡 Estado de suscripción Realtime:", status);
-            });
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [eventId, settings?.reactions_enabled]);
-
-    // Escuchar efectos DJ (Broadcast)
-    useEffect(() => {
-        if (!eventId || settings?.dj_mode_enabled === false) return;
-
-        const channel = supabase.channel('dj-effects');
-
-        channel.on(
-            'broadcast',
-            { event: 'dj-effect' },
-            (payload) => {
-                if (payload.payload.eventId === eventId) {
-                    triggerDjVisuals(payload.payload.effect);
-                }
-            }
-        ).subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [eventId, settings?.dj_mode_enabled]);
-
-    const triggerReaction = (emoji: string) => {
-        // Configuración base del confeti
-        const scalar = 4; // Emojis MUCHO más grandes (antes 2)
-        const emojiShape = confetti.shapeFromText({ text: emoji, scalar });
-
-        // Lanzar confeti con efecto "flotante" y lento
-        confetti({
-            particleCount: 20, // Un poco más de partículas
-            scalar,
-            shapes: [emojiShape],
-            spread: 100, // Más dispersión para ocupar más ancho
-            origin: { x: Math.random(), y: 1.1 }, // Desde abajo
-            gravity: 0.35, // Gravedad baja para que "floten" (antes 0.8)
-            drift: 0,
-            ticks: 400, // Duran mucho más tiempo en pantalla (aprox 4s)
-            startVelocity: 50, // Impulso inicial fuerte hacia arriba
-            decay: 0.92, // Se frenan suavemente en el aire
-            colors: ['#ffffff'] // No afecta emojis pero requerido
-        });
-    };
-
-    const triggerDjVisuals = (effect: string) => {
-        // Configuración común: Origen central inferior, movimiento hacia arriba
-        const commonConfig = {
-            origin: { x: 0.5, y: 0.85 }, // Centro abajo
-            ticks: 600, // 10 segundos
-            gravity: 0.6, // Gravedad normal para que suban y bajen natural
-            decay: 0.96, // Desvanecimiento suave
-            startVelocity: 45, // Velocidad moderada, no explosiva
-            scalar: 2 // Tamaño moderado (no gigante)
-        };
-
-        if (effect === 'siren') {
-            // Efecto Alerta: Fuente roja y blanca contenida
-            confetti({
-                ...commonConfig,
-                particleCount: 80,
-                spread: 40, // Muy concentrado (chorro vertical)
-                colors: ['#ff0000', '#ffffff'],
-            });
-        } else if (effect === 'love') {
-            // Efecto Romance: Corazones subiendo suavemente
-            const heart = confetti.shapeFromText({ text: '❤️', scalar: 3 });
-            confetti({
-                ...commonConfig,
-                particleCount: 40,
-                shapes: [heart],
-                gravity: 0.3, // Flotan un poco más
-                spread: 50,
-                startVelocity: 35,
-                scalar: 3
-            });
-        } else if (effect === 'party') {
-            // Efecto Fiesta: Fuente multicolor clásica
-            confetti({
-                ...commonConfig,
-                particleCount: 100,
-                spread: 60,
-            });
-        } else if (effect === 'camera') {
-            // Efecto Foto: Destellos blancos concentrados
-            confetti({
-                ...commonConfig,
-                particleCount: 60,
-                spread: 360, // Radial pero pequeño
-                startVelocity: 25, // Lento
-                colors: ['#ffffff'],
-                ticks: 100, // Corto (flash)
-                origin: { x: 0.5, y: 0.5 }, // Centro absoluto
-                scalar: 1.5
-            });
-        }
-    };
+    // Reacciones de los invitados y efectos del DJ
+    useWallEffects(eventId, settings);
 
     // Configuration
     const maxLoops = settings?.carousel_max_loops ?? 3;
@@ -195,14 +74,23 @@ export const SlideshowTemplate = ({ eventId, paused = false }: SlideshowTemplate
     const ticksRef = useRef(0);
     const nextSpecialRef = useRef<'collage' | 'ranking'>('collage');
     const liveRef = useRef({ photos: allPhotos, ranking: stats.ranking });
+    // Interruptores del panel (Pantalla): sin el dato (base vieja) queda prendido
+    const togglesRef = useRef({ collage: true, ranking: true });
+    useEffect(() => {
+        togglesRef.current = {
+            collage: settings?.wall_collage_enabled !== false,
+            ranking: settings?.wall_ranking_enabled !== false,
+        };
+    }, [settings?.wall_collage_enabled, settings?.wall_ranking_enabled]);
     useEffect(() => {
         liveRef.current = { photos: allPhotos, ranking: stats.ranking };
     }, [allPhotos, stats.ranking]);
 
     const pickSpecial = (): SpecialSlide | null => {
         const { photos, ranking } = liveRef.current;
-        const collageOk = photos.length >= 6;
-        const rankingOk = ranking.length >= 3 && ranking[0].count >= 2;
+        const { collage: collageOn, ranking: rankingOn } = togglesRef.current;
+        const collageOk = collageOn && photos.length >= 6;
+        const rankingOk = rankingOn && ranking.length >= 3 && ranking[0].count >= 2;
         const kind = nextSpecialRef.current === 'ranking'
             ? (rankingOk ? 'ranking' : collageOk ? 'collage' : null)
             : (collageOk ? 'collage' : rankingOk ? 'ranking' : null);
@@ -314,16 +202,8 @@ export const SlideshowTemplate = ({ eventId, paused = false }: SlideshowTemplate
         currentIdRef.current = currentItem?.id;
     }, [currentItem?.id]);
 
-    // Construir URL correcta para el QR usando el slug del evento
-    const appUrl = useMemo(() => {
-        if (!event?.slug) {
-            console.warn('⚠️ QR: No hay evento o slug disponible', { event });
-            return window.location.origin;
-        }
-        const url = `${window.location.origin}/${event.slug}`;
-        console.log('📱 QR generado con URL:', url, { eventSlug: event.slug, eventName: event.name });
-        return url;
-    }, [event?.slug]);
+    // Dirección del QR (página del invitado)
+    const appUrl = useGuestUrl(event);
 
     // Renderizado del contenido actual (Foto o Texto)
     const renderContent = () => {
@@ -359,7 +239,7 @@ export const SlideshowTemplate = ({ eventId, paused = false }: SlideshowTemplate
                             <div className="absolute bottom-8 right-32 z-30 max-w-[55vw] bg-black/40 backdrop-blur-xl px-5 py-3 rounded-3xl border border-white/5 animate-fade-in shadow-lg group">
                                 {!isAnonymousAuthor(currentItem.author) && (
                                     <div className="flex items-center gap-2">
-                                        <Camera className="w-5 h-5 text-white/80" />
+                                        <Camera className="w-5 h-5 text-[var(--accent-text)]" />
                                         <span className="text-white/90 text-xl font-semibold tracking-wide">{currentItem.author}</span>
                                     </div>
                                 )}
@@ -378,17 +258,17 @@ export const SlideshowTemplate = ({ eventId, paused = false }: SlideshowTemplate
                 <div className="w-full h-full flex items-center justify-center p-8 relative overflow-hidden">
                     <div className="relative z-10 max-w-5xl w-full">
                         <div className="bg-black/30 backdrop-blur-md p-16 md:p-24 rounded-[3rem] border border-white/20 shadow-2xl text-center transform hover:scale-105 transition-transform duration-700">
-                            <MessageSquare className="w-16 h-16 text-violet-400 mx-auto mb-8 opacity-80" />
+                            <MessageSquare className="w-16 h-16 text-[var(--accent-text)] mx-auto mb-8 opacity-80" />
                             <p className="text-4xl md:text-6xl lg:text-7xl font-serif text-white leading-tight drop-shadow-2xl font-medium italic">
                                 "{currentItem.content}"
                             </p>
                             {!isAnonymousAuthor(currentItem.author) && (
                                 <div className="mt-12 flex items-center justify-center gap-3 opacity-80">
-                                    <div className="h-1 w-12 bg-violet-400 rounded-full"></div>
-                                    <p className="text-2xl md:text-3xl text-violet-200 font-light tracking-widest uppercase">
+                                    <div className="h-1 w-12 bg-[var(--accent)] rounded-full"></div>
+                                    <p className="text-2xl md:text-3xl text-[var(--accent-text)] font-light tracking-widest uppercase">
                                         {currentItem.author}
                                     </p>
-                                    <div className="h-1 w-12 bg-violet-400 rounded-full"></div>
+                                    <div className="h-1 w-12 bg-[var(--accent)] rounded-full"></div>
                                 </div>
                             )}
                         </div>
@@ -398,35 +278,12 @@ export const SlideshowTemplate = ({ eventId, paused = false }: SlideshowTemplate
         }
     };
 
-    const DEFAULT_BACKGROUND_IMAGE = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop";
-
     return (
-        <div className={`absolute inset-0 w-full h-full bg-black text-white overflow-hidden ${settings?.font_family || 'font-sans'}`}>
-            {/* Header Flotante Minimalista */}
-            <header className="absolute top-0 left-0 z-50 p-6 w-full flex justify-between items-start bg-gradient-to-b from-black/80 to-transparent">
-                <div>
-                    <h1 className={`text-4xl font-bold ${settings?.font_family || 'font-serif'} tracking-tight text-white drop-shadow-lg flex items-center gap-3`}>
-                        {settings?.title || "EventPix"}
-                        <img src="/pwa-192x192.png" alt="EventPix" className="h-10 w-10 object-contain ml-2 opacity-90 drop-shadow-md" />
-                    </h1>
-                </div>
-
-                {/* QR siempre visible + contador en vivo */}
-                <div className="flex flex-col items-end gap-3">
-                    {mode === 'carousel' && (
-                        <div className="bg-white p-3 rounded-2xl shadow-2xl flex flex-col items-center gap-1.5">
-                            <QRCode value={appUrl} size={120} />
-                            <span className="text-black text-sm font-bold">📸 ¡Subí tu foto!</span>
-                        </div>
-                    )}
-                    {stats.photos > 0 && (
-                        <div className="bg-black/50 backdrop-blur-xl border border-white/15 rounded-full px-4 py-1.5 text-lg font-bold shadow-lg tabular-nums whitespace-nowrap">
-                            🔥 {stats.photos} {stats.photos === 1 ? 'foto' : 'fotos'}
-                            {stats.guests > 1 && <span className="text-white/80 font-semibold"> · {stats.guests} invitados</span>}
-                        </div>
-                    )}
-                </div>
-            </header>
+        <div
+            className={`absolute inset-0 w-full h-full bg-black text-white overflow-hidden ${settings?.font_family || 'font-sans'}`}
+            style={accentVars(settings?.accent_color)}
+        >
+            <WallHeader settings={settings} stats={stats} guestUrl={appUrl} showQr={mode === 'carousel'} />
 
             {/* ========== MARCO ENVOLVENTE (FRAME) ========== */}
             {settings?.frame_enabled && settings?.frame_image_url && mode === 'carousel' && approvedContent.length > 0 && (
@@ -445,15 +302,8 @@ export const SlideshowTemplate = ({ eventId, paused = false }: SlideshowTemplate
 
             {/* Contenido Principal */}
             <main className="w-full h-full relative">
-                {/* GLOBAL SKIN / BACKGROUND */}
-                <div className="absolute inset-0 z-0">
-                    <img
-                        src={settings?.background_image_url || DEFAULT_BACKGROUND_IMAGE}
-                        alt="Background Skin"
-                        className="w-full h-full object-cover opacity-60"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/30" />
-                </div>
+                {/* Fondo del tema */}
+                <WallBackground settings={settings} />
 
                 <div className="relative z-10 w-full h-full">
                     {(!approvedContent || approvedContent.length === 0) ? (
@@ -468,7 +318,7 @@ export const SlideshowTemplate = ({ eventId, paused = false }: SlideshowTemplate
                                 <h2 className="text-5xl md:text-7xl font-bold text-white mb-8 drop-shadow-lg animate-fade-in-up">
                                     {emptyMessages[emptyMessageIndex]}
                                 </h2>
-                                <div className="bg-white p-6 rounded-3xl inline-block shadow-2xl animate-bounce-slow">
+                                <div className="bg-white p-6 rounded-3xl inline-block shadow-[0_0_80px_var(--accent-soft)] ring-4 ring-[var(--accent)]">
                                     <QRCode value={appUrl} size={250} />
                                 </div>
                                 <p className="text-2xl text-slate-300 mt-8 font-light tracking-wide">
@@ -548,7 +398,7 @@ export const SlideshowTemplate = ({ eventId, paused = false }: SlideshowTemplate
                             size="icon"
                             onClick={() => setIsInfiniteLoop(!isInfiniteLoop)}
                             className={`h-9 w-9 rounded-full transition-all border ${isInfiniteLoop
-                                ? 'bg-violet-500/50 text-white border-violet-400/50'
+                                ? 'bg-[var(--accent-soft)] text-white border-[var(--accent)]'
                                 : 'text-white/50 hover:text-white hover:bg-white/5 border-transparent'
                                 }`}
                             title={isInfiniteLoop ? "Loop Infinito (Activo)" : "Activar Loop Infinito"}

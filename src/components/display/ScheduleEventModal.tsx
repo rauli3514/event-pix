@@ -48,8 +48,7 @@ export const ScheduleEventModal = ({ isOpen, onClose, onSave, onDelete, initialE
                 // Calculate default end time (1 hour later)
                 if (initialHour) {
                     const [h, m] = initialHour.split(':');
-                    let nextH = parseInt(h) + 1;
-                    if (nextH > 23) nextH = 23;
+                    const nextH = (parseInt(h) + 1) % 24;
                     setEndTime(`${nextH.toString().padStart(2, '0')}:${m}`);
                 } else {
                     setEndTime('10:00');
@@ -71,7 +70,7 @@ export const ScheduleEventModal = ({ isOpen, onClose, onSave, onDelete, initialE
     const handleSave = () => {
         if (!asset) return toast.error("Debes seleccionar un contenido");
         if (daysOfWeek.length === 0) return toast.error("Selecciona al menos un día");
-        if (startTime >= endTime) return toast.error("La hora de inicio debe ser menor a la de fin");
+        if (startTime === endTime) return toast.error("La hora de inicio y la de fin no pueden ser iguales");
 
         onSave({
             asset,
@@ -138,6 +137,13 @@ export const ScheduleEventModal = ({ isOpen, onClose, onSave, onDelete, initialE
                                 className="bg-slate-50"
                             />
                         </div>
+                        {endTime < startTime && (
+                            <p className="col-span-2 -mt-2 text-xs text-indigo-600">
+                                {endTime === '00:00'
+                                    ? 'Termina a la medianoche.'
+                                    : `Cruza la medianoche: termina a las ${endTime} del día siguiente.`}
+                            </p>
+                        )}
                     </div>
 
                     <div>

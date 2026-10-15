@@ -130,22 +130,11 @@ export const BluetoothProvisioningModal: React.FC<BluetoothProvisioningModalProp
                 bluetoothClient.sendWifiConfig(wifiSsid.trim(), wifiPassword);
             }
 
-            // 2. Also broadcast via Realtime channel if we have a PIN
+            // 2. Vincular por PIN. La red Wi-Fi viaja solo por Bluetooth: una pantalla
+            // pendiente no escucha comandos, y mandar la contraseña por el canal
+            // Realtime (público) la exponía sin ningún efecto.
             const pinToUse = devicePin.trim() || (selectedDevice ? selectedDevice.name.replace('EventPix-TV-', '').trim() : '');
             if (pinToUse) {
-                try {
-                    const { supabase } = await import('@/lib/supabase');
-                    const channel = supabase.channel(`device:${pinToUse}`);
-                    await channel.subscribe();
-                    await channel.send({
-                        type: 'broadcast',
-                        event: 'command',
-                        payload: { action: 'connect_wifi', ssid: wifiSsid.trim(), password: wifiPassword }
-                    });
-                } catch (rtErr) {
-                    console.warn("Realtime broadcast error:", rtErr);
-                }
-
                 // 3. Link device in Supabase database if commerceId is present
                 if (commerceId) {
                     await linkDevice.mutateAsync({

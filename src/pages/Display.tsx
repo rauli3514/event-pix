@@ -50,12 +50,14 @@ const Display = () => {
 
     return (
         <div className="absolute inset-0 w-full h-full bg-slate-950 text-white overflow-hidden">
-            {template === 'grid' && <GridTemplate eventId={event.id} />}
+            {template === 'grid' && <GridTemplate eventId={event.id} paused={spotlightActive} />}
             {template === 'slideshow' && <SlideshowTemplate eventId={event.id} paused={spotlightActive} />}
             {template === 'masonry' && <MasonryTemplate eventId={event.id} />}
 
             {/* Foto o mensaje recién aprobado, en grande (queda debajo de los juegos) */}
-            <NewPhotoSpotlight eventId={event.id} onActiveChange={setSpotlightActive} />
+            {settings?.wall_spotlight_enabled !== false && (
+                <NewPhotoSpotlight eventId={event.id} onActiveChange={setSpotlightActive} />
+            )}
 
             {/* Overlays para juegos dinámicos */}
             <PhotoVoteDisplayOverlay eventId={event.id} />

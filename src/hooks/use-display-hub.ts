@@ -1,8 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { DisplayDevice, DisplayAssignment, DisplayGroup, DisplayCampaign } from "@/types/display";
+import { linkDisplayDevice, LinkDeviceParams } from "@/lib/displayDeviceApi";
+import { pickActiveAssignment } from "@/lib/displaySchedule";
 
 export type DeviceDerivedStatus = 'pending' | 'online' | 'offline';
+
+// Las TVs mandan un latido por minuto (useTelemetry). Se toleran dos latidos
+// perdidos antes de mostrar la pantalla como "fuera de línea".
+export const DEVICE_ONLINE_WINDOW_MS = 3 * 60 * 1000;
 
 export type DisplayDeviceWithStatus = DisplayDevice & { 
     derived_status: DeviceDerivedStatus;
@@ -245,12 +251,30 @@ export const useDisplayDevices = (commerceId?: string | null) => {
 
             if (error) throw error;
 
-            // Fetch all assignments manually to ensure we get group assignments and bypass relation quirks
-            const { data: allAssignments } = await supabase
+            // Fetch assignments manually to ensure we get group assignments and bypass relation quirks.
+            // Con un negocio seleccionado, solo las de sus pantallas y grupos (no las de todos los negocios).
+            let assignmentsQuery = supabase
                 .from('display_assignments')
-                .select('*, campaign:display_campaigns(*), media:display_media(*), schedule:display_schedules(*, events:display_schedule_events(*, campaign:display_campaigns!campaign_id(*), media:display_media!media_id(*)), default_campaign:display_campaigns!default_campaign_id(*), default_media:display_media!default_media_id(*))');
-            
-            const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+                .select('*, campaign:display_campaigns(*), media:display_media(*), schedule:display_schedules(*, events:display_schedule_events(*, campaign:display_campaigns!campaign_id(*), media:display_media!media_id(*)), default_campaign:display_campaigns!default_campaign_id(*), default_media:display_media!default_media_id(*))')
+                .order('created_at', { ascending: false });
+
+            let allAssignments: any[] | null = null;
+            if (commerceId) {
+                const deviceIds = (data as any[]).map(d => d.id);
+                const groupIds = [...new Set((data as any[]).map(d => d.group_id).filter(Boolean))];
+                const filters = [
+                    deviceIds.length > 0 ? `device_id.in.(${deviceIds.join(',')})` : null,
+                    groupIds.length > 0 ? `group_id.in.(${groupIds.join(',')})` : null,
+                ].filter(Boolean);
+                if (filters.length > 0) {
+                    assignmentsQuery = assignmentsQuery.or(filters.join(','));
+                    ({ data: allAssignments } = await assignmentsQuery);
+                }
+            } else {
+                ({ data: allAssignments } = await assignmentsQuery);
+            }
+
+            const onlineSince = new Date(Date.now() - DEVICE_ONLINE_WINDOW_MS);
             
             return (data as any[]).map(device => {
                 let status: DeviceDerivedStatus = 'offline';
@@ -258,20 +282,15 @@ export const useDisplayDevices = (commerceId?: string | null) => {
                 if (device.pairing_status === 'pending') {
                     status = 'pending';
                 } else if (device.pairing_status === 'linked') {
-                    if (device.last_seen && new Date(device.last_seen) > twoMinutesAgo) {
+                    if (device.last_seen && new Date(device.last_seen) > onlineSince) {
                         status = 'online';
                     } else {
                         status = 'offline';
                     }
                 }
 
-                // Find assignment: first check direct device_id match, then group_id match
-                let activeAssignment = null;
-                if (allAssignments) {
-                    const directMatch = allAssignments.find(a => a.device_id === device.id);
-                    const groupMatch = device.group_id ? allAssignments.find(a => a.group_id === device.group_id) : null;
-                    activeAssignment = directMatch || groupMatch || null;
-                }
+                // Misma regla que el reproductor: primero la asignación directa, después la del grupo.
+                const activeAssignment = pickActiveAssignment(allAssignments, device.id, device.group_id);
 
                 return { 
                     ...device, 
@@ -320,10 +339,10 @@ export const useDisplayDevice = (id?: string) => {
             // assignment will be the default one (no start_time), but we can also attach the full array
             const defaultAssignment = assignments?.find(a => !a.start_time) || (assignments && assignments.length > 0 ? assignments[0] : null);
 
-            const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+            const onlineSince = new Date(Date.now() - DEVICE_ONLINE_WINDOW_MS);
             let status: DeviceDerivedStatus = 'offline';
             if (device.pairing_status === 'pending') status = 'pending';
-            else if (device.pairing_status === 'linked' && device.last_seen && new Date(device.last_seen) > twoMinutesAgo) status = 'online';
+            else if (device.pairing_status === 'linked' && device.last_seen && new Date(device.last_seen) > onlineSince) status = 'online';
 
             return {
                 ...device,
@@ -341,36 +360,8 @@ export const useLinkDevice = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ device_code, name, description, commerce_id, group_id, orientation = 'landscape' }: { device_code: string; name: string; description?: string; commerce_id: string; group_id?: string; orientation?: string }) => {
-            
-            // First verify that the device exists and is pending
-            const { data: pendingDevice, error: findError } = await supabase
-                .from("display_devices")
-                .select("id")
-                .eq("device_id", device_code)
-                .eq("pairing_status", "pending")
-                .single();
-
-            if (findError || !pendingDevice) {
-                throw new Error("Código inválido o dispositivo ya vinculado.");
-            }
-
-            const { data, error } = await supabase
-                .from("display_devices")
-                .update({
-                    name,
-                    description,
-                    commerce_id,
-                    group_id: group_id || null,
-                    pairing_status: 'linked',
-                    orientation
-                })
-                .eq("id", pendingDevice.id)
-                .select()
-                .single();
-
-            if (error) throw error;
-            return data as DisplayDevice;
+        mutationFn: async (params: LinkDeviceParams) => {
+            return (await linkDisplayDevice(params)) as DisplayDevice;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["display_devices"] });

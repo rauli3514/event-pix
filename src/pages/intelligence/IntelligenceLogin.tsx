@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Brain } from "lucide-react";
+import { IntelligenceStorageService } from "@/services/intelligence/IntelligenceStorageService";
 
 const IntelligenceLogin = () => {
     const [email, setEmail] = useState<string>("");
@@ -39,7 +40,41 @@ const IntelligenceLogin = () => {
             .eq("id", data.user?.id)
             .maybeSingle();
 
-        navigate(profile?.role === "super_admin" ? "/admin/intelligence" : from);
+        if (profile?.role === "super_admin") {
+            navigate("/admin/intelligence");
+            setLoading(false);
+            return;
+        }
+
+        // Clave para multi-tenancy real: fijar el negocio activo según el
+        // usuario logueado, no según lo último que haya quedado en el
+        // localStorage de este navegador (que por defecto cae al negocio
+        // demo @display_digital). Sin esto, un cliente real que entra desde
+        // un dispositivo nuevo —o después de que alguien más usó este
+        // navegador— ve el negocio equivocado en vez del suyo propio.
+        if (data.user?.id) {
+            const { data: membership } = await supabase
+                .from("intelligence_business_users")
+                .select("business_id")
+                .eq("user_id", data.user.id)
+                .limit(1)
+                .maybeSingle();
+            if (membership?.business_id) {
+                IntelligenceStorageService.setActiveBusinessId(membership.business_id);
+            } else {
+                // Sin membership todavía: puede ser un self-signup de
+                // /register que quedó pendiente porque Supabase exigía
+                // confirmar el mail y no había sesión en ese momento. Ahora
+                // sí hay sesión real: termina de crear el negocio y lo
+                // vincula a este usuario.
+                const resolvedBusinessId = await IntelligenceStorageService.finalizePendingBusinessRegistration(data.user);
+                if (resolvedBusinessId) {
+                    IntelligenceStorageService.setActiveBusinessId(resolvedBusinessId);
+                }
+            }
+        }
+
+        navigate(from);
         setLoading(false);
     };
 

@@ -181,12 +181,28 @@
     </div>
 
     <script>
+        // El puente nativo exige el token que la app inyecta al terminar de cargar
+        // esta página (evento 'tvbridgeready'). Ver TvBridge.kt.
+        function bridgeCall(method) {
+            var bridge = window.TvBridge;
+            var token = window.__tvBridgeToken;
+            if (!bridge || typeof bridge[method] !== 'function' || !token) return undefined;
+            var args = [token].concat(Array.prototype.slice.call(arguments, 1));
+            try { return bridge[method].apply(bridge, args); } catch (e) { return undefined; }
+        }
+
         function getDeviceCode() {
             var code = localStorage.getItem('device_id');
+            if (!code && window.TvBridge && !window.__tvBridgeToken) {
+                // Todavía no llegó el token: reintentar cuando llegue.
+                window.addEventListener('tvbridgeready', getDeviceCode, { once: true });
+                return;
+            }
             if (!code) {
                 if (window.TvBridge && typeof window.TvBridge.getDeviceCode === 'function') {
-                    code = window.TvBridge.getDeviceCode();
-                } else {
+                    code = bridgeCall('getDeviceCode');
+                }
+                if (!code) {
                     var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
                     code = '';
                     for (var i = 0; i < 6; i++) {
@@ -200,9 +216,9 @@
 
         function openWifi() {
             if (window.TvBridge && typeof window.TvBridge.openWifiSettings === 'function') {
-                window.TvBridge.openWifiSettings();
+                bridgeCall('openWifiSettings');
             } else if (window.TvBridge && typeof window.TvBridge.openSettings === 'function') {
-                window.TvBridge.openSettings();
+                bridgeCall('openSettings');
             } else if (window.AndroidKiosk && typeof window.AndroidKiosk.openWifiSettings === 'function') {
                 window.AndroidKiosk.openWifiSettings();
             } else {

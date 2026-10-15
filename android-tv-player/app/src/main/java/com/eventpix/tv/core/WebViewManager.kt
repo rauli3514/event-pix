@@ -1,7 +1,13 @@
 package com.eventpix.tv.core
 
 import android.annotation.SuppressLint
+import android.content.Context
+import android.net.Uri
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.os.Build
 import android.util.Log
+import android.view.ViewGroup
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -10,7 +16,42 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import java.io.InputStream
 
-class WebViewManager(private val webView: WebView) {
+class WebViewManager(
+    private val webView: WebView,
+    // Script que deja el token del puente (TvBridge) en la página. Se ejecuta
+    // solo en el frame principal y solo en páginas nuestras (isTrustedUrl).
+    private val bridgeTokenScript: () -> String,
+    // Se llama cuando el proceso de render del WebView murió (OOM o crash):
+    // la Activity tiene que crear uno nuevo o la pantalla queda en negro.
+    private val onRendererGone: () -> Unit
+) {
+
+    companion object {
+        private const val APP_HOST = "app.event-pix.com.ar"
+
+        // Páginas en las que confiamos: la web de EventPix y las del APK.
+        fun isTrustedUrl(url: String?): Boolean {
+            if (url.isNullOrEmpty()) return false
+            if (url.startsWith("file:///android_asset/")) return true
+            val uri = Uri.parse(url)
+            return uri.scheme == "https" && uri.host == APP_HOST
+        }
+    }
+
+    private fun injectBridgeToken(view: WebView?, url: String?) {
+        if (view != null && isTrustedUrl(url)) {
+            view.evaluateJavascript(bridgeTokenScript(), null)
+        }
+    }
+
+    // El frame principal no puede salir de nuestras páginas: si no, un iframe
+    // podría redirigir toda la TV a otro sitio (top.location) y ese sitio
+    // recibiría el token del puente al cargar.
+    private fun blockUntrustedNavigation(url: String?): Boolean {
+        if (isTrustedUrl(url)) return false
+        Log.w("WebViewManager", "Navegación bloqueada fuera de la app: $url")
+        return true
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     fun initializeWebView() {
@@ -18,7 +59,10 @@ class WebViewManager(private val webView: WebView) {
             javaScriptEnabled = true
             domStorageEnabled = true
             mediaPlaybackRequiresUserGesture = false
-            cacheMode = WebSettings.LOAD_CACHE_ELSE_NETWORK
+            // Con red: caché normal (respeta los headers), así las TVs toman cada
+            // versión nueva de la web. Sin red: lo que haya en caché, para arrancar
+            // igual y seguir reproduciendo el último contenido.
+            cacheMode = if (isOnline()) WebSettings.LOAD_DEFAULT else WebSettings.LOAD_CACHE_ELSE_NETWORK
             // Optimizations for TV & 60fps GPU CSS Transitions
             useWideViewPort = true
             loadWithOverviewMode = true
@@ -58,6 +102,29 @@ class WebViewManager(private val webView: WebView) {
                 return super.shouldInterceptRequest(view, request)
             }
 
+            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                if (request?.isForMainFrame != true) return false
+                return blockUntrustedNavigation(request.url?.toString())
+            }
+
+            // Android < 7 usa esta variante (solo navegaciones del frame principal).
+            @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
+            override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+                return blockUntrustedNavigation(url)
+            }
+
+            // El token se inyecta en cuanto la página es visible y otra vez al
+            // terminar de cargar (por si la primera llegó antes que el JS de la app).
+            override fun onPageCommitVisible(view: WebView?, url: String?) {
+                super.onPageCommitVisible(view, url)
+                injectBridgeToken(view, url)
+            }
+
+            override fun onPageFinished(view: WebView?, url: String?) {
+                super.onPageFinished(view, url)
+                injectBridgeToken(view, url)
+            }
+
             override fun onReceivedError(
                 view: WebView?,
                 request: WebResourceRequest?,
@@ -74,11 +141,31 @@ class WebViewManager(private val webView: WebView) {
             }
 
             override fun onRenderProcessGone(view: WebView?, detail: android.webkit.RenderProcessGoneDetail?): Boolean {
-                Log.e("WebViewManager", "Render process gone (OOM or crash). Reloading WebView...")
-                view?.destroy()
-                // Let the activity handle the recreation if needed, or we just return true to prevent app crash
+                Log.e("WebViewManager", "Render process gone (OOM or crash). Recreating WebView...")
+                // Un WebView cuyo renderer murió no se puede volver a usar: sacarlo de la
+                // vista, destruirlo y pedirle a la Activity que arme uno nuevo.
+                view?.let {
+                    (it.parent as? ViewGroup)?.removeView(it)
+                    it.destroy()
+                }
+                onRendererGone()
                 return true
             }
+        }
+    }
+
+    private fun isOnline(): Boolean {
+        return try {
+            val cm = webView.context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val capabilities = cm.getNetworkCapabilities(cm.activeNetwork)
+                capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+            } else {
+                @Suppress("DEPRECATION")
+                cm.activeNetworkInfo?.isConnected == true
+            }
+        } catch (e: Exception) {
+            false
         }
     }
 

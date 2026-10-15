@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+import { IntelligenceStorageService } from "@/services/intelligence/IntelligenceStorageService";
 
 const Login = () => {
     const [email, setEmail] = useState<string>("");
@@ -38,20 +39,20 @@ const Login = () => {
             toast.error(error.message);
         } else {
             toast.success("Bienvenido de nuevo");
-            navigate(safeFrom || await resolvePostLoginRoute(data.user?.id));
+            navigate(safeFrom || await resolvePostLoginRoute(data.user));
         }
         setLoading(false);
     };
 
     // Sin página pedida: un super_admin va al panel de administración (/admin).
     // Un cliente de Intelligence sin ese rol va directo a su negocio.
-    const resolvePostLoginRoute = async (userId?: string): Promise<string> => {
-        if (!userId) return "/admin";
+    const resolvePostLoginRoute = async (user?: { id: string; email?: string; user_metadata?: Record<string, any> }): Promise<string> => {
+        if (!user) return "/admin";
 
         const { data: profile } = await supabase
             .from("profiles")
             .select("role")
-            .eq("id", userId)
+            .eq("id", user.id)
             .maybeSingle();
 
         if (profile?.role === "super_admin") {
@@ -61,11 +62,31 @@ const Login = () => {
         const { data: membership } = await supabase
             .from("intelligence_business_users")
             .select("business_id")
-            .eq("user_id", userId)
+            .eq("user_id", user.id)
             .limit(1)
             .maybeSingle();
 
-        return membership ? "/intelligence" : "/admin";
+        // Clave para multi-tenancy real: el negocio activo vive en localStorage
+        // del navegador, no ligado al usuario logueado. Sin esto, cualquier
+        // cliente que entra desde un dispositivo nuevo (o un navegador que
+        // quedó con OTRO negocio activo) ve el negocio equivocado en vez del
+        // suyo propio.
+        if (membership?.business_id) {
+            IntelligenceStorageService.setActiveBusinessId(membership.business_id);
+            return "/intelligence";
+        }
+
+        // Sin membership todavía: puede ser un self-signup de /register que
+        // quedó pendiente porque Supabase exigía confirmar el mail y no
+        // había sesión en ese momento. Ahora sí hay sesión real: termina de
+        // crear el negocio en Supabase y lo vincula a este usuario.
+        const resolvedBusinessId = await IntelligenceStorageService.finalizePendingBusinessRegistration(user);
+        if (resolvedBusinessId) {
+            IntelligenceStorageService.setActiveBusinessId(resolvedBusinessId);
+            return "/intelligence";
+        }
+
+        return "/admin";
     };
 
     return (

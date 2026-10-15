@@ -1,9 +1,33 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { CampaignItem } from '@/types/display';
 import { useCacheManager } from './useCacheManager';
+import { findActiveScheduleEvent, pickActiveAssignment } from '@/lib/displaySchedule';
+import { getOrCreateCommandSecret, openSignedCommand, registerCommandSecret } from '@/lib/displayCommands';
+import { callTvBridge, hasTvBridgeMethod } from '@/lib/tvBridge';
 
 type PlayerStatus = 'loading' | 'playing' | 'offline_playing' | 'no_content' | 'error';
+
+// Última playlist reproducida, para seguir mostrando contenido sin internet.
+const cacheKey = (deviceCode: string) => `tv_cache_${deviceCode}_v3`;
+// Claves de versiones anteriores del reproductor (solo lectura / limpieza).
+const legacyCacheKeys = (deviceCode: string) => [`tv_cache_${deviceCode}_v2`, `tv_cache_${deviceCode}`];
+// Asignación con su programación, para cambiar de franja horaria aun sin internet.
+const assignmentCacheKey = (deviceCode: string) => `tv_assignment_${deviceCode}_v1`;
+
+// Cada cuánto se revisa si cambió la franja horaria de la programación.
+const SCHEDULE_TICK_MS = 30 * 1000;
+
+// Cada cuánto la TV vuelve a registrar su clave de comandos.
+const COMMAND_SECRET_RETRY_MS = 5 * 60 * 1000;
+
+// Agrupa ráfagas de cambios (ej.: guardar una playlist toca varias filas) en una sola consulta.
+const REFETCH_DEBOUNCE_MS = 1500;
+
+// Campos de la pantalla que cambian lo que se reproduce. El latido actualiza
+// last_seen/telemetría cada minuto y no debe disparar una recarga.
+const deviceConfigSignature = (d: Record<string, unknown> | null | undefined) =>
+    JSON.stringify([d?.pairing_status, d?.group_id, d?.commerce_id, d?.scale, d?.orientation, d?.name]);
 
 export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: () => void) {
     const [items, setItems] = useState<CampaignItem[]>([]);
@@ -11,11 +35,119 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
     const [deviceSettings, setDeviceSettings] = useState({ scale: 'fit', orientation: 'landscape' });
     const [deviceName, setDeviceName] = useState<string>('');
     const [deviceCommerceId, setDeviceCommerceId] = useState<string>('');
-    
+    const [deviceUuid, setDeviceUuid] = useState<string>('');
+    const [deviceGroupId, setDeviceGroupId] = useState<string>('');
+
     const { preloadAssets, preloadProgress } = useCacheManager();
+
+    // Cada consulta lleva un número; si termina después de una más nueva, se descarta.
+    const fetchSeqRef = useRef(0);
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const deviceSigRef = useRef<string>('');
+    const scheduleIdRef = useRef<string | null>(null);
+    // Ids que usa esta pantalla: los DELETE de Realtime solo traen el id, así que
+    // se comparan contra estos para no recargar por borrados de otros negocios.
+    const deviceUuidRef = useRef<string>('');
+    const assignmentIdsRef = useRef<Set<string>>(new Set());
+    const scheduleEventIdsRef = useRef<Set<string>>(new Set());
+
+    // Asignación vigente (con su programación completa) y qué parte de ella se está
+    // mostrando, para poder cambiar de franja horaria sin volver a consultar.
+    const assignmentRef = useRef<any>(null);
+    const activeContentKeyRef = useRef<string | null>(null);
+    const [contentKey, setContentKey] = useState<string | null>(null);
+    const [shuffle, setShuffle] = useState(false);
+    const offlineRef = useRef(false);
+
+    // Arma la playlist de lo que toca mostrar ahora según la asignación y la publica.
+    const applyAssignment = async (assignment: any, isStale: () => boolean) => {
+        const now = new Date();
+        let activeContent: { campaign: any; media: any } | null = null;
+        let contentKey: string | null = null;
+
+        if (assignment?.schedule) {
+            const schedule = assignment.schedule;
+            const activeEvent = findActiveScheduleEvent<any>(schedule.events, now);
+            activeContent = activeEvent
+                ? { campaign: activeEvent.campaign, media: activeEvent.media }
+                : { campaign: schedule.default_campaign, media: schedule.default_media };
+            contentKey = `${assignment.id}:${activeEvent ? activeEvent.id : 'default'}`;
+        } else if (assignment) {
+            activeContent = { campaign: assignment.campaign, media: assignment.media };
+            contentKey = `${assignment.id}:direct`;
+        }
+        activeContentKeyRef.current = contentKey;
+
+        let compiledItems: any[] = [];
+        let playlistShuffle = false;
+        if (activeContent) {
+            if (activeContent.campaign && activeContent.campaign.commerce_id) {
+                setDeviceCommerceId(prev => prev || activeContent!.campaign.commerce_id);
+            }
+
+            if (activeContent.campaign && activeContent.campaign.items_json) {
+                const rawItems = activeContent.campaign.items_json;
+                // La configuración de la playlist (editor V2) vive dentro de items_json.settings.
+                const playlistSettings = rawItems?.settings || activeContent.campaign.settings || {};
+                const campaignDefaultTransition = playlistSettings.transition || 'fade';
+                playlistShuffle = !!playlistSettings.shuffle;
+                
+                if (rawItems.version === '2.0' && Array.isArray(rawItems.zones) && rawItems.zones.length > 0) {
+                    compiledItems = rawItems.zones[0].playlist || [];
+                } else if (Array.isArray(rawItems)) {
+                    compiledItems = rawItems;
+                }
+
+                // Asegurar que cada elemento herede la transición por defecto de la playlist si no la especifica
+                compiledItems = compiledItems.map((item: any) => ({
+                    ...item,
+                    transition: (item.transition && item.transition !== 'default') ? item.transition : campaignDefaultTransition
+                }));
+            } else if (activeContent.media) {
+                if (activeContent.media.commerce_id) {
+                    setDeviceCommerceId(prev => prev || activeContent!.media.commerce_id);
+                }
+                compiledItems = [{
+                    id: activeContent.media.id,
+                    type: activeContent.media.type === 'web' ? 'url' : (activeContent.media.type || 'image'),
+                    url: activeContent.media.url,
+                    metadata: activeContent.media.metadata,
+                    duration: 0,
+                    title: activeContent.media.name,
+                    transition: 'fade'
+                }];
+            }
+        }
+
+        if (compiledItems.length === 0) {
+            setStatus('no_content');
+            return;
+        }
+
+        const newItemsString = JSON.stringify(compiledItems);
+        const oldItemsString = localStorage.getItem(cacheKey(deviceCode!));
+        
+        if (oldItemsString !== newItemsString) {
+            if (!offlineRef.current) await preloadAssets(compiledItems);
+            if (isStale()) return;
+            try {
+                localStorage.setItem(cacheKey(deviceCode!), newItemsString);
+            } catch (e) {
+                console.warn('No se pudo guardar la playlist para modo sin conexión', e);
+            }
+        }
+
+        // Siempre actualizar el estado de items en React para aplicar cambios de transición y duración
+        setContentKey(contentKey);
+        setShuffle(playlistShuffle);
+        setItems(compiledItems);
+        setStatus(offlineRef.current ? 'offline_playing' : 'playing');
+    };
 
     const fetchCampaign = async () => {
         if (!deviceCode) return;
+        const seq = ++fetchSeqRef.current;
+        const isStale = () => seq !== fetchSeqRef.current;
 
         try {
             const { data: device, error: deviceError } = await supabase
@@ -25,6 +157,12 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
                 .single();
 
             if (deviceError || !device) throw deviceError || new Error("Device not found");
+            if (isStale()) return;
+
+            deviceSigRef.current = deviceConfigSignature(device);
+            deviceUuidRef.current = device.id;
+            setDeviceUuid(device.id);
+            setDeviceGroupId(device.group_id || '');
 
             if (device.name) setDeviceName(device.name);
             setDeviceSettings({ scale: device.scale || 'fit', orientation: device.orientation || 'landscape' });
@@ -40,7 +178,7 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
                 orQuery += `,group_id.eq.${device.group_id}`;
             }
 
-            const { data: assignments } = await supabase
+            const { data: assignments, error: assignmentsError } = await supabase
                 .from('display_assignments')
                 .select(`
                   *,
@@ -60,119 +198,49 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
                 .or(orQuery)
                 .order('created_at', { ascending: false });
 
-            const now = new Date();
-            const currentDay = now.getDay();
-            const h = now.getHours().toString().padStart(2, '0');
-            const m = now.getMinutes().toString().padStart(2, '0');
-            const currentTimeStr = `${h}:${m}`;
+            if (assignmentsError) throw assignmentsError;
+            if (isStale()) return;
 
-            let activeContent: any = null;
+            // Misma regla que el panel: primero la asignación directa de la pantalla, después la del grupo.
+            const assignment = pickActiveAssignment(assignments as any[], device.id, device.group_id);
 
-            if (assignments && assignments.length > 0) {
-                const assignment = assignments[0];
-                
-                if (assignment.schedule) {
-                    const schedule = assignment.schedule;
-                    let activeEvent = null;
-                    
-                    for (const ev of schedule.events || []) {
-                        if (ev.days_of_week && ev.days_of_week.includes(currentDay)) {
-                            const parse12hTo24h = (timeStr: string) => {
-                                if (!timeStr) return '00:00';
-                                const match = timeStr.match(/(\d+):(\d+)\s*(a\.?\s*m\.?|p\.?\s*m\.?)/i);
-                                if (!match) return timeStr.substring(0, 5);
-                                let [_, hStr, ms, ampm] = match;
-                                let hr = parseInt(hStr, 10);
-                                const cleanAmPm = ampm.replace(/[\.\s]/g, '').toUpperCase();
-                                if (cleanAmPm === 'PM' && hr < 12) hr += 12;
-                                if (cleanAmPm === 'AM' && hr === 12) hr = 0;
-                                return `${hr.toString().padStart(2, '0')}:${ms}`;
-                            };
-                            
-                            const start24 = parse12hTo24h(ev.start_time);
-                            const end24 = parse12hTo24h(ev.end_time);
-                            
-                            if (currentTimeStr >= start24 && currentTimeStr <= end24) {
-                                activeEvent = ev;
-                                break;
-                            }
-                        }
-                    }
-                    
-                    if (activeEvent) {
-                        activeContent = { campaign: activeEvent.campaign, media: activeEvent.media };
-                    } else {
-                        activeContent = { campaign: schedule.default_campaign, media: schedule.default_media };
-                    }
-                } else {
-                    activeContent = { campaign: assignment.campaign, media: assignment.media };
-                }
+            assignmentIdsRef.current = new Set((assignments || []).map((a: any) => a.id));
+            scheduleIdRef.current = assignment?.schedule?.id || null;
+            scheduleEventIdsRef.current = new Set((assignment?.schedule?.events || []).map((ev: any) => ev.id));
+            assignmentRef.current = assignment;
+            offlineRef.current = false;
+            try {
+                localStorage.setItem(assignmentCacheKey(deviceCode), JSON.stringify(assignment));
+            } catch (e) {
+                console.warn('No se pudo guardar la programación para modo sin conexión', e);
             }
 
-            if (activeContent) {
-                let compiledItems: any[] = [];
-                if (!device.commerce_id && activeContent.campaign && activeContent.campaign.commerce_id) {
-                    setDeviceCommerceId(activeContent.campaign.commerce_id);
-                }
-
-                if (activeContent.campaign && activeContent.campaign.items_json) {
-                    const rawItems = activeContent.campaign.items_json;
-                    const campaignDefaultTransition = activeContent.campaign.settings?.transition || 'fade';
-                    
-                    if (rawItems.version === '2.0' && Array.isArray(rawItems.zones) && rawItems.zones.length > 0) {
-                        compiledItems = rawItems.zones[0].playlist || [];
-                    } else if (Array.isArray(rawItems)) {
-                        compiledItems = rawItems;
-                    }
-
-                    // Asegurar que cada elemento herede la transición por defecto de la playlist si no la especifica
-                    compiledItems = compiledItems.map((item: any) => ({
-                        ...item,
-                        transition: (item.transition && item.transition !== 'default') ? item.transition : campaignDefaultTransition
-                    }));
-                } else if (activeContent.media) {
-                    if (!device.commerce_id && activeContent.media.commerce_id) {
-                        setDeviceCommerceId(activeContent.media.commerce_id);
-                    }
-                    compiledItems = [{
-                        id: activeContent.media.id,
-                        type: activeContent.media.type === 'web' ? 'url' : (activeContent.media.type || 'image'),
-                        url: activeContent.media.url,
-                        metadata: activeContent.media.metadata,
-                        duration: 0,
-                        title: activeContent.media.name,
-                        transition: 'fade'
-                    }];
-                }
-
-                if (compiledItems.length > 0) {
-                    const newItemsString = JSON.stringify(compiledItems);
-                    const cacheKey = `tv_cache_${deviceCode}_v3`;
-                    const oldItemsString = localStorage.getItem(cacheKey);
-                    
-                    if (oldItemsString !== newItemsString) {
-                        await preloadAssets(compiledItems);
-                        localStorage.setItem(cacheKey, newItemsString);
-                    }
-
-                    // Siempre actualizar el estado de items en React para aplicar cambios de transición y duración
-                    setItems(compiledItems);
-                    setStatus('playing');
-                    return;
-                }
-            }
-
-            setStatus('no_content');
+            await applyAssignment(assignment, isStale);
 
         } catch (error: any) {
+            if (isStale()) return;
             console.error('Error fetching campaign from Supabase:', error);
-            if (error.code === 'PGRST116') {
+            if (error?.code === 'PGRST116') {
                 localStorage.removeItem('device_id');
                 window.location.href = '/';
                 return;
             }
 
-            const cachedData = localStorage.getItem(`tv_cache_${deviceCode}`);
+            offlineRef.current = true;
+
+            // Sin conexión: si hay una programación guardada se sigue respetando el horario.
+            try {
+                const cachedAssignment = JSON.parse(localStorage.getItem(assignmentCacheKey(deviceCode)) || 'null');
+                if (cachedAssignment?.schedule) {
+                    assignmentRef.current = cachedAssignment;
+                    await applyAssignment(cachedAssignment, isStale);
+                    return;
+                }
+            } catch (e) { /* programación guardada inválida: se usa la última playlist */ }
+
+            const cachedData = [cacheKey(deviceCode), ...legacyCacheKeys(deviceCode)]
+                .map(key => localStorage.getItem(key))
+                .find(Boolean);
             if (cachedData) {
                 try {
                     const parsedItems = JSON.parse(cachedData) as CampaignItem[];
@@ -181,40 +249,67 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
                         setStatus('offline_playing');
                         return;
                     }
-                } catch (e) { }
+                } catch (e) { /* caché inválida */ }
             }
             setStatus('error');
         }
     };
 
+    // Los listeners viven más que un render: siempre llaman a la versión más reciente.
+    const fetchRef = useRef(fetchCampaign);
+    fetchRef.current = fetchCampaign;
+    const applyRef = useRef(applyAssignment);
+    applyRef.current = applyAssignment;
+
+    const scheduleFetch = () => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => {
+            debounceRef.current = null;
+            fetchRef.current();
+        }, REFETCH_DEBOUNCE_MS);
+    };
+
     useEffect(() => {
-        fetchCampaign();
+        if (!deviceCode) return;
+        fetchRef.current();
 
         const handleOnline = () => {
             setStatus('loading');
-            fetchCampaign();
+            fetchRef.current();
         };
         window.addEventListener('online', handleOnline);
 
         const commandChannel = supabase.channel(`device:${deviceCode}`)
-            .on('broadcast', { event: 'command' }, (payload) => {
-                if (payload.payload?.action === 'reload') {
+            .on('broadcast', { event: 'command' }, async (message) => {
+                const raw = message.payload;
+                // Pedidos inofensivos (solo vuelven a consultar el contenido): se aceptan sin firma.
+                if (raw?.action === 'sync' || raw?.action === 'rotate_screen') {
+                    scheduleFetch();
+                    return;
+                }
+
+                // Todo lo demás tiene que venir cifrado y firmado por el panel (ver displayCommands.ts).
+                const command = await openSignedCommand(raw, deviceCode, getOrCreateCommandSecret(deviceCode));
+                if (!command) {
+                    console.warn('Comando remoto descartado: no está firmado para esta pantalla.');
+                    return;
+                }
+
+                if (command.action === 'reload') {
                     window.location.reload();
-                } else if (payload.payload?.action === 'clear_cache') {
-                    localStorage.removeItem(`tv_cache_${deviceCode}`);
+                } else if (command.action === 'clear_cache') {
+                    [cacheKey(deviceCode), assignmentCacheKey(deviceCode), ...legacyCacheKeys(deviceCode)].forEach(key => localStorage.removeItem(key));
                     window.location.reload();
-                } else if (payload.payload?.action === 'rotate_screen') {
-                    fetchCampaign();
-                } else if (payload.payload?.action === 'reset_telemetry') {
-                    if ((window as any).TvBridge && typeof (window as any).TvBridge.resetTelemetry === 'function') {
-                        (window as any).TvBridge.resetTelemetry();
+                } else if (command.action === 'reset_telemetry') {
+                    if (hasTvBridgeMethod('resetTelemetry')) {
+                        callTvBridge('resetTelemetry');
                         forceHeartbeat();
                     }
-                } else if (payload.payload?.action === 'set_volume') {
-                    const vol = payload.payload?.volume;
+                } else if (command.action === 'set_volume') {
+                    const vol = command.volume;
                     if (typeof vol === 'number' && vol >= 0 && vol <= 100) {
-                        if ((window as any).TvBridge && typeof (window as any).TvBridge.setVolume === 'function') {
-                            (window as any).TvBridge.setVolume(vol);
+                        if (hasTvBridgeMethod('setVolume')) {
+                            callTvBridge('setVolume', vol);
                         } else if ((window as any).AndroidKiosk) {
                             (window as any).AndroidKiosk.setVolume(vol);
                         } else {
@@ -224,33 +319,26 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
                         }
                         forceHeartbeat();
                     }
-                } else if (payload.payload?.action === 'connect_wifi') {
-                    const ssid = payload.payload?.ssid;
-                    const password = payload.payload?.password;
-                    if (ssid && password && (window as any).TvBridge && typeof (window as any).TvBridge.connectToWifi === 'function') {
-                        (window as any).TvBridge.connectToWifi(ssid, password);
+                } else if (command.action === 'connect_wifi') {
+                    const { ssid, password } = command;
+                    if (ssid && password && hasTvBridgeMethod('connectToWifi')) {
+                        callTvBridge('connectToWifi', ssid, password);
                         // Wait a few seconds for network to reconnect then heartbeat
                         setTimeout(() => forceHeartbeat(), 5000);
                     }
-                } else if (payload.payload?.action === 'sync') {
-                    fetchCampaign();
                 }
             })
-            // Suscribirse no solo a assignments sino también a campañas!
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'display_devices' }, () => {
-                fetchCampaign();
+            // Solo los cambios de ESTA pantalla, y solo si cambia algo que afecte lo que se ve
+            // (el latido de cada minuto también actualiza la fila).
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'display_devices', filter: `device_id=eq.${deviceCode}` }, (payload) => {
+                if (deviceConfigSignature(payload.new) !== deviceSigRef.current) {
+                    scheduleFetch();
+                }
             })
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'display_assignments' }, () => {
-                fetchCampaign();
-            })
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'display_campaigns' }, () => {
-                fetchCampaign();
-            })
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'display_media' }, () => {
-                fetchCampaign();
-            })
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'display_schedules' }, () => {
-                fetchCampaign();
+            .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'display_devices' }, (payload) => {
+                if ((payload.old as { id?: string })?.id === deviceUuidRef.current) {
+                    scheduleFetch();
+                }
             })
             .subscribe();
             
@@ -259,7 +347,7 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
         const fallbackInterval = setInterval(() => {
             // Check internet before polling
             if (navigator.onLine) {
-                fetchCampaign();
+                fetchRef.current();
             }
         }, 10 * 60 * 1000);
 
@@ -267,8 +355,81 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
             window.removeEventListener('online', handleOnline);
             supabase.removeChannel(commandChannel);
             clearInterval(fallbackInterval);
+            if (debounceRef.current) clearTimeout(debounceRef.current);
         };
     }, [deviceCode]); // Removed 'status' dependency to prevent constant resubscription loops
+
+    // Clave de comandos remotos: se registra al arrancar y se reintenta cada tanto
+    // (por si no había red, o si alguien la restableció desde el panel).
+    useEffect(() => {
+        if (!deviceCode) return;
+        const register = () => {
+            registerCommandSecret(deviceCode)
+                .then(ok => {
+                    if (!ok) console.warn('Esta pantalla tiene otra clave de comandos registrada: restablecela desde el panel.');
+                })
+                .catch(() => { /* sin red o migración pendiente: se reintenta */ });
+        };
+        register();
+        const interval = setInterval(register, COMMAND_SECRET_RETRY_MS);
+        return () => clearInterval(interval);
+    }, [deviceCode]);
+
+    // Cambio de franja horaria: se evalúa localmente (también sin internet) en vez de
+    // esperar a la próxima consulta al servidor, que puede tardar hasta 10 minutos.
+    useEffect(() => {
+        if (!deviceCode) return;
+        const interval = setInterval(() => {
+            const assignment = assignmentRef.current;
+            if (!assignment?.schedule) return;
+            const activeEvent = findActiveScheduleEvent<any>(assignment.schedule.events, new Date());
+            const key = `${assignment.id}:${activeEvent ? activeEvent.id : 'default'}`;
+            if (key !== activeContentKeyRef.current) {
+                const seq = fetchSeqRef.current;
+                applyRef.current(assignment, () => seq !== fetchSeqRef.current);
+            }
+        }, SCHEDULE_TICK_MS);
+        return () => clearInterval(interval);
+    }, [deviceCode]);
+
+    // Cambios de contenido: filtrados por esta pantalla, su grupo y su negocio, para que
+    // la edición de un cliente no haga recargar las TVs de todos los demás.
+    useEffect(() => {
+        if (!deviceCode || !deviceUuid) return;
+
+        let channel = supabase.channel(`device-content:${deviceCode}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'display_assignments', filter: `device_id=eq.${deviceUuid}` }, scheduleFetch)
+            // Los DELETE no se pueden filtrar en Realtime (solo traen el id).
+            .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'display_assignments' }, (payload) => {
+                const id = (payload.old as { id?: string })?.id;
+                if (id && assignmentIdsRef.current.has(id)) scheduleFetch();
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'display_schedule_events' }, (payload) => {
+                if (!scheduleIdRef.current) return;
+                if (payload.eventType === 'DELETE') {
+                    const id = (payload.old as { id?: string })?.id;
+                    if (id && scheduleEventIdsRef.current.has(id)) scheduleFetch();
+                } else if ((payload.new as { schedule_id?: string })?.schedule_id === scheduleIdRef.current) {
+                    scheduleFetch();
+                }
+            });
+
+        if (deviceGroupId) {
+            channel = channel.on('postgres_changes', { event: '*', schema: 'public', table: 'display_assignments', filter: `group_id=eq.${deviceGroupId}` }, scheduleFetch);
+        }
+
+        if (deviceCommerceId) {
+            for (const table of ['display_campaigns', 'display_media', 'display_schedules']) {
+                channel = channel.on('postgres_changes', { event: '*', schema: 'public', table, filter: `commerce_id=eq.${deviceCommerceId}` }, scheduleFetch);
+            }
+        }
+
+        channel.subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [deviceCode, deviceUuid, deviceGroupId, deviceCommerceId]);
 
     return {
         items,
@@ -278,6 +439,8 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
         deviceName,
         deviceCommerceId,
         preloadProgress,
-        fetchCampaign
+        fetchCampaign,
+        contentKey,
+        shuffle
     };
 }

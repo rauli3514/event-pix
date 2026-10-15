@@ -1,9 +1,23 @@
-import { useState, useEffect, useRef, Component, ErrorInfo, ReactNode } from 'react';
+import { useState, useEffect, Component, ErrorInfo, ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
 import { TvSettingsMenu } from '@/components/display/TvSettingsMenu';
 import { useTelemetry } from './useTelemetry';
 import { useSyncEngine } from './useSyncEngine';
 import { MediaRenderer } from './MediaRenderer';
+import { usePlaylistRotation } from '@/hooks/use-playlist-rotation';
+import { callTvBridge, hasTvBridgeMethod, onTvBridgeReady } from '@/lib/tvBridge';
+
+// Identidad de Display Digital para las pantallas de espera de la TV. En la app
+// Android el logo sale del APK (WebViewManager intercepta /edm-assets/).
+const BRAND_LOGO = '/edm-assets/logo.PNG';
+const BRAND_BACKGROUND: React.CSSProperties = {
+    // Centro del mismo tono que el fondo del logo (#020f28) para que se funda.
+    background: 'radial-gradient(ellipse at center, #031533 0%, #020f28 30%, #01040f 85%)',
+};
+// El logo trae su propio fondo azul: se difuminan los bordes para que no se vea
+// el rectángulo sobre el degradado (-webkit- para WebViews viejos).
+const LOGO_FADE = 'radial-gradient(ellipse at center, #000 63%, transparent 73%)';
+const BRAND_LOGO_STYLE: React.CSSProperties = { maskImage: LOGO_FADE, WebkitMaskImage: LOGO_FADE };
 
 // --- Master Watchdog Error Boundary ---
 class WatchdogBoundary extends Component<{children: ReactNode}, {hasError: boolean}> {
@@ -37,9 +51,7 @@ class WatchdogBoundary extends Component<{children: ReactNode}, {hasError: boole
 // --- Core Player Component ---
 const TvPlayerCore = () => {
     const { deviceCode } = useParams<{ deviceCode: string }>();
-    const [currentIndex, setCurrentIndex] = useState(0);
     const [localRotation, setLocalRotation] = useState<number | null>(null);
-    const rotationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // 1. Telemetry Engine
     const { sendHeartbeat } = useTelemetry(deviceCode);
@@ -53,7 +65,9 @@ const TvPlayerCore = () => {
         deviceName,
         deviceCommerceId,
         preloadProgress,
-        fetchCampaign
+        fetchCampaign,
+        contentKey,
+        shuffle
     } = useSyncEngine(deviceCode, sendHeartbeat);
 
     // 3. System Events (Rotation, Online status & Secret Exit)
@@ -113,14 +127,18 @@ const TvPlayerCore = () => {
 
     // Lock native orientation & apply rotation when orientation setting changes from Web Admin
     useEffect(() => {
+        let cancelBridge = () => {};
         if (deviceSettings.orientation !== undefined && deviceSettings.orientation !== null) {
             let degreeStr = String(deviceSettings.orientation);
             if (degreeStr === 'portrait') degreeStr = '90';
             if (degreeStr === 'landscape') degreeStr = '0';
             const degree = parseInt(degreeStr, 10) || 0;
 
-            if ((window as any).TvBridge?.setOrientation) {
-                (window as any).TvBridge.setOrientation(degree === 90 || degree === 270 ? false : true);
+            if (hasTvBridgeMethod('setOrientation')) {
+                // Con la app nueva el puente recién está listo al terminar de cargar la página.
+                cancelBridge = onTvBridgeReady(() => {
+                    callTvBridge('setOrientation', degree === 90 || degree === 270 ? false : true);
+                });
             } else if ((window as any).AndroidKiosk?.setOrientation) {
                 (window as any).AndroidKiosk.setOrientation(degree);
             }
@@ -133,31 +151,16 @@ const TvPlayerCore = () => {
                 else ScreenOrientation.lock({ orientation: 'landscape-primary' });
             }
         }
+        return cancelBridge;
     }, [deviceSettings.orientation]);
 
-    // 4. Media Rotation Logic
-    useEffect(() => {
-        if (items.length === 0 || (status !== 'playing' && status !== 'offline_playing')) return;
-
-        if (rotationTimeoutRef.current) clearTimeout(rotationTimeoutRef.current);
-
-        const currentItem = items[currentIndex];
-        if (!currentItem) {
-            setCurrentIndex(0);
-            return;
-        }
-        
-        const durationMs = (currentItem.duration && currentItem.duration > 0 ? currentItem.duration : 10) * 1000;
-
-        rotationTimeoutRef.current = setTimeout(() => {
-            setCurrentIndex((prevIndex) => (prevIndex + 1) % items.length);
-        }, durationMs);
-
-        return () => {
-            if (rotationTimeoutRef.current) clearTimeout(rotationTimeoutRef.current);
-        };
-    }, [currentIndex, items, status]);
-
+    // 4. Media Rotation Logic (los videos nunca se cortan: ver usePlaylistRotation)
+    const { currentIndex, prevIndex, nextIndex, onVideoEnded, onVideoError, onVideoDuration } = usePlaylistRotation(
+        items,
+        status === 'playing' || status === 'offline_playing',
+        contentKey,
+        shuffle
+    );
 
     // --- UI Renders ---
     
@@ -214,34 +217,43 @@ const TvPlayerCore = () => {
 
     if (status === 'loading') {
         return (
-            <div className="fixed inset-0 w-full h-full bg-[#111] flex flex-col items-center justify-center font-sans">
-                {preloadProgress && (
-                    <div className="absolute bottom-12 w-[600px] max-w-[80vw]">
-                        <div className="text-[1.2vw] text-zinc-400 mb-2 font-light">
-                            Descargando {preloadProgress.current} de {preloadProgress.total} activos
-                        </div>
-                        <div className="h-1 w-full bg-zinc-800 rounded-full overflow-hidden">
-                            <div 
-                                className="h-full bg-[#3b82f6] transition-all duration-300"
-                                style={{ width: `${(preloadProgress.current / preloadProgress.total) * 100}%` }}
-                            ></div>
-                        </div>
-                    </div>
-                )}
+            <div className="fixed inset-0 w-full h-full flex flex-col items-center justify-center font-sans" style={BRAND_BACKGROUND}>
+                <img src={BRAND_LOGO} alt="Display Digital" className="w-[22vw] max-w-[420px] animate-pulse" style={BRAND_LOGO_STYLE} />
+                <div className="absolute bottom-[8vh] w-[40vw] max-w-[640px]">
+                    {preloadProgress ? (
+                        <>
+                            <div className="text-[1.1vw] text-slate-400 mb-3 font-light text-center">
+                                Descargando contenido · {preloadProgress.current} de {preloadProgress.total}
+                            </div>
+                            <div className="h-[3px] w-full bg-slate-800 rounded-full overflow-hidden">
+                                <div
+                                    className="h-full bg-gradient-to-r from-orange-500 to-amber-400 transition-all duration-300"
+                                    style={{ width: `${(preloadProgress.current / preloadProgress.total) * 100}%` }}
+                                ></div>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="text-[1.1vw] text-slate-500 font-light text-center tracking-wide">Conectando…</div>
+                    )}
+                </div>
             </div>
         );
     }
 
     if (status === 'no_content') {
         return (
-            <div className="fixed inset-0 w-full h-full bg-[#333333] flex flex-col items-center justify-center font-sans">
-                <div className="flex-1 flex items-center justify-center">
-                    <p className="text-[14vw] font-light tracking-wide text-[#00C4CC] drop-shadow-sm">Paired</p>
+            <div className="fixed inset-0 w-full h-full flex flex-col items-center justify-center font-sans text-center" style={BRAND_BACKGROUND}>
+                <img src={BRAND_LOGO} alt="Display Digital" className="w-[18vw] max-w-[360px] mb-[4vh]" style={BRAND_LOGO_STYLE} />
+                <div className="flex items-center gap-[0.8vw] text-emerald-400 text-[1.6vw] font-medium mb-[1.5vh]">
+                    <span className="inline-block w-[0.9vw] h-[0.9vw] rounded-full bg-emerald-400 animate-pulse" />
+                    Pantalla vinculada
                 </div>
-                <div className="mb-16 text-center">
-                    <p className="text-[2.5vw] text-white mb-2 tracking-wide font-light">app.event-pix.com.ar</p>
-                    <p className="text-[1.5vw] text-zinc-400 font-light tracking-wide">para asignar contenido • Pantalla: {deviceName || deviceCode}</p>
-                </div>
+                <p className="text-[3vw] text-white font-semibold tracking-tight">{deviceName || `Pantalla ${deviceCode}`}</p>
+                <p className="text-[1.5vw] text-slate-400 font-light mt-[2vh] max-w-[60vw]">
+                    Todavía no tiene contenido asignado. Elegí qué mostrar desde{' '}
+                    <span className="text-orange-400 font-medium whitespace-nowrap">app.event-pix.com.ar</span>
+                </p>
+                <p className="absolute bottom-[5vh] text-[1vw] text-slate-600 font-mono tracking-widest">CÓDIGO {deviceCode}</p>
                 <TvSettingsMenu deviceCode={deviceCode!} onRefresh={() => fetchCampaign()} />
             </div>
         );
@@ -268,7 +280,12 @@ const TvPlayerCore = () => {
             <MediaRenderer 
                 items={items} 
                 currentIndex={currentIndex} 
+                prevIndex={prevIndex}
+                nextIndex={nextIndex}
                 deviceCommerceId={deviceCommerceId} 
+                onVideoEnded={onVideoEnded}
+                onVideoError={onVideoError}
+                onVideoDuration={onVideoDuration}
             />
             <TvSettingsMenu deviceCode={deviceCode!} onRefresh={() => fetchCampaign()} />
         </div>

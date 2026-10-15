@@ -21,6 +21,14 @@ export interface EventSettings {
     public_gallery_enabled?: boolean;
     dj_mode_enabled?: boolean;
     photo_booth_enabled?: boolean;
+    /** Muro: "¡NUEVA FOTO!" en grande + aviso en el celular (por defecto prendido) */
+    wall_spotlight_enabled?: boolean;
+    /** Muro: collage de fotos cada tanto (por defecto prendido) */
+    wall_collage_enabled?: boolean;
+    /** Muro: ranking de los que más fotos suben (por defecto prendido) */
+    wall_ranking_enabled?: boolean;
+    /** Muro: contador de fotos e invitados (por defecto prendido) */
+    wall_counter_enabled?: boolean;
     photobooth_frame_url?: string | null;
     ai_generation_enabled?: boolean;
     promo_banner_url?: string | null;
@@ -30,6 +38,8 @@ export interface EventSettings {
     ai_moderation_enabled?: boolean;
     ai_moderation_level?: 'low' | 'medium' | 'high';
     font_family?: string;
+    /** Color del evento (hex). Vacío = violeta de siempre. Ver lib/wallAccent */
+    accent_color?: string | null;
     created_at: string;
     updated_at: string;
 }

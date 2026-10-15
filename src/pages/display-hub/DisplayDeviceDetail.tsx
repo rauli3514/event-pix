@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDisplayDevice, useAssignContentToDevice, useUpdateDisplayDevice, useDisplayCampaigns, useDeleteAssignment } from "@/hooks/use-display-hub";
 import { useDisplayMedia } from "@/hooks/use-display-media";
-import { supabase } from "@/lib/supabase";
+import { sendDeviceCommand, resetDeviceCommandSecret, DeviceCommand } from "@/lib/displayCommands";
 
 const WifiSignal = ({ dbm }: { dbm: number }) => {
     let bars = 0;
@@ -116,64 +116,49 @@ const DisplayDeviceDetail = () => {
         });
     };
 
-    const handleForceReload = async () => {
-        if (!deviceData?.device_id) return;
-        const channel = supabase.channel(`device:${deviceData.device_id}`);
-        await channel.send({
-            type: 'broadcast',
-            event: 'command',
-            payload: { action: 'reload' },
-        });
-        toast.success("Comando de recarga enviado a la pantalla");
+    // Comandos remotos: los firma la base (solo para quien administra la pantalla)
+    // y la TV descarta lo que no esté firmado. Ver src/lib/displayCommands.ts.
+    const runCommand = async (command: DeviceCommand, successMessage: string) => {
+        if (!deviceData?.id || !deviceData?.device_id) return false;
+        try {
+            await sendDeviceCommand({ id: deviceData.id, device_id: deviceData.device_id }, command);
+            toast.success(successMessage);
+            return true;
+        } catch (err: any) {
+            toast.error(err?.message || 'No se pudo enviar el comando');
+            return false;
+        }
     };
 
-    const handleClearCache = async () => {
-        if (!deviceData?.device_id) return;
-        const channel = supabase.channel(`device:${deviceData.device_id}`);
-        await channel.send({
-            type: 'broadcast',
-            event: 'command',
-            payload: { action: 'clear_cache' },
-        });
-        toast.success("Comando de limpieza de caché enviado a la pantalla");
-    };
+    const handleForceReload = () => runCommand({ action: 'reload' }, "Comando de recarga enviado a la pantalla");
+
+    const handleClearCache = () => runCommand({ action: 'clear_cache' }, "Comando de limpieza de caché enviado a la pantalla");
 
     const handleConnectWifi = async () => {
-        if (!deviceData?.device_id || !wifiSsid || !wifiPass) {
+        if (!wifiSsid || !wifiPass) {
             toast.error("Ingresa el SSID y la contraseña");
             return;
         }
-        const channel = supabase.channel(`device:${deviceData.device_id}`);
-        await channel.send({
-            type: 'broadcast',
-            event: 'command',
-            payload: { action: 'connect_wifi', ssid: wifiSsid, password: wifiPass },
-        });
-        toast.success(`Comando para conectar a ${wifiSsid} enviado`);
-        setWifiSsid('');
-        setWifiPass('');
+        const sent = await runCommand({ action: 'connect_wifi', ssid: wifiSsid, password: wifiPass }, `Comando para conectar a ${wifiSsid} enviado`);
+        if (sent) {
+            setWifiSsid('');
+            setWifiPass('');
+        }
     };
 
-    const handleSetVolume = async () => {
-        if (!deviceData?.device_id) return;
-        const channel = supabase.channel(`device:${deviceData.device_id}`);
-        await channel.send({
-            type: 'broadcast',
-            event: 'command',
-            payload: { action: 'set_volume', volume: parseInt(volume, 10) },
-        });
-        toast.success(`Comando de volumen (${volume}%) enviado`);
-    };
+    const handleSetVolume = () => runCommand({ action: 'set_volume', volume: parseInt(volume, 10) }, `Comando de volumen (${volume}%) enviado`);
 
-    const handleResetTelemetry = async () => {
-        if (!deviceData?.device_id) return;
-        const channel = supabase.channel(`device:${deviceData.device_id}`);
-        await channel.send({
-            type: 'broadcast',
-            event: 'command',
-            payload: { action: 'reset_telemetry' },
-        });
-        toast.success("Comando de reseteo de telemetría enviado a la pantalla");
+    const handleResetTelemetry = () => runCommand({ action: 'reset_telemetry' }, "Comando de reseteo de telemetría enviado a la pantalla");
+
+    const handleResetCommandKey = async () => {
+        if (!deviceData?.id) return;
+        if (!window.confirm('¿Restablecer la clave de comandos? Usalo solo si la pantalla dejó de responder a los comandos remotos. La pantalla registra una clave nueva sola en unos minutos.')) return;
+        try {
+            await resetDeviceCommandSecret(deviceData.id);
+            toast.success('Clave restablecida. La pantalla registrará una nueva en unos minutos.');
+        } catch (err: any) {
+            toast.error(err?.message || 'No se pudo restablecer la clave');
+        }
     };
 
     const handleSaveInfo = () => {
@@ -462,6 +447,9 @@ const DisplayDeviceDetail = () => {
                                         <Button onClick={handleConnectWifi} variant="outline" className="w-full justify-center border-slate-700 bg-slate-950 text-indigo-400 hover:text-white hover:bg-slate-800">
                                             Cambiar Red Wi-Fi Remotamente
                                         </Button>
+                                        <p className="text-xs text-slate-500 mt-2">
+                                            Funciona en equipos con Android 9 o anterior. En Android 10+ el sistema no permite que una app cambie de red sola.
+                                        </p>
                                     </div>
 
                                     <div className="pt-4 border-t border-slate-800">
@@ -496,8 +484,11 @@ const DisplayDeviceDetail = () => {
                                             </Button>
                                         </div>
                                         <p className="text-xs text-slate-500 mt-3">
-                                            Las acciones remotas se ejecutan instantáneamente si la pantalla está online.
+                                            Las acciones remotas se ejecutan instantáneamente si la pantalla está online. Van cifradas y firmadas: solo esta pantalla las acepta.
                                         </p>
+                                        <button onClick={handleResetCommandKey} className="text-xs text-slate-500 hover:text-slate-300 underline mt-2">
+                                            ¿La pantalla no responde a los comandos? Restablecer clave
+                                        </button>
                                     </div>
                                 </div>
                             </div>
