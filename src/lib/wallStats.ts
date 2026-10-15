@@ -37,3 +37,9 @@ export const getWallStats = (submissions: Submission[]): WallStats => {
     const ranking = [...byAuthor.values()].sort((a, b) => b.count - a.count).slice(0, 5);
     return { photos, guests: guests.size, ranking };
 };
+
+/** Fotos y mensajes aprobados para el muro, de lo más nuevo a lo más viejo */
+export const wallItems = (submissions: Submission[], max = 60) =>
+    submissions
+        .filter((s) => s.status === 'approved' && (s.type === 'photo' || s.type === 'message') && s.content)
+        .slice(0, max);

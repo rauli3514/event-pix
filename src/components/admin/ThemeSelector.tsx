@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 
 interface ThemeSelectorProps {
     currentBackground: string | null;
-    onSelectTheme: (imageUrl: string, fontFamily: string, frameUrl?: string) => void;
+    onSelectTheme: (imageUrl: string, fontFamily: string, frameUrl?: string, accent?: string) => void;
 }
 
 export const ThemeSelector = ({ currentBackground, onSelectTheme }: ThemeSelectorProps) => {
@@ -61,7 +61,7 @@ export const ThemeSelector = ({ currentBackground, onSelectTheme }: ThemeSelecto
                                             "group relative aspect-[2/3] rounded-lg overflow-hidden cursor-pointer border-2 transition-all hover:scale-105",
                                             isActive ? "border-primary ring-2 ring-primary/30" : "border-transparent hover:border-white/20"
                                         )}
-                                        onClick={() => onSelectTheme(variant.imageUrl, theme.font, theme.frameUrl)}
+                                        onClick={() => onSelectTheme(variant.imageUrl, theme.font, theme.frameUrl, theme.accent)}
                                     >
                                         <img
                                             src={variant.imageUrl}

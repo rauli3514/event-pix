@@ -6,6 +6,7 @@ import QRCode from "react-qr-code";
 import { supabase } from "@/lib/supabase";
 import { useSubmissions } from "@/hooks/use-submissions";
 import { useEventSettings } from "@/hooks/use-event-settings";
+import { accentGradient } from "@/lib/wallAccent";
 import { useEvent } from "@/context/EventContext";
 import { isAnonymousAuthor } from "@/lib/guestSubmissions";
 import { Submission } from "@/types";
@@ -141,7 +142,7 @@ export const NewPhotoSpotlight = ({ eventId, onActiveChange }: NewPhotoSpotlight
                         transition={{ delay: 0.3, type: "spring", stiffness: 200, damping: 15 }}
                         className="absolute inset-x-0 top-[4vh] z-10 flex justify-center"
                     >
-                        <div className="animate-pulse rounded-full bg-gradient-to-r from-fuchsia-600 to-violet-600 px-[3vh] py-[1.2vh] text-[3.4vh] font-extrabold tracking-wide shadow-2xl ring-4 ring-white/25">
+                        <div className="animate-pulse rounded-full bg-gradient-to-r from-fuchsia-600 to-violet-600 px-[3vh] py-[1.2vh] text-[3.4vh] font-extrabold tracking-wide shadow-2xl ring-4 ring-white/25" style={accentGradient(settings?.accent_color)}>
                             {isPhoto ? '📸 ¡NUEVA FOTO!' : '💬 ¡NUEVO MENSAJE!'}
                         </div>
                     </motion.div>

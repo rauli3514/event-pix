@@ -38,6 +38,8 @@ export interface EventSettings {
     ai_moderation_enabled?: boolean;
     ai_moderation_level?: 'low' | 'medium' | 'high';
     font_family?: string;
+    /** Color del evento (hex). Vacío = violeta de siempre. Ver lib/wallAccent */
+    accent_color?: string | null;
     created_at: string;
     updated_at: string;
 }

@@ -1,84 +1,148 @@
-import { usePhotos } from "@/hooks/use-photos";
-import { Camera, Image as ImageIcon } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { useSubmissions } from "@/hooks/use-submissions";
+import { useEventSettings } from "@/hooks/use-event-settings";
+import { useWallEffects } from "@/hooks/use-wall-effects";
+import { useGuestUrl } from "@/hooks/use-wall";
+import { useEvent } from "@/context/EventContext";
+import { getWallStats, wallItems } from "@/lib/wallStats";
+import { accentVars } from "@/lib/wallAccent";
+import { RouletteModal } from "@/components/display/RouletteModal";
+import { MessageCard, PhotoCredit, WallBackground, WallEmpty, WallHeader } from "@/components/display/WallChrome";
+import { Submission } from "@/types";
+
+// "Cuadrícula viva": 12 fotos y mensajes a la vez; cada pocos segundos una
+// casilla cambia por otra, así la pantalla siempre se mueve sin marear.
+
+const TILES = 12;
+const SWAP_MS = 3500;
+
+/** Lo que se borró se reemplaza en su lugar y las casillas libres se llenan con lo más nuevo */
+const reconcileSlots = (prev: string[], pool: Submission[]) => {
+    const ids = new Set(pool.map((s) => s.id));
+    const want = Math.min(TILES, pool.length);
+    const shown = new Set(prev.filter((id) => ids.has(id)));
+    const fresh = pool.filter((s) => !shown.has(s.id)).map((s) => s.id);
+    const next = prev
+        .map((id) => (ids.has(id) ? id : fresh.shift()))
+        .filter((id): id is string => !!id)
+        .slice(0, want);
+    while (next.length < want && fresh.length) next.push(fresh.shift()!);
+    return next.length === prev.length && next.every((id, i) => id === prev[i]) ? prev : next;
+};
 
 interface GridTemplateProps {
     eventId?: string;
+    /** Quieto mientras se destaca una foto nueva encima */
+    paused?: boolean;
 }
 
-export const GridTemplate = ({ eventId }: GridTemplateProps) => {
-    const { data: photos, isLoading } = usePhotos(eventId);
+export const GridTemplate = ({ eventId, paused = false }: GridTemplateProps) => {
+    const { submissions } = useSubmissions(eventId);
+    const { data: settings } = useEventSettings(eventId);
+    const { event } = useEvent();
+    useWallEffects(eventId, settings);
 
-    if (isLoading) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-transparent">
-                <div className="w-12 h-12 border-4 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
-                <p className="mt-4 text-violet-200 font-light tracking-wide animate-pulse">Cargando galería...</p>
-            </div>
-        );
+    const guestUrl = useGuestUrl(event);
+    const stats = useMemo(() => getWallStats(submissions), [submissions]);
+    const pool = useMemo(() => wallItems(submissions), [submissions]);
+    const byId = useMemo(() => new Map(pool.map((s) => [s.id, s])), [pool]);
+
+    // Qué hay en cada casilla (ids). Arranca con lo más nuevo.
+    const [slots, setSlots] = useState<string[]>(() => reconcileSlots([], pool));
+    const cursorRef = useRef(0);
+    const lastSlotRef = useRef(-1);
+
+    // Altas y bajas: se ajusta en el mismo render en que cambia la lista
+    const [prevPool, setPrevPool] = useState(pool);
+    if (pool !== prevPool) {
+        setPrevPool(pool);
+        setSlots(reconcileSlots(slots, pool));
     }
 
-    if (!photos || photos.length === 0) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-screen p-8 text-center bg-transparent">
-                <div className="bg-slate-900/80 backdrop-blur-xl p-12 rounded-[2rem] border border-slate-700/50 shadow-2xl flex flex-col items-center gap-6 max-w-lg animate-fade-in-up">
-                    <div className="h-24 w-24 rounded-full bg-gradient-to-tr from-violet-600 to-fuchsia-600 flex items-center justify-center shadow-lg shadow-violet-900/50">
-                        <ImageIcon className="h-10 w-10 text-white" />
-                    </div>
-                    <div className="space-y-2">
-                        <h3 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-violet-200 to-white">
-                            Galería Vacía
-                        </h3>
-                        <p className="text-slate-300 text-lg leading-relaxed">
-                            Aún no hay fotos en este evento.<br />
-                            ¡Sé el primero en subir una! 📸
-                        </p>
-                    </div>
-                </div>
-            </div>
-        );
-    }
+    // Fotos que ya pasaron por pantalla: las nuevas tienen prioridad al rotar
+    const everShownRef = useRef(new Set<string>());
+    useEffect(() => { slots.forEach((id) => everShownRef.current.add(id)); }, [slots]);
+
+    // Cada tanto una casilla al azar muestra otra foto que no esté en pantalla
+    useEffect(() => {
+        if (paused || pool.length <= TILES) return;
+        const timer = setInterval(() => {
+            setSlots((prev) => {
+                const shown = new Set(prev);
+                const candidates = pool.filter((s) => !shown.has(s.id));
+                if (!candidates.length) return prev;
+                const neverShown = candidates.find((s) => !everShownRef.current.has(s.id));
+                const incoming = neverShown ?? candidates[cursorRef.current++ % candidates.length];
+                let slot = Math.floor(Math.random() * prev.length);
+                if (slot === lastSlotRef.current) slot = (slot + 1) % prev.length;
+                lastSlotRef.current = slot;
+                const next = [...prev];
+                next[slot] = incoming.id;
+                return next;
+            });
+        }, SWAP_MS);
+        return () => clearInterval(timer);
+    }, [paused, pool]);
+
+    const items = slots.map((id) => byId.get(id)).filter(Boolean) as Submission[];
+    // Con pocas fotos se agrandan las casillas
+    const fitWhole = items.length <= 6;
+    const cols = items.length <= 4 ? 'grid-cols-2 portrait:grid-cols-2' : items.length <= 6 ? 'grid-cols-3 portrait:grid-cols-2' : 'grid-cols-4 portrait:grid-cols-3';
 
     return (
-        <div className="min-h-screen w-full bg-gradient-to-br from-slate-950 via-violet-950/20 to-slate-950">
-            {/* Header decorativo opcional */}
-            <div className="container mx-auto px-4 pt-8 pb-4">
-                <h2 className="text-2xl font-light tracking-widest text-violet-200/80 uppercase mb-6 border-b border-white/10 pb-4">
-                    Galería del Evento
-                </h2>
-            </div>
+        <div
+            className={`absolute inset-0 flex flex-col overflow-hidden bg-black text-white ${settings?.font_family || 'font-sans'}`}
+            style={accentVars(settings?.accent_color)}
+        >
+            <WallBackground settings={settings} dim="strong" />
+            <WallHeader settings={settings} stats={stats} guestUrl={guestUrl} variant="bar" showQr={items.length > 0} />
 
-            <div className="container mx-auto px-4 pb-12">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
-                    {photos.map((photo, index) => (
-                        <div
-                            key={photo.id}
-                            className="group relative aspect-square overflow-hidden rounded-2xl bg-white/5 border border-white/10 shadow-lg backdrop-blur-sm animate-fade-in-up hover:shadow-violet-500/20 hover:border-violet-500/30 transition-all duration-500"
-                            style={{ animationDelay: `${index * 50}ms` }}
-                        >
-                            <img
-                                src={photo.image_url}
-                                alt={photo.message || "Foto del evento"}
-                                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                                loading="lazy"
-                            />
-
-                            {/* Overlay en hover */}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
-                                {photo.message ? (
-                                    <p className="text-white text-sm font-medium line-clamp-2">
-                                        "{photo.message}"
-                                    </p>
-                                ) : (
-                                    <div className="flex items-center gap-2 text-white/80 text-xs">
-                                        <Camera className="w-3 h-3" />
-                                        <span>EventPix</span>
-                                    </div>
-                                )}
+            {items.length === 0 ? (
+                <WallEmpty settings={settings} guestUrl={guestUrl} />
+            ) : (
+                <main className={`relative z-10 grid flex-1 min-h-0 auto-rows-fr gap-4 px-8 pb-8 portrait:px-5 portrait:pb-5 ${cols}`}>
+                    {slots.map((id, i) => {
+                        const item = byId.get(id);
+                        if (!item) return null;
+                        return (
+                            <div key={i} className="relative min-h-0 overflow-hidden rounded-2xl bg-white/5 shadow-2xl ring-1 ring-white/10">
+                                <AnimatePresence initial={false}>
+                                    <motion.div
+                                        key={item.id}
+                                        className="absolute inset-0"
+                                        initial={{ opacity: 0, scale: 1.08 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        transition={{ duration: 0.9, ease: 'easeOut' }}
+                                    >
+                                        {item.type === 'photo' ? (
+                                            <>
+                                                {fitWhole ? (
+                                                    // Casillas grandes: la foto entera sobre una copia desenfocada (no se cortan caras)
+                                                    <>
+                                                        <img src={item.content} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover opacity-80 blur-2xl" />
+                                                        <img src={item.content} alt="" className="relative h-full w-full object-contain" />
+                                                    </>
+                                                ) : (
+                                                    <img src={item.content} alt="" className="h-full w-full object-cover object-[center_30%]" />
+                                                )}
+                                                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent px-4 pb-3 pt-10">
+                                                    <PhotoCredit item={item} size="sm" />
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <MessageCard item={item} className="h-full w-full rounded-none border-0" />
+                                        )}
+                                    </motion.div>
+                                </AnimatePresence>
                             </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
+                        );
+                    })}
+                </main>
+            )}
+
+            <RouletteModal />
         </div>
     );
 };

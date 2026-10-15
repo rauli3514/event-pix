@@ -5,6 +5,7 @@ import { ReactionBar } from "@/components/ReactionBar";
 import { PublicGallery } from "./PublicGallery";
 
 import { useEventSettings } from "@/hooks/use-event-settings";
+import { accentGradient } from "@/lib/wallAccent";
 
 interface EventCardProps {
     onUploadClick: () => void;
@@ -65,6 +66,7 @@ export const EventCard = ({ onUploadClick, onMessageClick, onAudioClick, eventId
             <Button
                 onClick={onUploadClick}
                 className="w-full h-20 rounded-3xl bg-gradient-to-r from-fuchsia-600 via-violet-600 to-indigo-600 hover:opacity-95 text-white text-xl font-extrabold shadow-2xl shadow-violet-900/50 ring-2 ring-white/20 active:scale-[0.98] transition-transform flex items-center justify-center gap-3 [&_svg]:size-7"
+                style={accentGradient(settings?.accent_color)}
             >
                 <Camera className="w-8 h-8" />
                 Subí tu foto a la pantalla

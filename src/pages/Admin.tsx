@@ -20,6 +20,8 @@ import { useEvent } from "@/context/EventContext";
 import { useIsSuperAdmin } from "@/hooks/use-roles";
 import { ProvidersManagement } from "@/components/ProvidersManagement";
 import { ThemeSelector } from "@/components/admin/ThemeSelector";
+import { AccentColorCard } from "@/components/admin/AccentColorCard";
+import { WallDesignCard } from "@/components/admin/WallDesignCard";
 import { SubmissionCard } from "@/components/admin/SubmissionCard";
 import { DriveAlbumCard } from "@/components/admin/DriveAlbumCard";
 import { buildGuestbookPdf } from "@/lib/guestbookPdf";
@@ -832,7 +834,7 @@ const Admin = () => {
                                 <div className="bg-slate-900/50 p-6 rounded-2xl border border-white/5">
                                     <ThemeSelector
                                         currentBackground={settings?.background_image_url || null}
-                                        onSelectTheme={(imageUrl, fontFamily, frameUrl) => {
+                                        onSelectTheme={(imageUrl, fontFamily, frameUrl, accent) => {
                                             if (!settings) return;
                                             updateSettings.mutate({
                                                 id: settings.id,
@@ -841,12 +843,23 @@ const Admin = () => {
                                                 frame_image_url: frameUrl || null,
                                                 frame_enabled: !!frameUrl
                                             } as any, {
-                                                onSuccess: () => toast.success("Tema actualizado correctamente ✨")
+                                                onSuccess: () => {
+                                                    toast.success("Tema actualizado correctamente ✨");
+                                                    // El color va aparte: si la base todavía no tiene la columna, el tema igual se guarda
+                                                    if (accent) updateSettings.mutate({ id: settings.id, accent_color: accent } as any);
+                                                }
                                             });
                                         }}
                                     />
                                 </div>
                             </div>
+
+                            <AccentColorCard
+                                current={settings?.accent_color}
+                                onChange={(color) => settings && updateSettings.mutate({ id: settings.id, accent_color: color } as any, {
+                                    onError: () => toast.error("No se pudo guardar el color. ¿Corriste la migración del color del evento en Supabase?")
+                                })}
+                            />
 
                             {/* Custom Uploads */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -1003,6 +1016,11 @@ const Admin = () => {
                 {
                     activeTab === 'display' && (
                         <div className="max-w-4xl space-y-6">
+                            <WallDesignCard
+                                current={settings?.display_template}
+                                onChange={(template) => settings && updateSettings.mutate({ id: settings.id, display_template: template } as any)}
+                            />
+
                             <Card className="bg-slate-900 border-slate-800 border-l-4 border-l-violet-500 text-slate-100">
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2 text-slate-100">

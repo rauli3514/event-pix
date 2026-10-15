@@ -3,6 +3,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import confetti from "canvas-confetti";
 import { supabase } from "@/lib/supabase";
 import { forgetMySubmissions, getMySubmissions } from "@/lib/guestSubmissions";
+import { useEventSettings } from "@/hooks/use-event-settings";
+import { accentGradient } from "@/lib/wallAccent";
 
 const POLL_MS = 4000;
 const SHOW_MS = 9000;
@@ -18,6 +20,7 @@ interface OnScreenNoticeProps {
  */
 export const OnScreenNotice = ({ eventId }: OnScreenNoticeProps) => {
     const [notice, setNotice] = useState<'photo' | 'message' | null>(null);
+    const { data: settings } = useEventSettings(eventId);
 
     useEffect(() => {
         let cancelled = false;
@@ -65,6 +68,7 @@ export const OnScreenNotice = ({ eventId }: OnScreenNoticeProps) => {
                     exit={{ y: -120, opacity: 0 }}
                     transition={{ type: "spring", stiffness: 260, damping: 22 }}
                     className="fixed top-4 left-4 right-4 z-[200] mx-auto max-w-md rounded-3xl bg-gradient-to-r from-fuchsia-600 via-violet-600 to-indigo-600 p-5 text-left text-white shadow-2xl ring-2 ring-white/30"
+                    style={accentGradient(settings?.accent_color)}
                 >
                     <div className="flex items-center gap-4">
                         <span className="text-5xl animate-bounce">📺</span>
@@ -72,7 +76,7 @@ export const OnScreenNotice = ({ eventId }: OnScreenNoticeProps) => {
                             <p className="text-xl font-extrabold leading-tight">
                                 {notice === 'photo' ? '¡Tu foto está en la pantalla!' : '¡Tu mensaje está en la pantalla!'}
                             </p>
-                            <p className="mt-1 text-sm font-medium text-white/90">Mirá para arriba 👀 ¡Ahora mismo!</p>
+                            <p className="mt-1 text-sm font-medium opacity-90">Mirá para arriba 👀 ¡Ahora mismo!</p>
                         </div>
                     </div>
                 </motion.button>
