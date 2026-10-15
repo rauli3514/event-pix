@@ -92,16 +92,24 @@ h2 { font-size: clamp(2rem, 6vw, 3.2rem); margin-bottom: 14px; }
 .plan .photo { margin: -26px -26px 20px; border-radius: 23px 23px 0 0; overflow: hidden; }
 .plan .photo img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; object-position: center 35%; }
 
-/* Pasos */
-.steps { display: grid; gap: 16px; margin-top: 34px; }
-@media (min-width: 760px) { .steps { grid-template-columns: repeat(3, 1fr); } }
-.step { background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 26px; }
-.step .n { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; background: var(--grad); font-family: 'CarlMarx', sans-serif; font-size: 1.4rem; margin-bottom: 16px; }
-.step h3 { font-size: 1.45rem; margin-bottom: 8px; }
-.step p { color: var(--muted); }
+/* Pantallas del sistema */
+.screens { display: grid; grid-auto-flow: column; grid-auto-columns: 46%; gap: 14px; margin-top: 30px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 4px 2px 8px; scrollbar-width: none; }
+.screens::-webkit-scrollbar { display: none; }
+@media (min-width: 640px) { .screens { grid-auto-columns: 30%; } }
+@media (min-width: 980px) { .screens { grid-auto-columns: calc((100% - 4 * 14px) / 5); } }
+.screens figure { position: relative; scroll-snap-align: start; }
+.screens img { width: 100%; height: auto; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 18px; border: 3px solid #2a2350; box-shadow: 0 14px 34px rgba(0,0,0,.45); background: #000; }
+.screens .n { position: absolute; top: 10px; left: 10px; z-index: 1; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--grad); font-family: 'CarlMarx', sans-serif; font-size: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,.4); }
+.screens figcaption { margin-top: 10px; color: var(--muted); font-size: .86rem; line-height: 1.4; }
+.screens figcaption b { display: block; color: var(--text); font-size: .95rem; margin-bottom: 2px; }
+.screens + .hint { text-align: left; }
+
 
 /* Experiencias */
-.modes { display: grid; gap: 16px; margin-top: 34px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.modes { display: grid; gap: 14px; margin-top: 30px; grid-auto-flow: column; grid-auto-columns: 72%; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 6px; scrollbar-width: none; }
+.modes::-webkit-scrollbar { display: none; }
+.modes .mode { scroll-snap-align: start; }
+@media (min-width: 760px) { .modes { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); overflow: visible; } }
 .mode { position: relative; border-radius: 22px; overflow: hidden; background: var(--card); border: 1px solid var(--line); }
 .mode img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; }
 .mode div { padding: 18px 20px 22px; }
@@ -111,10 +119,10 @@ h2 { font-size: clamp(2rem, 6vw, 3.2rem); margin-bottom: 14px; }
 .mode .badge { position: absolute; top: 12px; left: 12px; padding: 5px 12px; border-radius: 999px; background: var(--gold); color: #2a1a00; font-size: .76rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
 
 /* Galería de temáticas */
-.gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 34px; }
-@media (min-width: 640px) { .gallery { grid-template-columns: repeat(3, 1fr); } }
+.gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 30px; }
+@media (min-width: 640px) { .gallery { grid-template-columns: repeat(4, 1fr); gap: 10px; } }
 @media (min-width: 980px) { .gallery { grid-template-columns: repeat(6, 1fr); } }
-.gallery img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 16px; border: 1px solid var(--line); }
+.gallery img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 12px; border: 1px solid var(--line); }
 .more { margin-top: 18px; color: var(--muted); }
 
 /* Incluye */
@@ -198,7 +206,7 @@ footer a:hover { color: var(--text); }
         <p>Espejo mágico con inteligencia artificial: tus invitados se sacan la foto, la IA los transforma en estrellas de cine, superhéroes o tapa de revista, y se la llevan <b>impresa al instante</b> y en el celular.</p>
         <div class="ctas">
           <a class="btn btn-wa" data-wa="cliente" href="#"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.8-1.4a.5.5 0 0 0 0-.5l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.8 11.9 11.9 0 0 0 4.6 4c1.7.7 2.4.8 3.2.7a2.8 2.8 0 0 0 1.8-1.3 2.3 2.3 0 0 0 .2-1.3c-.1-.1-.3-.2-.5-.3z"/></svg>Consultá disponibilidad</a>
-          <a class="btn btn-ghost" href="#experiencias">Ver qué hace</a>
+          <a class="btn btn-ghost" href="#como-funciona">Ver cómo funciona</a>
         </div>
         <div class="trust">
           <span>📸 <b>Impresión 10×15</b> en papel fotográfico</span>
@@ -233,17 +241,22 @@ footer a:hover { color: var(--text); }
     </div>
   </section>
 
-  <!-- Cómo funciona -->
-  <section class="reveal">
+  <!-- Cómo funciona: pantallas reales del sistema -->
+  <section class="reveal" id="como-funciona">
     <div class="wrap">
       <span class="eyebrow">Así de simple</span>
-      <h2>Posan, la IA hace el resto</h2>
-      <p class="lead">Sin filas eternas ni complicaciones: el espejo guía a cada invitado con la pantalla táctil y frases divertidas.</p>
-      <div class="steps">
-        <div class="step"><div class="n">1</div><h3>Se paran frente al espejo</h3><p>Eligen la experiencia, posan y la cuenta regresiva hace el resto. ¡Con flash y todo!</p></div>
-        <div class="step"><div class="n">2</div><h3>La magia ocurre</h3><p>Marco con los nombres y la fecha de tu evento, o una transformación con inteligencia artificial.</p></div>
-        <div class="step"><div class="n">3</div><h3>Se la llevan</h3><p>Impresa al instante en papel fotográfico y en el celular escaneando el QR. Lista para compartir.</p></div>
+      <h2>Así lo vive <span class="grad-text">cada invitado</span></h2>
+      <p class="lead">Pantallas reales del sistema EventPix. El espejo guía a cada invitado paso a paso con la pantalla táctil y frases divertidas.</p>
+      <div class="screens">
+        <figure><span class="n">1</span><img src="img/app-inicio.webp" alt="Pantalla de inicio del espejo: Tocá para empezar" loading="lazy" width="405" height="720" /><figcaption><b>Tocá para empezar</b>Una pantalla animada que invita a acercarse.</figcaption></figure>
+        <figure><span class="n">2</span><img src="img/app-modos.webp" alt="Elección de experiencia: Retrato Mágico, Selfie Grupal y Portada Fashion" loading="lazy" width="405" height="720" /><figcaption><b>Elegí tu experiencia</b>Foto real con marco o transformación con IA.</figcaption></figure>
+        <figure><span class="n">3</span><img src="img/app-cuenta.webp" alt="Cuenta regresiva antes de la foto" loading="lazy" width="405" height="720" /><figcaption><b>Cuenta regresiva</b>Tiempo para posar, con flash de pantalla.</figcaption></figure>
+        <figure><span class="n">4</span><img src="img/app-vista.webp" alt="Vista previa de la foto con opciones Repetir y Me gusta" loading="lazy" width="405" height="720" /><figcaption><b>¿Te gusta?</b>Se ven antes de imprimir y pueden repetir.</figcaption></figure>
+        <figure><span class="n">5</span><img src="img/app-estilos.webp" alt="Elección de estilo de inteligencia artificial" loading="lazy" width="405" height="720" /><figcaption><b>Elegí tu estilo IA</b>Más de 30 temáticas: fantasía, épocas, animación…</figcaption></figure>
+        <figure><span class="n">6</span><img src="img/app-frase.webp" alt="Frase divertida mientras se procesa la foto" loading="lazy" width="405" height="720" /><figcaption><b>Risas garantizadas</b>Frases divertidas mientras se procesa.</figcaption></figure>
+        <figure><span class="n">7</span><img src="img/app-final.webp" alt="Pantalla final para imprimir y llevarse la foto" loading="lazy" width="405" height="720" /><figcaption><b>¡A llevársela!</b>Impresa al instante y en el celular con QR.</figcaption></figure>
       </div>
+      <p class="hint">Deslizá para ver los 7 pasos 👉</p>
     </div>
   </section>
 
