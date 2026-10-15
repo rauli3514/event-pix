@@ -4,6 +4,10 @@ name: APK del kiosco
 # release elegida (por defecto "kiosco-prueba"), con un link fijo para bajarlo desde la TV box.
 # Solo a mano (Actions → "APK del kiosco" → Run workflow): para probar cambios
 # alcanza con la versión web de Vercel; el APK hace falta para la impresión nativa.
+#
+# Las versiones (release "kiosco-vX.Y") se publican además en "kiosco-latest" con un
+# kiosco-version.json (versión y huella SHA-256): de ahí se actualizan los equipos desde
+# Ajustes → Equipo → Actualización.
 on:
   workflow_dispatch:
     inputs:
@@ -71,6 +75,18 @@ jobs:
               -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
 
+      - name: Comprobar que es la firma de siempre
+        run: |
+          # Con otra firma Android no deja instalar encima: los equipos tendrían que
+          # desinstalar (y perder los ajustes). Mejor que falle acá.
+          EXPECTED="6C:A0:E0:90:64:0F:29:63:84:61:8E:0B:38:80:30:D1:E2:61:E3:85:9B:A1:41:F7:60:A2:17:41:59:E4:42:B1"
+          ACTUAL=$(keytool -list -v -keystore kiosk-debug.keystore -storepass android -alias androiddebugkey \
+            | sed -n 's/.*SHA256: *//p' | tr -d '[:space:]')
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::La firma no es la de siempre ($ACTUAL). Generá el APK desde la rama que tiene la firma guardada."
+            exit 1
+          fi
+
       - name: Compilar el APK
         working-directory: android
         run: |
@@ -97,3 +113,26 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "Kiosco ($RELEASE)" \
             --notes "APK del kiosco (commit ${GITHUB_SHA::7}). Se instala como \"EventPix Kiosco\" y se actualiza encima de la versión anterior sin perder los ajustes."
+
+      - name: Publicar para los equipos (kiosco-latest)
+        if: startsWith(inputs.release, 'kiosco-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          GRADLE=android/app/build.gradle
+          CODE=$(sed -n "s/.*eventpixVersionCode') ?: \"\([0-9]*\)\".*/\1/p" $GRADLE)
+          NAME=$(sed -n "s/.*eventpixVersionName') ?: \"\([^\"]*\)\".*/\1/p" $GRADLE)
+          if [ -z "$CODE" ] || [ -z "$NAME" ]; then echo "::error::No se encontró la versión en $GRADLE"; exit 1; fi
+          SHA=$(sha256sum eventpix-kiosco.apk | cut -d' ' -f1)
+          jq -n --argjson code "$CODE" --arg name "$NAME" --arg sha "$SHA" \
+            --argjson size "$(stat -c %s eventpix-kiosco.apk)" --arg commit "$GITHUB_SHA" \
+            --arg url "https://github.com/${{ github.repository }}/releases/download/kiosco-latest/eventpix-kiosco.apk" \
+            '{versionCode: $code, versionName: $name, apkUrl: $url, sha256: $sha, size: $size, commit: $commit, publishedAt: (now | todate)}' \
+            > kiosco-version.json
+          cat kiosco-version.json
+          gh release view kiosco-latest >/dev/null 2>&1 || gh release create kiosco-latest \
+            --prerelease --target "$GITHUB_SHA" --title "Kiosco (última versión)" \
+            --notes "Última versión del kiosco. Los equipos se actualizan desde Ajustes → Equipo → Actualización."
+          # Primero el APK y después el json: un equipo nunca ve una versión sin su APK
+          gh release upload kiosco-latest eventpix-kiosco.apk --clobber
+          gh release upload kiosco-latest kiosco-version.json --clobber
