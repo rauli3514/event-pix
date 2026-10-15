@@ -10,7 +10,9 @@ export type DeviceCommand =
     | { action: 'clear_cache' }
     | { action: 'reset_telemetry' }
     | { action: 'set_volume'; volume: number }
-    | { action: 'connect_wifi'; ssid: string; password: string };
+    | { action: 'connect_wifi'; ssid: string; password: string }
+    // Abre en la TV la actualización de la app (alguien confirma con el control remoto).
+    | { action: 'update_app' };
 
 interface SignedCommand {
     v: 2;

@@ -10,6 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useDisplayDevice, useAssignContentToDevice, useUpdateDisplayDevice, useDisplayCampaigns, useDeleteAssignment } from "@/hooks/use-display-hub";
 import { useDisplayMedia } from "@/hooks/use-display-media";
 import { sendDeviceCommand, resetDeviceCommandSecret, DeviceCommand } from "@/lib/displayCommands";
+import { fetchPublishedTvVersion, PublishedTvVersion } from "@/lib/tvUpdate";
+
+const TV_RELEASE_PAGE = 'https://github.com/rauli3514/event-pix/releases/tag/tv-latest';
 
 const WifiSignal = ({ dbm }: { dbm: number }) => {
     let bars = 0;
@@ -56,6 +59,11 @@ const DisplayDeviceDetail = () => {
     const [wifiSsid, setWifiSsid] = useState('');
     const [wifiPass, setWifiPass] = useState('');
     const [volume, setVolume] = useState('50');
+    // Última versión publicada de la app TV, para avisar si esta pantalla está desactualizada.
+    const [publishedTv, setPublishedTv] = useState<PublishedTvVersion | null>(null);
+    useEffect(() => {
+        fetchPublishedTvVersion().then(setPublishedTv);
+    }, []);
 
     useEffect(() => {
         if (deviceData) {
@@ -149,6 +157,11 @@ const DisplayDeviceDetail = () => {
     const handleSetVolume = () => runCommand({ action: 'set_volume', volume: parseInt(volume, 10) }, `Comando de volumen (${volume}%) enviado`);
 
     const handleResetTelemetry = () => runCommand({ action: 'reset_telemetry' }, "Comando de reseteo de telemetría enviado a la pantalla");
+
+    const handleUpdateApp = () => runCommand(
+        { action: 'update_app' },
+        'Actualización enviada: la TV la descarga y muestra "Instalar". Alguien tiene que confirmarlo con el control remoto.'
+    );
 
     const handleResetCommandKey = async () => {
         if (!deviceData?.id) return;
@@ -533,6 +546,31 @@ const DisplayDeviceDetail = () => {
                                     <div>
                                         <p className="text-sm font-medium text-slate-300">Versión APK EventPix</p>
                                         <p className="text-sm text-slate-500">{deviceData.app_version || 'Desconocida'}</p>
+                                        {(() => {
+                                            // app_version_code lo informan las apps desde la 2.2 (las que se actualizan solas).
+                                            const deviceCode = deviceData.telemetry?.app_version_code as number | undefined;
+                                            if (!publishedTv?.versionCode) return null;
+                                            if (typeof deviceCode !== 'number') {
+                                                return (
+                                                    <p className="text-xs text-amber-400 mt-1">
+                                                        Esta versión no se actualiza sola. Instalá una vez la{' '}
+                                                        <a href={TV_RELEASE_PAGE} target="_blank" rel="noreferrer" className="underline">v{publishedTv.versionName}</a>
+                                                        {' '}y desde ahí se actualiza desde el panel.
+                                                    </p>
+                                                );
+                                            }
+                                            if (deviceCode >= publishedTv.versionCode) {
+                                                return <p className="text-xs text-emerald-400 mt-1">Al día</p>;
+                                            }
+                                            return (
+                                                <div className="mt-1.5 space-y-1.5">
+                                                    <p className="text-xs text-orange-400">Hay una versión nueva: v{publishedTv.versionName}</p>
+                                                    <Button onClick={handleUpdateApp} size="sm" variant="outline" className="h-7 text-xs border-orange-500/50 bg-slate-950 text-orange-300 hover:text-white hover:bg-orange-600">
+                                                        Actualizar app
+                                                    </Button>
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                                 {deviceData.telemetry?.hardware && (

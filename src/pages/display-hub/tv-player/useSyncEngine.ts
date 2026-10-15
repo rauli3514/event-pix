@@ -319,6 +319,8 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
                         }
                         forceHeartbeat();
                     }
+                } else if (command.action === 'update_app') {
+                    if (hasTvBridgeMethod('startUpdate')) callTvBridge('startUpdate');
                 } else if (command.action === 'connect_wifi') {
                     const { ssid, password } = command;
                     if (ssid && password && hasTvBridgeMethod('connectToWifi')) {

@@ -11,10 +11,13 @@ android {
         applicationId = "com.eventpix.tv.player"
         minSdk = 21
         targetSdk = 34
-        // Subir en cada APK que se instale en las TVs: el panel muestra
-        // versionName en la telemetría de cada pantalla.
-        versionCode = 2
-        versionName = "2.1.0"
+        // En CI (workflow "APK de la TV") la versión sale del número de corrida:
+        // versionCode = 100 + N y versionName = 2.2.N, así cada APK publicado es
+        // mayor que el anterior y la actualización desde la TV lo reconoce.
+        // Compilado a mano (sin -PtvBuildNumber) queda en 2.2.0 / 3.
+        val ciBuild = (project.findProperty("tvBuildNumber") as String?)?.toIntOrNull()
+        versionCode = if (ciBuild != null) 100 + ciBuild else 3
+        versionName = if (ciBuild != null) "2.2.$ciBuild" else "2.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

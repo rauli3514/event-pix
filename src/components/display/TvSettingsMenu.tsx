@@ -3,6 +3,27 @@ import { useNavigate } from 'react-router-dom';
 import { Settings, RefreshCw, Unlink, Trash2, X, Info, Power, Monitor, Clock, ShieldCheck, Zap } from 'lucide-react';
 
 import { callTvBridge, exitAndroidApp, getTvAppVersion, hasTvBridgeMethod, onTvBridgeReady, openHomeSettings, openWifiSettings } from '@/lib/tvBridge';
+import { checkTvUpdate, startTvUpdate, supportsTvUpdate, TvUpdateStatus, useTvUpdateStatus } from '@/lib/tvUpdate';
+
+// Texto y acción de la opción "Actualizar app" según el estado que informa la app.
+function updateMenuItem(status: TvUpdateStatus): { label: string; action: () => void } {
+    const current = status.current?.name ? ` (v${status.current.name})` : '';
+    switch (status.state) {
+        case 'available':
+            return { label: `Actualizar app a v${status.latest?.name ?? ''}`, action: startTvUpdate };
+        case 'downloading':
+            return { label: `Descargando actualización… ${status.progress ?? 0}%`, action: () => {} };
+        case 'installing':
+        case 'confirm':
+            return { label: 'Confirmá la instalación en pantalla', action: () => {} };
+        case 'up_to_date':
+            return { label: `App al día${current}`, action: checkTvUpdate };
+        case 'error':
+            return { label: 'Actualización: error, reintentar', action: checkTvUpdate };
+        default:
+            return { label: 'Buscando actualización…', action: checkTvUpdate };
+    }
+}
 
 interface TvSettingsMenuProps {
     deviceCode: string;
@@ -22,6 +43,8 @@ export const TvSettingsMenu = ({ deviceCode, onRefresh }: TvSettingsMenuProps) =
     const [rebootHour, setRebootHour] = useState(3);
     // null = esta app no maneja el permiso (navegador, kiosco o Android viejo).
     const [canAutoStart, setCanAutoStart] = useState<boolean | null>(null);
+    const updateStatus = useTvUpdateStatus();
+    const [canUpdate, setCanUpdate] = useState(false);
 
     const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
@@ -34,6 +57,9 @@ export const TvSettingsMenu = ({ deviceCode, onRefresh }: TvSettingsMenuProps) =
                 setKeepAwake(callTvBridge<boolean>('getKeepAwake') ?? true);
                 setRebootHour(callTvBridge<number>('getRebootHour') ?? 3);
                 setCanAutoStart(hasTvBridgeMethod('canAutoStart') ? !!callTvBridge<boolean>('canAutoStart') : null);
+                // Al abrir el menú se busca si hay una versión nueva de la app.
+                setCanUpdate(supportsTvUpdate());
+                if (supportsTvUpdate()) checkTvUpdate();
                 callTvBridge('setOrientation', true); // Force hardware to landscape
             });
         }
@@ -64,6 +90,11 @@ export const TvSettingsMenu = ({ deviceCode, onRefresh }: TvSettingsMenuProps) =
                 setIsOpen(false);
             }
         },
+        ...(canUpdate ? [{
+            id: 'app_update',
+            ...updateMenuItem(updateStatus),
+            icon: <RefreshCw className={`w-5 h-5 ${updateStatus.state === 'available' ? 'text-orange-400' : ''}`} />,
+        }] : []),
         {
             id: 'autoboot',
             label: `Inicio Automático: ${autoBoot ? 'ON' : 'OFF'}`,

@@ -1,10 +1,13 @@
 name: APK de la TV
 
 # Compila la app Android de las pantallas (android-tv-player).
-# - En cada push o PR que toque android-tv-player/: compila y deja el APK como
-#   artefacto del run (sirve para verificar que el código compila).
-# - A mano (Actions → "APK de la TV" → Run workflow): además lo publica en la
-#   release elegida (por defecto "tv-prueba"), con un link fijo para bajarlo.
+# - Push o PR que toque android-tv-player/: compila y deja el APK como artefacto
+#   (sirve para verificar que el código compila).
+# - Push a main (o a mano, Run workflow): además lo publica en la release fija
+#   "tv-latest" con tv-version.json. Las TVs lo leen para ofrecer "Actualizar"
+#   desde su menú o desde el panel (sin pendrive).
+# - Semanal: mantiene viva la firma en la caché de GitHub (si la caché se
+#   borrara, la firma cambiaría y las TVs no aceptarían la actualización).
 on:
   push:
     paths:
@@ -15,21 +18,32 @@ on:
       - 'android-tv-player/**'
       - '.github/workflows/tv-apk.yml'
   workflow_dispatch:
-    inputs:
-      release:
-        description: 'Release donde se publica el APK (ej. tv-prueba, tv-v2.1)'
-        required: false
-        default: tv-prueba
+  schedule:
+    - cron: '17 6 * * 1' # lunes 06:17 UTC
 
 permissions:
   contents: write
 
 concurrency:
   group: tv-apk-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: tv-latest
 
 jobs:
+  keep-signing-key:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tocar la caché de la firma (evita que GitHub la borre por inactividad)
+        uses: actions/cache/restore@v4
+        with:
+          path: tv-debug.keystore
+          key: tv-debug-keystore-v1
+
   build:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,17 +53,18 @@ jobs:
           distribution: temurin
           java-version: '17' # AGP 8.5
 
-      - name: Firma de debug fija
+      - name: Firma fija
         uses: actions/cache@v4
         with:
           path: tv-debug.keystore
           key: tv-debug-keystore-v1
 
-      # Siempre la misma firma: cada APK de CI se instala encima del anterior
-      # sin perder el código de la pantalla ni sus ajustes.
+      # Siempre la misma firma: cada APK se instala encima del anterior sin
+      # perder el código de la pantalla ni sus ajustes.
       - name: Crear la firma si no existe
         run: |
           if [ ! -f tv-debug.keystore ]; then
+            echo "::warning::No había firma en caché: se crea una nueva. Las TVs con un APK firmado con otra clave necesitan reinstalarlo a mano una vez."
             keytool -genkeypair -keystore tv-debug.keystore -storepass android \
               -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
               -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
@@ -61,25 +76,42 @@ jobs:
         working-directory: android-tv-player
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
-          VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          ./gradlew assembleDebug --no-daemon --stacktrace -PtvBuildNumber=${{ github.run_number }}
           cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/eventpix-tv.apk"
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$((100 + ${{ github.run_number }}))" >> "$GITHUB_ENV"
+          echo "VERSION_NAME=2.2.${{ github.run_number }}" >> "$GITHUB_ENV"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: eventpix-tv-${{ env.VERSION }}
+          name: eventpix-tv-${{ env.VERSION_NAME }}
           path: eventpix-tv.apk
 
-      - name: Publicar en la release "${{ inputs.release || 'tv-prueba' }}"
-        if: github.event_name == 'workflow_dispatch'
+      - name: Publicar en la release "tv-latest"
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE: ${{ inputs.release || 'tv-prueba' }}
         run: |
-          gh release delete "$RELEASE" --yes --cleanup-tag || true
-          gh release create "$RELEASE" eventpix-tv.apk \
-            --prerelease \
-            --target "$GITHUB_SHA" \
-            --title "App TV $VERSION ($RELEASE)" \
-            --notes "APK de las pantallas EventPix TV $VERSION (commit ${GITHUB_SHA::7}). Los APK compilados por este workflow tienen siempre la misma firma y se instalan uno encima del otro."
+          SHA256=$(sha256sum eventpix-tv.apk | cut -d' ' -f1)
+          SIZE=$(stat -c%s eventpix-tv.apk)
+          cat > tv-version.json <<EOF
+          {
+            "versionCode": $VERSION_CODE,
+            "versionName": "$VERSION_NAME",
+            "apkUrl": "https://github.com/${{ github.repository }}/releases/download/$RELEASE_TAG/eventpix-tv.apk",
+            "sha256": "$SHA256",
+            "size": $SIZE,
+            "commit": "${GITHUB_SHA::7}",
+            "publishedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+          cat tv-version.json
+
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --title "App TV" --notes "Última versión de la app de las pantallas." --target "$GITHUB_SHA"
+          fi
+          # Primero el APK y después el JSON: una TV nunca ve una versión nueva
+          # cuyo APK todavía no está subido.
+          gh release upload "$RELEASE_TAG" eventpix-tv.apk --clobber
+          gh release upload "$RELEASE_TAG" tv-version.json --clobber
+          gh release edit "$RELEASE_TAG" --title "App TV $VERSION_NAME" \
+            --notes "Última versión de la app de las pantallas: $VERSION_NAME (versionCode $VERSION_CODE, commit ${GITHUB_SHA::7}). Las TVs la instalan desde Menú → Actualizar app, o desde el panel."

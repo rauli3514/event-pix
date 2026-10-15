@@ -8,6 +8,16 @@ import android.util.Log
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        // Después de actualizarse desde la TV, volver a abrir la app.
+        if (intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
+            Log.d("BootReceiver", "App actualizada: reabriendo EventPix TV")
+            val relaunch = Intent(context, MainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            }
+            context.startActivity(relaunch)
+            return
+        }
+
         if (intent.action == Intent.ACTION_BOOT_COMPLETED || 
             intent.action == "android.intent.action.QUICKBOOT_POWERON" ||
             intent.action == "android.intent.action.LOCKED_BOOT_COMPLETED") {
