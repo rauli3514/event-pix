@@ -17,21 +17,21 @@ export const salesWhatsAppUrl = (text = '¡Hola! Probé la demo de EventPix y me
  * public/demo/ y cambiar las rutas acá (vertical u horizontal, ~1200px).
  */
 const DEMO_PHOTOS: { url: string; author?: string; caption?: string }[] = [
-    { url: '/ai-themes/gala-alfombra-roja.jpg', author: 'Caro', caption: '¡La mejor noche!' },
-    { url: '/ai-themes/fiesta-disco-70s.jpg', author: 'Tío Jorge' },
-    { url: '/ai-themes/estudiante-de-magia.jpg', author: 'Lu y Fede', caption: 'Los queremos mucho 💛' },
-    { url: '/ai-themes/gaucho-argentino.jpg', author: 'Abuela Rosa' },
-    { url: '/ai-themes/capitan-pirata.jpg', author: 'Nico' },
-    { url: '/ai-themes/futuro-cyberpunk.jpg', author: 'Sofi' },
-    { url: '/ai-themes/caricatura-simpson.jpg', author: 'Los primos', caption: '¡Que vivan los novios!' },
-    { url: '/ai-themes/ancient-egypt-royalty.jpg', author: 'Martín' },
-    { url: '/ai-themes/gangster-retro.jpg', author: 'Juli' },
-    { url: '/ai-themes/figura-coleccionable-3d.jpg', author: 'Tomi' },
+    { url: '/demo/novios-anillo.jpg', author: 'Sofi', caption: '¡Sí, quiero! 💍' },
+    { url: '/demo/amigos.jpg', author: 'Los amigos', caption: '¡La mejor boda!' },
+    { url: '/demo/selfie-novios.jpg', author: 'Laura y Raúl', caption: 'Felices 💛' },
+    { url: '/demo/salon.jpg', author: 'Pao', caption: '¡Qué lindo salón!' },
+    { url: '/demo/amigas.jpg', author: 'Vero', caption: '¡Qué noche!' },
+    { url: '/demo/vaso-souvenir.jpg', author: 'Meli', caption: 'Los souvenirs 😍' },
+    { url: '/demo/novios.jpg', author: 'Martín' },
+    { url: '/demo/mesa.jpg', author: 'Mesa 4' },
+    { url: '/demo/novios-noche.jpg', author: 'Juli', caption: 'Hermosos' },
+    { url: '/demo/pista.jpg', author: 'Nico', caption: '¡A bailar!' },
 ];
 
 const DEMO_MESSAGES: { text: string; author: string }[] = [
-    { text: '¡Gracias por hacernos parte de este día tan lindo! Los queremos', author: 'Tía Marta' },
-    { text: 'Que sean muy felices. ¡A bailar toda la noche! 🎉', author: 'Los del trabajo' },
+    { text: '¡Muchas felicidades! ¡Los queremos!', author: 'Tía Marta' },
+    { text: 'La mejor boda 🎉', author: 'Los del trabajo' },
 ];
 
 /** Contenido inicial de la pantalla de demo (de lo más nuevo a lo más viejo, como el muro real) */
@@ -60,7 +60,7 @@ export const demoInitialItems = (): Submission[] => {
 /** Ajustes de la pantalla de demo (los mismos campos que un evento real) */
 export const DEMO_SETTINGS = {
     id: 'demo',
-    title: 'Tu fiesta, en pantalla gigante',
+    title: 'Boda de Laura & Raúl',
     description: '',
     background_image_url: '/event-hero.jpg',
     display_background_url: null,

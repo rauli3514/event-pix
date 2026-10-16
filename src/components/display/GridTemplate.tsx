@@ -149,7 +149,7 @@ export const GridWall = ({ submissions, settings, guestUrl, paused = false, chil
                                                 </div>
                                             </>
                                         ) : (
-                                            <MessageCard item={item} className="h-full w-full rounded-none border-0" />
+                                            <MessageCard item={item} compact className="h-full w-full rounded-none border-0" />
                                         )}
                                     </motion.div>
                                 </AnimatePresence>
