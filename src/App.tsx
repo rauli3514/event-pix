@@ -18,6 +18,8 @@ import KioskAdmin from "./pages/admin/KioskAdmin";
 import KioskScreensaver from "./components/kiosk/KioskScreensaver";
 import RotatedScreen from "./components/kiosk/RotatedScreen";
 import GuestPhoto from "./pages/GuestPhoto";
+import DemoDisplay from "./pages/DemoDisplay";
+import DemoUpload from "./pages/DemoUpload";
 import Display from "./pages/Display";
 import Login from "./pages/Login";
 import DisplayUserLogin from "./pages/DisplayUserLogin";
@@ -86,6 +88,9 @@ const App = () => (
             {/* Tablet que maneja la pantalla del kiosco por Bluetooth */}
             {/* Página pública del QR del kiosco: el invitado baja o comparte su foto */}
             <Route path="/foto" element={<GuestPhoto />} />
+            {/* Demo personal de la landing ("Probalo gratis") */}
+            <Route path="/demo" element={<ForceDark><DemoDisplay /></ForceDark>} />
+            <Route path="/demo/:session" element={<ForceDark><DemoUpload /></ForceDark>} />
             {/* Atajo al panel de kioscos */}
             <Route path="/kioscos" element={<Navigate to="/admin/kioscos" replace />} />
             <Route path="/sticker-test" element={<div className="min-h-screen bg-zinc-950 pt-10"><StickerEditor userPhotoUrl="/placeholder-user.jpg" onSave={(url) => console.log(url)} onCancel={() => console.log("cancel")} /></div>} />

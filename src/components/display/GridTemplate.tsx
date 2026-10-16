@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useSubmissions } from "@/hooks/use-submissions";
-import { useEventSettings } from "@/hooks/use-event-settings";
+import { useEventSettings, type EventSettings } from "@/hooks/use-event-settings";
 import { useWallEffects } from "@/hooks/use-wall-effects";
 import { useGuestUrl } from "@/hooks/use-wall";
 import { useEvent } from "@/context/EventContext";
@@ -42,8 +42,25 @@ export const GridTemplate = ({ eventId, paused = false }: GridTemplateProps) => 
     const { data: settings } = useEventSettings(eventId);
     const { event } = useEvent();
     useWallEffects(eventId, settings);
-
     const guestUrl = useGuestUrl(event);
+
+    return (
+        <GridWall submissions={submissions} settings={settings} guestUrl={guestUrl} paused={paused}>
+            <RouletteModal />
+        </GridWall>
+    );
+};
+
+interface GridWallProps {
+    submissions: Submission[];
+    settings?: EventSettings | null;
+    guestUrl: string;
+    paused?: boolean;
+    children?: ReactNode;
+}
+
+/** La cuadrícula en sí, con los datos que le pasen (la usa también la demo de la landing) */
+export const GridWall = ({ submissions, settings, guestUrl, paused = false, children }: GridWallProps) => {
     const stats = useMemo(() => getWallStats(submissions), [submissions]);
     const pool = useMemo(() => wallItems(submissions), [submissions]);
     const byId = useMemo(() => new Map(pool.map((s) => [s.id, s])), [pool]);
@@ -142,7 +159,7 @@ export const GridTemplate = ({ eventId, paused = false }: GridTemplateProps) => 
                 </main>
             )}
 
-            <RouletteModal />
+            {children}
         </div>
     );
 };
