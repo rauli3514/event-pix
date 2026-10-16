@@ -16,6 +16,8 @@ interface DriveAlbumCardProps {
     eventDate?: string | null;
     submissions: Submission[];
     eventName: string;
+    /** Avisa el link de la carpeta cuando terminó de copiar (lo usa el resumen para compartir) */
+    onExported?: (folderUrl: string) => void;
 }
 
 /**
@@ -23,7 +25,7 @@ interface DriveAlbumCardProps {
  * (la misma del kiosco si se llama igual) y deja el link listo para el anfitrión.
  * La conexión con Drive está configurada en Supabase (función drive-admin).
  */
-export const DriveAlbumCard = ({ eventId, eventDate, submissions, eventName }: DriveAlbumCardProps) => {
+export const DriveAlbumCard = ({ eventId, eventDate, submissions, eventName, onExported }: DriveAlbumCardProps) => {
     const [folder, setFolder] = useState(eventName);
     const [shareFolder, setShareFolder] = useState(true);
     const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -51,6 +53,7 @@ export const DriveAlbumCard = ({ eventId, eventDate, submissions, eventName }: D
                 onProgress: (done, total) => setProgress({ done, total }),
             });
             setResult(res);
+            if (res.folderUrl) onExported?.(res.folderUrl);
             if (res.failed.length) toast.warning(`Faltaron ${res.failed.length} archivos. Tocá de nuevo para reintentar.`);
             else toast.success("¡Álbum en Drive!");
         } catch (err) {
