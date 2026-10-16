@@ -24,6 +24,7 @@ import { AccentColorCard } from "@/components/admin/AccentColorCard";
 import { WallDesignCard } from "@/components/admin/WallDesignCard";
 import { SubmissionCard } from "@/components/admin/SubmissionCard";
 import { DriveAlbumCard } from "@/components/admin/DriveAlbumCard";
+import { EventRecapCard } from "@/components/admin/EventRecapCard";
 import { buildGuestbookPdf } from "@/lib/guestbookPdf";
 import { TriviaGameManager } from "@/components/trivia/TriviaGameManager";
 import { PhotoVoteManager } from "@/components/photovote/PhotoVoteManager";
@@ -41,6 +42,8 @@ const Admin = () => {
 
 
     const [activeTab, setActiveTab] = useState("dashboard");
+    // Link de Drive del último "Enviar álbum", para el resumen para compartir
+    const [albumLink, setAlbumLink] = useState<string | null>(null);
     const [moderationFilter, setModerationFilter] = useState<'pending' | 'approved' | 'rejected'>('pending');
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -1199,7 +1202,17 @@ const Admin = () => {
                 {
                     activeTab === 'downloads' && (
                         <div className="max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-8">
-                            {event && <DriveAlbumCard eventId={event.id} eventDate={event.date} submissions={submissions} eventName={event.name || settings?.title || 'Evento'} />}
+                            {event && <DriveAlbumCard eventId={event.id} eventDate={event.date} submissions={submissions} eventName={event.name || settings?.title || 'Evento'} onExported={setAlbumLink} />}
+                            {event && (
+                                <EventRecapCard
+                                    eventName={settings?.title || event.name || 'Nuestro evento'}
+                                    eventDate={event.date}
+                                    submissions={submissions}
+                                    accent={settings?.accent_color}
+                                    fontClass={settings?.font_family}
+                                    albumLink={albumLink}
+                                />
+                            )}
 
                             <Card className="bg-slate-900 border-slate-800 hover:border-blue-500/50 transition-all cursor-pointer group" onClick={handleDownloadApprovedPhotos}>
                                 <CardContent className="flex flex-col items-center justify-center py-12 gap-6">
