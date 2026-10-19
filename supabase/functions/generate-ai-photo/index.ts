@@ -112,6 +112,24 @@ async function replicatePoll(token: string, id: string): Promise<Prediction> {
   return { id, status: p.status === 'starting' ? 'starting' : 'processing' }
 }
 
+// ─── Saldo de fal.ai (para el panel) ───
+// Necesita una clave de fal con permiso de administrador: FAL_ADMIN_KEY (si FAL_KEY ya
+// es de administrador, sirve esa).
+async function falBalance(key: string) {
+  const res = await fetch('https://api.fal.ai/v1/account/billing?expand=credits', {
+    headers: { Authorization: `Key ${key}` },
+  })
+  const data = await res.json().catch(() => ({}))
+  if (res.status === 401 || res.status === 403) {
+    throw new Error('La clave de fal no puede ver el saldo: creá una clave de tipo ADMIN en fal y guardala en Supabase como FAL_ADMIN_KEY')
+  }
+  if (!res.ok) throw new Error(data?.detail || data?.error?.message || `fal respondió ${res.status}`)
+  const credits = data?.credits ?? data
+  const balance = Number(credits?.current_balance ?? credits?.balance)
+  if (!Number.isFinite(balance)) throw new Error('fal no devolvió el saldo')
+  return { balance, currency: String(credits?.currency || 'USD') }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -123,6 +141,19 @@ serve(async (req) => {
     const body = await req.json()
     const { imageUrl, predictionId, action, device } = body
     const prompt = typeof body.prompt === 'string' ? pickPromptVariants(body.prompt) : body.prompt
+
+    // ─── Saldo de fal.ai: solo super admin, desde el panel ───
+    if (action === 'balance') {
+      const token = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '')
+      const { data: auth } = token ? await admin.auth.getUser(token) : { data: { user: null } }
+      if (!auth?.user) return reply({ success: false, error: 'Iniciá sesión' })
+      const { data: profile } = await admin.from('profiles').select('role').eq('id', auth.user.id).maybeSingle()
+      if (profile?.role !== 'super_admin') return reply({ success: false, error: 'Solo un super admin puede ver el saldo' })
+      const key = Deno.env.get('FAL_ADMIN_KEY') || FAL_KEY
+      if (!key) return reply({ success: false, error: 'Falta FAL_KEY' })
+      const { balance, currency } = await falBalance(key)
+      return reply({ success: true, balance, currency, model: Deno.env.get('FAL_MODEL') || 'fal-ai/nano-banana/edit' })
+    }
 
     // ─── Consultar un trabajo ───
     if (predictionId) {
