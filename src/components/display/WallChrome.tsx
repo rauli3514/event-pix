@@ -51,21 +51,22 @@ export const WallQr = ({ guestUrl, size = 120 }: { guestUrl: string; size?: numb
 
 export const WallHeader = ({ settings, stats, guestUrl, showQr = true, variant = 'overlay' }: WallHeaderProps) => {
     const title = (
-        <h1 className={`text-4xl font-bold ${settings?.font_family || 'font-serif'} tracking-tight text-white drop-shadow-lg flex items-center gap-3 min-w-0`}>
+        <h1 className={`text-4xl max-sm:text-2xl font-bold ${settings?.font_family || 'font-serif'} tracking-tight text-white drop-shadow-lg flex items-center gap-3 min-w-0`}>
             <span className="truncate">{settings?.title || "EventPix"}</span>
-            <img src="/pwa-192x192.png" alt="EventPix" className="h-10 w-10 object-contain ml-2 opacity-90 drop-shadow-md shrink-0" />
+            <img src="/pwa-192x192.png" alt="EventPix" className="h-10 w-10 max-sm:h-7 max-sm:w-7 object-contain ml-2 opacity-90 drop-shadow-md shrink-0" />
         </h1>
     );
 
     if (variant === 'bar') {
         return (
-            <header className="relative z-20 flex items-center justify-between gap-6 px-8 py-4 portrait:px-5">
+            <header className="relative z-20 flex items-center justify-between gap-6 px-8 py-4 portrait:px-5 max-sm:gap-3 max-sm:px-3">
                 <div className="min-w-0 space-y-1">
                     {title}
                     <div className="h-1 w-24 rounded-full bg-[var(--accent)]" />
                 </div>
-                <div className="flex items-center gap-4">
-                    <WallCounter settings={settings} stats={stats} />
+                {/* En un celular no entra todo: queda el título y el QR */}
+                <div className="flex shrink-0 items-center gap-4">
+                    <div className="max-sm:hidden"><WallCounter settings={settings} stats={stats} /></div>
                     {showQr && <WallQr guestUrl={guestUrl} size={96} />}
                 </div>
             </header>
@@ -118,12 +119,13 @@ export const PhotoCredit = ({ item, size = 'md' }: { item: Submission; size?: 's
 };
 
 /** Mensaje de texto como tarjeta (Cuadrícula y Mosaico) */
-export const MessageCard = ({ item, className = '' }: { item: Submission; className?: string }) => (
-    <div className={`flex flex-col justify-center gap-4 rounded-2xl border border-white/15 bg-[var(--accent-soft)] p-6 backdrop-blur-md ${className}`}>
-        <MessageSquareQuote className="h-9 w-9 shrink-0 text-[var(--accent-text)]" />
-        <p className="font-serif text-2xl italic leading-snug text-white line-clamp-6">“{item.content}”</p>
+export const MessageCard = ({ item, className = '', compact = false }: { item: Submission; className?: string; compact?: boolean }) => (
+    // compact: para las celdas de la cuadrícula, que son bajas; el texto se achica con la pantalla y nunca se corta a la mitad
+    <div className={`flex flex-col justify-center rounded-2xl border border-white/15 bg-[var(--accent-soft)] backdrop-blur-md ${compact ? 'min-h-0 gap-[0.9vmin] overflow-hidden p-[2vmin]' : 'gap-4 p-6'} ${className}`}>
+        <MessageSquareQuote className={`shrink-0 text-[var(--accent-text)] ${compact ? 'h-[2.6vmin] w-[2.6vmin] min-h-4 min-w-4' : 'h-9 w-9'}`} />
+        <p className={`font-serif italic leading-snug text-white ${compact ? 'text-[clamp(0.85rem,2.3vmin,2.2rem)] line-clamp-3' : 'text-2xl line-clamp-6'}`}>“{item.content}”</p>
         {!isAnonymousAuthor(item.author) && (
-            <p className="text-lg font-semibold uppercase tracking-widest text-[var(--accent-text)]">— {item.author}</p>
+            <p className={`shrink-0 truncate font-semibold uppercase tracking-widest text-[var(--accent-text)] ${compact ? 'text-[clamp(0.7rem,1.7vmin,1.4rem)]' : 'text-lg'}`}>— {item.author}</p>
         )}
     </div>
 );
