@@ -34,6 +34,14 @@ const CREDIT_ERRORS: Record<string, string> = {
 
 interface Prediction { id: string; status: 'starting' | 'processing' | 'succeeded' | 'failed'; output?: string | null; error?: string }
 
+// Opciones al azar en el prompt: {fondo A|fondo B} → una de ellas en cada foto
+// (igual que src/lib/promptVariants.ts; así anda también con equipos de antes)
+const pickPromptVariants = (prompt: string) =>
+  prompt.replace(/\{([^{}]*\|[^{}]*)\}/g, (_: string, options: string) => {
+    const list = options.split('|').map(o => o.trim()).filter(Boolean)
+    return list.length ? list[Math.floor(Math.random() * list.length)] : ''
+  })
+
 // ─── fal.ai ─────────────────────────────────────────────────────────
 const FAL_QUEUE = 'https://queue.fal.run/'
 
@@ -113,7 +121,8 @@ serve(async (req) => {
 
   try {
     const body = await req.json()
-    const { imageUrl, prompt, predictionId, action, device } = body
+    const { imageUrl, predictionId, action, device } = body
+    const prompt = typeof body.prompt === 'string' ? pickPromptVariants(body.prompt) : body.prompt
 
     // ─── Consultar un trabajo ───
     if (predictionId) {

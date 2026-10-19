@@ -33,6 +33,7 @@ import { useCoverPreview } from '@/hooks/use-cover-preview';
 import { getPageBackground, getScreenBackground } from '@/lib/kioskMedia';
 import { AIProcessing, CameraFlash, CountdownRing } from '@/components/kiosk/KioskAnimations';
 import { revealPhoto, useConfettiBurst } from '@/components/kiosk/kioskEffects';
+import { pickPromptVariants } from '@/lib/promptVariants';
 
 // ---- Types ----
 type Step =
@@ -657,8 +658,8 @@ export default function KioskAI() {
 
       const publicUrl = signedData.signedUrl;
 
-      // Build prompt based on mode
-      const prompt = theme?.prompt || '';
+      // Prompt de la temática; las opciones {a|b|c} se eligen al azar en cada foto
+      const prompt = pickPromptVariants(theme?.prompt || '');
       
       // Llamada unificada a la Edge Function. El equipo paga con los créditos de su cliente
       const requestBody: any = { imageUrl: publicUrl };
