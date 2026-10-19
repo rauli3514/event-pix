@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { ImagePlus, Loader2, Plus, Save, Sparkles, Wand2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { pickPromptVariants } from '@/lib/promptVariants';
 import { coverOptionsFrom } from '@/lib/magazineCover';
 import { useCoverPreview } from '@/hooks/use-cover-preview';
 import { btnGhost, btnPrimary, card, Check, Field, input, Select } from './ui';
@@ -45,7 +46,7 @@ const EDIT_TEMPLATE = 'Edit this photo. Keep every person exactly as they are: s
 
 /** Corre la IA con la sesión del panel (sin equipo) y espera el resultado. */
 async function runTest(imageUrl: string, prompt: string, removeBg = false): Promise<string> {
-  const body = removeBg ? { imageUrl, action: 'remove_bg' } : { imageUrl, prompt };
+  const body = removeBg ? { imageUrl, action: 'remove_bg' } : { imageUrl, prompt: pickPromptVariants(prompt) };
   const { data, error } = await supabase.functions.invoke('generate-ai-photo', { body });
   if (error || !data?.success) throw new Error(error?.message || data?.error || 'No se pudo iniciar la IA');
   let prediction = data.prediction;
@@ -212,7 +213,7 @@ function ThemeEditor({ theme, onSaved }: { theme: ThemeRow; onSaved: () => void 
             <Select value={form.max_people ?? 1} options={[1, 2, 3, 4].map(n => ({ value: n, label: n === 4 ? 'Grupo' : String(n) }))} onChange={v => set('max_people', v)} />
           </Field>
         </div>
-        <Field label="Prompt (en inglés)" hint='Formato de edición: "Edit this photo. Keep every person exactly as they are… Dress them as… Replace the background with…". Así la IA conserva las caras.'>
+        <Field label="Prompt (en inglés)" hint='Formato de edición: "Edit this photo. Keep every person exactly as they are… Dress them as… Replace the background with…". Así la IA conserva las caras. Opciones al azar: {fondo A|fondo B|fondo C} usa una distinta en cada foto.'>
           <textarea className={`${input} min-h-[180px] font-mono text-sm disabled:opacity-50`} value={form.prompt} disabled={form.result_style === 'figurita'} onChange={e => set('prompt', e.target.value)} />
         </Field>
         {form.result_style && SPECIAL[form.result_style] && <p className="text-sm text-violet-300">{SPECIAL[form.result_style]}</p>}

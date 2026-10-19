@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Coins, Plus, Save, Trash2 } from 'lucide-react';
+import { Coins, ExternalLink, Plus, RefreshCw, Save, Trash2, Wallet } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { DEFAULT_STORE, formatArs, loadStore, saveStore, type CreditPack, type StoreSettings } from '@/lib/kioskStore';
 import { btnDanger, btnGhost, btnPrimary, card, Field, input } from './ui';
@@ -25,6 +25,58 @@ const REASONS: Record<LedgerRow['reason'], string> = {
   refund: 'Devolución (la IA falló)',
   adjust: 'Ajuste',
 };
+
+// Precio aproximado por foto de cada modelo de fal (US$), para estimar cuántas quedan
+const COST_PER_PHOTO: Record<string, number> = {
+  'fal-ai/nano-banana/edit': 0.039,
+  'fal-ai/flux-pro/kontext': 0.04,
+};
+
+const fetchFalBalance = async (): Promise<{ balance: number; currency: string; model: string } | { error: string }> => {
+  const { data, error } = await supabase.functions.invoke('generate-ai-photo', { body: { action: 'balance' } });
+  if (error || !data?.success) return { error: data?.error || error?.message || 'No se pudo consultar el saldo' };
+  return { balance: data.balance, currency: data.currency, model: data.model };
+};
+
+/** Saldo de la cuenta de fal.ai: el dinero que queda para las conversiones con IA. */
+function FalBalance() {
+  const [state, setState] = useState<{ balance: number; currency: string; model: string } | null>(null);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const apply = useCallback((r: Awaited<ReturnType<typeof fetchFalBalance>>) => {
+    if ('error' in r) setError(r.error);
+    else { setError(''); setState(r); }
+    setLoading(false);
+  }, []);
+  useEffect(() => { fetchFalBalance().then(apply); }, [apply]);
+  const reload = () => { setLoading(true); fetchFalBalance().then(apply); };
+
+  const cost = state ? COST_PER_PHOTO[state.model] : undefined;
+  const low = state != null && state.balance < 5;
+  return (
+    <div className={`${card} flex flex-wrap items-center gap-4`}>
+      <Wallet className={`h-8 w-8 ${low ? 'text-amber-400' : 'text-violet-400'}`} />
+      <div className="min-w-[200px] flex-1">
+        <p className="text-sm text-slate-400">Saldo para conversiones con IA (fal.ai)</p>
+        {state ? (
+          <>
+            <p className={`text-2xl font-bold ${low ? 'text-amber-300' : 'text-white'}`}>
+              {state.currency === 'USD' ? 'US$' : state.currency} {state.balance.toFixed(2)}
+              {cost && <span className="ml-2 text-base font-medium text-slate-400">≈ {Math.floor(state.balance / cost)} fotos</span>}
+            </p>
+            {low && <p className="text-sm text-amber-300">Queda poco saldo: cargá antes del próximo evento.</p>}
+          </>
+        ) : error ? (
+          <p className="text-sm text-amber-300">{error}</p>
+        ) : (
+          <p className="text-slate-500">Consultando…</p>
+        )}
+      </div>
+      <button onClick={reload} disabled={loading} className={btnGhost}><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Actualizar</button>
+      <a href="https://fal.ai/dashboard/billing" target="_blank" rel="noreferrer" className={btnPrimary}><ExternalLink className="h-4 w-4" /> Cargar saldo</a>
+    </div>
+  );
+}
 
 export default function ClientsTab({ accounts, devices, onChange }: {
   accounts: KioskAccountRow[];
@@ -55,6 +107,7 @@ export default function ClientsTab({ accounts, devices, onChange }: {
 
   return (
     <div className="space-y-6">
+    <FalBalance />
     <StoreEditor store={store} onSaved={setStore} />
     <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
       <div className="space-y-4">
