@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Music, Trash2, Upload, Video } from 'lucide-react';
-import { toast } from 'sonner';
+import { ArrowLeft, Video } from 'lucide-react';
 import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
 import { useRemoteFocus } from '@/hooks/use-remote-focus';
-import { getScreenMedia, removeScreenMedia, saveScreenMedia } from '@/lib/kioskMedia';
-import { isDriveConfigured } from '@/lib/driveBackup';
+import { migrateLegacyMedia } from '@/lib/videoBooth/media';
 import { recordingSupport } from '@/lib/videoBooth/recorder';
+import { BrandPanel, DeliveryPanel, FramesPanel, LayersPanel, MotionPanel, MusicPanel } from './VideoSettingsPanels';
 import {
   DEFAULT_PROMPTS, getVideoSettings, modeConfig, RAMP_PRESETS, saveModeConfig, saveVideoSettings,
   VIDEO_FILTERS, VIDEO_MODES, type VideoBoothSettings,
@@ -16,31 +15,6 @@ import { buttonClass, Choice, Field, inputClass, Panel, Toggle } from '@/pages/k
 // Ajustes de la cabina de video (detrás de la clave del equipo). La cámara
 // (cuál, espejo, giro, calidad) es la misma del kiosco: se cambia en sus Ajustes.
 
-function useMediaName(key: string) {
-  const [name, setName] = useState<string | null>(null);
-  const [url, setUrl] = useState<string | null>(null);
-  useEffect(() => {
-    let alive = true;
-    let objectUrl: string | null = null;
-    const load = () => getScreenMedia(key).then(rec => {
-      if (!alive) return;
-      setName(rec?.name ?? null);
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-      objectUrl = rec ? URL.createObjectURL(rec.blob) : null;
-      setUrl(objectUrl);
-    }).catch(() => {});
-    void load();
-    const onChange = (e: Event) => { if ((e as CustomEvent).detail === key) void load(); };
-    window.addEventListener('kiosk-media-changed', onChange);
-    return () => {
-      alive = false;
-      window.removeEventListener('kiosk-media-changed', onChange);
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [key]);
-  return { name, url };
-}
-
 export default function VideoBoothSettings() {
   const navigate = useNavigate();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -49,22 +23,11 @@ export default function VideoBoothSettings() {
   const updateMode = (key: Parameters<typeof saveModeConfig>[0], patch: Parameters<typeof saveModeConfig>[1]) => setS(saveModeConfig(key, patch));
   useRemoteFocus(rootRef, []);
 
-  const overlay = useMediaName('video:overlay');
-  const music = useMediaName('video:music');
-  const overlayInput = useRef<HTMLInputElement>(null);
-  const musicInput = useRef<HTMLInputElement>(null);
   const support = recordingSupport();
   const [promptsText, setPromptsText] = useState(() => (s.prompts?.length ? s.prompts : DEFAULT_PROMPTS).join('\n'));
 
-  const upload = async (key: 'video:overlay' | 'video:music', file: File | undefined) => {
-    if (!file) return;
-    try {
-      await saveScreenMedia(key, file);
-      toast.success('Archivo guardado en el equipo');
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'No se pudo guardar el archivo');
-    }
-  };
+  // Marco y canción de la primera versión → listas nuevas
+  useEffect(() => { void migrateLegacyMedia().then(() => setS(getVideoSettings())); }, []);
 
   return (
     <div ref={rootRef} className="relative min-h-screen text-white">
@@ -94,7 +57,7 @@ export default function VideoBoothSettings() {
                     <Choice label="Filtro" value={c.filter} options={VIDEO_FILTERS.map(f => ({ value: f.value, label: f.label }))}
                       onChange={v => updateMode(m.key, { filter: v })} />
                     <div className="grid sm:grid-cols-2 gap-3">
-                      <Toggle label="Música de fondo" hint={music.name ? music.name : 'Primero cargá una canción'} checked={c.music} onChange={v => updateMode(m.key, { music: v })} />
+                      <Toggle label="Música de fondo" hint={s.songs?.length ? 'Tu música (panel Música)' : 'Primero cargá una canción'} checked={c.music} onChange={v => updateMode(m.key, { music: v })} />
                       {m.effect === 'none' && <Toggle label="Sonido del ambiente" hint="Micrófono de la webcam" checked={c.mic} onChange={v => updateMode(m.key, { mic: v })} />}
                     </div>
                   </div>
@@ -116,35 +79,10 @@ export default function VideoBoothSettings() {
             options={[30, 45, 60, 90].map(n => ({ value: n, label: `${n} s` }))} />
         </Panel>
 
-        <Panel title="Marco del video" description="Se dibuja encima de todo el video. El PNG propio tiene que tener la misma forma que el video (por ejemplo 1080×1920 para vertical) y el centro transparente.">
-          <Choice label="Marco" value={s.overlay ?? 'none'} onChange={v => update({ overlay: v })}
-            options={[{ value: 'none', label: 'Sin marco' }, { value: 'title', label: 'Nombre del evento' }, { value: 'custom', label: 'PNG propio' }]} />
-          {(s.overlay ?? 'none') === 'title' && (
-            <Field label="Texto (vacío = nombre del evento)">
-              <input className={inputClass} value={s.overlayText ?? ''} onChange={e => update({ overlayText: e.target.value })} placeholder="Ej. Sofi & Juan" />
-            </Field>
-          )}
-          {s.overlay === 'custom' && (
-            <div className="flex flex-wrap items-center gap-4">
-              {overlay.url && <img src={overlay.url} alt="" className="h-40 rounded-xl bg-[repeating-conic-gradient(#444_0_25%,#666_0_50%)] bg-[length:20px_20px]" />}
-              <input ref={overlayInput} type="file" accept="image/png,image/webp" className="hidden" onChange={e => { void upload('video:overlay', e.target.files?.[0]); e.target.value = ''; }} />
-              <button className={buttonClass} onClick={() => overlayInput.current?.click()}><Upload className="w-5 h-5" /> {overlay.name ? 'Cambiar PNG' : 'Subir PNG'}</button>
-              {overlay.name && <button className={buttonClass} onClick={() => void removeScreenMedia('video:overlay')}><Trash2 className="w-5 h-5" /> Quitar</button>}
-            </div>
-          )}
-        </Panel>
-
-        <Panel title="Música" description="Una canción (MP3) que suena en los videos con música. Queda guardada en el equipo.">
-          <div className="flex flex-wrap items-center gap-4">
-            <span className="flex items-center gap-2 text-lg"><Music className="w-5 h-5 text-[#ff2e93]" /> {music.name ?? 'Sin canción'}</span>
-            {music.url && <audio src={music.url} controls className="h-10" />}
-            <input ref={musicInput} type="file" accept="audio/*" className="hidden" onChange={e => { void upload('video:music', e.target.files?.[0]); e.target.value = ''; }} />
-            <button className={buttonClass} onClick={() => musicInput.current?.click()}><Upload className="w-5 h-5" /> {music.name ? 'Cambiar' : 'Cargar canción'}</button>
-            {music.name && <button className={buttonClass} onClick={() => void removeScreenMedia('video:music')}><Trash2 className="w-5 h-5" /> Quitar</button>}
-          </div>
-          <Choice label="Volumen" value={s.musicVolume ?? 0.8} onChange={v => update({ musicVolume: v })}
-            options={[0.4, 0.6, 0.8, 1].map(n => ({ value: n, label: `${Math.round(n * 100)}%` }))} />
-        </Panel>
+        <FramesPanel s={s} update={update} />
+        <LayersPanel s={s} update={update} />
+        <BrandPanel s={s} update={update} />
+        <MusicPanel s={s} update={update} />
 
         <Panel title="Efectos" description="Cámara lenta, plataforma 360 y boomerang.">
           <Choice label="Rampa de velocidad del 360" value={s.rampPreset ?? 'clasica'} onChange={v => update({ rampPreset: v })}
@@ -162,11 +100,13 @@ export default function VideoBoothSettings() {
             onBlur={() => update({ prompts: promptsText.split('\n').map(p => p.trim()).filter(Boolean) })} />
         </Panel>
 
-        <Panel title="Pantalla de inicio y QR">
+        <MotionPanel s={s} update={update} />
+        <DeliveryPanel s={s} update={update} />
+
+        <Panel title="Pantalla de inicio">
           <Field label="Texto grande (vacío = nombre del evento)">
             <input className={inputClass} value={s.title ?? ''} onChange={e => update({ title: e.target.value })} placeholder="¡Grabá tu video!" />
           </Field>
-          <Toggle label="Mostrar QR para bajar el video" hint={isDriveConfigured() ? 'Se sube a la carpeta de Drive del kiosco' : 'Falta configurar Drive en Ajustes del kiosco → Compartir y nube'} checked={s.showQr !== false} onChange={v => update({ showQr: v })} />
         </Panel>
 
         <Panel title="Cámara" description="La webcam, el espejo y el giro son los del kiosco de fotos (Ajustes del kiosco → Cámara).">

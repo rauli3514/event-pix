@@ -1,3 +1,5 @@
+import { detectFaces, drawAccessory, loadCustomAccessory, type Face } from '@/lib/faceFx';
+import type { Decor } from './decor';
 import { videoFilter } from './settings';
 
 // Compositor en vivo: dibuja la cámara en un canvas del tamaño del video final
@@ -11,8 +13,10 @@ export interface CompositorOptions {
   mirror?: boolean;
   rotation?: number;
   filter?: string;
-  /** Marco (PNG con transparencia o canvas) del tamaño del video */
-  overlay?: CanvasImageSource | null;
+  /** Capas (marco, animación, logo) que se graban en vivo. Sin capas acá, se agregan después */
+  decor?: Decor | null;
+  /** Accesorio que sigue la cara ('none' o vacío = sin accesorio) */
+  accessory?: string;
 }
 
 /** Un cuadro guardado para la reversa (boomerang / final del 360). */
@@ -50,6 +54,14 @@ export class Compositor {
   private gen = 0;
 
   private video: HTMLVideoElement;
+  private startedAt = performance.now();
+  // Accesorios: se buscan caras ~8 veces por segundo y se dibujan en cada cuadro
+  private faces: Face[] = [];
+  private detecting = false;
+  private lastDetect = 0;
+  private customAcc: Awaited<ReturnType<typeof loadCustomAccessory>>;
+  /** Mientras corre la placa final no se dibuja la cámara */
+  private paused = false;
 
   constructor(video: HTMLVideoElement, opts: CompositorOptions) {
     this.video = video;
@@ -71,7 +83,54 @@ export class Compositor {
 
   update(patch: Partial<CompositorOptions>) {
     this.opts = { ...this.opts, ...patch };
+    if (patch.accessory) void this.loadAccessory();
   }
+
+  private async loadAccessory() {
+    const acc = this.opts.accessory;
+    this.customAcc = acc ? await loadCustomAccessory(acc).catch(() => undefined) : undefined;
+  }
+
+  /** Segundos desde que arrancó (para las animaciones en vivo). */
+  get time() { return (performance.now() - this.startedAt) / 1000; }
+
+  /**
+   * Placa final en vivo (videos sin efectos): deja de dibujar la cámara y muestra
+   * la placa durante `seconds` mientras la grabación sigue.
+   */
+  async playEndCard(decor: Decor, seconds: number) {
+    this.paused = true;
+    const start = performance.now();
+    await new Promise<void>(resolve => {
+      const tick = () => {
+        const t = (performance.now() - start) / 1000;
+        decor.drawEndCard(this.ctx, Math.min(t, seconds), seconds);
+        if (t >= seconds) resolve();
+        else requestAnimationFrame(tick);
+      };
+      tick();
+    });
+  }
+
+  /** Foto chica del cuadro actual (miniatura para la galería). */
+  snapshot(maxWidth = 360): Promise<Blob | null> {
+    const k = Math.min(1, maxWidth / this.opts.width);
+    const c = document.createElement('canvas');
+    c.width = Math.round(this.opts.width * k);
+    c.height = Math.round(this.opts.height * k);
+    const ctx = c.getContext('2d')!;
+    ctx.drawImage(this.canvas, 0, 0, c.width, c.height);
+    // Si las capas no van grabadas en vivo, igual aparecen en la miniatura
+    if (!this.opts.decor && this.thumbDecor) {
+      ctx.save();
+      ctx.scale(k, k);
+      this.thumbDecor.draw(ctx, this.time);
+      ctx.restore();
+    }
+    return new Promise(resolve => c.toBlob(b => resolve(b), 'image/jpeg', 0.8));
+  }
+  /** Capas para la miniatura cuando no se graban en vivo */
+  thumbDecor: Decor | null = null;
 
   private buildVignette() {
     const { width: w, height: h } = this.opts;
@@ -84,6 +143,8 @@ export class Compositor {
   start() {
     if (this.running) return;
     this.running = true;
+    this.startedAt = performance.now();
+    void this.loadAccessory();
     const v = this.video as VideoWithRvfc;
     const loop = () => {
       if (!this.running) return;
@@ -136,10 +197,10 @@ export class Compositor {
 
   private draw() {
     const { video, ctx } = this;
-    const { width: W, height: H, mirror, rotation, overlay } = this.opts;
+    const { width: W, height: H, mirror, rotation, decor, accessory } = this.opts;
     const vw = video.videoWidth;
     const vh = video.videoHeight;
-    if (!vw || !vh || video.readyState < 2) return;
+    if (this.paused || !vw || !vh || video.readyState < 2) return;
     this.lastDraw = performance.now();
     const rot = ((((Number(rotation) || 0) % 360) + 360) % 360);
     const sideways = rot === 90 || rot === 270;
@@ -175,9 +236,24 @@ export class Compositor {
       ctx.fillStyle = this.vignette;
       ctx.fillRect(0, 0, W, H);
     }
-    if (overlay) ctx.drawImage(overlay, 0, 0, W, H);
+    if (accessory && accessory !== 'none') this.drawAccessories(accessory);
+    if (decor) decor.draw(ctx, this.time);
 
     if (this.bufferSeconds > 0) this.capture();
+  }
+
+  private drawAccessories(accessory: string) {
+    const now = performance.now();
+    // La búsqueda copia el cuadro al llamarla (antes de dibujar el accesorio)
+    if (!this.detecting && now - this.lastDetect > 120) {
+      this.detecting = true;
+      this.lastDetect = now;
+      detectFaces(this.canvas)
+        .then(f => { this.faces = f; })
+        .catch(() => { /* el detector todavía no está listo */ })
+        .finally(() => { this.detecting = false; });
+    }
+    for (const f of this.faces) drawAccessory(this.ctx, f, accessory, this.customAcc);
   }
 
   private capture() {

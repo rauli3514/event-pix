@@ -25,11 +25,15 @@ export const videoFileName = (mode: string, ext: string) => `${stamp()}-video-${
 const DB_NAME = 'eventpix_kiosk_videos';
 const STORE = 'videos';
 
-const openDb = () => new Promise<IDBDatabase>((resolve, reject) => {
-  const req = indexedDB.open(DB_NAME, 1);
+/** Videos pendientes de subir (sin internet): se suben solos cuando vuelve */
+export const UPLOADS = 'uploads';
+
+export const openDb = () => new Promise<IDBDatabase>((resolve, reject) => {
+  const req = indexedDB.open(DB_NAME, 2);
   req.onupgradeneeded = () => {
-    const store = req.result.createObjectStore(STORE, { keyPath: 'uri' });
-    store.createIndex('folder', 'folder');
+    const db = req.result;
+    if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: 'uri' }).createIndex('folder', 'folder');
+    if (!db.objectStoreNames.contains(UPLOADS)) db.createObjectStore(UPLOADS, { keyPath: 'name' });
   };
   req.onsuccess = () => resolve(req.result);
   req.onerror = () => reject(req.error);

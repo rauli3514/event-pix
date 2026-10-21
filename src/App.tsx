@@ -16,6 +16,7 @@ import KioskVip from "./pages/kiosk-box/KioskVip";
 import VideoBooth from "./pages/video-booth/VideoBooth";
 import VideoBoothSettings from "./pages/video-booth/VideoBoothSettings";
 import GuestVideo from "./pages/GuestVideo";
+import VideoGallery from "./pages/VideoGallery";
 import RemoteHost from "./components/kiosk/RemoteHost";
 import KioskAdmin from "./pages/admin/KioskAdmin";
 import KioskScreensaver from "./components/kiosk/KioskScreensaver";
@@ -92,6 +93,7 @@ const App = () => (
             <Route path="/video" element={<VideoBooth />} />
             <Route path="/video/ajustes" element={<VideoBoothSettings />} />
             <Route path="/clip" element={<GuestVideo />} />
+            <Route path="/galeria-video/:code" element={<VideoGallery />} />
             {/* Tablet que maneja la pantalla del kiosco por Bluetooth */}
             {/* Página pública del QR del kiosco: el invitado baja o comparte su foto */}
             <Route path="/foto" element={<GuestPhoto />} />

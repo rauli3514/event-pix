@@ -98,6 +98,8 @@ export function decodeMusic(blob: Blob) {
 
 export interface AudioMix {
   track: MediaStreamTrack;
+  /** Corta el micrófono (placa final) y deja la música */
+  muteMic: () => void;
   stop: () => void;
 }
 
@@ -105,11 +107,12 @@ export interface AudioMix {
  * Mezcla para grabar (no suena por los parlantes): música desde el principio,
  * con desvanecido al final, y/o el micrófono.
  */
-export function mixAudio(opts: { music?: AudioBuffer | null; musicVolume?: number; duration?: number; mic?: MediaStream | null }): AudioMix | null {
+export function mixAudio(opts: { music?: AudioBuffer | null; musicVolume?: number; duration?: number; mic?: MediaStream | null; /** Segundo de la canción donde empieza */ offset?: number }): AudioMix | null {
   const ctx = audioContext();
   if (!ctx || (!opts.music && !opts.mic)) return null;
   const dest = ctx.createMediaStreamDestination();
   const nodes: AudioNode[] = [];
+  let micStream: MediaStreamAudioSourceNode | null = null;
   let source: AudioBufferSourceNode | null = null;
   if (opts.music) {
     source = ctx.createBufferSource();
@@ -126,16 +129,18 @@ export function mixAudio(opts: { music?: AudioBuffer | null; musicVolume?: numbe
     }
     source.connect(gain).connect(dest);
     nodes.push(gain);
-    source.start();
+    const offset = Math.max(0, opts.offset ?? 0);
+    source.start(0, opts.music.duration > 0 ? offset % opts.music.duration : 0);
   }
   if (opts.mic) {
-    const mic = ctx.createMediaStreamSource(opts.mic);
-    mic.connect(dest);
-    nodes.push(mic);
+    micStream = ctx.createMediaStreamSource(opts.mic);
+    micStream.connect(dest);
+    nodes.push(micStream);
   }
   const track = dest.stream.getAudioTracks()[0];
   return {
     track,
+    muteMic: () => { try { micStream?.disconnect(); } catch { /* ya estaba */ } },
     stop: () => {
       try { source?.stop(); } catch { /* ya paró */ }
       nodes.forEach(n => n.disconnect());

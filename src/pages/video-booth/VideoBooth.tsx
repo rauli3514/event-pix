@@ -3,8 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
 import {
-  ArrowLeft, BookHeart, Check, Gem, Home, Loader2, RefreshCw, Repeat, Rotate3d, RotateCcw, Settings, Snail, Square, Video,
-  type LucideIcon,
+  ArrowLeft, BookHeart, Check, CloudOff, Gem, Home, Loader2, Music, Play, RefreshCw, Repeat, Rotate3d, RotateCcw, Settings, Snail,
+  Square, Video, type LucideIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
@@ -17,21 +17,28 @@ import { getScreenMedia } from '@/lib/kioskMedia';
 import { getCameraSettings, getGeneralSettings } from '@/lib/kioskSettings';
 import { guestVideoUrl } from '@/lib/kioskShare';
 import { useShutter } from '@/lib/kioskShutter';
-import { isDriveConfigured } from '@/lib/driveBackup';
-import { Compositor, loadOverlayImage, titleOverlay } from '@/lib/videoBooth/compositor';
+import { eventFolder } from '@/lib/kioskStorage';
+import { isSupabaseConfigured } from '@/lib/supabase';
+import { deliverVideo, galleryUrl, startVideoSync } from '@/lib/videoBooth/cloud';
+import { Compositor } from '@/lib/videoBooth/compositor';
 import { bufferSecondsFor, effectPlan, renderEffects } from '@/lib/videoBooth/effects';
-import { audioContext, bitrateFor, ClipRecorder, decodeMusic, extensionFor, mixAudio, openMic, type AudioMix } from '@/lib/videoBooth/recorder';
+import { buildDecor, frameUrl, loadSong, migrateLegacyMedia, pickSong, type DecorBundle } from '@/lib/videoBooth/media';
+import { MotionDetector, watchMotion } from '@/lib/videoBooth/motion';
+import { audioContext, bitrateFor, ClipRecorder, extensionFor, mixAudio, openMic, type AudioMix } from '@/lib/videoBooth/recorder';
 import {
-  DEFAULT_PROMPTS, enabledModes, getVideoSettings, modeConfig, outputSize,
-  type VideoModeDef, type VideoModeKey,
+  DEFAULT_PROMPTS, enabledModes, galleryCode, getVideoSettings, modeConfig, outputSize, songKey,
+  type SongItem, type VideoModeDef, type VideoModeKey,
 } from '@/lib/videoBooth/settings';
-import { saveVideoLocally, uploadVideoForShare, videoFileName } from '@/lib/videoBooth/storage';
+import { saveVideoLocally, videoFileName } from '@/lib/videoBooth/storage';
 
 // Cabina de video: el invitado elige la experiencia (video, boomerang, cámara lenta,
-// 360, libro de firmas, glam), se graba con cuenta regresiva y se lleva el video
-// con un QR. Mismo equipo, cámara, disparador Bluetooth y Drive que el kiosco de fotos.
+// 360, libro de firmas, glam), el marco y la canción si se lo permiten, se graba
+// con cuenta regresiva (o sola, cuando gira la plataforma 360) y se lleva el video
+// con un QR (al video o a la galería del evento). Funciona sin internet: el video
+// queda en el equipo y se sube cuando vuelve.
 
-type Step = 'splash' | 'modes' | 'prompt' | 'live' | 'countdown' | 'recording' | 'processing' | 'review' | 'result' | 'error';
+type Step = 'splash' | 'modes' | 'prompt' | 'frame' | 'song' | 'live' | 'countdown' | 'recording' | 'ending' | 'processing' | 'review' | 'result' | 'error';
+type PreStep = 'prompt' | 'frame' | 'song';
 
 const ICONS: Record<VideoModeKey, LucideIcon> = {
   clasico: Video, boomerang: Repeat, lenta: Snail, '360': Rotate3d, firmas: BookHeart, glam: Gem,
@@ -50,8 +57,12 @@ const primaryBtn = 'rounded-full px-10 py-5 text-2xl font-black text-white flex 
 
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
-interface Result { blob: Blob; url: string; name: string }
-type Qr = { state: 'off' } | { state: 'uploading' } | { state: 'done'; url: string } | { state: 'error'; message: string };
+interface Result { blob: Blob; url: string; name: string; thumb: Blob | null }
+type Qr =
+  | { state: 'off' }
+  | { state: 'uploading' }
+  | { state: 'ready'; video?: string; gallery?: string; queued?: boolean }
+  | { state: 'error'; message: string };
 
 export default function VideoBooth() {
   const navigate = useNavigate();
@@ -73,34 +84,56 @@ export default function VideoBooth() {
   const [error, setError] = useState('');
   const [cameraReady, setCameraReady] = useState(false);
   const [pinOpen, setPinOpen] = useState(false);
+  const [motionLevel, setMotionLevel] = useState(0);
+  const [frameThumbs, setFrameThumbs] = useState<{ id: string; name: string; url: string }[]>([]);
+  const [previewSong, setPreviewSong] = useState<string | null>(null);
 
   const rootRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
+  const layerRef = useRef<HTMLCanvasElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const compositorRef = useRef<Compositor | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const micRef = useRef<MediaStream | null>(null);
   const musicRef = useRef<AudioBuffer | null>(null);
-  const overlayRef = useRef<CanvasImageSource | null>(null);
+  const songRef = useRef<SongItem | null>(null);
+  const decorRef = useRef<DecorBundle | null>(null);
   const recorderRef = useRef<ClipRecorder | null>(null);
   const recStreamRef = useRef<MediaStream | null>(null);
   const mixRef = useRef<AudioMix | null>(null);
+  const motionRef = useRef<MotionDetector | null>(null);
+  const thumbRef = useRef<Blob | null>(null);
   const tickRef = useRef(0);
   const recStartRef = useRef(0);
   const finishingRef = useRef(false);
   const resultRef = useRef<Result | null>(null);
+  const modeRef = useRef<VideoModeDef | null>(null);
+  const queueRef = useRef<PreStep[]>([]);
+  const chosenFrameRef = useRef<string | null>(null);
+  const chosenSongRef = useRef<string | null>(null);
   useEffect(() => { resultRef.current = result; }, [result]);
+  useEffect(() => { modeRef.current = mode; }, [mode]);
 
   useEffect(() => {
     const reload = () => setSettings(getVideoSettings());
     window.addEventListener('video-settings-changed', reload);
+    // Archivos de la primera versión → listas nuevas; videos pendientes de subir
+    void migrateLegacyMedia();
+    startVideoSync();
     return () => window.removeEventListener('video-settings-changed', reload);
   }, []);
 
-  useRemoteFocus(rootRef, [step, qr.state], !pinOpen);
+  useRemoteFocus(rootRef, [step, qr.state, frameThumbs.length], !pinOpen);
 
   // ─── Cámara ──────────────────────────────────────────────────────
+  const stopMotion = useCallback(() => {
+    motionRef.current?.stop();
+    motionRef.current = null;
+  }, []);
+
   const closeCamera = useCallback(() => {
+    stopMotion();
     compositorRef.current?.stop();
     compositorRef.current?.clearBuffer();
     compositorRef.current?.canvas.remove();
@@ -110,7 +143,12 @@ export default function VideoBooth() {
     stopStream(micRef.current);
     micRef.current = null;
     setCameraReady(false);
-  }, []);
+  }, [stopMotion]);
+
+  const disposeDecor = () => {
+    decorRef.current?.dispose();
+    decorRef.current = null;
+  };
 
   const openCamera = useCallback(async (m: VideoModeDef) => {
     const cam = getCameraSettings();
@@ -124,11 +162,15 @@ export default function VideoBooth() {
     const video = videoRef.current!;
     video.srcObject = stream;
     await video.play().catch(() => {});
+    const decor = decorRef.current?.decor ?? null;
+    // Sin efectos las capas se graban en vivo; con efectos se agregan al armar el video
     const comp = new Compositor(video, {
       width: size.width, height: size.height,
       mirror: !!cam.mirror, rotation: Number(cam.rotation) || 0,
-      filter: cfg.filter, overlay: overlayRef.current,
+      filter: cfg.filter, accessory: settings.accessory,
+      decor: m.effect === 'none' ? decor : null,
     });
+    comp.thumbDecor = decor;
     comp.canvas.className = 'w-full h-full object-contain';
     previewRef.current?.replaceChildren(comp.canvas);
     comp.start();
@@ -143,23 +185,40 @@ export default function VideoBooth() {
     setCameraReady(true);
   }, [settings, size]);
 
-  // Si el canvas de la vista previa se desmontó (cambio de pantalla), se vuelve a poner
-  useEffect(() => {
-    const comp = compositorRef.current;
-    if (comp && previewRef.current && comp.canvas.parentElement !== previewRef.current) previewRef.current.replaceChildren(comp.canvas);
-  });
-
   useEffect(() => () => {
     window.clearInterval(tickRef.current);
     mixRef.current?.stop();
     closeCamera();
+    decorRef.current?.dispose();
     if (resultRef.current) URL.revokeObjectURL(resultRef.current.url);
   }, [closeCamera]);
 
+  // Capas en la vista previa cuando no se graban en vivo (modos con efectos)
+  const cameraSteps: Step[] = ['live', 'countdown', 'recording'];
+  const showCamera = cameraSteps.includes(step) || step === 'ending';
+  useEffect(() => {
+    const canvas = layerRef.current;
+    const decor = decorRef.current?.decor;
+    if (!showCamera || !mode || mode.effect === 'none' || !canvas || !decor || !decor.hasLayers) return;
+    canvas.width = size.width;
+    canvas.height = size.height;
+    const ctx = canvas.getContext('2d')!;
+    const t0 = performance.now();
+    let raf = 0;
+    const loop = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      decor.draw(ctx, (performance.now() - t0) / 1000);
+      raf = requestAnimationFrame(loop);
+    };
+    loop();
+    return () => { cancelAnimationFrame(raf); ctx.clearRect(0, 0, canvas.width, canvas.height); };
+  }, [showCamera, mode, size, cameraReady]);
+
   // ─── Flujo ───────────────────────────────────────────────────────
-  const reset = useCallback(() => {
+  const goSplash = useCallback(() => {
     window.clearInterval(tickRef.current);
     closeCamera();
+    disposeDecor();
     if (resultRef.current) URL.revokeObjectURL(resultRef.current.url);
     setResult(null);
     setQr({ state: 'off' });
@@ -170,76 +229,137 @@ export default function VideoBooth() {
     setStep('splash');
   }, [closeCamera]);
 
-  const prepareMode = useCallback(async (m: VideoModeDef) => {
-    const cfg = modeConfig(m.key, settings);
-    // Marco y música se preparan antes de abrir la cámara
-    overlayRef.current = null;
-    if (settings.overlay === 'title') {
-      overlayRef.current = titleOverlay(size.width, size.height, settings.overlayText || general.eventTitle || 'EventPix');
-    } else if (settings.overlay === 'custom') {
-      const rec = await getScreenMedia('video:overlay').catch(() => null);
-      if (rec) overlayRef.current = await loadOverlayImage(rec.blob);
-    }
-    musicRef.current = null;
-    if (cfg.music) {
-      const rec = await getScreenMedia('video:music').catch(() => null);
-      if (rec) musicRef.current = await decodeMusic(rec.blob).catch(() => null);
-    }
-  }, [settings, size, general.eventTitle]);
-
-  const chooseMode = useCallback(async (m: VideoModeDef) => {
-    audioContext(); // con el toque: Android deja usar el audio
-    setMode(m);
-    if (m.guestbook) {
-      const list = (settings.prompts?.filter(p => p.trim()) ?? []);
-      const pool = list.length ? list : DEFAULT_PROMPTS;
-      setPrompt(pool[Math.floor(Math.random() * pool.length)]);
-      setStep('prompt');
-      void prepareMode(m);
-      return;
-    }
+  const enterLive = useCallback(async (m: VideoModeDef) => {
     setStep('live');
     try {
-      await prepareMode(m);
+      const cfg = modeConfig(m.key, settings);
+      disposeDecor();
+      decorRef.current = await buildDecor(settings, size, { frameId: chosenFrameRef.current, eventTitle: general.eventTitle });
+      songRef.current = cfg.music ? pickSong(settings, chosenSongRef.current) : null;
+      musicRef.current = await loadSong(songRef.current);
       await openCamera(m);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setStep('error');
     }
-  }, [settings.prompts, prepareMode, openCamera]);
+  }, [settings, size, general.eventTitle, openCamera]);
 
-  const startFromPrompt = async () => {
-    if (!mode) return;
-    setStep('live');
-    try {
-      await prepareMode(mode);
-      await openCamera(mode);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      setStep('error');
+  /** Siguiente pantalla previa (pregunta, marco, canción) o la cámara. */
+  const nextPre = useCallback((m: VideoModeDef) => {
+    const next = queueRef.current.shift();
+    if (next) setStep(next);
+    else void enterLive(m);
+  }, [enterLive]);
+
+  const chooseMode = useCallback((m: VideoModeDef) => {
+    audioContext(); // con el toque: Android deja usar el audio
+    setMode(m);
+    modeRef.current = m;
+    chosenFrameRef.current = null;
+    chosenSongRef.current = null;
+    const cfg = modeConfig(m.key, settings);
+    const queue: PreStep[] = [];
+    if (m.guestbook) {
+      const list = (settings.prompts?.filter(p => p.trim()) ?? []);
+      const pool = list.length ? list : DEFAULT_PROMPTS;
+      setPrompt(pool[Math.floor(Math.random() * pool.length)]);
+      queue.push('prompt');
     }
-  };
+    if (settings.overlay === 'custom' && settings.frameChoice && (settings.frames?.length ?? 0) > 1) queue.push('frame');
+    if (cfg.music && settings.songMode === 'guest' && (settings.songs?.length ?? 0) > 1) queue.push('song');
+    queueRef.current = queue;
+    nextPre(m);
+  }, [settings, nextPre]);
 
   const start = useCallback(() => {
     audioContext();
-    if (modes.length === 1) void chooseMode(modes[0]);
+    if (modes.length === 1) chooseMode(modes[0]);
     else setStep('modes');
   }, [modes, chooseMode]);
+
+  // Después del video: otra vez al inicio, o (360 continuo) directo a esperar el próximo giro
+  const reset = useCallback(() => {
+    const m = modeRef.current;
+    if (m?.key === '360' && settings.continuous360) {
+      window.clearInterval(tickRef.current);
+      if (resultRef.current) URL.revokeObjectURL(resultRef.current.url);
+      setResult(null);
+      setQr({ state: 'off' });
+      setProgress(0);
+      chooseMode(m);
+      return;
+    }
+    goSplash();
+  }, [settings.continuous360, chooseMode, goSplash]);
+
+  // Marcos para elegir
+  useEffect(() => {
+    if (step !== 'frame') return;
+    let alive = true;
+    const urls: string[] = [];
+    void Promise.all((settings.frames ?? []).map(async f => ({ ...f, url: await frameUrl(f.id) }))).then(list => {
+      const ok = list.filter((f): f is { id: string; name: string; url: string } => !!f.url);
+      urls.push(...ok.map(f => f.url));
+      if (alive) setFrameThumbs(ok);
+      else urls.forEach(u => URL.revokeObjectURL(u));
+    });
+    return () => {
+      alive = false;
+      urls.forEach(u => URL.revokeObjectURL(u));
+      setFrameThumbs([]);
+    };
+  }, [step, settings.frames]);
+
+  const chooseFrame = (id: string) => {
+    chosenFrameRef.current = id;
+    if (mode) nextPre(mode);
+  };
+
+  // Canciones para elegir: al tocar una suena un pedacito
+  const playPreview = async (song: SongItem) => {
+    setPreviewSong(song.id);
+    const rec = await getScreenMedia(songKey(song.id)).catch(() => null);
+    const audio = audioRef.current;
+    if (!rec || !audio) return;
+    if (audio.src) URL.revokeObjectURL(audio.src);
+    audio.src = URL.createObjectURL(rec.blob);
+    audio.currentTime = song.start ?? 0;
+    void audio.play().catch(() => {});
+  };
+  const stopPreview = () => {
+    const audio = audioRef.current;
+    if (audio) { audio.pause(); if (audio.src) URL.revokeObjectURL(audio.src); audio.removeAttribute('src'); }
+  };
+  const chooseSong = () => {
+    stopPreview();
+    chosenSongRef.current = previewSong;
+    if (mode) nextPre(mode);
+  };
 
   const finishRecording = useCallback(async () => {
     if (finishingRef.current || !mode) return;
     finishingRef.current = true;
     window.clearInterval(tickRef.current);
+    stopMotion();
     const rec = recorderRef.current;
     const comp = compositorRef.current;
     const actual = Math.max(0.5, (performance.now() - recStartRef.current) / 1000);
+    const decor = decorRef.current?.decor ?? null;
+    const endSeconds = settings.endCard && decor ? settings.endCardSeconds ?? 2.5 : 0;
     try {
       if (!rec || !comp) throw new Error('La grabación no arrancó');
+      // Sin efectos, la placa final se graba en vivo (sin el micrófono)
+      if (mode.effect === 'none' && endSeconds && decor) {
+        setStep('ending');
+        mixRef.current?.muteMic();
+        await comp.playEndCard(decor, endSeconds);
+      }
       const raw = await rec.stop();
       mixRef.current?.stop();
       mixRef.current = null;
       recStreamRef.current?.getTracks().forEach(t => t.stop());
       const frames = await comp.takeBuffer();
+      if (!thumbRef.current) thumbRef.current = await comp.snapshot().catch(() => null);
       closeCamera();
       setProgress(0);
       setStep('processing');
@@ -252,7 +372,8 @@ export default function VideoBooth() {
         try {
           const out = await renderEffects({
             source: raw, frames, plan, width: size.width, height: size.height,
-            music: cfg.music ? musicRef.current : null, musicVolume: settings.musicVolume,
+            music: cfg.music ? musicRef.current : null, musicVolume: settings.musicVolume, musicStart: songRef.current?.start,
+            decor, endCard: endSeconds, zoom: settings.zoomEffect, flash: settings.flashEffect && mode.effect === 'ramp',
             onProgress: setProgress,
           });
           blob = out.blob;
@@ -263,7 +384,7 @@ export default function VideoBooth() {
       }
       if (!blob.size) throw new Error('El video salió vacío. Probá de nuevo.');
       const name = videoFileName(mode.key, extensionFor(mime || blob.type));
-      const res = { blob, url: URL.createObjectURL(blob), name };
+      const res: Result = { blob, url: URL.createObjectURL(blob), name, thumb: thumbRef.current };
       setResult(res);
       // Respaldo en el equipo, siempre
       saveVideoLocally(blob, name).catch(e => {
@@ -279,7 +400,7 @@ export default function VideoBooth() {
       recorderRef.current = null;
       finishingRef.current = false;
     }
-  }, [mode, settings, size, closeCamera]);
+  }, [mode, settings, size, closeCamera, stopMotion]);
 
   const startRecording = useCallback(() => {
     const comp = compositorRef.current;
@@ -291,17 +412,26 @@ export default function VideoBooth() {
     const fps = Math.min(60, Math.round(streamRef.current?.getVideoTracks()[0]?.getSettings().frameRate || 30));
     const stream = comp.canvas.captureStream(fps);
     recStreamRef.current = stream;
+    const endSeconds = settings.endCard && decorRef.current ? settings.endCardSeconds ?? 2.5 : 0;
     // Sin efectos, el audio (música y/o micrófono) se graba en vivo
     if (mode.effect === 'none') {
-      const mix = mixAudio({ music: cfg.music ? musicRef.current : null, musicVolume: settings.musicVolume, duration: planned, mic: cfg.mic ? micRef.current : null });
+      const mix = mixAudio({
+        music: cfg.music ? musicRef.current : null, musicVolume: settings.musicVolume, offset: songRef.current?.start,
+        duration: planned + endSeconds, mic: cfg.mic ? micRef.current : null,
+      });
       if (mix) { stream.addTrack(mix.track); mixRef.current = mix; }
     }
     // Con efectos este clip es intermedio: se graba con más calidad
-    const rec = new ClipRecorder(stream, { bitrate: mode.effect === 'none' ? bitrateFor(size.width, size.height, planned) : 12_000_000 });
+    const rec = new ClipRecorder(stream, { bitrate: mode.effect === 'none' ? bitrateFor(size.width, size.height, planned + endSeconds) : 12_000_000 });
     rec.start();
     const startedAt = performance.now();
     recStartRef.current = startedAt;
     recorderRef.current = rec;
+    thumbRef.current = null;
+    // Miniatura para la galería: un cuadro al rato de empezar
+    window.setTimeout(() => {
+      if (recorderRef.current === rec) void comp.snapshot().then(b => { if (b) thumbRef.current = b; });
+    }, Math.min(1500, planned * 400));
     setElapsed(0);
     setStep('recording');
     tickRef.current = window.setInterval(() => {
@@ -313,6 +443,7 @@ export default function VideoBooth() {
 
   const startCountdown = useCallback(() => {
     if (!cameraReady || step !== 'live') return;
+    stopMotion();
     const total = Math.max(0, settings.countdown ?? 3);
     if (!total) { startRecording(); return; }
     setStep('countdown');
@@ -327,30 +458,78 @@ export default function VideoBooth() {
       } else setCount(n);
     }, 1000);
     tickRef.current = t;
-  }, [cameraReady, step, settings.countdown, startRecording]);
+  }, [cameraReady, step, settings.countdown, startRecording, stopMotion]);
 
-  const uploadQr = useCallback(async (res: Result) => {
-    if (settings.showQr === false || !isDriveConfigured() || general.offline) { setQr({ state: 'off' }); return; }
-    if (!navigator.onLine) { setQr({ state: 'error', message: 'Sin internet' }); return; }
+  // ─── 360: arranque y corte por movimiento ───────────────────────
+  const autoStart = mode?.key === '360' && !!settings.autoStart360;
+  const autoStop = mode?.key === '360' && !!settings.autoStop360;
+  const threshold = settings.motionThreshold ?? 14;
+  useEffect(() => {
+    if (!cameraReady || (step !== 'live' && step !== 'recording')) return;
+    if (step === 'live' && !autoStart) return;
+    if (step === 'recording' && !autoStop) return;
+    const video = videoRef.current;
+    if (!video) return;
+    const detector = new MotionDetector(video);
+    detector.start();
+    motionRef.current = detector;
+    // Al grabar se espera un poco antes de mirar si paró (arranca girando despacio)
+    const delay = step === 'recording' ? 2500 : 600;
+    let cancel = () => {};
+    const timer = window.setTimeout(() => {
+      cancel = watchMotion(detector, {
+        threshold: step === 'live' ? threshold : threshold * 0.7,
+        when: step === 'live' ? 'above' : 'below',
+        holdMs: step === 'live' ? 400 : 1200,
+        onLevel: setMotionLevel,
+        // Girando: graba ya, sin cuenta regresiva (la plataforma no espera)
+        onTrigger: () => (step === 'live' ? startRecording() : void finishRecording()),
+      });
+    }, delay);
+    return () => {
+      window.clearTimeout(timer);
+      cancel();
+      detector.stop();
+      if (motionRef.current === detector) motionRef.current = null;
+    };
+  }, [cameraReady, step, autoStart, autoStop, threshold, startRecording, finishRecording]);
+
+  // ─── Entrega ─────────────────────────────────────────────────────
+  const deliver = useCallback(async (res: Result) => {
+    if (settings.showQr === false) { setQr({ state: 'off' }); return; }
+    const delivery = settings.delivery ?? 'video';
+    const code = isSupabaseConfigured ? galleryCode() : '';
+    const gallery = code && delivery !== 'video' ? galleryUrl(code) : undefined;
     setQr({ state: 'uploading' });
     try {
-      const id = await uploadVideoForShare(res.blob, res.name);
-      setQr({ state: 'done', url: guestVideoUrl(id, general.eventTitle || undefined) });
+      const driveId = await deliverVideo({
+        name: res.name, folder: eventFolder(), blob: res.blob, thumb: res.thumb,
+        title: general.eventTitle || settings.title || undefined, mode: modeRef.current?.key ?? 'video',
+        gallery: code, created: Date.now(),
+      });
+      if (driveId) {
+        setQr({ state: 'ready', video: delivery !== 'gallery' ? guestVideoUrl(driveId, general.eventTitle || undefined) : undefined, gallery });
+      } else if (code) {
+        // Sin internet: la galería ya tiene dirección; el video aparece cuando se suba
+        setQr({ state: 'ready', gallery: galleryUrl(code), queued: true });
+      } else {
+        setQr({ state: 'error', message: navigator.onLine ? 'Falta configurar Google Drive' : 'Sin internet' });
+      }
     } catch (e) {
       setQr({ state: 'error', message: e instanceof Error ? e.message : String(e) });
     }
-  }, [settings.showQr, general.offline, general.eventTitle]);
+  }, [settings.showQr, settings.delivery, settings.title, general.eventTitle]);
 
   const accept = useCallback(() => {
     const res = resultRef.current;
     if (!res) return;
     setStep('result');
-    void uploadQr(res);
-  }, [uploadQr]);
+    void deliver(res);
+  }, [deliver]);
 
-  // Sin revisión: el resultado sale directo (y se sube para el QR)
+  // Sin revisión: el resultado sale directo (y se entrega)
   useEffect(() => {
-    if (step === 'result' && qr.state === 'off' && resultRef.current && settings.review === false) void uploadQr(resultRef.current);
+    if (step === 'result' && qr.state === 'off' && resultRef.current && settings.review === false) void deliver(resultRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
@@ -358,10 +537,10 @@ export default function VideoBooth() {
     if (!mode) return;
     if (resultRef.current) URL.revokeObjectURL(resultRef.current.url);
     setResult(null);
-    void chooseMode(mode);
-  }, [mode, chooseMode]);
+    void enterLive(mode);
+  }, [mode, enterLive]);
 
-  // El resultado vuelve solo al inicio (no mientras se sube el video)
+  // El resultado vuelve solo (no mientras se sube el video)
   useEffect(() => {
     if (step !== 'result' || qr.state === 'uploading') return;
     const t = window.setTimeout(reset, (settings.resultSeconds ?? 45) * 1000);
@@ -377,7 +556,9 @@ export default function VideoBooth() {
   // Disparador Bluetooth: avanza en cada pantalla
   useShutter(() => {
     if (step === 'splash') start();
-    else if (step === 'prompt') void startFromPrompt();
+    else if (step === 'prompt' && mode) nextPre(mode);
+    else if (step === 'frame' && frameThumbs[0]) chooseFrame(chosenFrameRef.current ?? frameThumbs[0].id);
+    else if (step === 'song' && mode) chooseSong();
     else if (step === 'live') startCountdown();
     else if (step === 'recording' && mode?.canStop) void finishRecording();
     else if (step === 'review') accept();
@@ -385,24 +566,30 @@ export default function VideoBooth() {
   }, !pinOpen);
 
   // ─── Pantallas ───────────────────────────────────────────────────
-  const cameraLayer = (
-    <>
-      <div className="absolute inset-0 bg-black" />
-      {/* El video de la cámara queda debajo: el canvas (lo que se graba) lo tapa */}
-      <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover opacity-0" />
-      <div ref={previewRef} className="absolute inset-0" />
-    </>
-  );
-  const cameraSteps: Step[] = ['live', 'countdown', 'recording'];
-  const showCamera = cameraSteps.includes(step);
   const cfg = mode ? modeConfig(mode.key, settings) : null;
   // Controles: abajo con la pantalla vertical; al costado con la horizontal (no tapan el marco)
   const side = 'absolute bottom-[6vmin] inset-x-0 landscape:inset-x-auto landscape:bottom-auto landscape:top-1/2 landscape:-translate-y-1/2 landscape:right-[4vmin]';
+  const meter = (
+    <div className="kiosk-glass rounded-2xl px-6 py-4 w-[min(22rem,80vw)] space-y-2">
+      <p className="text-lg font-bold flex items-center gap-2"><Rotate3d className="w-5 h-5 text-[#00d4ff]" /> Esperando que gire la plataforma…</p>
+      <div className="relative h-3 rounded-full bg-white/15 overflow-hidden">
+        <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-[#00d4ff] to-[#ff2e93] transition-[width] duration-150" style={{ width: `${Math.min(100, motionLevel * 1.5)}%` }} />
+        <div className="absolute inset-y-0 w-0.5 bg-white" style={{ left: `${Math.min(100, threshold * 1.5)}%` }} />
+      </div>
+    </div>
+  );
 
   return (
     <div ref={rootRef} className="kiosk-root relative min-h-screen h-screen overflow-hidden text-white bg-[#07051a]">
       {/* La cámara se monta siempre (para no perder el video entre pantallas) */}
-      <div className={showCamera ? 'absolute inset-0' : 'hidden'}>{cameraLayer}</div>
+      <div className={showCamera ? 'absolute inset-0' : 'hidden'}>
+        <div className="absolute inset-0 bg-black" />
+        {/* El video de la cámara queda debajo: el canvas (lo que se graba) lo tapa */}
+        <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover opacity-0" />
+        <div ref={previewRef} className="absolute inset-0" />
+        <canvas ref={layerRef} className="absolute inset-0 w-full h-full object-contain pointer-events-none" />
+      </div>
+      <audio ref={audioRef} className="hidden" />
 
       {step === 'splash' && (
         <div className="absolute inset-0">
@@ -434,7 +621,7 @@ export default function VideoBooth() {
         <div className="absolute inset-0 flex flex-col">
           <AuroraBackground />
           <header className="relative flex items-center justify-between px-[5vmin] pt-[4vmin]">
-            <button onClick={reset} className={btn}><ArrowLeft className="w-6 h-6" /> Volver</button>
+            <button onClick={goSplash} className={btn}><ArrowLeft className="w-6 h-6" /> Volver</button>
             <h2 className="carlmarx-bold text-[clamp(2rem,6vmin,4.5rem)]">¿Qué video hacemos?</h2>
             <span className="w-32" />
           </header>
@@ -447,7 +634,7 @@ export default function VideoBooth() {
                   <motion.button
                     key={m.key}
                     data-autofocus={i === 0 ? true : undefined}
-                    onClick={() => void chooseMode(m)}
+                    onClick={() => chooseMode(m)}
                     initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.05 + i * 0.07, type: 'spring', stiffness: 140, damping: 15 }}
                     className="group flex flex-col items-center gap-[2vmin] rounded-[3rem] p-[1.2vmin] focus:outline-none"
@@ -472,7 +659,7 @@ export default function VideoBooth() {
         </div>
       )}
 
-      {step === 'prompt' && (
+      {step === 'prompt' && mode && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-10 px-[6vmin] text-center">
           <AuroraBackground />
           <BookHeart className="relative w-24 h-24 text-[#ff8a5b]" strokeWidth={1.4} />
@@ -483,8 +670,56 @@ export default function VideoBooth() {
           </motion.h2>
           <p className="relative text-white/70 text-2xl">Tenés hasta {fmt(cfg?.seconds ?? 30)} para tu mensaje. Podés terminar antes.</p>
           <div className="relative flex gap-5">
-            <button onClick={reset} className={btn}><ArrowLeft className="w-6 h-6" /> Volver</button>
-            <button onClick={() => void startFromPrompt()} className={primaryBtn} data-autofocus><Video className="w-8 h-8" /> Grabar mensaje</button>
+            <button onClick={goSplash} className={btn}><ArrowLeft className="w-6 h-6" /> Volver</button>
+            <button onClick={() => nextPre(mode)} className={primaryBtn} data-autofocus><Video className="w-8 h-8" /> Grabar mensaje</button>
+          </div>
+        </div>
+      )}
+
+      {step === 'frame' && (
+        <div className="absolute inset-0 flex flex-col">
+          <AuroraBackground />
+          <header className="relative flex items-center justify-between px-[5vmin] pt-[4vmin]">
+            <button onClick={goSplash} className={btn}><ArrowLeft className="w-6 h-6" /> Volver</button>
+            <h2 className="carlmarx-bold text-[clamp(2rem,6vmin,4.5rem)]">Elegí tu marco</h2>
+            <span className="w-32" />
+          </header>
+          <main className="relative flex-1 flex items-center justify-center px-[4vmin]">
+            {!frameThumbs.length ? <Loader2 className="w-14 h-14 animate-spin text-[#00d4ff]" /> : (
+              <div className="flex flex-wrap justify-center gap-[3vmin]">
+                {frameThumbs.map((f, i) => (
+                  <motion.button key={f.id} onClick={() => chooseFrame(f.id)} data-autofocus={i === 0 ? true : undefined}
+                    initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
+                    className="rounded-3xl p-2 bg-white/5 focus:outline-none focus:ring-[6px] focus:ring-white/90 focus:scale-105 transition-transform">
+                    <span className="block rounded-2xl overflow-hidden bg-gradient-to-br from-[#2b2350] to-[#0d0a24]"
+                      style={{ aspectRatio: `${size.width} / ${size.height}`, height: 'min(46vh, 38vmin)' }}>
+                      <img src={f.url} alt={f.name} className="w-full h-full object-fill" />
+                    </span>
+                    <span className="block mt-2 text-lg font-bold">{f.name}</span>
+                  </motion.button>
+                ))}
+              </div>
+            )}
+          </main>
+        </div>
+      )}
+
+      {step === 'song' && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-8 px-[5vmin]">
+          <AuroraBackground />
+          <h2 className="relative carlmarx-bold text-[clamp(2rem,6vmin,4.5rem)]">Elegí la música</h2>
+          <div className="relative grid gap-3 w-[min(40rem,90vw)] max-h-[55vh] overflow-y-auto p-1">
+            {(settings.songs ?? []).map((sg, i) => (
+              <button key={sg.id} onClick={() => void playPreview(sg)} data-autofocus={i === 0 ? true : undefined}
+                className={`flex items-center gap-4 rounded-2xl px-6 py-4 text-left text-xl font-bold focus:outline-none focus:ring-4 focus:ring-[#00d4ff] ${previewSong === sg.id ? 'bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7]' : 'kiosk-glass'}`}>
+                {previewSong === sg.id ? <Music className="w-7 h-7 animate-pulse" /> : <Play className="w-7 h-7" />}
+                <span className="truncate">{sg.name}</span>
+              </button>
+            ))}
+          </div>
+          <div className="relative flex gap-5">
+            <button onClick={() => { stopPreview(); goSplash(); }} className={btn}><ArrowLeft className="w-6 h-6" /> Volver</button>
+            <button onClick={chooseSong} disabled={!previewSong} className={`${primaryBtn} disabled:opacity-40`}><Check className="w-8 h-8" /> Usar esta</button>
           </div>
         </div>
       )}
@@ -493,15 +728,16 @@ export default function VideoBooth() {
         <div className="absolute inset-0 pointer-events-none">
           {/* Arriba: experiencia y, en el libro de firmas, la pregunta */}
           <div className="absolute top-6 inset-x-0 flex flex-col items-center gap-3 px-6">
-            <span className="kiosk-glass rounded-full px-7 py-3 text-2xl font-black">{mode.label}</span>
-            {mode.guestbook && prompt && <p className="kiosk-glass rounded-3xl px-8 py-4 text-2xl font-semibold text-center max-w-4xl">{prompt}</p>}
+            {step !== 'ending' && <span className="kiosk-glass rounded-full px-7 py-3 text-2xl font-black">{mode.label}</span>}
+            {mode.guestbook && prompt && step !== 'ending' && <p className="kiosk-glass rounded-3xl px-8 py-4 text-2xl font-semibold text-center max-w-4xl">{prompt}</p>}
           </div>
 
           {step === 'live' && (
             <div className={`${side} flex flex-col items-center gap-5 pointer-events-auto`}>
-              {mode.key === '360' && <p className="kiosk-glass rounded-2xl px-6 py-3 text-xl max-w-xs text-center">Subite a la plataforma. Cuando estés listo, ¡a grabar!</p>}
+              {mode.key === '360' && (autoStart && cameraReady ? meter
+                : <p className="kiosk-glass rounded-2xl px-6 py-3 text-xl max-w-xs text-center">Subite a la plataforma. Cuando estés listo, ¡a grabar!</p>)}
               <div className="flex items-center gap-5 landscape:flex-col-reverse">
-                <button onClick={reset} className={btn}><ArrowLeft className="w-6 h-6" /> Volver</button>
+                <button onClick={goSplash} className={btn}><ArrowLeft className="w-6 h-6" /> Volver</button>
                 <button onClick={startCountdown} disabled={!cameraReady} className={`${primaryBtn} disabled:opacity-50`} data-autofocus>
                   {cameraReady ? <span className="w-7 h-7 rounded-full bg-red-500 ring-4 ring-white" /> : <Loader2 className="w-7 h-7 animate-spin" />}
                   {cameraReady ? 'Grabar' : 'Abriendo cámara…'}
@@ -554,7 +790,7 @@ export default function VideoBooth() {
             key={result.url}
             src={result.url} autoPlay loop playsInline muted={!cfg?.mic}
             initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }}
-            className="relative max-h-[78vh] max-w-[min(60vw,100%)] portrait:max-w-[86vw] portrait:max-h-[52vh] rounded-[2rem] shadow-[0_30px_80px_-20px_rgba(0,0,0,0.8)] ring-4 ring-white/20 bg-black"
+            className="relative max-h-[78vh] max-w-[min(55vw,100%)] portrait:max-w-[86vw] portrait:max-h-[48vh] rounded-[2rem] shadow-[0_30px_80px_-20px_rgba(0,0,0,0.8)] ring-4 ring-white/20 bg-black"
           />
           {step === 'review' ? (
             <div className="relative flex flex-col items-center gap-6">
@@ -563,14 +799,27 @@ export default function VideoBooth() {
               <button onClick={retake} className={btn}><RotateCcw className="w-6 h-6" /> Repetir</button>
             </div>
           ) : (
-            <div className="relative flex flex-col items-center gap-6 max-w-md text-center">
-              {qr.state === 'done' && (
+            <div className="relative flex flex-col items-center gap-5 max-w-xl text-center">
+              {qr.state === 'ready' && (
                 <>
                   <h2 className="carlmarx-bold text-[clamp(2rem,5.5vmin,4rem)] leading-tight">Escaneá y llevátelo</h2>
-                  <div className="bg-white p-5 rounded-[2rem] shadow-2xl">
-                    <QRCodeSVG value={qr.url} size={260} level="M" />
+                  <div className="flex flex-wrap justify-center gap-5">
+                    {qr.video && (
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="bg-white p-4 rounded-[1.5rem] shadow-2xl"><QRCodeSVG value={qr.video} size={qr.gallery ? 190 : 250} level="M" /></div>
+                        {qr.gallery && <span className="text-lg font-bold">Tu video</span>}
+                      </div>
+                    )}
+                    {qr.gallery && (
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="bg-white p-4 rounded-[1.5rem] shadow-2xl"><QRCodeSVG value={qr.gallery} size={qr.video ? 190 : 250} level="M" /></div>
+                        <span className="text-lg font-bold">Galería del evento</span>
+                      </div>
+                    )}
                   </div>
-                  <p className="text-white/70 text-lg">Bajalo o compartilo por WhatsApp e Instagram</p>
+                  {qr.queued
+                    ? <p className="text-amber-100 text-lg flex items-center gap-2"><CloudOff className="w-5 h-5 shrink-0" /> Sin internet: tu video aparece en la galería apenas vuelva la conexión.</p>
+                    : <p className="text-white/70 text-lg">Bajalo o compartilo por WhatsApp e Instagram</p>}
                 </>
               )}
               {qr.state === 'uploading' && (
@@ -583,7 +832,7 @@ export default function VideoBooth() {
                 <>
                   <h2 className="carlmarx-bold text-[clamp(2rem,5vmin,3.5rem)]">¡Quedó guardado!</h2>
                   <p className="text-amber-200 text-lg">No se pudo generar el QR: {qr.message}</p>
-                  <button onClick={() => void uploadQr(result)} className={btn}><RefreshCw className="w-6 h-6" /> Reintentar</button>
+                  <button onClick={() => void deliver(result)} className={btn}><RefreshCw className="w-6 h-6" /> Reintentar</button>
                 </>
               )}
               {qr.state === 'off' && <h2 className="carlmarx-bold text-[clamp(2.5rem,6vmin,4.5rem)]">¡Quedó genial!</h2>}
@@ -598,7 +847,7 @@ export default function VideoBooth() {
           <AuroraBackground />
           <h2 className="relative carlmarx-bold text-5xl">Algo falló</h2>
           <p className="relative text-xl text-white/80 max-w-3xl">{error}</p>
-          <button onClick={reset} className={`relative ${primaryBtn}`} data-autofocus><RotateCcw className="w-7 h-7" /> Volver al inicio</button>
+          <button onClick={goSplash} className={`relative ${primaryBtn}`} data-autofocus><RotateCcw className="w-7 h-7" /> Volver al inicio</button>
         </div>
       )}
 

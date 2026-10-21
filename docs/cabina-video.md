@@ -49,13 +49,42 @@ Lo que ofrece LumaBooth y cómo lo resolvemos:
 En Chromium con cámara simulada: Boomerang, Glam, 360 y Libro de firmas salen en MP4
 720×1280 con marco. Falta probar en la TV box y en un celular reales.
 
+## Versión 2 (referencias: Snap360 y TouchPix)
+
+| Pedido | Cómo quedó |
+|---|---|
+| Arranque automático del 360 por movimiento | La cámara compara cuadros: cuando la plataforma gira, graba sola (sin cuenta regresiva). Opcional: corta sola cuando para y **modo continuo** (vuelve directo a esperar el próximo giro). **Calibración** en Ajustes: "medir quieta" y "medir girando" fijan el umbral |
+| Marcos interactivos | Varios marcos PNG y el invitado **elige el suyo** antes de grabar. **Animaciones** encima del video (confeti, brillos, corazones, burbujas, nieve, borde neón) o un **video propio** (WebM con transparencia o MP4 con fondo negro). **Accesorios que siguen la cara** (los del kiosco de fotos) |
+| Tu propia música | Biblioteca de canciones en el equipo, con el **segundo donde empieza** cada una. Suena siempre la misma, una al azar, o **la elige el invitado** (escucha un pedacito antes) |
+| Efectos y filtros | Filtros nuevos (Cine, Soñado, Neón, Retro), **zoom suave** y **destellos** en los cambios de velocidad del 360 |
+| Integración de marca | **Logo** (lugar, tamaño, transparencia), **marca de agua** de texto, **color de la marca** y **placa final** con logo, nombre del evento y tu texto (web/Instagram) |
+| Tipos de entrega | QR al **video**, a la **galería del evento** o **los dos**. Página del invitado para bajar o mandar por WhatsApp |
+| Trabajar sin internet | El video queda en el equipo y en una **cola**: se sube solo cuando vuelve internet (Ajustes muestra cuántos faltan y "Subir ahora"). Sin internet el invitado igual se lleva el QR de la galería: su video aparece ahí cuando se sube |
+| Gestión vía web | Panel → Kioscos → equipo → **Cabina de video**: experiencias, 360, efectos, marcos, logo, música, entrega y galería. Los archivos se suben al panel y el equipo los baja y los guarda (después funcionan sin internet) |
+| Galería online | `/galeria-video/<código>`: todos los videos del evento, en vivo. Con `?pantalla=1` (tele o tablet del evento): el último video en grande, la grilla y el QR para que cada uno busque el suyo |
+
+### Para activar la galería online
+
+Correr en Supabase la migración `supabase/migrations/20261021000000_video_clips.sql`
+(crea la tabla `video_clips`). Sin eso, todo lo demás funciona y el QR al video también.
+
+### Detalles técnicos
+
+- Capas (`decor.ts`): todo se dibuja en función del tiempo, igual en vivo y al armar el video.
+  En los modos sin efectos las capas y la placa final se graban en vivo; en los modos con
+  efectos se agregan al armar el video (así la reversa no da vuelta la animación ni el logo).
+- Movimiento (`motion.ts`): diferencia entre cuadros en una copia de 64×36 en grises, 12 veces
+  por segundo (liviano para la TV box).
+- Galería (`cloud.ts`): el video y su miniatura se suben a Drive; la galería se anota en la
+  tabla `video_clips` con el código de la galería (largo y al azar).
+- Panel (`kioskRemote.ts`, `VideoBoothConfig.tsx`): los ajustes viajan en `kiosk_devices.settings.video`
+  y los archivos en `settings.videoAssets` (URLs de `kiosk-assets`).
+
 ## Próximos pasos (propuestos)
 
-- Arranque automático del 360 por movimiento (detectar cuando la plataforma gira).
-- Intro y cierre (pre-roll / post-roll) y marcos animados (video con transparencia).
-- Cola de reintento para subir a Drive los videos que no se pudieron subir en el momento.
-- Galería de videos en el equipo y descarga de todos los videos del evento.
+- Envío por mail o WhatsApp directo desde la cabina (necesita un servicio de envío con su clave).
+- Moderación de la galería desde el panel (ocultar o borrar videos).
+- Intro (pre-roll) además de la placa final.
 - Libro de firmas: compilado final de todos los mensajes para entregar a los anfitriones.
 - Recorte de fondo (chroma key) en vivo, compartido con el kiosco de fotos.
 - App propia (variante `VITE_APP_FLAVOR=video`) si se quiere vender la cabina por separado.
-- Configurar la cabina desde el panel web (como los kioscos).

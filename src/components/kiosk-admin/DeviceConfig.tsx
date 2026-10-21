@@ -7,6 +7,7 @@ import { GLASS_PREFIX, GLASS_STYLES } from '@/lib/glassFrame';
 import { NAME_STYLES } from '@/components/kiosk/attractStyles';
 import type { RemoteSettings } from '@/lib/kioskRemote';
 import { btnGhost, btnPrimary, Check, Field, input, Section, Select } from './ui';
+import VideoBoothConfig from './VideoBoothConfig';
 import type { KioskDeviceRow } from './types';
 
 // Ajustes de un equipo desde el panel. Arranca con lo que informó el equipo
@@ -20,6 +21,9 @@ const merge = (reported?: RemoteSettings | null, desired?: RemoteSettings | null
   camera: { ...(reported?.camera ?? {}), ...(desired?.camera ?? {}) },
   print: { ...(reported?.print ?? {}), ...(desired?.print ?? {}) },
   frame: desired?.frame !== undefined ? desired.frame : reported?.frame ?? null,
+  video: { ...(reported?.video ?? {}), ...(desired?.video ?? {}) },
+  // Los archivos de la cabina de video solo los conoce el panel (el equipo informa nombres)
+  ...(desired?.videoAssets ? { videoAssets: desired.videoAssets } : {}),
 });
 
 const num = (v: unknown, d: number) => (v === undefined || v === null || v === '' ? d : Number(v));
@@ -220,6 +224,9 @@ export default function DeviceConfig({ device, onClose, onSaved }: {
           <Check label="Modo espejo" checked={bool('camera', 'mirror', false)} onChange={v => set('camera', 'mirror', v)} />
         </Section>
       </div>
+
+      <h2 className="text-lg font-bold text-white pt-2">Cabina de video</h2>
+      <VideoBoothConfig form={form} setForm={setForm} />
     </div>
   );
 }

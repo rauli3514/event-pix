@@ -77,6 +77,10 @@ export const VIDEO_FILTERS = [
   { value: 'warm', label: 'Cálido', css: 'sepia(0.2) saturate(1.3) hue-rotate(-8deg)', glow: 0 },
   { value: 'cold', label: 'Frío', css: 'saturate(1.1) hue-rotate(14deg) brightness(1.03)', glow: 0 },
   { value: 'pop', label: 'Pop', css: 'saturate(1.8) contrast(1.15)', glow: 0 },
+  { value: 'cine', label: 'Cine', css: 'contrast(1.15) saturate(1.2) sepia(0.18) hue-rotate(-12deg)', glow: 0.1, vignette: true },
+  { value: 'sueno', label: 'Soñado', css: 'brightness(1.12) saturate(1.1) contrast(0.95)', glow: 0.4 },
+  { value: 'neon', label: 'Neón', css: 'saturate(2.2) contrast(1.2) hue-rotate(20deg)', glow: 0.2 },
+  { value: 'retro', label: 'Retro', css: 'sepia(0.6) saturate(1.4) contrast(1.1) hue-rotate(-20deg)', glow: 0.08, vignette: true },
 ] as { value: string; label: string; css: string; glow: number; vignette?: boolean }[];
 export const videoFilter = (value?: string) => VIDEO_FILTERS.find(f => f.value === value) ?? VIDEO_FILTERS[0];
 
@@ -129,7 +133,112 @@ export interface VideoBoothSettings {
   highFps?: boolean;
   /** El invitado ve su video y elige entre quedárselo o repetir */
   review?: boolean;
+
+  // ─── Marcos y capas ───
+  /** Marcos PNG cargados (el archivo está en el equipo: frameKey(id)) */
+  frames?: MediaItem[];
+  /** Marco por defecto cuando overlay = 'custom' */
+  frameId?: string;
+  /** El invitado elige el marco (si hay más de uno) */
+  frameChoice?: boolean;
+  /** Animación encima del video */
+  animation?: AnimationKey;
+  /** Animación propia (video): mezcla "pantalla" para videos con fondo negro */
+  animBlend?: 'screen' | 'normal';
+  /** Accesorio que sigue la cara (los del kiosco de fotos) */
+  accessory?: string;
+
+  // ─── Marca ───
+  showLogo?: boolean;
+  logoPosition?: Corner;
+  /** Ancho del logo (fracción del ancho del video) */
+  logoSize?: number;
+  logoOpacity?: number;
+  /** Texto chico encima del video (ej. @tuempresa) */
+  watermark?: string;
+  watermarkPosition?: Corner;
+  /** Color de la marca (placa final, neón, franja del nombre) */
+  brandColor?: string;
+  /** Placa final con el logo y el nombre del evento */
+  endCard?: boolean;
+  endCardSeconds?: number;
+  endCardText?: string;
+
+  // ─── Efectos ───
+  /** Acercamiento suave durante el video (modos con efectos) */
+  zoomEffect?: boolean;
+  /** Destello en cada cambio de velocidad (360) */
+  flashEffect?: boolean;
+
+  // ─── Música ───
+  songs?: SongItem[];
+  /** Una fija, una al azar o la elige el invitado */
+  songMode?: 'fixed' | 'random' | 'guest';
+  songId?: string;
+
+  // ─── 360 por movimiento ───
+  /** Empieza a grabar sola cuando la plataforma gira */
+  autoStart360?: boolean;
+  /** Corta sola cuando la plataforma para */
+  autoStop360?: boolean;
+  /** Nivel de movimiento que dispara (0–100, se calibra en Ajustes) */
+  motionThreshold?: number;
+  /** Después de cada video vuelve directo a esperar el próximo giro */
+  continuous360?: boolean;
+
+  // ─── Entrega ───
+  /** Qué abre el QR: el video, la galería del evento o los dos */
+  delivery?: 'video' | 'gallery' | 'both';
+  /** Código de la galería online del evento */
+  galleryCode?: string;
 }
+
+export interface MediaItem { id: string; name: string }
+export interface SongItem extends MediaItem { /** Segundo de la canción donde empieza */ start?: number }
+export type Corner = 'tl' | 'tr' | 'bl' | 'br' | 'top' | 'bottom';
+
+export const ANIMATIONS = [
+  { value: 'none', label: 'Sin animación' },
+  { value: 'confeti', label: 'Confeti' },
+  { value: 'brillos', label: 'Brillos' },
+  { value: 'corazones', label: 'Corazones' },
+  { value: 'burbujas', label: 'Burbujas' },
+  { value: 'nieve', label: 'Nieve' },
+  { value: 'neon', label: 'Borde neón' },
+  { value: 'custom', label: 'Video propio' },
+] as const;
+export type AnimationKey = typeof ANIMATIONS[number]['value'];
+
+export const CORNERS: { value: Corner; label: string }[] = [
+  { value: 'tl', label: 'Arriba izquierda' }, { value: 'top', label: 'Arriba al centro' }, { value: 'tr', label: 'Arriba derecha' },
+  { value: 'bl', label: 'Abajo izquierda' }, { value: 'bottom', label: 'Abajo al centro' }, { value: 'br', label: 'Abajo derecha' },
+];
+
+// Archivos guardados en el equipo (IndexedDB de kioskMedia). 'overlay' y 'music'
+// son los de la primera versión (un solo marco y una sola canción).
+export const frameKey = (id: string) => (id === 'overlay' ? 'video:overlay' : `video:frame:${id}`);
+export const songKey = (id: string) => (id === 'music' ? 'video:music' : `video:song:${id}`);
+export const LOGO_KEY = 'video:logo';
+export const ANIM_KEY = 'video:anim';
+export const newMediaId = () => Math.random().toString(36).slice(2, 10);
+
+/** Código nuevo para la galería online (8 letras y números, difícil de adivinar). */
+export const newGalleryCode = () => {
+  const abc = 'abcdefghjkmnpqrstuvwxyz23456789';
+  let s = '';
+  const rnd = crypto.getRandomValues(new Uint32Array(8));
+  for (const n of rnd) s += abc[n % abc.length];
+  return s;
+};
+
+/** Código de la galería del evento (se crea la primera vez). */
+export const galleryCode = () => {
+  const s = getVideoSettings();
+  if (s.galleryCode) return s.galleryCode;
+  const code = newGalleryCode();
+  saveVideoSettings({ galleryCode: code });
+  return code;
+};
 
 export const getVideoSettings = (): VideoBoothSettings => {
   try {

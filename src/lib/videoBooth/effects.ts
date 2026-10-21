@@ -1,4 +1,5 @@
 import type { BufferedFrame } from './compositor';
+import type { Decor } from './decor';
 import { bitrateFor, ClipRecorder, mixAudio } from './recorder';
 import type { RampPreset, VideoBoothSettings, VideoEffect } from './settings';
 
@@ -68,6 +69,22 @@ export function planDuration(plan: EffectPlan, frames: BufferedFrame[] = []) {
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, Math.max(0, ms)));
 
+export interface RenderExtras {
+  /** Capas encima del video (marco, animación, logo) */
+  decor?: Decor | null;
+  /** Segundos de placa final (0 = sin placa) */
+  endCard?: number;
+  /** Acercamiento suave a lo largo del video */
+  zoom?: boolean;
+  /** Destello en cada cambio de velocidad */
+  flash?: boolean;
+}
+
+/**
+ * Arma el video final a 30 cuadros por segundo: en cada cuadro dibuja el cuadro
+ * del clip que corresponde (adelante con su velocidad, o de la reversa), el zoom,
+ * las capas y el destello; al final, la placa.
+ */
 export async function renderEffects(opts: {
   source: Blob;
   frames: BufferedFrame[];
@@ -76,9 +93,10 @@ export async function renderEffects(opts: {
   height: number;
   music?: AudioBuffer | null;
   musicVolume?: number;
+  musicStart?: number;
   onProgress?: (p: number) => void;
-}): Promise<{ blob: Blob; mime: string }> {
-  const { width: W, height: H, plan, frames } = opts;
+} & RenderExtras): Promise<{ blob: Blob; mime: string }> {
+  const { width: W, height: H, plan, frames, decor } = opts;
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
@@ -87,37 +105,120 @@ export async function renderEffects(opts: {
   ctx.fillRect(0, 0, W, H);
 
   const tailFrames = plan.tail ? frames : [];
-  const total = planDuration(plan, tailFrames);
+  const endSeconds = decor && opts.endCard ? opts.endCard : 0;
+  const main = planDuration(plan, tailFrames);
+  const total = main + endSeconds;
   const stream = canvas.captureStream(30);
-  const mix = opts.music ? mixAudio({ music: opts.music, musicVolume: opts.musicVolume, duration: total }) : null;
+  const mix = opts.music ? mixAudio({ music: opts.music, musicVolume: opts.musicVolume, duration: total, offset: opts.musicStart }) : null;
   if (mix) stream.addTrack(mix.track);
   const rec = new ClipRecorder(stream, { bitrate: bitrateFor(W, H, total) });
 
-  const startedAt = performance.now();
-  const progress = window.setInterval(() => opts.onProgress?.(Math.min(0.99, (performance.now() - startedAt) / 1000 / Math.max(0.1, total))), 200);
-  const url = URL.createObjectURL(opts.source);
-  let video: HTMLVideoElement | null = null;
-  try {
-    // Primer cuadro antes de arrancar: el video no empieza en negro
-    video = await loadVideo(url);
-    ctx.drawImage(video, 0, 0, W, H);
-    rec.start();
-    await playForward(video, ctx, W, H, plan.segments);
-
-    if (plan.tail && tailFrames.length > 1) {
-      const { parts, speed } = plan.tail;
-      let clock = performance.now();
-      for (const part of parts) {
-        const list = part === 'rev' ? [...tailFrames].reverse() : tailFrames;
-        for (let i = 0; i < list.length; i++) {
-          ctx.drawImage(list[i].bitmap, 0, 0, W, H);
-          const next = list[i + 1];
-          const dt = next ? Math.abs(next.t - list[i].t) : 1 / 30;
-          clock += (Math.min(0.2, Math.max(1 / 120, dt)) / speed) * 1000;
-          await sleep(clock - performance.now());
-        }
+  // Secuencia de la reversa: [cuadro, momento en que termina] (segundos desde que empieza)
+  const tail: { frame: BufferedFrame; until: number }[] = [];
+  if (plan.tail && tailFrames.length > 1) {
+    let acc = 0;
+    for (const part of plan.tail.parts) {
+      const list = part === 'rev' ? [...tailFrames].reverse() : tailFrames;
+      for (let i = 0; i < list.length; i++) {
+        const next = list[i + 1];
+        const dt = next ? Math.abs(next.t - list[i].t) : 1 / 30;
+        acc += Math.min(0.2, Math.max(1 / 120, dt)) / plan.tail.speed;
+        tail.push({ frame: list[i], until: acc });
       }
     }
+  }
+
+  const url = URL.createObjectURL(opts.source);
+  let video: HTMLVideoElement | null = null;
+  const startedAt = performance.now();
+  const progress = window.setInterval(() => opts.onProgress?.(Math.min(0.99, (performance.now() - startedAt) / 1000 / Math.max(0.1, total))), 200);
+  try {
+    video = await loadVideo(url);
+    const v = video;
+    const segments = plan.segments;
+    const end = segments.length ? segments[segments.length - 1].until : 0;
+
+    // Dibuja una fuente con el zoom del momento
+    const paint = (src: CanvasImageSource, t: number) => {
+      const z = opts.zoom ? 1 + 0.12 * Math.min(1, t / Math.max(1, main)) : 1;
+      if (z === 1) { ctx.drawImage(src, 0, 0, W, H); return; }
+      const w = W * z;
+      const h = H * z;
+      ctx.drawImage(src, (W - w) / 2, (H - h) / 2, w, h);
+    };
+    let flashAt = -10;
+    const paintTop = (t: number) => {
+      decor?.draw(ctx, t);
+      const f = t - flashAt;
+      if (opts.flash && f >= 0 && f < 0.3) {
+        ctx.fillStyle = `rgba(255,255,255,${0.7 * (1 - f / 0.3)})`;
+        ctx.fillRect(0, 0, W, H);
+      }
+    };
+
+    paint(v, 0);
+    paintTop(0);
+    rec.start();
+    const clock0 = performance.now();
+    const now = () => (performance.now() - clock0) / 1000;
+
+    await new Promise<void>(resolve => {
+      let phase: 'forward' | 'tail' | 'end' = segments.length ? 'forward' : 'tail';
+      let idx = 0;
+      let forwardEnd = 0;
+      let tailIdx = 0;
+      let done = false;
+      let lastPaint = -1;
+      const finishForward = () => {
+        if (phase !== 'forward') return;
+        v.pause();
+        forwardEnd = now();
+        phase = tail.length ? 'tail' : 'end';
+      };
+      // Por si el video no avisa que terminó (algunos WebView con WebM recién grabados)
+      const expected = segments.reduce((acc, sg, i) => acc + (sg.until - (i ? segments[i - 1].until : 0)) / sg.speed, 0);
+      const safety = window.setTimeout(finishForward, (expected * 1.6 + 5) * 1000);
+      v.onended = finishForward;
+      const tick = () => {
+        if (done) return;
+        const t = now();
+        if (phase === 'forward') {
+          const ct = v.currentTime;
+          while (idx < segments.length - 1 && ct >= segments[idx].until) {
+            idx++;
+            v.playbackRate = segments[idx].speed;
+            flashAt = t;
+          }
+          if (ct >= end - 0.02) finishForward();
+        }
+        if (phase === 'tail') {
+          const tt = t - forwardEnd;
+          while (tailIdx < tail.length - 1 && tt >= tail[tailIdx].until) tailIdx++;
+          if (tt >= tail[tail.length - 1].until) { phase = 'end'; forwardEnd = t; }
+        }
+        // 30 cuadros por segundo
+        if (t - lastPaint >= 1 / 31) {
+          lastPaint = t;
+          if (phase === 'forward') { paint(v, t); paintTop(t); }
+          else if (phase === 'tail' && tail.length) { paint(tail[tailIdx].frame.bitmap, t); paintTop(t); }
+          else if (phase === 'end') {
+            const te = t - forwardEnd;
+            if (endSeconds && decor) decor.drawEndCard(ctx, Math.min(te, endSeconds), endSeconds);
+            if (te >= endSeconds) {
+              done = true;
+              window.clearTimeout(safety);
+              resolve();
+              return;
+            }
+          }
+        }
+        requestAnimationFrame(tick);
+      };
+      if (segments.length) {
+        v.playbackRate = segments[0].speed;
+        v.play().then(() => requestAnimationFrame(tick)).catch(() => { finishForward(); requestAnimationFrame(tick); });
+      } else requestAnimationFrame(tick);
+    });
     await sleep(120);
     const blob = await rec.stop();
     opts.onProgress?.(1);
@@ -145,45 +246,5 @@ function loadVideo(url: string) {
     video.onloadeddata = () => { window.clearTimeout(timer); resolve(video); };
     video.onerror = fail;
     video.src = url;
-  });
-}
-
-/** Reproduce el clip una vez, cambiando la velocidad en cada tramo, y dibuja cada cuadro nuevo. */
-function playForward(video: HTMLVideoElement, ctx: CanvasRenderingContext2D, W: number, H: number, segments: Segment[]) {
-  return new Promise<void>(resolve => {
-    if (!segments.length) { resolve(); return; }
-    const end = segments[segments.length - 1].until;
-    let idx = 0;
-    let finished = false;
-    let last = -1;
-    let raf = 0;
-    const finish = () => {
-      if (finished) return;
-      finished = true;
-      cancelAnimationFrame(raf);
-      window.clearTimeout(safety);
-      video.pause();
-      resolve();
-    };
-    // Por si el video no avisa que terminó (algunos WebView con WebM recién grabados)
-    const expected = segments.reduce((acc, s, i) => acc + (s.until - (i ? segments[i - 1].until : 0)) / s.speed, 0);
-    const safety = window.setTimeout(finish, (expected * 1.6 + 5) * 1000);
-    const tick = () => {
-      if (finished) return;
-      const t = video.currentTime;
-      if (t !== last) {
-        last = t;
-        ctx.drawImage(video, 0, 0, W, H);
-        while (idx < segments.length - 1 && t >= segments[idx].until) {
-          idx++;
-          video.playbackRate = segments[idx].speed;
-        }
-        if (t >= end - 0.02) { finish(); return; }
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    video.onended = finish;
-    video.playbackRate = segments[0].speed;
-    video.play().then(() => { raf = requestAnimationFrame(tick); }).catch(finish);
   });
 }
