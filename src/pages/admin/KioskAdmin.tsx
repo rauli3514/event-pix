@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, CalendarDays, Coins, MonitorSmartphone, RefreshCw, Wand2 } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Clapperboard, Coins, MonitorSmartphone, RefreshCw, Wand2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import DevicesTab from '@/components/kiosk-admin/DevicesTab';
 import DeviceConfig from '@/components/kiosk-admin/DeviceConfig';
 import EventsTab from '@/components/kiosk-admin/EventsTab';
 import ClientsTab from '@/components/kiosk-admin/ClientsTab';
 import ThemesTab from '@/components/kiosk-admin/ThemesTab';
+import VideoGalleryTab from '@/components/kiosk-admin/VideoGalleryTab';
 import { btnGhost } from '@/components/kiosk-admin/ui';
 import type { KioskAccountRow, KioskDeviceRow, KioskEventRow } from '@/components/kiosk-admin/types';
 
@@ -19,7 +20,7 @@ const DEVICE_COLUMNS = 'id, device_code, name, pairing_status, kiosk_event_id, a
 const REMOTE_COLUMNS = 'settings, settings_rev, applied_rev, reported, reported_at';
 const CREDIT_COLUMNS = 'account_id';
 
-type Tab = 'devices' | 'events' | 'clients' | 'themes';
+type Tab = 'devices' | 'events' | 'videos' | 'clients' | 'themes';
 
 export default function KioskAdmin() {
   const [tab, setTab] = useState<Tab>('devices');
@@ -73,7 +74,7 @@ export default function KioskAdmin() {
             <Link to="/admin" className={btnGhost}><ArrowLeft className="h-4 w-4" /> Admin</Link>
             <div>
               <h1 className="text-xl font-bold text-white">Kioscos</h1>
-              <p className="text-xs text-slate-400">Equipos, eventos y fotos</p>
+              <p className="text-xs text-slate-400">Equipos, eventos, fotos y videos</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -85,6 +86,10 @@ export default function KioskAdmin() {
               <button onClick={() => { setTab('events'); setConfiguring(null); }}
                 className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold ${tab === 'events' ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-white'}`}>
                 <CalendarDays className="h-4 w-4" /> Eventos y fotos
+              </button>
+              <button onClick={() => { setTab('videos'); setConfiguring(null); }}
+                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold ${tab === 'videos' ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-white'}`}>
+                <Clapperboard className="h-4 w-4" /> Videos
               </button>
               <button onClick={() => { setTab('clients'); setConfiguring(null); }}
                 className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold ${tab === 'clients' ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-white'}`}>
@@ -113,6 +118,7 @@ export default function KioskAdmin() {
               onConfigure={d => (missingMigration ? toast.error('Primero corré la migración de configuración remota') : setConfiguring(d.id))} />)}
         {tab === 'themes' && <ThemesTab />}
         {tab === 'events' && <EventsTab events={events} devices={devices} onChange={load} />}
+        {tab === 'videos' && <VideoGalleryTab devices={devices} />}
         {tab === 'clients' && (accounts
           ? <ClientsTab accounts={accounts} devices={devices} onChange={load} />
           : (

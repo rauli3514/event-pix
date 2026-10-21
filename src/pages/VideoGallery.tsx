@@ -28,27 +28,29 @@ function useClips(code: string) {
     if (!isSupabaseConfigured || !code) return;
     let alive = true;
     const load = async () => {
-      const { data, error: e } = await supabase.from('video_clips')
+      const query = () => supabase.from('video_clips')
         .select('id, drive_id, thumb_id, title, mode, created_at')
         .eq('gallery', code).order('created_at', { ascending: false }).limit(300);
+      // Solo los aprobados (aunque mire alguien logueado en el panel)
+      let { data, error: e } = await query().eq('hidden', false);
+      // Base sin la migración de moderación: no hay columna "hidden"
+      if (e && /hidden/i.test(e.message)) ({ data, error: e } = await query());
       if (!alive) return;
       if (e) setError(e.message);
       else { setError(''); setClips(data as Clip[]); }
     };
     void load();
-    // Videos nuevos en vivo (y por las dudas, cada 30 s)
+    // En vivo: videos nuevos, aprobados, ocultos o borrados (y por las dudas, cada 30 s)
+    let pending = 0;
+    const reload = () => { window.clearTimeout(pending); pending = window.setTimeout(load, 400); };
     const channel = supabase.channel(`video_clips:${code}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'video_clips', filter: `gallery=eq.${code}` }, payload => {
-        setClips(list => {
-          const row = payload.new as Clip;
-          return list?.some(c => c.id === row.id) ? list : [row, ...(list ?? [])];
-        });
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'video_clips', filter: `gallery=eq.${code}` }, reload)
       .subscribe();
     const timer = window.setInterval(load, 30000);
     return () => {
       alive = false;
       window.clearInterval(timer);
+      window.clearTimeout(pending);
       void supabase.removeChannel(channel);
     };
   }, [code]);

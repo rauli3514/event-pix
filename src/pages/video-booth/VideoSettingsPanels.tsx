@@ -364,6 +364,15 @@ export function DeliveryPanel({ s, update }: Props) {
       <Toggle label="Mostrar QR al terminar" hint={isDriveConfigured() ? 'Los videos se suben a la carpeta de Drive del kiosco' : 'Falta configurar Drive en Ajustes del kiosco → Compartir y nube'} checked={s.showQr !== false} onChange={v => update({ showQr: v })} />
       <Choice label="El QR abre" value={s.delivery ?? 'video'} onChange={v => update({ delivery: v })}
         options={[{ value: 'video', label: 'Su video' }, { value: 'gallery', label: 'La galería del evento' }, { value: 'both', label: 'Los dos (dos QR)' }]} />
+      <Choice label="Videos en la galería" value={s.galleryModeration ?? 'post'} onChange={v => update({ galleryModeration: v })}
+        options={[{ value: 'post', label: 'Aparecen solos (se pueden ocultar desde el panel)' }, { value: 'pre', label: 'Aparecen cuando los apruebo en el panel' }]} />
+      <Toggle label="Botón “Enviar por WhatsApp”" hint="El invitado escribe su número y le llega el video. Necesita el WhatsApp de la empresa configurado en el servidor (ver docs/cabina-video.md)."
+        checked={!!s.whatsappEnabled} onChange={v => update({ whatsappEnabled: v })} />
+      {s.whatsappEnabled && (
+        <Field label="Prefijo del país (va antes del número; 549 = Argentina celulares)">
+          <input className={inputClass} inputMode="numeric" value={s.whatsappPrefix ?? '549'} onChange={e => update({ whatsappPrefix: e.target.value.replace(/\D/g, '') })} />
+        </Field>
+      )}
       {code ? (
         <div className="flex flex-wrap items-center gap-6 rounded-2xl bg-black/20 border border-white/10 p-5">
           <span className="bg-white p-3 rounded-2xl"><QRCodeSVG value={`${url}?pantalla=1`} size={140} /></span>

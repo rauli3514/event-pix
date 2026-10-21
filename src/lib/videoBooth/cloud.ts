@@ -3,7 +3,9 @@ import { getDeviceCode } from '@/lib/kioskDevice';
 import { getGeneralSettings } from '@/lib/kioskSettings';
 import { publicSiteUrl } from '@/lib/kioskShare';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { getVideoSettings } from './settings';
 import { blobToDataUrl, openDb, UPLOADS, uploadVideoForShare } from './storage';
+import { sendVideoWhatsApp } from './whatsapp';
 
 // Entrega del video: se sube a Drive (QR al video) y se anota en la galería online
 // del evento. Sin internet queda en una cola en el equipo y se sube solo cuando
@@ -20,6 +22,8 @@ export interface PendingUpload {
   mode: string;
   gallery: string;
   created: number;
+  /** WhatsApp de invitados que pidieron el video (se manda al subirlo) */
+  phones?: string[];
 }
 
 export const galleryUrl = (code: string) => `${publicSiteUrl()}/galeria-video/${encodeURIComponent(code)}`;
@@ -30,11 +34,30 @@ export const canUpload = () => isDriveConfigured() && !getGeneralSettings().offl
 /** Anota el video en la galería online (si hay servidor). No corta si falla. */
 async function registerClip(item: PendingUpload, driveId: string, thumbId: string | null) {
   if (!isSupabaseConfigured || !item.gallery) return;
-  const { error } = await supabase.from('video_clips').upsert({
+  const row = {
     gallery: item.gallery, drive_id: driveId, thumb_id: thumbId,
     title: item.title?.slice(0, 120) || null, mode: item.mode, device_code: getDeviceCode(),
-  }, { onConflict: 'gallery,drive_id', ignoreDuplicates: true });
+  };
+  // Con aprobación previa el video entra oculto hasta que se apruebe en el panel
+  const pre = getVideoSettings().galleryModeration === 'pre';
+  let { error } = await supabase.from('video_clips').upsert(pre ? { ...row, hidden: true } : row, { onConflict: 'gallery,drive_id', ignoreDuplicates: true });
+  // Base sin la columna "hidden" (falta la migración de moderación)
+  if (error && pre && /hidden/i.test(error.message)) ({ error } = await supabase.from('video_clips').upsert(row, { onConflict: 'gallery,drive_id', ignoreDuplicates: true }));
   if (error) console.warn('[video] no se pudo anotar en la galería', error.message);
+}
+
+/** Manda el video a los WhatsApp anotados. Devuelve los que fallaron. */
+export async function sendToPhones(item: Pick<PendingUpload, 'title' | 'gallery' | 'mode'>, driveId: string, phones: string[]) {
+  const failed: string[] = [];
+  for (const phone of phones) {
+    try {
+      await sendVideoWhatsApp({ phone, driveId, title: item.title, gallery: item.gallery || undefined, mode: item.mode });
+    } catch (e) {
+      console.warn('[video] WhatsApp', e);
+      failed.push(phone);
+    }
+  }
+  return failed;
 }
 
 async function uploadOne(item: PendingUpload) {
@@ -49,6 +72,7 @@ async function uploadOne(item: PendingUpload) {
     }
   }
   await registerClip(item, driveId, thumbId).catch(() => {});
+  if (item.phones?.length) await sendToPhones(item, driveId, item.phones);
   return driveId;
 }
 
@@ -89,6 +113,14 @@ async function queueDelete(name: string) {
 }
 
 export const pendingVideoCount = async () => (await queueAll().catch(() => [])).length;
+
+/** Anota un WhatsApp en un video que espera internet: se manda cuando se sube. */
+export async function addPhoneToQueued(name: string, phone: string) {
+  const item = (await queueAll()).find(i => i.name === name);
+  if (!item) return false;
+  await queuePut({ ...item, phones: [...new Set([...(item.phones ?? []), phone])] });
+  return true;
+}
 
 /**
  * Entrega un video: lo sube ya (devuelve el ID de Drive para el QR) o, si no se

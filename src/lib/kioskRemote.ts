@@ -43,6 +43,7 @@ export const REMOTE_VIDEO_KEYS = [
   'showLogo', 'logoPosition', 'logoSize', 'logoOpacity', 'watermark', 'watermarkPosition', 'brandColor',
   'endCard', 'endCardSeconds', 'endCardText', 'zoomEffect', 'flashEffect',
   'songMode', 'songId', 'autoStart360', 'autoStop360', 'motionThreshold', 'continuous360', 'delivery', 'galleryCode',
+  'galleryModeration', 'whatsappEnabled', 'whatsappPrefix',
 ] as const;
 /** Se informan al panel pero no se pisan desde él (los maneja videoAssets) */
 const REPORT_ONLY_VIDEO_KEYS = ['frames', 'songs'] as const;

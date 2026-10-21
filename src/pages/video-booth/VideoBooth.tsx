@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
 import {
-  ArrowLeft, BookHeart, Check, CloudOff, Gem, Home, Loader2, Music, Play, RefreshCw, Repeat, Rotate3d, RotateCcw, Settings, Snail,
+  ArrowLeft, BookHeart, Check, CloudOff, Gem, Home, Loader2, MessageCircle, Music, Play, RefreshCw, Repeat, Rotate3d, RotateCcw, Settings, Snail,
   Square, Video, type LucideIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -19,7 +19,9 @@ import { guestVideoUrl } from '@/lib/kioskShare';
 import { useShutter } from '@/lib/kioskShutter';
 import { eventFolder } from '@/lib/kioskStorage';
 import { isSupabaseConfigured } from '@/lib/supabase';
-import { deliverVideo, galleryUrl, startVideoSync } from '@/lib/videoBooth/cloud';
+import { addPhoneToQueued, deliverVideo, galleryUrl, sendToPhones, startVideoSync } from '@/lib/videoBooth/cloud';
+import { DEFAULT_WA_PREFIX, fullPhone, sendVideoWhatsApp, validPhone } from '@/lib/videoBooth/whatsapp';
+import { isDriveConfigured } from '@/lib/driveBackup';
 import { Compositor } from '@/lib/videoBooth/compositor';
 import { bufferSecondsFor, effectPlan, renderEffects } from '@/lib/videoBooth/effects';
 import { buildDecor, frameUrl, loadSong, migrateLegacyMedia, pickSong, type DecorBundle } from '@/lib/videoBooth/media';
@@ -124,7 +126,6 @@ export default function VideoBooth() {
     return () => window.removeEventListener('video-settings-changed', reload);
   }, []);
 
-  useRemoteFocus(rootRef, [step, qr.state, frameThumbs.length], !pinOpen);
 
   // ─── Cámara ──────────────────────────────────────────────────────
   const stopMotion = useCallback(() => {
@@ -222,6 +223,8 @@ export default function VideoBooth() {
     if (resultRef.current) URL.revokeObjectURL(resultRef.current.url);
     setResult(null);
     setQr({ state: 'off' });
+    setWaOpen(false);
+    pendingPhonesRef.current = [];
     setMode(null);
     setCount(null);
     setProgress(0);
@@ -285,6 +288,8 @@ export default function VideoBooth() {
       if (resultRef.current) URL.revokeObjectURL(resultRef.current.url);
       setResult(null);
       setQr({ state: 'off' });
+      setWaOpen(false);
+      pendingPhonesRef.current = [];
       setProgress(0);
       chooseMode(m);
       return;
@@ -495,18 +500,49 @@ export default function VideoBooth() {
   }, [cameraReady, step, autoStart, autoStop, threshold, startRecording, finishRecording]);
 
   // ─── Entrega ─────────────────────────────────────────────────────
+  // Estado de la subida, para el envío por WhatsApp
+  const driveIdRef = useRef<string | null>(null);
+  const uploadingRef = useRef(false);
+  const queuedRef = useRef(false);
+  const pendingPhonesRef = useRef<string[]>([]);
+  const [waOpen, setWaOpen] = useState(false);
+  const [waNumber, setWaNumber] = useState('');
+  const [waStatus, setWaStatus] = useState<{ state: 'idle' | 'sending' | 'waiting' | 'sent' | 'queued' | 'error'; message?: string }>({ state: 'idle' });
+  useRemoteFocus(rootRef, [step, qr.state, frameThumbs.length, waOpen, waStatus.state], !pinOpen);
+  const waPrefix = settings.whatsappPrefix || DEFAULT_WA_PREFIX;
+  const whatsappOn = !!settings.whatsappEnabled && isSupabaseConfigured && isDriveConfigured();
+
   const deliver = useCallback(async (res: Result) => {
-    if (settings.showQr === false) { setQr({ state: 'off' }); return; }
+    const showQr = settings.showQr !== false;
     const delivery = settings.delivery ?? 'video';
     const code = isSupabaseConfigured ? galleryCode() : '';
     const gallery = code && delivery !== 'video' ? galleryUrl(code) : undefined;
-    setQr({ state: 'uploading' });
+    const title = general.eventTitle || settings.title || undefined;
+    const mode = modeRef.current?.key ?? 'video';
+    driveIdRef.current = null;
+    queuedRef.current = false;
+    uploadingRef.current = true;
+    setQr(showQr ? { state: 'uploading' } : { state: 'off' });
     try {
       const driveId = await deliverVideo({
         name: res.name, folder: eventFolder(), blob: res.blob, thumb: res.thumb,
-        title: general.eventTitle || settings.title || undefined, mode: modeRef.current?.key ?? 'video',
-        gallery: code, created: Date.now(),
+        title, mode, gallery: code, created: Date.now(),
       });
+      uploadingRef.current = false;
+      // WhatsApp pedidos mientras se subía
+      const phones = pendingPhonesRef.current.splice(0);
+      if (driveId) {
+        driveIdRef.current = driveId;
+        if (phones.length) {
+          const failed = await sendToPhones({ title, gallery: code, mode }, driveId, phones);
+          setWaStatus(failed.length ? { state: 'error', message: 'No se pudo mandar el WhatsApp' } : { state: 'sent' });
+        }
+      } else {
+        queuedRef.current = true;
+        for (const phone of phones) await addPhoneToQueued(res.name, phone);
+        if (phones.length) setWaStatus({ state: 'queued' });
+      }
+      if (!showQr) return;
       if (driveId) {
         setQr({ state: 'ready', video: delivery !== 'gallery' ? guestVideoUrl(driveId, general.eventTitle || undefined) : undefined, gallery });
       } else if (code) {
@@ -516,9 +552,46 @@ export default function VideoBooth() {
         setQr({ state: 'error', message: navigator.onLine ? 'Falta configurar Google Drive' : 'Sin internet' });
       }
     } catch (e) {
-      setQr({ state: 'error', message: e instanceof Error ? e.message : String(e) });
+      uploadingRef.current = false;
+      if (showQr) setQr({ state: 'error', message: e instanceof Error ? e.message : String(e) });
     }
   }, [settings.showQr, settings.delivery, settings.title, general.eventTitle]);
+
+  const openWhatsApp = () => {
+    setWaNumber('');
+    setWaStatus({ state: 'idle' });
+    setWaOpen(true);
+  };
+
+  const submitWhatsApp = async () => {
+    const res = resultRef.current;
+    const phone = fullPhone(waPrefix, waNumber);
+    if (!res || !validPhone(phone)) { setWaStatus({ state: 'error', message: 'Revisá el número' }); return; }
+    const title = general.eventTitle || settings.title || undefined;
+    if (driveIdRef.current) {
+      setWaStatus({ state: 'sending' });
+      try {
+        await sendVideoWhatsApp({ phone, driveId: driveIdRef.current, title, gallery: settings.galleryCode, mode: modeRef.current?.key });
+        setWaStatus({ state: 'sent' });
+      } catch (e) {
+        setWaStatus({ state: 'error', message: e instanceof Error ? e.message : String(e) });
+      }
+    } else if (uploadingRef.current) {
+      pendingPhonesRef.current.push(phone);
+      setWaStatus({ state: 'waiting' });
+    } else if (queuedRef.current && await addPhoneToQueued(res.name, phone)) {
+      setWaStatus({ state: 'queued' });
+    } else {
+      setWaStatus({ state: 'error', message: 'El video no se pudo subir' });
+    }
+  };
+
+  // Con el mensaje mandado (o en camino), el teclado se cierra solo
+  useEffect(() => {
+    if (!waOpen || !['sent', 'queued', 'waiting'].includes(waStatus.state)) return;
+    const t = window.setTimeout(() => setWaOpen(false), 3500);
+    return () => window.clearTimeout(t);
+  }, [waOpen, waStatus.state]);
 
   const accept = useCallback(() => {
     const res = resultRef.current;
@@ -542,10 +615,10 @@ export default function VideoBooth() {
 
   // El resultado vuelve solo (no mientras se sube el video)
   useEffect(() => {
-    if (step !== 'result' || qr.state === 'uploading') return;
+    if (step !== 'result' || qr.state === 'uploading' || waOpen) return;
     const t = window.setTimeout(reset, (settings.resultSeconds ?? 45) * 1000);
     return () => window.clearTimeout(t);
-  }, [step, qr.state, settings.resultSeconds, reset]);
+  }, [step, qr.state, waOpen, settings.resultSeconds, reset]);
   // Revisión sin respuesta: se queda con el video
   useEffect(() => {
     if (step !== 'review') return;
@@ -562,7 +635,7 @@ export default function VideoBooth() {
     else if (step === 'live') startCountdown();
     else if (step === 'recording' && mode?.canStop) void finishRecording();
     else if (step === 'review') accept();
-    else if (step === 'result') reset();
+    else if (step === 'result' && !waOpen) reset();
   }, !pinOpen);
 
   // ─── Pantallas ───────────────────────────────────────────────────
@@ -836,7 +909,17 @@ export default function VideoBooth() {
                 </>
               )}
               {qr.state === 'off' && <h2 className="carlmarx-bold text-[clamp(2.5rem,6vmin,4.5rem)]">¡Quedó genial!</h2>}
-              <button onClick={reset} className={primaryBtn} data-autofocus={qr.state !== 'error' ? true : undefined}><Check className="w-8 h-8" /> Listo</button>
+              {whatsappOn && (waStatus.state === 'sent' || waStatus.state === 'queued' || waStatus.state === 'waiting') && !waOpen && (
+                <p className="text-[#7dffb3] text-lg font-semibold">{waStatus.state === 'sent' ? '¡Listo! Te lo mandamos por WhatsApp' : 'Te llega por WhatsApp apenas se suba'}</p>
+              )}
+              <div className="flex flex-wrap justify-center gap-4">
+                {whatsappOn && (
+                  <button onClick={openWhatsApp} className="rounded-full px-8 py-4 text-xl font-bold flex items-center gap-3 bg-[#25D366] text-[#05300f] hover:brightness-110 focus:outline-none focus:ring-4 focus:ring-[#00d4ff] transition-transform focus:scale-105">
+                    <MessageCircle className="w-7 h-7" /> Enviar por WhatsApp
+                  </button>
+                )}
+                <button onClick={reset} className={primaryBtn} data-autofocus={qr.state !== 'error' ? true : undefined}><Check className="w-8 h-8" /> Listo</button>
+              </div>
             </div>
           )}
         </div>
@@ -848,6 +931,43 @@ export default function VideoBooth() {
           <h2 className="relative carlmarx-bold text-5xl">Algo falló</h2>
           <p className="relative text-xl text-white/80 max-w-3xl">{error}</p>
           <button onClick={goSplash} className={`relative ${primaryBtn}`} data-autofocus><RotateCcw className="w-7 h-7" /> Volver al inicio</button>
+        </div>
+      )}
+
+      {waOpen && step === 'result' && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-sm p-6">
+          <div className="kiosk-glass rounded-[2.5rem] p-8 w-[min(30rem,94vw)] flex flex-col items-center gap-5 text-center">
+            <h2 className="text-3xl font-black flex items-center gap-3"><MessageCircle className="w-8 h-8 text-[#25D366]" /> Tu WhatsApp</h2>
+            <p className="text-white/70">Código de área sin el 0 y número sin el 15</p>
+            <div className="w-full rounded-2xl bg-black/40 border border-white/20 px-5 py-4 text-3xl font-mono tracking-wider tabular-nums min-h-[4.5rem] flex items-center justify-center gap-2">
+              <span className="text-white/50">+{waPrefix}</span>
+              <span>{waNumber || <span className="text-white/30">11 2345 6789</span>}</span>
+            </div>
+            {waStatus.state === 'idle' || waStatus.state === 'error' ? (
+              <>
+                <div className="grid grid-cols-3 gap-3 w-full">
+                  {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d, i) => (
+                    <button key={d} onClick={() => setWaNumber(n => (n + d).slice(0, 13))} data-autofocus={i === 0 ? true : undefined}
+                      className="h-16 rounded-2xl bg-white/10 text-3xl font-bold hover:bg-white/20 focus:bg-white/25 focus:outline-none focus:ring-4 focus:ring-[#00d4ff]">{d}</button>
+                  ))}
+                  <button onClick={() => setWaNumber(n => n.slice(0, -1))} className="h-16 rounded-2xl bg-white/10 text-xl font-bold hover:bg-white/20 focus:outline-none focus:ring-4 focus:ring-[#00d4ff]">Borrar</button>
+                  <button onClick={() => setWaNumber(n => (n + '0').slice(0, 13))} className="h-16 rounded-2xl bg-white/10 text-3xl font-bold hover:bg-white/20 focus:outline-none focus:ring-4 focus:ring-[#00d4ff]">0</button>
+                  <button onClick={() => void submitWhatsApp()} disabled={waNumber.length < 6}
+                    className="h-16 rounded-2xl bg-[#25D366] text-[#05300f] text-xl font-black disabled:opacity-40 focus:outline-none focus:ring-4 focus:ring-[#00d4ff]">Enviar</button>
+                </div>
+                {waStatus.state === 'error' && <p className="text-amber-200">{waStatus.message}</p>}
+                <p className="text-white/45 text-sm">Usamos tu número solo para mandarte el video.</p>
+                <button onClick={() => setWaOpen(false)} className={btn}><ArrowLeft className="w-6 h-6" /> Cancelar</button>
+              </>
+            ) : waStatus.state === 'sending' ? (
+              <Loader2 className="w-16 h-16 animate-spin text-[#25D366]" />
+            ) : (
+              <>
+                <Check className="w-16 h-16 text-[#25D366]" />
+                <p className="text-2xl font-bold">{waStatus.state === 'sent' ? '¡Enviado! Revisá tu WhatsApp' : waStatus.state === 'waiting' ? 'Te lo mandamos apenas termine de subirse' : 'Sin internet: te llega apenas vuelva la conexión'}</p>
+              </>
+            )}
+          </div>
         </div>
       )}
 

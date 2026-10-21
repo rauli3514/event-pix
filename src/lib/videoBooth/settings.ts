@@ -191,6 +191,12 @@ export interface VideoBoothSettings {
   delivery?: 'video' | 'gallery' | 'both';
   /** Código de la galería online del evento */
   galleryCode?: string;
+  /** Galería: los videos aparecen solos ('post', se pueden ocultar después) o después de aprobarlos ('pre') */
+  galleryModeration?: 'post' | 'pre';
+  /** Botón "Enviar por WhatsApp" en el resultado */
+  whatsappEnabled?: boolean;
+  /** Código de país (y 9 para celulares de Argentina) que va antes del número */
+  whatsappPrefix?: string;
 }
 
 export interface MediaItem { id: string; name: string }

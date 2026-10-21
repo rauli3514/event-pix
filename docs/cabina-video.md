@@ -80,10 +80,52 @@ Correr en Supabase la migración `supabase/migrations/20261021000000_video_clips
 - Panel (`kioskRemote.ts`, `VideoBoothConfig.tsx`): los ajustes viajan en `kiosk_devices.settings.video`
   y los archivos en `settings.videoAssets` (URLs de `kiosk-assets`).
 
+## Versión 3: envío por WhatsApp y moderación de la galería
+
+### Envío por WhatsApp
+
+En el resultado aparece **Enviar por WhatsApp**: el invitado escribe su número en un
+teclado grande (sirve con el control remoto) y le llega un mensaje con el link a su video.
+Si no hay internet, el número queda anotado junto al video y el mensaje sale solo cuando
+el video se sube. Cada envío queda registrado (tabla `video_sends`, solo visible en el panel).
+
+Va por la **API oficial de WhatsApp (Meta Cloud API)**, desde la función de Supabase
+`send-video-whatsapp`. Solo la pueden usar los equipos vinculados (código + clave secreta,
+igual que la IA) y hay un tope de envíos por equipo por día.
+
+Para activarlo (una sola vez):
+
+1. En Meta Business: crear la app de WhatsApp, agregar el número de la empresa y un
+   **token permanente** (usuario del sistema con permiso `whatsapp_business_messaging`).
+2. Crear la **plantilla** `video_cabina` (idioma Español (ARG), categoría Utilidad), con el cuerpo:
+   `¡Hola! Acá está tu video de {{1}} 🎬 Miralo y bajalo acá: {{2}}`
+   (opcional: encabezado de tipo Video; en ese caso poner `WHATSAPP_VIDEO_HEADER=1`).
+3. Correr la migración `supabase/migrations/20261022000000_video_whatsapp_moderation.sql`.
+4. Cargar los secrets y publicar la función:
+   ```
+   supabase secrets set WHATSAPP_TOKEN=… WHATSAPP_PHONE_ID=… PUBLIC_SITE_URL=https://app.event-pix.com.ar
+   supabase functions deploy send-video-whatsapp
+   ```
+   Opcionales: `WHATSAPP_TEMPLATE` (otro nombre), `WHATSAPP_TEMPLATE_LANG` (por defecto `es_AR`),
+   `WHATSAPP_DAILY_LIMIT` (por defecto 500 por equipo cada 24 h).
+5. En Ajustes de la cabina (o en el panel) activar **Botón “Enviar por WhatsApp”** y revisar el
+   prefijo del país (`549` = Argentina, celulares).
+
+Meta cobra cada conversación iniciada con plantilla según el país y la categoría.
+
+### Moderación de la galería
+
+- Panel → Kioscos → **Videos**: elegir la galería y ver todos los videos (también los ocultos),
+  con **Ocultar / Mostrar**, **Borrar** (opcional: también de Drive) y **Aprobar todos**.
+  Muestra cuántos videos se mandaron por WhatsApp.
+- En Ajustes de la cabina, **Videos en la galería**: "aparecen solos" (se pueden ocultar después)
+  o "con aprobación previa" (esperan en el panel hasta aprobarlos).
+- La galería pública y el modo pantalla muestran solo los aprobados y se actualizan solos.
+- El QR de cada invitado lleva a **su** video, aunque esté oculto en la galería.
+
 ## Próximos pasos (propuestos)
 
-- Envío por mail o WhatsApp directo desde la cabina (necesita un servicio de envío con su clave).
-- Moderación de la galería desde el panel (ocultar o borrar videos).
+- Envío por mail (necesita un servicio de envío con su clave).
 - Intro (pre-roll) además de la placa final.
 - Libro de firmas: compilado final de todos los mensajes para entregar a los anfitriones.
 - Recorte de fondo (chroma key) en vivo, compartido con el kiosco de fotos.

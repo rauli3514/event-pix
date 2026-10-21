@@ -232,6 +232,15 @@ export default function VideoBoothConfig({ form, setForm }: { form: RemoteSettin
           <Select value={val('delivery', 'video')} options={[{ value: 'video', label: 'El video del invitado' }, { value: 'gallery', label: 'La galería del evento' }, { value: 'both', label: 'Los dos (dos QR)' }]} onChange={x => set('delivery', x)} />
         </Field>
         <Check label="Mostrar QR" checked={val('showQr', true)} onChange={x => set('showQr', x)} />
+        <Field label="Videos en la galería" hint="Con aprobación, los videos esperan en Kioscos → Videos hasta que los apruebes.">
+          <Select value={val('galleryModeration', 'post')} options={[{ value: 'post', label: 'Aparecen solos' }, { value: 'pre', label: 'Con aprobación previa' }]} onChange={x => set('galleryModeration', x)} />
+        </Field>
+        <Check label="Botón “Enviar por WhatsApp”" checked={val('whatsappEnabled', false)} onChange={x => set('whatsappEnabled', x)} />
+        {val('whatsappEnabled', false) && (
+          <Field label="Prefijo del país" hint="Va antes del número que escribe el invitado. 549 = Argentina, celulares.">
+            <input className={input} inputMode="numeric" value={val('whatsappPrefix', '549')} onChange={e => set('whatsappPrefix', e.target.value.replace(/\D/g, ''))} />
+          </Field>
+        )}
         <Field label="Código de la galería" hint="Cambialo para empezar una galería nueva (por ejemplo, en cada evento).">
           <div className="flex gap-2">
             <input className={input} value={gallery} onChange={e => set('galleryCode', e.target.value.trim())} placeholder="Se crea solo en el equipo" />
