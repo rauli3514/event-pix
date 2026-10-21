@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Camera, Sparkles, Ticket, Settings, Loader2, AlertTriangle, Images, WifiOff, type LucideIcon } from 'lucide-react';
+import { Camera, Sparkles, Ticket, Settings, Loader2, AlertTriangle, Images, WifiOff, Video, type LucideIcon } from 'lucide-react';
 import { useRemoteFocus } from '@/hooks/use-remote-focus';
 import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
 import ScreenBackground from '@/components/kiosk/ScreenBackground';
@@ -143,6 +143,7 @@ export default function KioskBox() {
   const tiles: { key: string; label: string; hint: string; icon: LucideIcon; gradient: string; glow: string; onClick: () => void }[] = [
     ...(general.enableSelfie !== false ? [{ key: 'fotos', label: 'Fotos', hint: general.enablePortada ? 'Selfie y Portada Fashion' : 'Selfie con marco', icon: Camera, gradient: 'from-[#00d4ff] via-[#2b8cff] to-[#5b3bff]', glow: 'rgba(0,212,255,0.55)', onClick: () => openExperience('selfie') }] : []),
     ...(aiEnabled ? [{ key: 'ia', label: 'Fotos IA', hint: 'Retratos, caricaturas y más', icon: Sparkles, gradient: 'from-[#ff2e93] via-[#c03bff] to-[#7b2ff7]', glow: 'rgba(255,46,147,0.55)', onClick: () => openExperience('ai') }] : []),
+    ...(general.enableVideo !== false ? [{ key: 'video', label: 'Video', hint: '360, boomerang, glam y más', icon: Video, gradient: 'from-[#ff8a5b] via-[#ff4d6d] to-[#c03bff]', glow: 'rgba(255,77,109,0.55)', onClick: () => navigate('/video?home=1') }] : []),
     ...(general.enableGallery ? [{ key: 'galeria', label: 'Galería', hint: 'Las fotos del evento', icon: Images, gradient: 'from-[#2ee6a6] via-[#00b3c7] to-[#2b6cff]', glow: 'rgba(46,230,166,0.5)', onClick: () => navigate('/box/galeria') }] : []),
     ...(general.enableVip ? [{ key: 'vip', label: 'Ingreso VIP', hint: 'Buscá tu mesa', icon: Ticket, gradient: 'from-[#ffd23f] via-[#ff9f1c] to-[#ff4d6d]', glow: 'rgba(255,159,28,0.55)', onClick: () => navigate('/box/vip') }] : []),
   ];

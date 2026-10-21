@@ -84,9 +84,9 @@ export async function testDrive() {
  * Sube ya mismo la foto final para el QR: queda visible con el link (solo esa
  * foto) y devuelve su ID de Drive. Si falla, la foto sigue en la cola normal.
  */
-export async function uploadForShare(dataUrl: string, name: string, folder: string): Promise<string> {
+export async function uploadForShare(dataUrl: string, name: string, folder: string, type = 'image/jpeg'): Promise<string> {
   const { folderId } = driveConfig();
-  const res = await post({ folderId, folder, name, type: 'image/jpeg', share: true, data: dataUrl.slice(dataUrl.indexOf(',') + 1) });
+  const res = await post({ folderId, folder, name, type, share: true, data: dataUrl.slice(dataUrl.indexOf(',') + 1) });
   if (!res.id) throw new Error('Drive no devolvió la foto (actualizá el script)');
   const done = doneSet();
   done.add(`${folder}/${name}`);

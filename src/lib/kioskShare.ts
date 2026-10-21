@@ -33,3 +33,10 @@ export const guestPhotoUrl = (photoRef: string, title?: string) => {
   if (title) params.set('t', title);
   return `${base}/foto?${params.toString()}`;
 };
+
+/** Página del invitado para un video de la cabina (subido a Drive). */
+export const guestVideoUrl = (driveId: string, title?: string) => {
+  const params = new URLSearchParams({ d: driveId });
+  if (title) params.set('t', title);
+  return `${publicSiteUrl()}/clip?${params.toString()}`;
+};

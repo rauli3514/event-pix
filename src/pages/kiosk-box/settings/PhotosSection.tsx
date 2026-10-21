@@ -49,6 +49,8 @@ export default function PhotosSection() {
           checked={settings.splashGallery !== false} onChange={splashGallery => update({ splashGallery })} />
         <Toggle label="Galería en el inicio" hint="Ícono para ver las fotos que se sacaron en el evento."
           checked={!!settings.enableGallery} onChange={enableGallery => update({ enableGallery })} />
+        <Toggle label="Cabina de video en el inicio" hint="Ícono Video: 360, boomerang, cámara lenta, glam y libro de firmas. Se configura adentro (engranaje)."
+          checked={settings.enableVideo !== false} onChange={enableVideo => update({ enableVideo })} />
       </Panel>
     </div>
   );

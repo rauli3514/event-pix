@@ -17,6 +17,8 @@ interface KioskStoragePlugin {
   readImage(options: { uri: string; maxSize?: number }): Promise<{ dataUrl: string }>;
   storageInfo(options: { folder: string }): Promise<StorageInfo>;
   deleteImages(options: { folder?: string }): Promise<{ deleted: number }>;
+  /** Cabina de video (APK con la cabina de video o más nuevo) */
+  saveVideo(options: { data: string; folder: string; fileName: string; mime: string }): Promise<{ uri: string; folder: string }>;
 }
 
 export interface StorageInfo {
@@ -31,7 +33,8 @@ export interface StorageInfo {
   eventCount: number;
 }
 
-const KioskStorage = registerPlugin<KioskStoragePlugin>('KioskStorage');
+/** Plugin nativo (se registra una sola vez: lo usa también la cabina de video) */
+export const KioskStorage = registerPlugin<KioskStoragePlugin>('KioskStorage');
 const isNative = () => Capacitor.isNativePlatform() && Capacitor.isPluginAvailable('KioskStorage');
 
 /** Carpeta del evento: la configurada en Ajustes, o el nombre del evento. */

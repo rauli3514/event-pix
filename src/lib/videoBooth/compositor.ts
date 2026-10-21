@@ -1,0 +1,245 @@
+import { videoFilter } from './settings';
+
+// Compositor en vivo: dibuja la cámara en un canvas del tamaño del video final
+// (recortada a la forma elegida, con espejo y giro), le aplica el filtro y el
+// marco. Ese mismo canvas es la vista previa en pantalla y lo que se graba:
+// lo que ve el invitado es exactamente lo que sale.
+
+export interface CompositorOptions {
+  width: number;
+  height: number;
+  mirror?: boolean;
+  rotation?: number;
+  filter?: string;
+  /** Marco (PNG con transparencia o canvas) del tamaño del video */
+  overlay?: CanvasImageSource | null;
+}
+
+/** Un cuadro guardado para la reversa (boomerang / final del 360). */
+export interface BufferedFrame { bitmap: ImageBitmap; t: number }
+
+type VideoWithRvfc = HTMLVideoElement & {
+  requestVideoFrameCallback?: (cb: () => void) => number;
+  cancelVideoFrameCallback?: (id: number) => void;
+};
+
+/** Máximo de cuadros por segundo que se guardan para la reversa (cuida la memoria). */
+const BUFFER_FPS = 30;
+/** Lado corto máximo de los cuadros guardados (720p ≈ 3,7 MB por cuadro). */
+const BUFFER_SHORT_SIDE = 720;
+
+export class Compositor {
+  readonly canvas: HTMLCanvasElement;
+  private ctx: CanvasRenderingContext2D;
+  private glowCanvas: HTMLCanvasElement;
+  private glowCtx: CanvasRenderingContext2D;
+  private vignette: CanvasGradient | null = null;
+  private running = false;
+  private handle = 0;
+  private watchdog = 0;
+  private lastDraw = 0;
+  private opts: CompositorOptions;
+
+  // Reversa: últimos `bufferSeconds` segundos en memoria
+  private bufferSeconds = 0;
+  private bufferStart = 0;
+  private lastBufferAt = -1;
+  private frames: BufferedFrame[] = [];
+  private pending = 0;
+  /** Cambia al empezar/terminar una ventana: los cuadros de otra ventana se descartan */
+  private gen = 0;
+
+  private video: HTMLVideoElement;
+
+  constructor(video: HTMLVideoElement, opts: CompositorOptions) {
+    this.video = video;
+    this.opts = opts;
+    this.canvas = document.createElement('canvas');
+    this.canvas.width = opts.width;
+    this.canvas.height = opts.height;
+    this.ctx = this.canvas.getContext('2d', { alpha: false })!;
+    // Brillo difuso del glam: una copia chiquita del cuadro, agrandada (desenfoque barato)
+    this.glowCanvas = document.createElement('canvas');
+    this.glowCanvas.width = Math.max(16, Math.round(opts.width / 6));
+    this.glowCanvas.height = Math.max(16, Math.round(opts.height / 6));
+    this.glowCtx = this.glowCanvas.getContext('2d')!;
+    this.buildVignette();
+  }
+
+  get width() { return this.opts.width; }
+  get height() { return this.opts.height; }
+
+  update(patch: Partial<CompositorOptions>) {
+    this.opts = { ...this.opts, ...patch };
+  }
+
+  private buildVignette() {
+    const { width: w, height: h } = this.opts;
+    const g = this.ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.hypot(w, h) * 0.6);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(1, 'rgba(0,0,0,0.55)');
+    this.vignette = g;
+  }
+
+  start() {
+    if (this.running) return;
+    this.running = true;
+    const v = this.video as VideoWithRvfc;
+    const loop = () => {
+      if (!this.running) return;
+      this.draw();
+      this.handle = v.requestVideoFrameCallback ? v.requestVideoFrameCallback(loop) : requestAnimationFrame(loop);
+    };
+    loop();
+    // Si el WebView no avisa los cuadros nuevos (o se cortó la cadena), se sigue a mano
+    this.watchdog = window.setInterval(() => {
+      if (this.running && performance.now() - this.lastDraw > 400) {
+        this.draw();
+        if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(loop);
+      }
+    }, 250);
+  }
+
+  stop() {
+    this.running = false;
+    window.clearInterval(this.watchdog);
+    const v = this.video as VideoWithRvfc;
+    if (v.cancelVideoFrameCallback) v.cancelVideoFrameCallback(this.handle);
+    cancelAnimationFrame(this.handle);
+  }
+
+  /** Empieza a guardar cuadros: se quedan los últimos `seconds` segundos. */
+  startBuffer(seconds: number) {
+    this.clearBuffer();
+    this.gen++;
+    this.bufferSeconds = seconds;
+    this.bufferStart = performance.now();
+    this.lastBufferAt = -1;
+  }
+
+  /** Deja de guardar y devuelve los cuadros (espera los que se estaban copiando). */
+  async takeBuffer(): Promise<BufferedFrame[]> {
+    this.bufferSeconds = 0;
+    for (let i = 0; i < 50 && this.pending > 0; i++) await new Promise(r => setTimeout(r, 20));
+    this.gen++;
+    const frames = this.frames.sort((a, b) => a.t - b.t);
+    this.frames = [];
+    return frames;
+  }
+
+  clearBuffer() {
+    this.bufferSeconds = 0;
+    this.gen++;
+    this.frames.forEach(f => f.bitmap.close());
+    this.frames = [];
+  }
+
+  private draw() {
+    const { video, ctx } = this;
+    const { width: W, height: H, mirror, rotation, overlay } = this.opts;
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    if (!vw || !vh || video.readyState < 2) return;
+    this.lastDraw = performance.now();
+    const rot = ((((Number(rotation) || 0) % 360) + 360) % 360);
+    const sideways = rot === 90 || rot === 270;
+    const rw = sideways ? vh : vw;
+    const rh = sideways ? vw : vh;
+    const scale = Math.max(W / rw, H / rh);
+    const fx = videoFilter(this.opts.filter);
+
+    ctx.save();
+    ctx.translate(W / 2, H / 2);
+    if (mirror) ctx.scale(-1, 1);
+    ctx.rotate((rot * Math.PI) / 180);
+    ctx.filter = fx.css || 'none';
+    ctx.drawImage(video, (-vw * scale) / 2, (-vh * scale) / 2, vw * scale, vh * scale);
+    ctx.restore();
+    ctx.filter = 'none';
+
+    if (fx.glow > 0) {
+      const g = this.glowCanvas;
+      this.glowCtx.drawImage(this.canvas, 0, 0, g.width, g.height);
+      ctx.save();
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      // Mezcla normal: suaviza la piel. "screen": el brillo de revista.
+      ctx.globalAlpha = fx.glow;
+      ctx.drawImage(g, 0, 0, W, H);
+      ctx.globalCompositeOperation = 'screen';
+      ctx.globalAlpha = fx.glow * 0.6;
+      ctx.drawImage(g, 0, 0, W, H);
+      ctx.restore();
+    }
+    if (fx.vignette && this.vignette) {
+      ctx.fillStyle = this.vignette;
+      ctx.fillRect(0, 0, W, H);
+    }
+    if (overlay) ctx.drawImage(overlay, 0, 0, W, H);
+
+    if (this.bufferSeconds > 0) this.capture();
+  }
+
+  private capture() {
+    const now = performance.now();
+    if (this.lastBufferAt >= 0 && now - this.lastBufferAt < 1000 / BUFFER_FPS - 2) return;
+    this.lastBufferAt = now;
+    const t = (now - this.bufferStart) / 1000;
+    const { width: W, height: H } = this.opts;
+    const k = Math.min(1, BUFFER_SHORT_SIDE / Math.min(W, H));
+    this.pending++;
+    const gen = this.gen;
+    createImageBitmap(this.canvas, k < 1 ? { resizeWidth: Math.round(W * k), resizeHeight: Math.round(H * k), resizeQuality: 'medium' } : undefined)
+      .then(bitmap => {
+        if (gen !== this.gen) { bitmap.close(); return; }
+        this.frames.push({ bitmap, t });
+        // Se descartan los cuadros más viejos que la ventana
+        const limit = t - this.bufferSeconds;
+        while (this.frames.length && this.frames[0].t < limit) this.frames.shift()!.bitmap.close();
+      })
+      .catch(() => { /* cuadro perdido: no pasa nada */ })
+      .finally(() => { this.pending--; });
+  }
+}
+
+// ─── Marcos ────────────────────────────────────────────────────────────────
+
+/** Marco "nombre del evento": franja abajo con el título y la fecha. */
+export function titleOverlay(width: number, height: number, title: string, subtitle?: string) {
+  const c = document.createElement('canvas');
+  c.width = width;
+  c.height = height;
+  const ctx = c.getContext('2d')!;
+  const band = Math.round(height * 0.2);
+  const g = ctx.createLinearGradient(0, height - band, 0, height);
+  g.addColorStop(0, 'rgba(0,0,0,0)');
+  g.addColorStop(1, 'rgba(0,0,0,0.7)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, height - band, width, band);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#fff';
+  ctx.shadowColor = 'rgba(0,0,0,0.5)';
+  ctx.shadowBlur = Math.round(width * 0.01);
+  let size = Math.round(Math.min(width, height) * 0.075);
+  ctx.font = `800 ${size}px 'CarlMarx', 'Montserrat', sans-serif`;
+  while (ctx.measureText(title).width > width * 0.88 && size > 12) {
+    size -= 2;
+    ctx.font = `800 ${size}px 'CarlMarx', 'Montserrat', sans-serif`;
+  }
+  const sub = subtitle ?? new Date().toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' });
+  const subSize = Math.round(size * 0.42);
+  ctx.fillText(title, width / 2, height - band * 0.32 - subSize);
+  ctx.font = `600 ${subSize}px 'Montserrat', sans-serif`;
+  ctx.globalAlpha = 0.8;
+  ctx.fillText(sub, width / 2, height - band * 0.18);
+  return c;
+}
+
+/** Abre una imagen (Blob guardado en el equipo) para usarla de marco. */
+export async function loadOverlayImage(blob: Blob): Promise<ImageBitmap | null> {
+  try {
+    return await createImageBitmap(blob);
+  } catch {
+    return null;
+  }
+}
