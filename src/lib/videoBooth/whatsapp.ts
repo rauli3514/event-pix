@@ -1,5 +1,5 @@
-import { getDeviceCode, getDeviceSecret } from '@/lib/kioskDevice';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { getDeviceCode, getDeviceSecret } from './device';
 
 // Envío del video al WhatsApp del invitado, por la función send-video-whatsapp
 // (API oficial de WhatsApp). El equipo se identifica con su código y su clave.

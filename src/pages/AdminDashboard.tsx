@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
     Plus, Calendar, ExternalLink, Settings, LogOut, Trash2, Lock, Unlock, 
-    Users, Monitor, Activity, Tv, ServerCrash, Building2, ChevronRight, PenTool 
+    Users, Monitor, Activity, Tv, ServerCrash, Building2, ChevronRight, PenTool, Video 
 } from 'lucide-react';
 import TemplateManager from './admin/TemplateManager';
 
@@ -241,6 +241,11 @@ const AdminDashboard = () => {
                             <Button asChild className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white border border-fuchsia-500/50">
                                 <Link to="/admin/kioscos">
                                     <Monitor className="w-4 h-4 mr-2" /> Kioscos (equipos y fotos)
+                                </Link>
+                            </Button>
+                            <Button asChild className="bg-violet-600 hover:bg-violet-700 text-white border border-violet-500/50">
+                                <Link to="/admin/cabina-video">
+                                    <Video className="w-4 h-4 mr-2" /> Cabina de video
                                 </Link>
                             </Button>
                         </>

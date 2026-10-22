@@ -1,14 +1,15 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0"
 
-// Cabina de video: manda el video al WhatsApp del invitado.
+// App EventPix Video (cabina de video): manda el video al WhatsApp del invitado.
 //
 // Usa la API oficial de WhatsApp (Meta Cloud API) con una plantilla aprobada,
 // porque el invitado no le escribió antes al número (fuera de la ventana de 24 h
 // solo se pueden mandar plantillas).
 //
-// Lo llama el equipo con su código y su clave secreta (como la IA): solo los
-// equipos vinculados pueden mandar, con un tope de envíos por día por equipo.
+// Lo llama el equipo de la cabina con su código y su clave secreta (tabla
+// video_devices): solo los equipos vinculados pueden mandar, con un tope de
+// envíos por día por equipo.
 //
 // Secrets (supabase secrets set …):
 //   WHATSAPP_TOKEN          token permanente del usuario del sistema (Meta Business)
@@ -31,8 +32,8 @@ const reply = (body: Record<string, unknown>, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
 const ERRORS: Record<string, string> = {
-  device_auth: 'El equipo no está autorizado (actualizá la app).',
-  device_not_linked: 'El equipo no está vinculado al panel.',
+  device_auth: 'El equipo no está autorizado (volvé a vincularlo en el panel de la cabina).',
+  device_not_linked: 'El equipo no está vinculado al panel de la cabina.',
 }
 
 serve(async (req) => {
@@ -53,7 +54,7 @@ serve(async (req) => {
     if (!/^[\w-]{20,120}$/.test(driveId)) return reply({ ok: false, error: 'Falta el video.' })
 
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
-    const { data: check, error: checkError } = await admin.rpc('kiosk_video_send_check', {
+    const { data: check, error: checkError } = await admin.rpc('video_send_check', {
       p_code: String(device.code ?? ''), p_secret: String(device.secret ?? ''),
     })
     if (checkError) {

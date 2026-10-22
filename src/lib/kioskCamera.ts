@@ -40,27 +40,18 @@ const describeCameraError = (err: unknown) => {
  * cámara: primero en alta resolución y después en la que dé. Las webcams USB
  * baratas no siempre llegan a 1280×720.
  */
-export async function openCameraStream(
-  deviceId?: string,
-  quality: Quality = getCameraSettings().quality ?? 'auto',
-  /** Cabina de video: cuadros por segundo pedidos y cámara de adelante/atrás (celular) */
-  extra: { fps?: number; facingMode?: 'user' | 'environment' } = {},
-): Promise<MediaStream> {
+export async function openCameraStream(deviceId?: string, quality: Quality = getCameraSettings().quality ?? 'auto'): Promise<MediaStream> {
   if (!navigator.mediaDevices?.getUserMedia) {
     throw new Error('Este equipo no permite usar la cámara desde la app.');
   }
   // Modo liviano: en "Automática" se pide HD (720p), que le cuesta menos a la TV box
   if (quality === 'auto' && isLiteMode()) quality = '720';
-  const more: MediaTrackConstraints = {
-    ...(extra.fps ? { frameRate: { ideal: extra.fps } } : {}),
-    ...(extra.facingMode ? { facingMode: { ideal: extra.facingMode } } : {}),
-  };
-  const wanted = { ...(QUALITY[quality] ?? QUALITY.auto), ...more };
-  const hd = { ...QUALITY.auto, ...more };
+  const wanted = QUALITY[quality] ?? QUALITY.auto;
+  const hd = QUALITY.auto;
   const attempts: (MediaTrackConstraints | true)[] = [];
   if (deviceId && deviceId !== 'default') {
     attempts.push({ ...wanted, deviceId: { exact: deviceId } });
-    if (quality !== 'auto') attempts.push({ ...hd, deviceId: { exact: deviceId } });
+    if (wanted !== hd) attempts.push({ ...hd, deviceId: { exact: deviceId } });
   }
   attempts.push(hd, true);
 

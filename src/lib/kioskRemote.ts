@@ -4,8 +4,6 @@ import {
 } from '@/lib/kioskSettings';
 import { applyScreenRotation } from '@/lib/screenRotation';
 import { applyLiteMode } from '@/lib/liteMode';
-import { getVideoSettings, saveVideoSettings } from '@/lib/videoBooth/settings';
-import { applyVideoAssets, type VideoAssets } from '@/lib/videoBooth/remoteAssets';
 
 // Configuración a distancia: el panel admin guarda en kiosk_devices.settings los
 // ajustes que quiere cambiar y el equipo los aplica en el próximo checkin (cada
@@ -18,10 +16,6 @@ export interface RemoteSettings {
   print?: Record<string, unknown>;
   /** Marco: null = sin marco, 'glass:<estilo>', un marco incluido (/kiosk-marco-1.png) o una URL https del PNG */
   frame?: string | null;
-  /** Cabina de video: ajustes */
-  video?: Record<string, unknown>;
-  /** Cabina de video: archivos subidos desde el panel (el equipo los baja) */
-  videoAssets?: VideoAssets;
 }
 
 /** Ajustes de Ajustes del equipo que se pueden manejar desde el panel. */
@@ -35,18 +29,6 @@ export const REMOTE_GENERAL_KEYS = [
 ] as const;
 export const REMOTE_CAMERA_KEYS = ['timer', 'mirror', 'rotation', 'quality'] as const;
 export const REMOTE_PRINT_KEYS = ['autoPrint', 'copies', 'borderless', 'bleed'] as const;
-/** Ajustes de la cabina de video que maneja el panel (los archivos van aparte, en videoAssets). */
-export const REMOTE_VIDEO_KEYS = [
-  'modes', 'aspect', 'resolution', 'countdown', 'overlay', 'overlayText', 'musicVolume', 'slowSpeed', 'rampPreset',
-  'boomerangLoops', 'prompts', 'showQr', 'resultSeconds', 'title', 'facing', 'highFps', 'review',
-  'frameId', 'frameChoice', 'animation', 'animBlend', 'accessory',
-  'showLogo', 'logoPosition', 'logoSize', 'logoOpacity', 'watermark', 'watermarkPosition', 'brandColor',
-  'endCard', 'endCardSeconds', 'endCardText', 'zoomEffect', 'flashEffect',
-  'songMode', 'songId', 'autoStart360', 'autoStop360', 'motionThreshold', 'continuous360', 'delivery', 'galleryCode',
-  'galleryModeration', 'whatsappEnabled', 'whatsappPrefix',
-] as const;
-/** Se informan al panel pero no se pisan desde él (los maneja videoAssets) */
-const REPORT_ONLY_VIDEO_KEYS = ['frames', 'songs'] as const;
 
 const pick = (src: Record<string, unknown>, keys: readonly string[]) => {
   const out: Record<string, unknown> = {};
@@ -61,7 +43,6 @@ export function buildReport(): RemoteSettings {
     general: pick(getGeneralSettings(), REMOTE_GENERAL_KEYS),
     camera: pick(getCameraSettings(), REMOTE_CAMERA_KEYS),
     print: pick(getPrintSettings(), REMOTE_PRINT_KEYS),
-    video: pick(getVideoSettings() as Record<string, unknown>, [...REMOTE_VIDEO_KEYS, ...REPORT_ONLY_VIDEO_KEYS]),
     // Un PNG subido en el equipo es una data URL enorme: se informa solo que es propio
     frame: frame?.startsWith('data:') ? 'custom' : frame,
   };
@@ -101,10 +82,6 @@ export async function applyRemoteSettings(settings: RemoteSettings | null | unde
   if (Object.keys(general).length) saveGeneralSettings(general);
   if (Object.keys(camera).length) saveCameraSettings(camera);
   if (Object.keys(print).length) savePrintSettings(print);
-  const video = pick(settings.video ?? {}, REMOTE_VIDEO_KEYS);
-  if (Object.keys(video).length) saveVideoSettings(video);
-  // Si un archivo no se puede bajar, se reintenta en el próximo checkin (no se marca como aplicado)
-  if (settings.videoAssets) await applyVideoAssets(settings.videoAssets);
 
   if (settings.frame !== undefined && settings.frame !== 'custom') {
     const frame = settings.frame;

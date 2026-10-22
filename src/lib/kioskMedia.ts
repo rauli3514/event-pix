@@ -59,7 +59,7 @@ const tx = async <T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => I
 /** El video de bienvenida del Ingreso VIP puede ser más largo que un fondo. */
 export const MAX_VIP_VIDEO_BYTES = 300 * 1024 * 1024;
 
-export const saveScreenMedia = async (screen: ScreenKey | `acc:${string}` | `vip:${string}` | `video:${string}`, file: File) => {
+export const saveScreenMedia = async (screen: ScreenKey | `acc:${string}` | `vip:${string}`, file: File) => {
   const max = screen.startsWith('vip:') ? MAX_VIP_VIDEO_BYTES : MAX_MEDIA_BYTES;
   if (file.size > max) throw new Error(`El archivo pesa más de ${Math.round(max / 1024 / 1024)} MB`);
   await tx('readwrite', s => s.put({ screen, blob: file, type: file.type, name: file.name } satisfies MediaRecord));
@@ -69,7 +69,7 @@ export const saveScreenMedia = async (screen: ScreenKey | `acc:${string}` | `vip
 export const getScreenMedia = async (screen: string): Promise<MediaRecord | null> =>
   (await tx<MediaRecord | undefined>('readonly', s => s.get(screen))) ?? null;
 
-export const removeScreenMedia = async (screen: ScreenKey | `acc:${string}` | `vip:${string}` | `video:${string}`) => {
+export const removeScreenMedia = async (screen: ScreenKey | `acc:${string}` | `vip:${string}`) => {
   await tx('readwrite', s => s.delete(screen));
   window.dispatchEvent(new CustomEvent('kiosk-media-changed', { detail: screen }));
 };

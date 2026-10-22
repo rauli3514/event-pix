@@ -1,37 +1,35 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
 import {
-  ArrowLeft, BookHeart, Check, CloudOff, Gem, Home, Loader2, MessageCircle, Music, Play, RefreshCw, Repeat, Rotate3d, RotateCcw, Settings, Snail,
+  ArrowLeft, BookHeart, Check, CloudOff, Gem, Loader2, MessageCircle, Music, Play, RefreshCw, Repeat, Rotate3d, RotateCcw, Settings, Snail,
   Square, Video, type LucideIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
 import { EventPixLogo } from '@/components/kiosk/brand/EventPixLogo';
 import { AIProcessing, CountdownRing } from '@/components/kiosk/KioskAnimations';
-import PinDialog from '@/components/kiosk/PinDialog';
+import PinDialog from '../PinDialog';
 import { useRemoteFocus } from '@/hooks/use-remote-focus';
-import { openCameraStream, stopStream } from '@/lib/kioskCamera';
-import { getScreenMedia } from '@/lib/kioskMedia';
-import { getCameraSettings, getGeneralSettings } from '@/lib/kioskSettings';
-import { guestVideoUrl } from '@/lib/kioskShare';
-import { useShutter } from '@/lib/kioskShutter';
-import { eventFolder } from '@/lib/kioskStorage';
+import { getCameraSettings, openCameraStream, stopStream } from '@/lib/videoBooth/camera';
+import { getMedia } from '@/lib/videoBooth/mediaStore';
+import { guestVideoUrl } from '@/lib/videoBooth/share';
+import { useShutter } from '@/lib/videoBooth/shutter';
 import { isSupabaseConfigured } from '@/lib/supabase';
-import { addPhoneToQueued, deliverVideo, galleryUrl, sendToPhones, startVideoSync } from '@/lib/videoBooth/cloud';
+import { addPhoneToQueued, deliverVideo, galleryUrl, sendToPhones } from '@/lib/videoBooth/cloud';
 import { DEFAULT_WA_PREFIX, fullPhone, sendVideoWhatsApp, validPhone } from '@/lib/videoBooth/whatsapp';
-import { isDriveConfigured } from '@/lib/driveBackup';
+import { isDriveConfigured } from '@/lib/videoBooth/drive';
 import { Compositor } from '@/lib/videoBooth/compositor';
 import { bufferSecondsFor, effectPlan, renderEffects } from '@/lib/videoBooth/effects';
-import { buildDecor, frameUrl, loadSong, migrateLegacyMedia, pickSong, type DecorBundle } from '@/lib/videoBooth/media';
+import { buildDecor, frameUrl, loadSong, pickSong, type DecorBundle } from '@/lib/videoBooth/media';
 import { MotionDetector, watchMotion } from '@/lib/videoBooth/motion';
 import { audioContext, bitrateFor, ClipRecorder, extensionFor, mixAudio, openMic, type AudioMix } from '@/lib/videoBooth/recorder';
 import {
   DEFAULT_PROMPTS, enabledModes, galleryCode, getVideoSettings, modeConfig, outputSize, songKey,
   type SongItem, type VideoModeDef, type VideoModeKey,
 } from '@/lib/videoBooth/settings';
-import { saveVideoLocally, videoFileName } from '@/lib/videoBooth/storage';
+import { eventFolder, saveVideoLocally, videoFileName } from '@/lib/videoBooth/storage';
 
 // Cabina de video: el invitado elige la experiencia (video, boomerang, cámara lenta,
 // 360, libro de firmas, glam), el marco y la canción si se lo permiten, se graba
@@ -68,10 +66,7 @@ type Qr =
 
 export default function VideoBooth() {
   const navigate = useNavigate();
-  const [params] = useSearchParams();
-  const fromHome = params.get('home') === '1';
   const [settings, setSettings] = useState(getVideoSettings);
-  const general = useMemo(() => getGeneralSettings(), []);
   const modes = useMemo(() => enabledModes(settings), [settings]);
   const size = useMemo(() => outputSize(settings), [settings]);
 
@@ -120,9 +115,6 @@ export default function VideoBooth() {
   useEffect(() => {
     const reload = () => setSettings(getVideoSettings());
     window.addEventListener('video-settings-changed', reload);
-    // Archivos de la primera versión → listas nuevas; videos pendientes de subir
-    void migrateLegacyMedia();
-    startVideoSync();
     return () => window.removeEventListener('video-settings-changed', reload);
   }, []);
 
@@ -155,10 +147,7 @@ export default function VideoBooth() {
     const cam = getCameraSettings();
     const cfg = modeConfig(m.key, settings);
     const wantsFps = m.effect !== 'none' && settings.highFps !== false ? 60 : 30;
-    const stream = await openCameraStream(cam.deviceId, cam.quality ?? 'auto', {
-      fps: wantsFps,
-      facingMode: cam.deviceId ? undefined : settings.facing,
-    });
+    const stream = await openCameraStream({ fps: wantsFps, facingMode: settings.facing });
     streamRef.current = stream;
     const video = videoRef.current!;
     video.srcObject = stream;
@@ -237,7 +226,7 @@ export default function VideoBooth() {
     try {
       const cfg = modeConfig(m.key, settings);
       disposeDecor();
-      decorRef.current = await buildDecor(settings, size, { frameId: chosenFrameRef.current, eventTitle: general.eventTitle });
+      decorRef.current = await buildDecor(settings, size, { frameId: chosenFrameRef.current, eventTitle: settings.eventTitle });
       songRef.current = cfg.music ? pickSong(settings, chosenSongRef.current) : null;
       musicRef.current = await loadSong(songRef.current);
       await openCamera(m);
@@ -245,7 +234,7 @@ export default function VideoBooth() {
       setError(e instanceof Error ? e.message : String(e));
       setStep('error');
     }
-  }, [settings, size, general.eventTitle, openCamera]);
+  }, [settings, size, openCamera]);
 
   /** Siguiente pantalla previa (pregunta, marco, canción) o la cámara. */
   const nextPre = useCallback((m: VideoModeDef) => {
@@ -323,7 +312,7 @@ export default function VideoBooth() {
   // Canciones para elegir: al tocar una suena un pedacito
   const playPreview = async (song: SongItem) => {
     setPreviewSong(song.id);
-    const rec = await getScreenMedia(songKey(song.id)).catch(() => null);
+    const rec = await getMedia(songKey(song.id)).catch(() => null);
     const audio = audioRef.current;
     if (!rec || !audio) return;
     if (audio.src) URL.revokeObjectURL(audio.src);
@@ -517,7 +506,7 @@ export default function VideoBooth() {
     const delivery = settings.delivery ?? 'video';
     const code = isSupabaseConfigured ? galleryCode() : '';
     const gallery = code && delivery !== 'video' ? galleryUrl(code) : undefined;
-    const title = general.eventTitle || settings.title || undefined;
+    const title = settings.eventTitle || settings.title || undefined;
     const mode = modeRef.current?.key ?? 'video';
     driveIdRef.current = null;
     queuedRef.current = false;
@@ -544,7 +533,7 @@ export default function VideoBooth() {
       }
       if (!showQr) return;
       if (driveId) {
-        setQr({ state: 'ready', video: delivery !== 'gallery' ? guestVideoUrl(driveId, general.eventTitle || undefined) : undefined, gallery });
+        setQr({ state: 'ready', video: delivery !== 'gallery' ? guestVideoUrl(driveId, settings.eventTitle || undefined) : undefined, gallery });
       } else if (code) {
         // Sin internet: la galería ya tiene dirección; el video aparece cuando se suba
         setQr({ state: 'ready', gallery: galleryUrl(code), queued: true });
@@ -555,7 +544,7 @@ export default function VideoBooth() {
       uploadingRef.current = false;
       if (showQr) setQr({ state: 'error', message: e instanceof Error ? e.message : String(e) });
     }
-  }, [settings.showQr, settings.delivery, settings.title, general.eventTitle]);
+  }, [settings.showQr, settings.delivery, settings.title, settings.eventTitle]);
 
   const openWhatsApp = () => {
     setWaNumber('');
@@ -567,7 +556,7 @@ export default function VideoBooth() {
     const res = resultRef.current;
     const phone = fullPhone(waPrefix, waNumber);
     if (!res || !validPhone(phone)) { setWaStatus({ state: 'error', message: 'Revisá el número' }); return; }
-    const title = general.eventTitle || settings.title || undefined;
+    const title = settings.eventTitle || settings.title || undefined;
     if (driveIdRef.current) {
       setWaStatus({ state: 'sending' });
       try {
@@ -673,7 +662,7 @@ export default function VideoBooth() {
               initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
               className="carlmarx-bold text-center text-[clamp(3rem,9vmin,7.5rem)] leading-tight px-8"
             >
-              {settings.title || general.eventTitle || '¡Grabá tu video!'}
+              {settings.title || settings.eventTitle || '¡Grabá tu video!'}
             </motion.h1>
             <motion.span
               animate={{ scale: [1, 1.06, 1] }} transition={{ repeat: Infinity, duration: 1.8 }}
@@ -684,7 +673,6 @@ export default function VideoBooth() {
             {!modes.length && <p className="text-amber-200 text-xl">No hay experiencias activadas: entrá a Ajustes.</p>}
           </button>
           <div className="absolute top-6 right-6 flex gap-3 z-10">
-            {fromHome && <button onClick={() => navigate('/box')} className={btn} aria-label="Inicio"><Home className="w-6 h-6" /></button>}
             <button onClick={() => setPinOpen(true)} className={btn} aria-label="Ajustes"><Settings className="w-6 h-6" /></button>
           </div>
         </div>
@@ -971,7 +959,7 @@ export default function VideoBooth() {
         </div>
       )}
 
-      {pinOpen && <PinDialog onCancel={() => setPinOpen(false)} onSuccess={() => navigate('/video/ajustes')} />}
+      {pinOpen && <PinDialog onCancel={() => setPinOpen(false)} onSuccess={() => navigate('/ajustes')} />}
     </div>
   );
 }

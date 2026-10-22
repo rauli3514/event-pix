@@ -2,18 +2,17 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Check, ExternalLink, Eye, EyeOff, Loader2, MessageCircle, Play, RefreshCw, Trash2, Video } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { deleteDrivePhotos } from '@/lib/driveAdmin';
-import { driveImageUrl, publicSiteUrl } from '@/lib/kioskShare';
+import { DEFAULT_PUBLIC_SITE, driveImageUrl } from '@/lib/videoBooth/share';
 import { btnDanger, btnGhost, btnPrimary, card } from './ui';
-import type { KioskDeviceRow } from './types';
+import type { VideoDeviceRow } from './types';
 
-// Moderación de la galería online de la cabina de video: ver todos los videos
+// Moderación de las galerías online de la cabina de video: ver todos los videos
 // de una galería (también los ocultos o pendientes de aprobación), aprobar,
-// ocultar o borrar (opcionalmente también de Drive), y ver los envíos por WhatsApp.
+// ocultar o sacar de la galería, y ver los envíos por WhatsApp.
 
 interface Clip {
   id: string; gallery: string; drive_id: string; thumb_id: string | null; title: string | null;
-  mode: string | null; device_code: string | null; created_at: string; hidden?: boolean;
+  mode: string | null; device_id: string | null; created_at: string; hidden?: boolean;
 }
 interface GallerySummary { code: string; title: string; count: number; hidden: number; last: string }
 type Filter = 'all' | 'visible' | 'hidden';
@@ -22,17 +21,15 @@ const MODE_LABEL: Record<string, string> = {
   clasico: 'Video', boomerang: 'Boomerang', lenta: 'Cámara lenta', '360': '360', firmas: 'Libro de firmas', glam: 'Glam',
 };
 
-const clipUrl = (c: Clip) => `${publicSiteUrl()}/clip?${new URLSearchParams({ d: c.drive_id, ...(c.title ? { t: c.title } : {}) }).toString()}`;
+const clipUrl = (siteUrl: string, c: Clip) => `${siteUrl}/clip?${new URLSearchParams({ d: c.drive_id, ...(c.title ? { t: c.title } : {}) }).toString()}`;
 
-export default function VideoGalleryTab({ devices }: { devices: KioskDeviceRow[] }) {
+export default function GalleryTab({ devices }: { devices: VideoDeviceRow[] }) {
   const [galleries, setGalleries] = useState<GallerySummary[] | null>(null);
   const [code, setCode] = useState('');
   const [clips, setClips] = useState<Clip[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
   const [loading, setLoading] = useState(false);
   const [missing, setMissing] = useState('');
-  const [hasHidden, setHasHidden] = useState(true);
-  const [alsoDrive, setAlsoDrive] = useState(false);
   const [sends, setSends] = useState<{ sent: number; failed: number } | null>(null);
   const [busy, setBusy] = useState('');
 
@@ -42,14 +39,9 @@ export default function VideoGalleryTab({ devices }: { devices: KioskDeviceRow[]
       const res = await supabase.from('video_clips').select(cols).order('created_at', { ascending: false }).limit(5000);
       return { data: res.data as unknown[] | null, error: res.error };
     };
-    let { data, error } = await fetchRows('gallery, title, created_at, hidden');
-    // Base sin la migración de moderación: no hay columna "hidden"
-    if (error && /hidden/i.test(error.message)) {
-      setHasHidden(false);
-      ({ data, error } = await fetchRows('gallery, title, created_at'));
-    }
+    const { data, error } = await fetchRows('gallery, title, created_at, hidden');
     if (error) {
-      setMissing(/video_clips/i.test(error.message) ? 'Falta crear la tabla de la galería: corré la migración 20261021000000_video_clips.sql (y 20261022000000 para moderar).' : error.message);
+      setMissing(/video_clips|relation|schema cache/i.test(error.message) ? 'Falta correr la migración 20261022000000_video_booth.sql en Supabase.' : error.message);
       setGalleries([]);
       return;
     }
@@ -73,7 +65,7 @@ export default function VideoGalleryTab({ devices }: { devices: KioskDeviceRow[]
   const loadClips = useCallback(async () => {
     if (!code) return;
     setLoading(true);
-    const cols = `id, gallery, drive_id, thumb_id, title, mode, device_code, created_at${hasHidden ? ', hidden' : ''}`;
+    const cols = 'id, gallery, drive_id, thumb_id, title, mode, device_id, created_at, hidden';
     const { data, error } = await supabase.from('video_clips').select(cols).eq('gallery', code).order('created_at', { ascending: false }).limit(1000);
     setLoading(false);
     if (error) { toast.error(`No se pudieron cargar los videos: ${error.message}`); return; }
@@ -84,7 +76,7 @@ export default function VideoGalleryTab({ devices }: { devices: KioskDeviceRow[]
       const rows = (s.data ?? []) as { status: string }[];
       setSends({ sent: rows.filter(r => r.status === 'sent').length, failed: rows.filter(r => r.status === 'failed').length });
     }
-  }, [code, hasHidden]);
+  }, [code]);
 
   useEffect(() => { const t = window.setTimeout(loadGalleries, 0); return () => window.clearTimeout(t); }, [loadGalleries]);
   useEffect(() => {
@@ -116,17 +108,8 @@ export default function VideoGalleryTab({ devices }: { devices: KioskDeviceRow[]
   };
 
   const remove = async (clip: Clip) => {
-    if (!window.confirm(alsoDrive ? '¿Borrar el video de la galería y de Drive? No se puede deshacer.' : '¿Sacar el video de la galería? (sigue en Drive y en el equipo)')) return;
+    if (!window.confirm('¿Sacar el video de la galería? (el archivo sigue en el Drive de la cabina y en el equipo)')) return;
     setBusy(clip.id);
-    if (alsoDrive) {
-      try {
-        await deleteDrivePhotos([clip.drive_id, ...(clip.thumb_id ? [clip.thumb_id] : [])]);
-      } catch (e) {
-        toast.error(`No se pudo borrar de Drive: ${e instanceof Error ? e.message : e}`);
-        setBusy('');
-        return;
-      }
-    }
     const { error } = await supabase.from('video_clips').delete().eq('id', clip.id);
     setBusy('');
     if (error) { toast.error(`No se pudo borrar: ${error.message}`); return; }
@@ -136,19 +119,20 @@ export default function VideoGalleryTab({ devices }: { devices: KioskDeviceRow[]
 
   const shown = useMemo(() => clips.filter(c => filter === 'all' || (filter === 'hidden' ? c.hidden : !c.hidden)), [clips, filter]);
   const hiddenIds = clips.filter(c => c.hidden).map(c => c.id);
-  const deviceName = (dc: string | null) => {
-    const d = devices.find(x => x.device_code === dc);
-    return d?.name || dc || '';
+  const deviceName = (id: string | null) => {
+    const d = devices.find(x => x.id === id);
+    return d?.name || d?.device_code || '';
   };
   const usedBy = devices.filter(d => ((d.reported?.video?.galleryCode ?? d.settings?.video?.galleryCode) as string | undefined) === code);
   const current = galleries?.find(g => g.code === code);
+  const siteUrl = (String(usedBy[0]?.reported?.video?.publicSiteUrl ?? '').trim() || DEFAULT_PUBLIC_SITE).replace(/\/+$/, '');
 
   if (galleries === null) return <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-violet-400" /></div>;
   if (missing) return <div className={`${card} text-amber-200`}>{missing}</div>;
   if (!galleries.length) {
     return (
       <div className={`${card} text-slate-400`}>
-        Todavía no hay galerías. Se crean solas cuando una cabina de video sube su primer video (con Drive y QR activados).
+        Todavía no hay galerías. Se crean solas cuando un equipo de la cabina sube su primer video (con Drive configurado).
       </div>
     );
   }
@@ -168,15 +152,14 @@ export default function VideoGalleryTab({ devices }: { devices: KioskDeviceRow[]
             </select>
           </label>
           <button onClick={() => { void loadGalleries(); void loadClips(); }} className={btnGhost}><RefreshCw className="h-4 w-4" /> Actualizar</button>
-          <a href={`${publicSiteUrl()}/galeria-video/${code}`} target="_blank" rel="noreferrer" className={btnGhost}><ExternalLink className="h-4 w-4" /> Ver galería</a>
-          <a href={`${publicSiteUrl()}/galeria-video/${code}?pantalla=1`} target="_blank" rel="noreferrer" className={btnGhost}><ExternalLink className="h-4 w-4" /> Modo pantalla</a>
+          <a href={`${siteUrl}/galeria-video/${code}`} target="_blank" rel="noreferrer" className={btnGhost}><ExternalLink className="h-4 w-4" /> Ver galería</a>
+          <a href={`${siteUrl}/galeria-video/${code}?pantalla=1`} target="_blank" rel="noreferrer" className={btnGhost}><ExternalLink className="h-4 w-4" /> Modo pantalla</a>
         </div>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-slate-400">
           <span>{current?.count ?? clips.length} videos{hiddenIds.length ? ` · ${hiddenIds.length} ocultos o pendientes` : ''}</span>
           {sends && <span className="flex items-center gap-1.5"><MessageCircle className="h-4 w-4 text-emerald-400" /> {sends.sent} enviados por WhatsApp{sends.failed ? ` · ${sends.failed} fallidos` : ''}</span>}
           {usedBy.length > 0 && <span>Equipos: {usedBy.map(d => d.name || d.device_code).join(', ')}</span>}
         </div>
-        {!hasHidden && <p className="text-sm text-amber-200">Para ocultar y aprobar videos corré la migración 20261022000000_video_whatsapp_moderation.sql. Mientras tanto solo se pueden borrar.</p>}
         <div className="flex flex-wrap items-center gap-2">
           {(['all', 'visible', 'hidden'] as Filter[]).map(f => (
             <button key={f} onClick={() => setFilter(f)}
@@ -185,13 +168,9 @@ export default function VideoGalleryTab({ devices }: { devices: KioskDeviceRow[]
             </button>
           ))}
           <span className="flex-1" />
-          {hasHidden && hiddenIds.length > 0 && (
+          {hiddenIds.length > 0 && (
             <button onClick={() => void setHidden(hiddenIds, false)} disabled={!!busy} className={btnPrimary}><Check className="h-4 w-4" /> Aprobar todos ({hiddenIds.length})</button>
           )}
-          <label className="flex items-center gap-2 text-sm text-slate-300">
-            <input type="checkbox" checked={alsoDrive} onChange={e => setAlsoDrive(e.target.checked)} className="accent-violet-500" />
-            Al borrar, borrar también de Drive
-          </label>
         </div>
       </div>
 
@@ -203,7 +182,7 @@ export default function VideoGalleryTab({ devices }: { devices: KioskDeviceRow[]
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
           {shown.map(c => (
             <div key={c.id} className={`overflow-hidden rounded-2xl border ${c.hidden ? 'border-amber-500/50' : 'border-slate-800'} bg-slate-900/60`}>
-              <a href={clipUrl(c)} target="_blank" rel="noreferrer" className="relative block aspect-[9/16] bg-black">
+              <a href={clipUrl(siteUrl, c)} target="_blank" rel="noreferrer" className="relative block aspect-[9/16] bg-black">
                 {c.thumb_id ? (
                   <>
                     <img src={driveImageUrl(c.thumb_id, 400)} alt="" loading="lazy" className={`h-full w-full object-cover ${c.hidden ? 'opacity-50' : ''}`} />
@@ -215,10 +194,10 @@ export default function VideoGalleryTab({ devices }: { devices: KioskDeviceRow[]
               <div className="space-y-2 p-3">
                 <p className="text-xs text-slate-400">
                   {MODE_LABEL[c.mode ?? ''] ?? c.mode ?? 'Video'} · {new Date(c.created_at).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                  {c.device_code ? ` · ${deviceName(c.device_code)}` : ''}
+                  {c.device_id ? ` · ${deviceName(c.device_id)}` : ''}
                 </p>
                 <div className="flex gap-2">
-                  {hasHidden && (
+                  {(
                     <button onClick={() => void setHidden([c.id], !c.hidden)} disabled={!!busy} className={`${btnGhost} flex-1 px-2`} title={c.hidden ? 'Mostrar' : 'Ocultar'}>
                       {c.hidden ? <><Eye className="h-4 w-4" /> Mostrar</> : <><EyeOff className="h-4 w-4" /> Ocultar</>}
                     </button>

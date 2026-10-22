@@ -85,8 +85,6 @@ export interface KioskGeneralSettings {
   splashGallery?: boolean;
   /** Ícono "Galería" en el inicio */
   enableGallery?: boolean;
-  /** Ícono "Video" (cabina de video) en el inicio (por defecto sí) */
-  enableVideo?: boolean;
   /** Carpeta del equipo donde se guardan las fotos (vacío = nombre del evento) */
   localFolder?: string;
   /** Fotos: un juego al azar durante un minuto antes del resultado (con la IA siempre hay juego) */

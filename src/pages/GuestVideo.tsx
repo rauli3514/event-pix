@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Download, MessageCircle, Share2 } from 'lucide-react';
 import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
 import { EventPixLogo } from '@/components/kiosk/brand/EventPixLogo';
-import { getCachedStore, loadStore } from '@/lib/kioskStore';
 
 // Página que abre el invitado al escanear el QR de la cabina de video: ve su
 // video y lo baja o lo comparte. El video está en Drive (compartido con link).
@@ -17,10 +16,7 @@ export default function GuestVideo() {
   const fileUrl = `https://drive.usercontent.google.com/download?id=${id}&export=download`;
   // Si el video no se puede reproducir directo, se usa el reproductor de Drive
   const [useDrivePlayer, setUseDrivePlayer] = useState(false);
-  const [contactPhone, setContactPhone] = useState(() => getCachedStore().contact_phone || EVENTPIX_WHATSAPP);
-  useEffect(() => {
-    loadStore().then(s => { if (s.contact_phone) setContactPhone(s.contact_phone); }).catch(() => {});
-  }, []);
+  const contactPhone = EVENTPIX_WHATSAPP;
 
   const share = async () => {
     try {

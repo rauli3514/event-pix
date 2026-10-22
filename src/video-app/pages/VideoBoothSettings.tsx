@@ -3,17 +3,18 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Video } from 'lucide-react';
 import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
 import { useRemoteFocus } from '@/hooks/use-remote-focus';
-import { migrateLegacyMedia } from '@/lib/videoBooth/media';
 import { recordingSupport } from '@/lib/videoBooth/recorder';
+import { REMOTE_APPLIED_EVENT } from '@/lib/videoBooth/remote';
 import { BrandPanel, DeliveryPanel, FramesPanel, LayersPanel, MotionPanel, MusicPanel } from './VideoSettingsPanels';
 import {
   DEFAULT_PROMPTS, getVideoSettings, modeConfig, RAMP_PRESETS, saveModeConfig, saveVideoSettings,
   VIDEO_FILTERS, VIDEO_MODES, type VideoBoothSettings,
 } from '@/lib/videoBooth/settings';
-import { buttonClass, Choice, Field, inputClass, Panel, Toggle } from '@/pages/kiosk-box/settings/ui';
+import { buttonClass, Choice, Field, inputClass, Panel, Toggle } from '../ui';
+import { CameraPanel, CloudPanel, DevicePanel, EventPanel } from './DevicePanels';
 
-// Ajustes de la cabina de video (detrás de la clave del equipo). La cámara
-// (cuál, espejo, giro, calidad) es la misma del kiosco: se cambia en sus Ajustes.
+// Ajustes de la app EventPix Video (detrás de la clave del equipo). Casi todo se
+// puede cambiar también desde el panel de la cabina.
 
 export default function VideoBoothSettings() {
   const navigate = useNavigate();
@@ -26,22 +27,29 @@ export default function VideoBoothSettings() {
   const support = recordingSupport();
   const [promptsText, setPromptsText] = useState(() => (s.prompts?.length ? s.prompts : DEFAULT_PROMPTS).join('\n'));
 
-  // Marco y canción de la primera versión → listas nuevas
-  useEffect(() => { void migrateLegacyMedia().then(() => setS(getVideoSettings())); }, []);
+  // Cambios que llegan del panel mientras Ajustes está abierto
+  useEffect(() => {
+    const reload = () => setS(getVideoSettings());
+    window.addEventListener(REMOTE_APPLIED_EVENT, reload);
+    return () => window.removeEventListener(REMOTE_APPLIED_EVENT, reload);
+  }, []);
 
   return (
     <div ref={rootRef} className="relative min-h-screen text-white">
       <AuroraBackground className="fixed" />
       <div className="relative max-w-5xl mx-auto px-6 py-8 space-y-6">
         <header className="flex items-center gap-4">
-          <button onClick={() => navigate('/video')} className={buttonClass} data-autofocus><ArrowLeft className="w-6 h-6" /> Volver</button>
-          <h1 className="text-3xl font-black flex items-center gap-3"><Video className="w-8 h-8 text-[#00d4ff]" /> Ajustes de la cabina de video</h1>
+          <button onClick={() => navigate('/')} className={buttonClass} data-autofocus><ArrowLeft className="w-6 h-6" /> Volver</button>
+          <h1 className="text-3xl font-black flex items-center gap-3"><Video className="w-8 h-8 text-[#00d4ff]" /> Ajustes de EventPix Video</h1>
         </header>
 
         <div className={`kiosk-glass rounded-2xl px-6 py-4 ${support.ok && support.mp4 ? 'text-white/80' : 'text-amber-100'}`}>
           Formato de video de este equipo: <b>{support.format}</b>
           {support.ok && !support.mp4 && ' — los iPhone no reproducen WebM: conviene actualizar el WebView del equipo (Chrome 126 o más nuevo graba MP4).'}
         </div>
+
+        <DevicePanel onLink={() => navigate('/')} />
+        <EventPanel s={s} update={update} />
 
         <Panel title="Experiencias" description="Las que se activen aparecen en la pantalla “¿Qué video hacemos?”. Con una sola, arranca directo.">
           {VIDEO_MODES.map(m => {
@@ -102,6 +110,7 @@ export default function VideoBoothSettings() {
 
         <MotionPanel s={s} update={update} />
         <DeliveryPanel s={s} update={update} />
+        <CloudPanel s={s} update={update} />
 
         <Panel title="Pantalla de inicio">
           <Field label="Texto grande (vacío = nombre del evento)">
@@ -109,11 +118,7 @@ export default function VideoBoothSettings() {
           </Field>
         </Panel>
 
-        <Panel title="Cámara" description="La webcam, el espejo y el giro son los del kiosco de fotos (Ajustes del kiosco → Cámara).">
-          <Choice label="En celular o tablet (fotos itinerantes), usar la cámara" value={s.facing ?? 'user'} onChange={v => update({ facing: v })}
-            options={[{ value: 'user', label: 'De adelante (selfie)' }, { value: 'environment', label: 'De atrás' }]} />
-          <button className={buttonClass} onClick={() => navigate('/box/ajustes')}>Abrir Ajustes del kiosco</button>
-        </Panel>
+        <CameraPanel s={s} update={update} />
       </div>
     </div>
   );

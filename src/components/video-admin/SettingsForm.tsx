@@ -2,32 +2,34 @@ import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { ExternalLink, ImagePlus, Music, Trash2, Upload } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import type { RemoteSettings } from '@/lib/kioskRemote';
-import { publicSiteUrl } from '@/lib/kioskShare';
-import type { RemoteFile, VideoAssets } from '@/lib/videoBooth/remoteAssets';
+import type { RemoteFile, RemoteVideoSettings, VideoAssets } from '@/lib/videoBooth/remote';
+import { DEFAULT_PUBLIC_SITE } from '@/lib/videoBooth/share';
 import {
   ANIMATIONS, CORNERS, newGalleryCode, RAMP_PRESETS, VIDEO_FILTERS, VIDEO_MODES,
   type VideoModeConfig, type VideoModeKey,
 } from '@/lib/videoBooth/settings';
 import { btnGhost, Check, Field, input, Section, Select } from './ui';
 
-// Cabina de video desde el panel: ajustes y archivos (marcos, logo, música,
-// animación). Los archivos se suben a kiosk-assets y el equipo los baja.
+// Configuración de un equipo de la cabina desde el panel: ajustes y archivos
+// (marcos, logo, música, animación). Los archivos se suben al bucket
+// video-assets y el equipo los baja y los guarda.
 
-type Setter = (fn: (f: RemoteSettings) => RemoteSettings) => void;
+type Setter = (fn: (f: RemoteVideoSettings) => RemoteVideoSettings) => void;
 
 const uid = () => `r-${Math.random().toString(36).slice(2, 10)}`;
 
 async function uploadAsset(kind: string, file: File) {
-  const path = `video/${kind}/${Date.now()}-${file.name.replace(/[^\w.-]+/g, '_')}`;
-  const { error } = await supabase.storage.from('kiosk-assets').upload(path, file, { contentType: file.type || undefined });
-  if (error) throw new Error(error.message);
-  return supabase.storage.from('kiosk-assets').getPublicUrl(path).data.publicUrl;
+  const path = `${kind}/${Date.now()}-${file.name.replace(/[^\w.-]+/g, '_')}`;
+  const { error } = await supabase.storage.from('video-assets').upload(path, file, { contentType: file.type || undefined });
+  if (error) throw new Error(/bucket/i.test(error.message) ? 'Falta correr la migración de la cabina de video (bucket video-assets)' : error.message);
+  return supabase.storage.from('video-assets').getPublicUrl(path).data.publicUrl;
 }
 
-export default function VideoBoothConfig({ form, setForm }: { form: RemoteSettings; setForm: Setter }) {
+export default function SettingsForm({ form, setForm }: { form: RemoteVideoSettings; setForm: Setter }) {
   const v = form.video ?? {};
-  const assets: VideoAssets = form.videoAssets ?? {};
+  const assets: VideoAssets = form.assets ?? {};
+  const cam = form.camera ?? {};
+  const setCam = (key: string, value: unknown) => setForm(f => ({ ...f, camera: { ...(f.camera ?? {}), [key]: value } }));
   const [busy, setBusy] = useState('');
   const frameInput = useRef<HTMLInputElement>(null);
   const songInput = useRef<HTMLInputElement>(null);
@@ -35,7 +37,7 @@ export default function VideoBoothConfig({ form, setForm }: { form: RemoteSettin
   const animInput = useRef<HTMLInputElement>(null);
 
   const set = (key: string, value: unknown) => setForm(f => ({ ...f, video: { ...(f.video ?? {}), [key]: value } }));
-  const setAssets = (patch: Partial<VideoAssets>) => setForm(f => ({ ...f, videoAssets: { ...(f.videoAssets ?? {}), ...patch } }));
+  const setAssets = (patch: Partial<VideoAssets>) => setForm(f => ({ ...f, assets: { ...(f.assets ?? {}), ...patch } }));
   const val = <T,>(key: string, def: T) => (v[key] === undefined || v[key] === null ? def : v[key] as T);
   const modes = (v.modes ?? {}) as Partial<Record<VideoModeKey, Partial<VideoModeConfig>>>;
   const mode = (key: VideoModeKey) => ({ ...VIDEO_MODES.find(m => m.key === key)!.defaults, ...(modes[key] ?? {}) });
@@ -73,10 +75,52 @@ export default function VideoBoothConfig({ form, setForm }: { form: RemoteSettin
     ...(assets.songs ?? []).map(f => ({ value: f.id, label: f.name })),
   ];
   const gallery = String(v.galleryCode ?? '');
+  const site = (String(v.publicSiteUrl ?? '').trim() || DEFAULT_PUBLIC_SITE).replace(/\/+$/, '');
 
   return (
     <div className="grid gap-5 lg:grid-cols-2">
-      <Section title="Cabina de video: experiencias">
+      <Section title="Evento">
+        <Field label="Nombre del evento" hint="Va en el marco y la placa final, y es la carpeta de los videos.">
+          <input className={input} value={val('eventTitle', '')} onChange={e => set('eventTitle', e.target.value)} placeholder="15 de Pía" />
+        </Field>
+        <Field label="Texto de la bienvenida">
+          <input className={input} value={val('title', '')} onChange={e => set('title', e.target.value)} placeholder="¡Grabá tu video!" />
+        </Field>
+        <Check label="Trabajar sin conexión (sin QR ni WhatsApp)" checked={val('offline', false)} onChange={x => set('offline', x)} />
+      </Section>
+
+      <Section title="Cámara">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Calidad">
+            <Select value={String(cam.quality ?? 'auto')} options={[{ value: 'auto', label: 'Automática' }, { value: '1080', label: 'Full HD' }, { value: '720', label: 'HD' }, { value: '480', label: 'Baja' }]} onChange={x => setCam('quality', x)} />
+          </Field>
+          <Field label="Giro de la imagen">
+            <Select value={Number(cam.rotation ?? 0)} options={[0, 90, 180, 270].map(n => ({ value: n, label: `${n}°` }))} onChange={x => setCam('rotation', x)} />
+          </Field>
+          <Field label="En celular o tablet">
+            <Select value={val('facing', 'user')} options={[{ value: 'user', label: 'Cámara de adelante' }, { value: 'environment', label: 'Cámara de atrás' }]} onChange={x => set('facing', x)} />
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Check label="Modo espejo" checked={!!cam.mirror} onChange={x => setCam('mirror', x)} />
+          <Check label="Enfoque fijo lejos" checked={cam.focus === 'far'} onChange={x => setCam('focus', x ? 'far' : 'auto')} />
+          <Check label="Pedir 60 cuadros por segundo" checked={val('highFps', true)} onChange={x => set('highFps', x)} />
+        </div>
+      </Section>
+
+      <Section title="Nube (Google Drive de la cabina)">
+        <Field label="Dirección del Apps Script" hint="Vacío = el incluido en la app (VITE_VIDEO_DRIVE_SCRIPT_URL).">
+          <input className={input} value={val('driveScriptUrl', '')} onChange={e => set('driveScriptUrl', e.target.value.trim())} placeholder="https://script.google.com/macros/s/…/exec" />
+        </Field>
+        <Field label="Link de la carpeta de Drive">
+          <input className={input} value={val('driveFolderLink', '')} onChange={e => set('driveFolderLink', e.target.value.trim())} placeholder="https://drive.google.com/drive/folders/…" />
+        </Field>
+        <Field label="Sitio de la página del invitado" hint={`Vacío = ${DEFAULT_PUBLIC_SITE}`}>
+          <input className={input} value={val('publicSiteUrl', '')} onChange={e => set('publicSiteUrl', e.target.value.trim())} placeholder={DEFAULT_PUBLIC_SITE} />
+        </Field>
+      </Section>
+
+      <Section title="Experiencias">
         <div className="space-y-3">
           {VIDEO_MODES.map(m => {
             const c = mode(m.key);
@@ -99,14 +143,11 @@ export default function VideoBoothConfig({ form, setForm }: { form: RemoteSettin
           <Field label="Cuenta regresiva">
             <Select value={val('countdown', 3)} options={[0, 3, 5, 10].map(n => ({ value: n, label: n ? `${n} s` : 'Sin cuenta' }))} onChange={x => set('countdown', x)} />
           </Field>
-          <Field label="Texto de la bienvenida">
-            <input className={input} value={val('title', '')} onChange={e => set('title', e.target.value)} placeholder="¡Grabá tu video!" />
-          </Field>
         </div>
         <Check label="El invitado revisa su video y puede repetirlo" checked={val('review', true)} onChange={x => set('review', x)} />
       </Section>
 
-      <Section title="Cabina de video: 360 y efectos">
+      <Section title="360 y efectos">
         <Check label="El 360 empieza solo cuando gira la plataforma" checked={val('autoStart360', false)} onChange={x => set('autoStart360', x)} />
         <Check label="Y corta solo cuando la plataforma para" checked={val('autoStop360', false)} onChange={x => set('autoStop360', x)} />
         <Check label="Modo continuo (vuelve directo a esperar el próximo giro)" checked={val('continuous360', false)} onChange={x => set('continuous360', x)} />
@@ -138,7 +179,7 @@ export default function VideoBoothConfig({ form, setForm }: { form: RemoteSettin
         </div>
       </Section>
 
-      <Section title="Cabina de video: marcos">
+      <Section title="Marcos">
         <Field label="Marco">
           <Select value={val('overlay', 'none')} options={[{ value: 'none', label: 'Sin marco' }, { value: 'title', label: 'Nombre del evento' }, { value: 'custom', label: 'PNG' }]} onChange={x => set('overlay', x)} />
         </Field>
@@ -164,7 +205,7 @@ export default function VideoBoothConfig({ form, setForm }: { form: RemoteSettin
         </Field>
       </Section>
 
-      <Section title="Cabina de video: marca">
+      <Section title="Marca">
         <div className="flex flex-wrap items-center gap-3">
           {assets.logo && <img src={assets.logo} alt="Logo" className="h-14 rounded bg-slate-800 p-1" />}
           <input ref={logoInput} type="file" accept="image/png,image/webp,image/svg+xml" className="hidden" onChange={e => { void upload('logo', e.target.files); e.target.value = ''; }} />
@@ -198,7 +239,7 @@ export default function VideoBoothConfig({ form, setForm }: { form: RemoteSettin
         </Field>
       </Section>
 
-      <Section title="Cabina de video: música">
+      <Section title="Música">
         <div className="space-y-2">
           {(assets.songs ?? []).map(sg => (
             <div key={sg.id} className="flex items-center gap-2">
@@ -227,7 +268,7 @@ export default function VideoBoothConfig({ form, setForm }: { form: RemoteSettin
         </div>
       </Section>
 
-      <Section title="Cabina de video: entrega y galería">
+      <Section title="Entrega, galería y WhatsApp">
         <Field label="El QR del resultado abre">
           <Select value={val('delivery', 'video')} options={[{ value: 'video', label: 'El video del invitado' }, { value: 'gallery', label: 'La galería del evento' }, { value: 'both', label: 'Los dos (dos QR)' }]} onChange={x => set('delivery', x)} />
         </Field>
@@ -249,8 +290,8 @@ export default function VideoBoothConfig({ form, setForm }: { form: RemoteSettin
         </Field>
         {gallery && (
           <div className="flex flex-wrap gap-2">
-            <a href={`${publicSiteUrl()}/galeria-video/${gallery}`} target="_blank" rel="noreferrer" className={btnGhost}><ExternalLink className="h-4 w-4" /> Galería</a>
-            <a href={`${publicSiteUrl()}/galeria-video/${gallery}?pantalla=1`} target="_blank" rel="noreferrer" className={btnGhost}><ExternalLink className="h-4 w-4" /> Modo pantalla</a>
+            <a href={`${site}/galeria-video/${gallery}`} target="_blank" rel="noreferrer" className={btnGhost}><ExternalLink className="h-4 w-4" /> Galería</a>
+            <a href={`${site}/galeria-video/${gallery}?pantalla=1`} target="_blank" rel="noreferrer" className={btnGhost}><ExternalLink className="h-4 w-4" /> Modo pantalla</a>
           </div>
         )}
       </Section>

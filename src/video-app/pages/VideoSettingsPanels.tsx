@@ -3,10 +3,9 @@ import { QRCodeSVG } from 'qrcode.react';
 import { CloudUpload, ImagePlus, Music, Play, Square, Trash2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { BUILT_IN_ACCESSORIES } from '@/lib/faceFx';
-import { openCameraStream, stopStream } from '@/lib/kioskCamera';
-import { getScreenMedia, removeScreenMedia, saveScreenMedia } from '@/lib/kioskMedia';
-import { getCameraSettings } from '@/lib/kioskSettings';
-import { isDriveConfigured } from '@/lib/driveBackup';
+import { openCameraStream, stopStream } from '@/lib/videoBooth/camera';
+import { getMedia, MEDIA_EVENT, removeMedia, saveMedia } from '@/lib/videoBooth/mediaStore';
+import { isDriveConfigured } from '@/lib/videoBooth/drive';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { galleryUrl, pendingVideoCount, processVideoQueue, VIDEO_QUEUE_EVENT } from '@/lib/videoBooth/cloud';
 import { MotionDetector, suggestThreshold } from '@/lib/videoBooth/motion';
@@ -14,7 +13,7 @@ import {
   ANIM_KEY, ANIMATIONS, CORNERS, frameKey, galleryCode, LOGO_KEY, newGalleryCode, newMediaId, songKey,
   type VideoBoothSettings,
 } from '@/lib/videoBooth/settings';
-import { buttonClass, Choice, Field, inputClass, Panel, primaryClass, Toggle } from '@/pages/kiosk-box/settings/ui';
+import { buttonClass, Choice, Field, inputClass, Panel, primaryClass, Toggle } from '../ui';
 
 // Paneles de Ajustes de la cabina de video: marcos, capas, marca, música, 360 y entrega.
 
@@ -27,7 +26,7 @@ function useMediaUrl(key: string) {
   useEffect(() => {
     let alive = true;
     let current: string | null = null;
-    const load = () => getScreenMedia(key).then(rec => {
+    const load = () => getMedia(key).then(rec => {
       if (!alive) return;
       if (current) URL.revokeObjectURL(current);
       current = rec ? URL.createObjectURL(rec.blob) : null;
@@ -35,10 +34,10 @@ function useMediaUrl(key: string) {
     }).catch(() => {});
     void load();
     const onChange = (e: Event) => { if ((e as CustomEvent).detail === key) void load(); };
-    window.addEventListener('kiosk-media-changed', onChange);
+    window.addEventListener(MEDIA_EVENT, onChange);
     return () => {
       alive = false;
-      window.removeEventListener('kiosk-media-changed', onChange);
+      window.removeEventListener(MEDIA_EVENT, onChange);
       if (current) URL.revokeObjectURL(current);
     };
   }, [key]);
@@ -47,7 +46,7 @@ function useMediaUrl(key: string) {
 
 const save = async (key: string, file: File) => {
   try {
-    await saveScreenMedia(key as `video:${string}`, file);
+    await saveMedia(key, file);
     return true;
   } catch (e) {
     toast.error(e instanceof Error ? e.message : 'No se pudo guardar el archivo');
@@ -80,7 +79,7 @@ export function FramesPanel({ s, update }: Props) {
     if (added.length) update({ frames: [...frames, ...added], frameId: s.frameId || added[0].id, overlay: 'custom' });
   };
   const remove = async (id: string) => {
-    await removeScreenMedia(frameKey(id) as `video:${string}`).catch(() => {});
+    await removeMedia(frameKey(id)).catch(() => {});
     const rest = frames.filter(f => f.id !== id);
     update({ frames: rest, frameId: s.frameId === id ? rest[0]?.id : s.frameId });
   };
@@ -114,7 +113,7 @@ export function LayersPanel({ s, update }: Props) {
   const input = useRef<HTMLInputElement>(null);
   const anim = useMediaUrl(ANIM_KEY);
   return (
-    <Panel title="Animaciones y accesorios" description="Se mueven encima del video. Los accesorios siguen la cara (como en el kiosco de fotos); en equipos lentos conviene no usarlos.">
+    <Panel title="Animaciones y accesorios" description="Se mueven encima del video. Los accesorios siguen la cara; en equipos lentos conviene no usarlos.">
       <Choice label="Animación" value={s.animation ?? 'none'} onChange={v => update({ animation: v })}
         options={ANIMATIONS.map(a => ({ value: a.value, label: a.label }))} />
       {s.animation === 'custom' && (
@@ -125,7 +124,7 @@ export function LayersPanel({ s, update }: Props) {
             <input ref={input} type="file" accept="video/webm,video/mp4" className="hidden"
               onChange={e => { const f = e.target.files?.[0]; if (f) void save(ANIM_KEY, f); e.target.value = ''; }} />
             <button className={buttonClass} onClick={() => input.current?.click()}><Upload className="w-5 h-5" /> {anim ? 'Cambiar video' : 'Subir video'}</button>
-            {anim && <button className={buttonClass} onClick={() => void removeScreenMedia(ANIM_KEY)}><Trash2 className="w-5 h-5" /> Quitar</button>}
+            {anim && <button className={buttonClass} onClick={() => void removeMedia(ANIM_KEY)}><Trash2 className="w-5 h-5" /> Quitar</button>}
           </div>
           <Choice label="Mezcla" value={s.animBlend ?? 'screen'} onChange={v => update({ animBlend: v })}
             options={[{ value: 'screen', label: 'Pantalla (fondo negro)' }, { value: 'normal', label: 'Normal (con transparencia)' }]} />
@@ -151,7 +150,7 @@ export function BrandPanel({ s, update }: Props) {
         <input ref={input} type="file" accept="image/png,image/webp,image/svg+xml" className="hidden"
           onChange={e => { const f = e.target.files?.[0]; if (f) void save(LOGO_KEY, f); e.target.value = ''; }} />
         <button className={buttonClass} onClick={() => input.current?.click()}><ImagePlus className="w-5 h-5" /> {logo ? 'Cambiar logo' : 'Subir logo (PNG)'}</button>
-        {logo && <button className={buttonClass} onClick={() => void removeScreenMedia(LOGO_KEY)}><Trash2 className="w-5 h-5" /> Quitar</button>}
+        {logo && <button className={buttonClass} onClick={() => void removeMedia(LOGO_KEY)}><Trash2 className="w-5 h-5" /> Quitar</button>}
       </div>
       {logo && (
         <>
@@ -228,7 +227,7 @@ export function MusicPanel({ s, update }: Props) {
     if (added.length) update({ songs: [...songs, ...added], songId: s.songId || added[0].id });
   };
   const remove = async (id: string) => {
-    await removeScreenMedia(songKey(id) as `video:${string}`).catch(() => {});
+    await removeMedia(songKey(id)).catch(() => {});
     const rest = songs.filter(x => x.id !== id);
     update({ songs: rest, songId: s.songId === id ? rest[0]?.id : s.songId });
   };
@@ -278,8 +277,7 @@ export function MotionPanel({ s, update }: Props) {
 
   const openCam = async () => {
     try {
-      const cam = getCameraSettings();
-      const stream = await openCameraStream(cam.deviceId, '480', { facingMode: cam.deviceId ? undefined : s.facing });
+      const stream = await openCameraStream({ facingMode: s.facing });
       streamRef.current = stream;
       setOpen(true);
       await new Promise(r => setTimeout(r, 50));
@@ -361,7 +359,7 @@ export function DeliveryPanel({ s, update }: Props) {
   const url = code ? galleryUrl(code) : '';
   return (
     <Panel title="Entrega del video y galería" description="El invitado escanea el QR y baja su video, o entra a la galería con todos los videos del evento. Sin internet, los videos quedan en el equipo y se suben solos cuando vuelve.">
-      <Toggle label="Mostrar QR al terminar" hint={isDriveConfigured() ? 'Los videos se suben a la carpeta de Drive del kiosco' : 'Falta configurar Drive en Ajustes del kiosco → Compartir y nube'} checked={s.showQr !== false} onChange={v => update({ showQr: v })} />
+      <Toggle label="Mostrar QR al terminar" hint={isDriveConfigured() ? 'Los videos se suben a la carpeta de Drive de la cabina' : 'Falta configurar Drive en el panel Nube'} checked={s.showQr !== false} onChange={v => update({ showQr: v })} />
       <Choice label="El QR abre" value={s.delivery ?? 'video'} onChange={v => update({ delivery: v })}
         options={[{ value: 'video', label: 'Su video' }, { value: 'gallery', label: 'La galería del evento' }, { value: 'both', label: 'Los dos (dos QR)' }]} />
       <Choice label="Videos en la galería" value={s.galleryModeration ?? 'post'} onChange={v => update({ galleryModeration: v })}

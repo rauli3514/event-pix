@@ -1,7 +1,7 @@
-// Ajustes de la cabina de video. Quedan en el equipo (como los del kiosco de
-// fotos): la cámara (cuál, espejo, giro, calidad) se comparte con el kiosco.
+// Ajustes de la app EventPix Video. Quedan guardados en el equipo y se pueden
+// cambiar desde el panel de la cabina (/admin/cabina-video).
 
-const KEY = 'kiosk_video_settings';
+const KEY = 'video_settings';
 
 export type VideoModeKey = 'clasico' | 'boomerang' | 'lenta' | '360' | 'firmas' | 'glam';
 export type Aspect = '9:16' | '16:9' | '1:1';
@@ -101,6 +101,15 @@ export const DEFAULT_PROMPTS = [
 ];
 
 export interface VideoBoothSettings {
+  /** Nombre del evento: carpeta de los videos, marco y placa final */
+  eventTitle?: string;
+  /** Sin internet: no muestra QR ni WhatsApp (los videos quedan en el equipo) */
+  offline?: boolean;
+  /** Sitio de la página del invitado (vacío = el de EventPix) */
+  publicSiteUrl?: string;
+  /** Google Drive propio de la cabina: dirección del Apps Script y link de la carpeta */
+  driveScriptUrl?: string;
+  driveFolderLink?: string;
   modes?: Partial<Record<VideoModeKey, Partial<VideoModeConfig>>>;
   /** Forma del video: vertical (historias), horizontal o cuadrado */
   aspect?: Aspect;
@@ -220,10 +229,9 @@ export const CORNERS: { value: Corner; label: string }[] = [
   { value: 'bl', label: 'Abajo izquierda' }, { value: 'bottom', label: 'Abajo al centro' }, { value: 'br', label: 'Abajo derecha' },
 ];
 
-// Archivos guardados en el equipo (IndexedDB de kioskMedia). 'overlay' y 'music'
-// son los de la primera versión (un solo marco y una sola canción).
-export const frameKey = (id: string) => (id === 'overlay' ? 'video:overlay' : `video:frame:${id}`);
-export const songKey = (id: string) => (id === 'music' ? 'video:music' : `video:song:${id}`);
+// Archivos guardados en el equipo (mediaStore.ts)
+export const frameKey = (id: string) => `video:frame:${id}`;
+export const songKey = (id: string) => `video:song:${id}`;
 export const LOGO_KEY = 'video:logo';
 export const ANIM_KEY = 'video:anim';
 export const newMediaId = () => Math.random().toString(36).slice(2, 10);

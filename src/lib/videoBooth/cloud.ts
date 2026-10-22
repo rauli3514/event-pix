@@ -1,9 +1,8 @@
-import { isDriveConfigured, uploadForShare } from '@/lib/driveBackup';
-import { getDeviceCode } from '@/lib/kioskDevice';
-import { getGeneralSettings } from '@/lib/kioskSettings';
-import { publicSiteUrl } from '@/lib/kioskShare';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { getDeviceCode, getDeviceSecret } from './device';
+import { isDriveConfigured, uploadForShare } from './drive';
 import { getVideoSettings } from './settings';
+import { publicSiteUrl } from './share';
 import { blobToDataUrl, openDb, UPLOADS, uploadVideoForShare } from './storage';
 import { sendVideoWhatsApp } from './whatsapp';
 
@@ -29,20 +28,18 @@ export interface PendingUpload {
 export const galleryUrl = (code: string) => `${publicSiteUrl()}/galeria-video/${encodeURIComponent(code)}`;
 
 /** Se puede subir ahora (internet, Drive configurado y no está en "sin conexión"). */
-export const canUpload = () => isDriveConfigured() && !getGeneralSettings().offline && navigator.onLine;
+export const canUpload = () => isDriveConfigured() && !getVideoSettings().offline && navigator.onLine;
 
-/** Anota el video en la galería online (si hay servidor). No corta si falla. */
+/** Anota el video en la galería online (el equipo se identifica con su clave). No corta si falla. */
 async function registerClip(item: PendingUpload, driveId: string, thumbId: string | null) {
   if (!isSupabaseConfigured || !item.gallery) return;
-  const row = {
-    gallery: item.gallery, drive_id: driveId, thumb_id: thumbId,
-    title: item.title?.slice(0, 120) || null, mode: item.mode, device_code: getDeviceCode(),
-  };
-  // Con aprobación previa el video entra oculto hasta que se apruebe en el panel
-  const pre = getVideoSettings().galleryModeration === 'pre';
-  let { error } = await supabase.from('video_clips').upsert(pre ? { ...row, hidden: true } : row, { onConflict: 'gallery,drive_id', ignoreDuplicates: true });
-  // Base sin la columna "hidden" (falta la migración de moderación)
-  if (error && pre && /hidden/i.test(error.message)) ({ error } = await supabase.from('video_clips').upsert(row, { onConflict: 'gallery,drive_id', ignoreDuplicates: true }));
+  const { error } = await supabase.rpc('video_clip_add', {
+    p_code: getDeviceCode(), p_secret: getDeviceSecret(),
+    p_gallery: item.gallery, p_drive_id: driveId, p_thumb_id: thumbId,
+    p_title: item.title?.slice(0, 120) || null, p_mode: item.mode,
+    // Con aprobación previa el video entra oculto hasta que se apruebe en el panel
+    p_hidden: getVideoSettings().galleryModeration === 'pre',
+  });
   if (error) console.warn('[video] no se pudo anotar en la galería', error.message);
 }
 

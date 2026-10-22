@@ -1,10 +1,21 @@
-import { Capacitor } from '@capacitor/core';
-import { eventFolder, KioskStorage } from '@/lib/kioskStorage';
-import { isDriveConfigured, uploadForShare } from '@/lib/driveBackup';
+import { Capacitor, registerPlugin } from '@capacitor/core';
+import { isDriveConfigured, uploadForShare } from './drive';
 import { baseMime } from './recorder';
+import { getVideoSettings } from './settings';
 
-// Guardado de los videos de la cabina: en el equipo siempre (Películas/EventPix/<evento>
-// en la app, IndexedDB en el navegador) y en Drive para el QR del invitado.
+// Guardado de los videos: en el equipo siempre (Películas/EventPix Video/<evento>
+// con el plugin nativo VideoStorage de la app; IndexedDB en el navegador) y en el
+// Drive de la cabina para el QR del invitado.
+
+interface VideoStoragePlugin {
+  saveVideo(options: { data: string; folder: string; fileName: string; mime: string }): Promise<{ uri: string; folder: string }>;
+}
+const VideoStorage = registerPlugin<VideoStoragePlugin>('VideoStorage');
+
+/** Carpeta del evento: el nombre del evento sin caracteres raros. */
+export const folderNameFor = (name: string) =>
+  name.trim().replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').slice(0, 60) || 'Videos';
+export const eventFolder = () => folderNameFor(getVideoSettings().eventTitle || 'Videos');
 
 export const blobToDataUrl = (blob: Blob) => new Promise<string>((resolve, reject) => {
   const r = new FileReader();
@@ -22,7 +33,7 @@ const stamp = () => {
 export const videoFileName = (mode: string, ext: string) => `${stamp()}-video-${mode}.${ext}`;
 
 // ─── IndexedDB (navegador, o APK viejo sin saveVideo) ─────────────────────
-const DB_NAME = 'eventpix_kiosk_videos';
+const DB_NAME = 'eventpix_video_files';
 const STORE = 'videos';
 
 /** Videos pendientes de subir (sin internet): se suben solos cuando vuelve */
@@ -68,13 +79,13 @@ export async function listWebVideos(folder = eventFolder(), limit = 60): Promise
 
 /** Guarda el video en el equipo. Devuelve dónde quedó. */
 export async function saveVideoLocally(blob: Blob, fileName: string, folder = eventFolder()): Promise<string> {
-  if (Capacitor.isNativePlatform() && Capacitor.isPluginAvailable('KioskStorage')) {
+  if (Capacitor.isNativePlatform() && Capacitor.isPluginAvailable('VideoStorage')) {
     try {
       const data = await blobToDataUrl(blob);
-      return (await KioskStorage.saveVideo({ data, folder, fileName, mime: baseMime(blob.type) })).uri;
+      return (await VideoStorage.saveVideo({ data, folder, fileName, mime: baseMime(blob.type) })).uri;
     } catch (e) {
-      // APK anterior a la cabina de video: queda en la memoria de la app
-      console.warn('[video] saveVideo nativo no disponible', e);
+      // Si falla la galería del equipo, queda en la memoria de la app
+      console.warn('[video] no se pudo guardar en la galería del equipo', e);
     }
   }
   return webSave(blob, folder, fileName);
@@ -82,7 +93,7 @@ export async function saveVideoLocally(blob: Blob, fileName: string, folder = ev
 
 /** Sube el video a Drive para el QR. Devuelve el ID del archivo. */
 export async function uploadVideoForShare(blob: Blob, fileName: string, folder = eventFolder()) {
-  if (!isDriveConfigured()) throw new Error('Falta configurar Google Drive en Ajustes → Compartir y nube');
+  if (!isDriveConfigured()) throw new Error('Falta configurar Google Drive en Ajustes → Nube');
   if (blob.size > 45 * 1024 * 1024) throw new Error('El video pesa demasiado para subirlo (más de 45 MB)');
   return uploadForShare(await blobToDataUrl(blob), fileName, folder, baseMime(blob.type));
 }

@@ -1,43 +1,19 @@
-import { getScreenMedia } from '@/lib/kioskMedia';
+import { getMedia } from './mediaStore';
 import { titleOverlay } from './compositor';
 import { Decor, disposeAnimVideo, loadAnimVideo } from './decor';
 import { decodeMusic } from './recorder';
-import {
-  ANIM_KEY, frameKey, getVideoSettings, LOGO_KEY, saveVideoSettings, songKey,
-  type SongItem, type VideoBoothSettings,
-} from './settings';
+import { ANIM_KEY, frameKey, LOGO_KEY, songKey, type SongItem, type VideoBoothSettings } from './settings';
 
 // Archivos de la cabina guardados en el equipo: marcos, logo, animación y música.
 
-/** Pasa el marco y la canción de la primera versión (uno solo) a las listas nuevas. */
-export async function migrateLegacyMedia() {
-  const s = getVideoSettings();
-  const patch: Partial<VideoBoothSettings> = {};
-  if (!s.frames?.length) {
-    const rec = await getScreenMedia('video:overlay').catch(() => null);
-    if (rec) {
-      patch.frames = [{ id: 'overlay', name: rec.name.replace(/\.\w+$/, '') || 'Marco' }];
-      if (!s.frameId) patch.frameId = 'overlay';
-    }
-  }
-  if (!s.songs?.length) {
-    const rec = await getScreenMedia('video:music').catch(() => null);
-    if (rec) {
-      patch.songs = [{ id: 'music', name: rec.name.replace(/\.\w+$/, '') || 'Canción' }];
-      if (!s.songId) patch.songId = 'music';
-    }
-  }
-  if (Object.keys(patch).length) saveVideoSettings(patch);
-}
-
 const bitmap = async (key: string) => {
-  const rec = await getScreenMedia(key).catch(() => null);
+  const rec = await getMedia(key).catch(() => null);
   if (!rec) return null;
   try { return await createImageBitmap(rec.blob); } catch { return null; }
 };
 
 export const frameUrl = async (id: string) => {
-  const rec = await getScreenMedia(frameKey(id)).catch(() => null);
+  const rec = await getMedia(frameKey(id)).catch(() => null);
   return rec ? URL.createObjectURL(rec.blob) : null;
 };
 
@@ -52,7 +28,7 @@ export function pickSong(s: VideoBoothSettings, chosen?: string | null): SongIte
 
 export async function loadSong(song: SongItem | null) {
   if (!song) return null;
-  const rec = await getScreenMedia(songKey(song.id)).catch(() => null);
+  const rec = await getMedia(songKey(song.id)).catch(() => null);
   if (!rec) return null;
   return decodeMusic(rec.blob).catch(() => null);
 }
@@ -71,7 +47,7 @@ export async function buildDecor(s: VideoBoothSettings, size: { width: number; h
   const logo = s.showLogo !== false ? await bitmap(LOGO_KEY) : null;
   let animVideo: HTMLVideoElement | null = null;
   if (s.animation === 'custom') {
-    const rec = await getScreenMedia(ANIM_KEY).catch(() => null);
+    const rec = await getMedia(ANIM_KEY).catch(() => null);
     if (rec) animVideo = await loadAnimVideo(rec.blob);
   }
   const decor = new Decor({
