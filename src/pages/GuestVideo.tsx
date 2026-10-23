@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Download, MessageCircle, Share2 } from 'lucide-react';
 import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
 import { EventPixLogo } from '@/components/kiosk/brand/EventPixLogo';
+import { clipPlayUrls } from '@/lib/videoBooth/galleryClips';
 
 // Página que abre el invitado al escanear el QR de la cabina de video: ve su
 // video y lo baja o lo comparte. El video está en Drive (compartido con link).
@@ -14,8 +15,10 @@ export default function GuestVideo() {
   const id = /^[\w-]{20,}$/.test(params.get('d') || '') ? params.get('d')! : '';
   const title = params.get('t') || '';
   const fileUrl = `https://drive.usercontent.google.com/download?id=${id}&export=download`;
-  // Si el video no se puede reproducir directo, se usa el reproductor de Drive
-  const [useDrivePlayer, setUseDrivePlayer] = useState(false);
+  // Se prueba cada dirección; si ninguna se puede reproducir, el reproductor de Drive
+  const playUrls = clipPlayUrls(id);
+  const [attempt, setAttempt] = useState(0);
+  const useDrivePlayer = attempt >= playUrls.length;
   const contactPhone = EVENTPIX_WHATSAPP;
 
   const share = async () => {
@@ -43,7 +46,7 @@ export default function GuestVideo() {
               <iframe src={`https://drive.google.com/file/d/${id}/preview`} allow="autoplay" title="Tu video"
                 className="w-full aspect-[9/16] rounded-3xl shadow-2xl border border-white/20 bg-black" />
             ) : (
-              <video src={fileUrl} controls autoPlay loop playsInline muted onError={() => setUseDrivePlayer(true)}
+              <video key={attempt} src={playUrls[attempt]} controls autoPlay loop playsInline muted onError={() => setAttempt(a => a + 1)}
                 className="w-full rounded-3xl shadow-2xl border border-white/20 bg-black" />
             )}
             <div className="w-full space-y-3">

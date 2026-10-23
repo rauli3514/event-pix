@@ -64,6 +64,12 @@ Android** (brazo de la plataforma 360, uso itinerante).
   videos anteriores muestran la portada con un acercamiento suave. Necesita correr
   `supabase/migrations/20261023000000_video_clip_preview.sql` (sin eso todo sigue andando,
   sin vista previa).
+- **Reproductor propio (opcional):** con una clave de Google en el sitio (variable
+  `VITE_GOOGLE_API_KEY` en Vercel), la página del invitado y la pantalla reproducen los
+  videos con la API de Drive (sin el reproductor de Drive y sus controles). La clave se crea
+  en Google Cloud (proyecto → habilitar **Google Drive API** → Credenciales → Clave de API),
+  restringida a "Sitios web" `https://app.event-pix.com.ar/*` y a la API **Google Drive API**.
+  Sin clave, se usa el reproductor de Drive como antes.
 
 ## Puesta en marcha
 

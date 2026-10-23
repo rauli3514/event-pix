@@ -5,7 +5,7 @@ import { Loader2, Sparkles, Video } from 'lucide-react';
 import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
 import { EventPixLogo } from '@/components/kiosk/brand/EventPixLogo';
 import { driveImageUrl } from '@/lib/kioskShare';
-import { clipPage, clipTime, clipVideoUrl, MODE_LABEL, type Clip } from '@/lib/videoBooth/galleryClips';
+import { clipPage, clipPlayUrls, clipTime, MODE_LABEL, type Clip } from '@/lib/videoBooth/galleryClips';
 import { PREVIEW_COLS, PREVIEW_FRAMES, PREVIEW_ROWS } from '@/lib/videoBooth/preview';
 
 // Pantalla de la galería para una tele, tablet o compu del evento (sin tocarla):
@@ -131,8 +131,13 @@ function DemoItem({ clip, box, onDone }: { clip: Clip; box: { w: number; h: numb
   const [kind, setKind] = useState<'video' | 'preview' | 'cover'>(() => (tryDirect() ? 'video' : fallback()));
   const plays = useRef(0);
   const loaded = useRef(false);
+  const urls = clipPlayUrls(clip.drive_id);
+  const [attempt, setAttempt] = useState(0);
   const videoFailed = () => {
-    if (!loaded.current) direct.failed += 1;
+    if (loaded.current) { setKind(fallback()); return; }
+    // Otra dirección del mismo video; si no queda ninguna, la vista previa
+    if (attempt + 1 < urls.length) { setAttempt(a => a + 1); return; }
+    direct.failed += 1;
     setKind(fallback());
   };
   // El video tiene unos segundos para empezar; si no, la vista previa
@@ -141,7 +146,7 @@ function DemoItem({ clip, box, onDone }: { clip: Clip; box: { w: number; h: numb
     const t = window.setTimeout(() => { if (!loaded.current) videoFailed(); }, 9000);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kind]);
+  }, [kind, attempt]);
   // La portada queda unos segundos con un acercamiento suave
   useEffect(() => {
     if (kind !== 'cover') return;
@@ -153,7 +158,7 @@ function DemoItem({ clip, box, onDone }: { clip: Clip; box: { w: number; h: numb
   if (kind === 'video') {
     return (
       <video
-        src={clipVideoUrl(clip.drive_id)} autoPlay muted playsInline
+        key={attempt} src={urls[attempt]} autoPlay muted playsInline
         onLoadedData={() => { loaded.current = true; direct.ok += 1; }}
         onEnded={e => {
           // Los cortos (boomerang) se ven dos veces
