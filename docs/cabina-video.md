@@ -48,7 +48,9 @@ Android** (brazo de la plataforma 360, uso itinerante).
 - **Vista previa** en Ajustes (Biblioteca y cada experiencia): cómo sale el video terminado
   y la placa final, sin grabar.
 - **Fondos de las pantallas** (inicio, pregunta del libro de firmas, marcos, resultado): el de
-  siempre, siete de fábrica (dorado, boda, 15 años, fiesta, empresa, natural, noche) o fondos
+  siempre, siete de colores (dorado, boda, 15 años, fiesta, empresa, natural, noche), seis claros
+  (rayas champagne, boda clara, salvia, dorado claro, confeti pastel, minimalista), tres de neón
+  (grilla, marco, retro synthwave) o fondos
   propios (imágenes o un video corto en loop) cargados en Biblioteca o desde el panel. Uno en
   General y, si se quiere, otro por experiencia. Los propios se oscurecen un poco para que se
   lean los textos (ajustable).

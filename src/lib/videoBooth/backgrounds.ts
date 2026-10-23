@@ -27,11 +27,28 @@ export const THEME_BACKGROUNDS: ThemeBackground[] = [
 ];
 
 export const themeBackground = (id?: string) => THEME_BACKGROUNDS.find(t => t.id === id);
+
+/** Fondos de fábrica dibujados (claros y neón): los arma ScreenBackground por su ID. */
+export const PATTERN_BACKGROUNDS: { id: string; label: string; group: 'claro' | 'neon' }[] = [
+  { id: 'p-rayas', label: 'Rayas champagne (claro)', group: 'claro' },
+  { id: 'p-boda', label: 'Boda clara (rosa)', group: 'claro' },
+  { id: 'p-salvia', label: 'Salvia (verde claro)', group: 'claro' },
+  { id: 'p-dorado', label: 'Dorado claro', group: 'claro' },
+  { id: 'p-confeti', label: 'Confeti pastel', group: 'claro' },
+  { id: 'p-minimal', label: 'Minimalista (gris)', group: 'claro' },
+  { id: 'n-grilla', label: 'Neón grilla', group: 'neon' },
+  { id: 'n-marco', label: 'Neón marco', group: 'neon' },
+  { id: 'n-synth', label: 'Neón retro (synthwave)', group: 'neon' },
+];
+export const patternBackground = (id?: string) => PATTERN_BACKGROUNDS.find(p => p.id === id);
+/** Fondo de fábrica (no un archivo propio) */
+export const isBuiltinBackground = (id?: string) => !!id && (id === AURORA || !!themeBackground(id) || !!patternBackground(id));
 export const bgKey = (id: string) => `video:bg:${id}`;
 
 /** Opciones de fondo para elegir: el de siempre, los de fábrica y los propios. */
 export const backgroundOptions = (s: Pick<VideoBoothSettings, 'backgrounds'>, own = s.backgrounds ?? []) => [
   { value: AURORA, label: 'El de siempre' },
   ...THEME_BACKGROUNDS.map(t => ({ value: t.id, label: t.label })),
+  ...PATTERN_BACKGROUNDS.map(p => ({ value: p.id, label: p.label })),
   ...own.map(b => ({ value: b.id, label: b.name })),
 ];
