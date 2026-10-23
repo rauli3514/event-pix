@@ -50,8 +50,14 @@ Android** (brazo de la plataforma 360, uso itinerante).
 - **Música propia:** varias canciones con punto de inicio; fija, al azar o la elige el invitado.
 - **Entrega:** QR al video y/o a la galería del evento; **WhatsApp** al número del invitado.
 - **Sin internet:** todo queda en el equipo y se sube solo cuando vuelve la conexión.
-- **Galería online** `/galeria-video/<código>` (con `?pantalla=1` para una tele del evento)
-  y **moderación** desde el panel (ocultar, aprobar, aprobación previa).
+- **Galería online** `/galeria-video/<código>` para el celular de los invitados, sin entrar
+  al panel, y **moderación** desde el panel (ocultar, aprobar, aprobación previa).
+- **Pantalla de la galería** para una tele, tablet o compu del evento (`?pantalla=1`), sin
+  tocarla: portadas de los videos con un QR chico abajo para bajar cada uno (las páginas
+  pasan solas y los nuevos aparecen al instante) y los videos pasando como demostración,
+  con el QR del que se ve. Vistas: `&vista=portadas` (solo portadas) y `&vista=videos`
+  (solo videos). Los enlaces y sus QR están en Ajustes → General → Galería del evento y en
+  el panel (Equipos y Galerías), para compartirlos sin dar acceso al panel.
 
 ## Puesta en marcha
 

@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { CloudUpload, ImagePlus, Music, Play, Square, Trash2, Upload } from 'lucide-react';
+import { CloudUpload, Copy, ExternalLink, ImagePlus, Music, Play, Square, Trash2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { VIDEO_ACCESSORIES } from '@/lib/videoBooth/accessories';
 import { openCameraStream, stopStream } from '@/lib/videoBooth/camera';
 import { getMedia, MEDIA_EVENT, removeMedia, saveMedia } from '@/lib/videoBooth/mediaStore';
 import { isDriveConfigured } from '@/lib/videoBooth/drive';
 import { isSupabaseConfigured } from '@/lib/supabase';
-import { galleryUrl, pendingVideoCount, processVideoQueue, VIDEO_QUEUE_EVENT } from '@/lib/videoBooth/cloud';
+import { galleryScreenUrl, galleryUrl, pendingVideoCount, processVideoQueue, SCREEN_VIEWS, VIDEO_QUEUE_EVENT, type ScreenViewKey } from '@/lib/videoBooth/cloud';
 import { MotionDetector, suggestThreshold } from '@/lib/videoBooth/motion';
 import {
   ANIM_KEY, ANIMATIONS, CORNERS, END_KEY, frameKey, galleryCode, LOGO_KEY, LOGO_SIZES, newGalleryCode, newMediaId, outputSize, resolveMode, songKey,
@@ -15,7 +15,7 @@ import {
 } from '@/lib/videoBooth/settings';
 import { buildDecor, framePool, type DecorBundle } from '@/lib/videoBooth/media';
 import { allFrames, builtinFrameThumb, isBuiltinFrame } from '@/lib/videoBooth/builtinFrames';
-import { buttonClass, Choice, Field, inputClass, MultiChoice, Panel, primaryClass, Toggle } from '../ui';
+import { buttonClass, Choice, Field, inputClass, MultiChoice, Note, Panel, primaryClass, Toggle } from '../ui';
 
 // Paneles de Ajustes de la cabina de video: marcos, capas, marca, música, 360 y entrega.
 
@@ -442,6 +442,60 @@ export function MotionPanel({ s, update }: Props) {
   );
 }
 
+/** Copia un texto (en equipos que no dejan, avisa que lo anoten). */
+const copyText = async (text: string) => {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast.success('Enlace copiado');
+  } catch {
+    toast.message('Anotá el enlace o escaneá el QR', { description: text });
+  }
+};
+
+function LinkBox({ title, hint, url }: { title: string; hint: string; url: string }) {
+  return (
+    <div className="flex flex-wrap items-center gap-5 rounded-2xl bg-black/20 border border-white/10 p-5">
+      <span className="bg-white p-3 rounded-2xl"><QRCodeSVG value={url} size={140} /></span>
+      <div className="space-y-2 min-w-0 flex-1">
+        <p className="text-lg font-bold">{title}</p>
+        <p className="text-white/60 text-sm">{hint}</p>
+        <p className="text-white/80 text-sm break-all font-mono">{url}</p>
+        <div className="flex flex-wrap gap-3">
+          <button className={buttonClass} onClick={() => void copyText(url)}><Copy className="w-5 h-5" /> Copiar enlace</button>
+          <a className={buttonClass} href={url} target="_blank" rel="noreferrer"><ExternalLink className="w-5 h-5" /> Abrir</a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Galería del evento para compartir sin dar acceso al panel: la de los invitados
+ * (celular) y la pantalla para una tele, tablet o compu del evento.
+ */
+export function GalleryPanel({ s, update }: Props) {
+  const [view, setView] = useState<ScreenViewKey>('completa');
+  const code = isSupabaseConfigured ? s.galleryCode || galleryCode() : '';
+  if (!code) {
+    return (
+      <Panel title="Galería del evento">
+        <p className="text-amber-200">La galería online necesita el servidor de EventPix configurado.</p>
+      </Panel>
+    );
+  }
+  return (
+    <Panel title="Galería del evento" description="Para compartir sin dar acceso al panel. Muestra los videos de este evento (los ocultos en el panel no aparecen).">
+      <p className="text-lg">Código: <b className="font-mono">{code}</b> <span className="text-white/50 text-sm">(lleva el nombre del evento; al cambiar el evento se crea una galería nueva sola)</span></p>
+      <LinkBox title="Pantalla del evento" url={galleryScreenUrl(code, view)}
+        hint="Abrila en una tele, tablet o compu del evento: los invitados se buscan y escanean el QR de su video. No hace falta tocarla: pasa sola y los videos nuevos aparecen al instante." />
+      <Choice label="Qué muestra la pantalla" value={view} onChange={setView} options={SCREEN_VIEWS.map(v => ({ value: v.value, label: v.label }))} />
+      <Note>{SCREEN_VIEWS.find(v => v.value === view)?.hint}</Note>
+      <LinkBox title="Galería para los invitados" url={galleryUrl(code)} hint="Para el celular: todos los videos del evento para ver y bajar. Se puede mandar por WhatsApp o imprimir el QR." />
+      <button className={buttonClass} onClick={() => update({ galleryCode: newGalleryCode(s.eventTitle), galleryEvent: (s.eventTitle || '').trim() })}>Empezar galería nueva</button>
+    </Panel>
+  );
+}
+
 export function DeliveryPanel({ s, update }: Props) {
   const [pending, setPending] = useState(0);
   const [syncing, setSyncing] = useState(false);
@@ -451,10 +505,8 @@ export function DeliveryPanel({ s, update }: Props) {
     window.addEventListener(VIDEO_QUEUE_EVENT, refresh);
     return () => window.removeEventListener(VIDEO_QUEUE_EVENT, refresh);
   }, []);
-  const code = isSupabaseConfigured ? s.galleryCode || galleryCode() : '';
-  const url = code ? galleryUrl(code) : '';
   return (
-    <Panel title="Entrega del video y galería" description="El invitado escanea el QR y baja su video, o entra a la galería con todos los videos del evento. Sin internet, los videos quedan en el equipo y se suben solos cuando vuelve.">
+    <Panel title="Entrega del video" description="El invitado escanea el QR y baja su video, o entra a la galería con todos los videos del evento. Sin internet, los videos quedan en el equipo y se suben solos cuando vuelve.">
       <Toggle label="Mostrar QR al terminar" hint={isDriveConfigured() ? 'Los videos se suben a la carpeta de Drive de la cabina' : 'Falta configurar Drive en el panel Nube'} checked={s.showQr !== false} onChange={v => update({ showQr: v })} />
       <Choice label="El QR abre" value={s.delivery ?? 'video'} onChange={v => update({ delivery: v })}
         options={[{ value: 'video', label: 'Su video' }, { value: 'gallery', label: 'La galería del evento' }, { value: 'both', label: 'Los dos (dos QR)' }]} />
@@ -467,18 +519,6 @@ export function DeliveryPanel({ s, update }: Props) {
           <input className={inputClass} inputMode="numeric" value={s.whatsappPrefix ?? '549'} onChange={e => update({ whatsappPrefix: e.target.value.replace(/\D/g, '') })} />
         </Field>
       )}
-      {code ? (
-        <div className="flex flex-wrap items-center gap-6 rounded-2xl bg-black/20 border border-white/10 p-5">
-          <span className="bg-white p-3 rounded-2xl"><QRCodeSVG value={`${url}?pantalla=1`} size={140} /></span>
-          <div className="space-y-2 min-w-0">
-            <p className="text-lg">Galería: <b className="font-mono">{code}</b></p>
-            <p className="text-white/60 text-sm break-all">{url}</p>
-            <p className="text-white/60 text-sm">El código lleva el nombre del evento: al cambiar el evento se crea una galería nueva sola.</p>
-            <p className="text-white/60 text-sm">Escaneá este QR con una tablet o tele del evento para mostrar la galería en pantalla (modo pantalla).</p>
-            <button className={buttonClass} onClick={() => update({ galleryCode: newGalleryCode(s.eventTitle), galleryEvent: (s.eventTitle || '').trim() })}>Empezar galería nueva</button>
-          </div>
-        </div>
-      ) : <p className="text-amber-200">La galería online necesita el servidor de EventPix configurado.</p>}
       <div className="flex flex-wrap items-center gap-4">
         <p className="text-lg">{pending ? `${pending} video${pending === 1 ? '' : 's'} esperando internet para subirse` : 'No hay videos pendientes de subir'}</p>
         {pending > 0 && (

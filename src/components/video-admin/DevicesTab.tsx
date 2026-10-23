@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { Link2, Settings2, Trash2, Unlink } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import GalleryLinks from './GalleryLinks';
+import { DEFAULT_PUBLIC_SITE } from '@/lib/videoBooth/share';
 import { btnDanger, btnGhost, btnPrimary, card, Field, input } from './ui';
 import { ONLINE_WINDOW_MS, type VideoDeviceRow } from './types';
 
@@ -97,6 +99,8 @@ export default function DevicesTab({ devices, loadedAt, onChange, onConfigure }:
             const online = !!d.last_seen && loadedAt - new Date(d.last_seen).getTime() < ONLINE_WINDOW_MS;
             const pendingSettings = d.settings_rev > d.applied_rev;
             const event = (d.reported?.video?.eventTitle as string | undefined) || '';
+            const gallery = ((d.settings?.video?.galleryCode ?? d.reported?.video?.galleryCode) as string | undefined) || '';
+            const site = (String(d.reported?.video?.publicSiteUrl ?? '').trim() || DEFAULT_PUBLIC_SITE);
             return (
               <div key={d.id} className={`${card} space-y-3`}>
                 <div className="flex items-start justify-between gap-3">
@@ -114,6 +118,7 @@ export default function DevicesTab({ devices, loadedAt, onChange, onConfigure }:
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <button onClick={() => onConfigure(d)} className={btnPrimary}><Settings2 className="h-4 w-4" /> Configurar</button>
+                  {gallery && <GalleryLinks site={site} code={gallery} compact />}
                   <button onClick={() => { const n = window.prompt('Nombre del equipo', d.name ?? ''); if (n !== null) void update(d, { name: n.trim() || null }, 'Nombre cambiado'); }} disabled={busy === d.id} className={btnGhost}>Renombrar</button>
                   <button onClick={() => void update(d, { pairing_status: 'pending' }, 'Equipo desvinculado')} disabled={busy === d.id} className={btnGhost}><Unlink className="h-4 w-4" /> Desvincular</button>
                 </div>

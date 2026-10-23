@@ -26,6 +26,15 @@ export interface PendingUpload {
 }
 
 export const galleryUrl = (code: string) => `${publicSiteUrl()}/galeria-video/${encodeURIComponent(code)}`;
+/** Vistas de la pantalla de la galería (tele, tablet o compu del evento). */
+export const SCREEN_VIEWS = [
+  { value: 'completa', label: 'Videos y portadas', hint: 'Los videos pasando como demostración y las portadas con su QR' },
+  { value: 'portadas', label: 'Solo portadas', hint: 'Portadas con un QR chico abajo; las páginas pasan solas' },
+  { value: 'videos', label: 'Solo videos', hint: 'Los videos a pantalla completa con el QR del que se ve' },
+] as const;
+export type ScreenViewKey = typeof SCREEN_VIEWS[number]['value'];
+export const galleryScreenUrl = (code: string, view: ScreenViewKey = 'completa') =>
+  `${galleryUrl(code)}?pantalla=1${view === 'completa' ? '' : `&vista=${view}`}`;
 
 /** Se puede subir ahora (internet, Drive configurado y no está en "sin conexión"). */
 export const canUpload = () => isDriveConfigured() && !getVideoSettings().offline && navigator.onLine;
