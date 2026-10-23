@@ -6,6 +6,7 @@ import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
 import { EventPixLogo } from '@/components/kiosk/brand/EventPixLogo';
 import { driveImageUrl } from '@/lib/kioskShare';
 import { clipPage, clipTime, clipVideoUrl, MODE_LABEL, type Clip } from '@/lib/videoBooth/galleryClips';
+import { PREVIEW_COLS, PREVIEW_FRAMES, PREVIEW_ROWS } from '@/lib/videoBooth/preview';
 
 // Pantalla de la galería para una tele, tablet o compu del evento (sin tocarla):
 // - "completa": los videos pasando como demostración + portadas con su QR.
@@ -47,26 +48,30 @@ function useLandscape() {
   return landscape;
 }
 
+const SHORT_MODE: Record<string, string> = { firmas: 'Firmas', lenta: 'Lenta', clasico: 'Video' };
+
 /** Portada de un video con su QR abajo. */
 function Card({ clip, imgW, imgH, qr, fresh, onAspect }: {
   clip: Clip; imgW: number; imgH: number; qr: number; fresh: boolean; onAspect: (a: number) => void;
 }) {
   const [failed, setFailed] = useState(false);
+  const small = imgW < 150;
+  const mode = clip.mode ? (small ? SHORT_MODE[clip.mode] ?? MODE_LABEL[clip.mode] ?? clip.mode : MODE_LABEL[clip.mode] ?? clip.mode) : '';
   return (
     <motion.div layout initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
       className="flex flex-col items-center gap-[1vmin]">
       <span className="relative block overflow-hidden rounded-2xl bg-black/40 ring-2 ring-white/15 shadow-xl" style={{ width: imgW, height: imgH }}>
         {clip.thumb_id && !failed ? (
-          <img src={driveImageUrl(clip.thumb_id, 480)} alt="" onError={() => setFailed(true)}
+          <img src={driveImageUrl(clip.thumb_id, 720)} alt="" onError={() => setFailed(true)}
             onLoad={e => { const i = e.currentTarget; if (i.naturalWidth && i.naturalHeight) onAspect(i.naturalWidth / i.naturalHeight); }}
             className="absolute inset-0 w-full h-full object-cover" />
         ) : (
           <span className="absolute inset-0 flex items-center justify-center"><Video className="w-1/3 h-1/3 text-white/30" /></span>
         )}
         {fresh && <span className="absolute top-2 left-2 rounded-full bg-[#ff2e93] px-2.5 py-0.5 text-xs font-black">¡NUEVO!</span>}
-        <span className="absolute bottom-1.5 inset-x-1.5 flex justify-between text-[11px] font-semibold">
-          {clip.mode ? <span className="rounded-full bg-black/55 px-2 py-0.5">{MODE_LABEL[clip.mode] ?? clip.mode}</span> : <span />}
-          <span className="rounded-full bg-black/55 px-2 py-0.5">{clipTime(clip)}</span>
+        <span className="absolute bottom-1.5 inset-x-1.5 flex justify-between gap-1 text-[11px] font-semibold whitespace-nowrap">
+          {mode ? <span className="rounded-full bg-black/55 px-2 py-0.5 truncate">{mode}</span> : <span />}
+          {!small && <span className="rounded-full bg-black/55 px-2 py-0.5">{clipTime(clip)}</span>}
         </span>
       </span>
       <span className="bg-white rounded-xl p-1.5 shadow-lg">
@@ -76,9 +81,109 @@ function Card({ clip, imgW, imgH, qr, fresh, onAspect }: {
   );
 }
 
+// Los videos de Drive no siempre se pueden reproducir desde otra página: si fallan
+// dos y ninguno anduvo, se deja de intentar y se muestra la vista previa animada.
+const direct = { ok: 0, failed: 0 };
+const tryDirect = () => direct.ok > 0 || direct.failed < 2;
+
+/** Lo más grande que entra en (W, H) con la forma `aspect` (ancho / alto). */
+const fit = (W: number, H: number, aspect: number) => (W / H > aspect ? { w: H * aspect, h: H } : { w: W, h: W / aspect });
+
+/** Vista previa animada: 24 cuadros en una imagen, pasando a 8 por segundo. */
+function SpritePreview({ id, box, onDone, onFail }: { id: string; box: { w: number; h: number }; onDone: () => void; onFail: () => void }) {
+  const url = driveImageUrl(id, 1600);
+  const [frameAspect, setFrameAspect] = useState<number | null>(null);
+  const [frame, setFrame] = useState(0);
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => setFrameAspect((img.naturalWidth / PREVIEW_COLS) / (img.naturalHeight / PREVIEW_ROWS));
+    img.onerror = onFail;
+    img.src = url;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url]);
+  useEffect(() => {
+    if (!frameAspect) return;
+    let n = 0;
+    const t = window.setInterval(() => {
+      n += 1;
+      setFrame(n % PREVIEW_FRAMES);
+      if (n >= PREVIEW_FRAMES * 2) { window.clearInterval(t); onDone(); }
+    }, 125);
+    return () => window.clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [frameAspect]);
+  if (!frameAspect) return <Loader2 className="w-12 h-12 animate-spin text-white/50" />;
+  const { w, h } = fit(box.w, box.h, frameAspect);
+  const col = frame % PREVIEW_COLS;
+  const row = Math.floor(frame / PREVIEW_COLS);
+  return (
+    <div className="rounded-3xl ring-4 ring-white/20 shadow-2xl bg-black" style={{
+      width: w, height: h, backgroundImage: `url("${url}")`,
+      backgroundSize: `${PREVIEW_COLS * 100}% ${PREVIEW_ROWS * 100}%`,
+      backgroundPosition: `${(col / (PREVIEW_COLS - 1)) * 100}% ${(row / (PREVIEW_ROWS - 1)) * 100}%`,
+    }} />
+  );
+}
+
+/** Un video de la demostración: el video, su vista previa animada o la portada con zoom. */
+function DemoItem({ clip, box, onDone }: { clip: Clip; box: { w: number; h: number }; onDone: () => void }) {
+  const fallback = (): 'preview' | 'cover' => (clip.preview_id ? 'preview' : 'cover');
+  const [kind, setKind] = useState<'video' | 'preview' | 'cover'>(() => (tryDirect() ? 'video' : fallback()));
+  const plays = useRef(0);
+  const loaded = useRef(false);
+  const videoFailed = () => {
+    if (!loaded.current) direct.failed += 1;
+    setKind(fallback());
+  };
+  // El video tiene unos segundos para empezar; si no, la vista previa
+  useEffect(() => {
+    if (kind !== 'video') return;
+    const t = window.setTimeout(() => { if (!loaded.current) videoFailed(); }, 9000);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kind]);
+  // La portada queda unos segundos con un acercamiento suave
+  useEffect(() => {
+    if (kind !== 'cover') return;
+    const t = window.setTimeout(onDone, 6000);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kind]);
+
+  if (kind === 'video') {
+    return (
+      <video
+        src={clipVideoUrl(clip.drive_id)} autoPlay muted playsInline
+        onLoadedData={() => { loaded.current = true; direct.ok += 1; }}
+        onEnded={e => {
+          // Los cortos (boomerang) se ven dos veces
+          if (e.currentTarget.duration < 7 && plays.current < 1) { plays.current += 1; void e.currentTarget.play(); }
+          else onDone();
+        }}
+        onError={videoFailed}
+        className="rounded-3xl ring-4 ring-white/20 shadow-2xl bg-black object-contain"
+        style={{ maxWidth: box.w, maxHeight: box.h }}
+      />
+    );
+  }
+  if (kind === 'preview' && clip.preview_id) {
+    return <SpritePreview id={clip.preview_id} box={box} onDone={onDone} onFail={() => setKind('cover')} />;
+  }
+  const { w, h } = fit(box.w, box.h, 9 / 16);
+  return (
+    <div className="relative overflow-hidden rounded-3xl ring-4 ring-white/20 shadow-2xl bg-black/40" style={{ width: w, height: h }}>
+      {clip.thumb_id
+        ? <motion.img src={driveImageUrl(clip.thumb_id, 1080)} alt="" initial={{ scale: 1 }} animate={{ scale: 1.12 }} transition={{ duration: 6, ease: 'linear' }}
+            className="absolute inset-0 w-full h-full object-cover" />
+        : <span className="absolute inset-0 flex items-center justify-center"><Video className="w-1/4 h-1/4 text-white/30" /></span>}
+    </div>
+  );
+}
+
 /** Videos pasando de a uno (demostración), con el QR del que se ve. */
 function DemoPlayer({ clips, compact }: { clips: Clip[]; compact?: boolean }) {
   const [index, setIndex] = useState(0);
+  const [ref, box] = useSize();
   const newest = clips[0]?.id;
   const lastNewest = useRef(newest);
   // Video nuevo: se muestra enseguida
@@ -89,37 +194,56 @@ function DemoPlayer({ clips, compact }: { clips: Clip[]; compact?: boolean }) {
   const list = clips.slice(0, 40);
   const clip = list.length ? list[index % list.length] : null;
   const next = () => setIndex(i => (list.length ? (i + 1) % list.length : 0));
-  const plays = useRef(0);
+  // Por si un video se queda trabado
   useEffect(() => {
-    plays.current = 0;
     if (!clip) return;
     const t = window.setTimeout(next, MAX_VIDEO_SECONDS * 1000);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clip?.id, index]);
-  if (!clip) return null;
   return (
-    <div className="relative h-full w-full flex items-center justify-center">
-      <AnimatePresence mode="wait">
-        <motion.video
-          key={`${clip.id}-${index}`}
-          src={clipVideoUrl(clip.drive_id)} autoPlay muted playsInline
-          onEnded={e => {
-            // Los cortos (boomerang) se ven dos veces
-            if (e.currentTarget.duration < 7 && plays.current < 1) { plays.current += 1; void e.currentTarget.play(); }
-            else next();
-          }}
-          onError={() => window.setTimeout(next, 3000)}
-          initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
-          className="max-h-full max-w-full rounded-3xl ring-4 ring-white/20 shadow-2xl bg-black"
-        />
-      </AnimatePresence>
-      <div className={`absolute ${compact ? 'bottom-2 right-2' : 'bottom-[3vmin] right-[3vmin]'} flex items-center gap-3 rounded-2xl bg-black/55 backdrop-blur p-2 pr-4`}>
-        <span className="bg-white rounded-xl p-1.5"><QRCodeSVG value={absolute(clipPage(clip))} size={compact ? 84 : 120} level="L" /></span>
-        <span className={`font-bold leading-tight ${compact ? 'text-sm max-w-[8rem]' : 'text-lg max-w-[11rem]'}`}>¿Sos vos? Escaneá y bajalo</span>
-      </div>
+    <div ref={ref} className="relative h-full w-full flex items-center justify-center">
+      {clip && box.w > 0 && (
+        <AnimatePresence mode="wait">
+          <motion.div key={`${clip.id}-${index}`} initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+            className="flex items-center justify-center">
+            <DemoItem clip={clip} box={box} onDone={next} />
+          </motion.div>
+        </AnimatePresence>
+      )}
+      {clip && (
+        <div className={`absolute ${compact ? 'bottom-2 right-2' : 'bottom-[3vmin] right-[3vmin]'} flex items-center gap-3 rounded-2xl bg-black/55 backdrop-blur p-2 pr-4`}>
+          <span className="bg-white rounded-xl p-1.5"><QRCodeSVG value={absolute(clipPage(clip))} size={compact ? 84 : 120} level="L" /></span>
+          <span className={`font-bold leading-tight ${compact ? 'text-sm max-w-[8rem]' : 'text-lg max-w-[11rem]'}`}>¿Sos vos? Escaneá y bajalo</span>
+        </div>
+      )}
     </div>
   );
+}
+
+/**
+ * Cuántas columnas y filas usar para que las portadas salgan lo más grandes
+ * posible (con pocos videos, grandes; con muchos, hasta el máximo por página).
+ */
+function layoutGrid(n: number, W: number, H: number, maxCols: number, maxRows: number, aspect: number, gap: number) {
+  const need = Math.max(1, Math.min(n, maxCols * maxRows));
+  let best = { cols: maxCols, rows: maxRows, imgW: 0, imgH: 0, qr: 64 };
+  for (let rows = 1; rows <= maxRows; rows++) {
+    for (let cols = 1; cols <= maxCols; cols++) {
+      if (cols * rows < need) continue;
+      const cellW = (W - gap * (cols - 1)) / cols;
+      const cellH = (H - gap * (rows - 1)) / rows;
+      const qr = Math.round(Math.max(64, Math.min(140, cellH * 0.26, cellW * 0.7)));
+      const maxH = cellH - qr - 28;
+      if (maxH < 40) continue;
+      const imgW = Math.min(cellW, maxH * aspect);
+      // Más grande gana; a igual tamaño, menos lugares vacíos
+      if (imgW > best.imgW + 1 || (Math.abs(imgW - best.imgW) <= 1 && cols * rows < best.cols * best.rows)) {
+        best = { cols, rows, imgW, imgH: imgW / aspect, qr };
+      }
+    }
+  }
+  return best;
 }
 
 export default function GalleryScreen({ clips, title, galleryUrl, view }: { clips: Clip[] | null; title: string; galleryUrl: string; view: ScreenView }) {
@@ -144,18 +268,14 @@ export default function GalleryScreen({ clips, title, galleryUrl, view }: { clip
     return () => window.clearTimeout(t);
   }, [clips]);
 
-  // Grilla de portadas: columnas y filas según la pantalla y la vista
+  // Grilla de portadas: columnas y filas según la pantalla, la vista y cuántos videos hay
   const withPlayer = view === 'completa';
-  const cols = withPlayer ? (landscape ? 4 : 4) : (landscape ? 6 : 4);
-  const rows = withPlayer ? (landscape ? 2 : 1) : (landscape ? 2 : 3);
+  const maxCols = withPlayer ? 4 : (landscape ? 6 : 4);
+  const maxRows = withPlayer ? (landscape ? 2 : 1) : (landscape ? 2 : 3);
   const gap = 16;
-  const cellW = grid.w ? (grid.w - gap * (cols - 1)) / cols : 0;
-  const cellH = grid.h ? (grid.h - gap * (rows - 1)) / rows : 0;
-  const qr = Math.round(Math.max(64, Math.min(150, cellH * 0.3, cellW * 0.75)));
-  const maxImgH = Math.max(40, cellH - qr - 24);
-  const imgW = Math.min(cellW, maxImgH * aspect);
-  const imgH = imgW / aspect;
-  const perPage = cols * rows;
+  const { cols, imgW, imgH, qr } = grid.w ? layoutGrid(list.length, grid.w, grid.h, maxCols, maxRows, aspect, gap) : { cols: maxCols, imgW: 0, imgH: 0, qr: 64 };
+  const cellW = imgW;
+  const perPage = maxCols * maxRows;
   const pages = Math.max(1, Math.ceil(list.length / perPage));
   useEffect(() => {
     if (pages <= 1) return;
@@ -218,7 +338,7 @@ export default function GalleryScreen({ clips, title, galleryUrl, view }: { clip
           <p className="text-center text-[clamp(1rem,2.4vmin,1.6rem)] font-bold text-white/85">Buscá tu video y escaneá el QR para bajarlo</p>
           <div ref={gridRef} className="flex-1 min-h-0">
             {cellW > 0 && (
-              <div className="grid h-full content-start justify-items-center" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap }}>
+              <div className="grid h-full content-center justify-items-center" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap }}>
                 <AnimatePresence mode="popLayout">
                   {shown.map(c => (
                     <Card key={c.id} clip={c} imgW={imgW} imgH={imgH} qr={qr} fresh={fresh.has(c.id)} onAspect={a => { if (Math.abs(a - aspect) > 0.05) setAspect(a); }} />

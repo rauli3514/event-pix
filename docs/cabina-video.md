@@ -58,6 +58,12 @@ Android** (brazo de la plataforma 360, uso itinerante).
   con el QR del que se ve. Vistas: `&vista=portadas` (solo portadas) y `&vista=videos`
   (solo videos). Los enlaces y sus QR están en Ajustes → General → Galería del evento y en
   el panel (Equipos y Galerías), para compartirlos sin dar acceso al panel.
+  Los videos de Drive no siempre se pueden reproducir desde otra página: por eso cada video
+  sube también una **vista previa animada** (24 cuadros del video editado en una imagen,
+  `vista-previa-….jpg`) y la pantalla la usa cuando Drive no deja reproducir el video. Los
+  videos anteriores muestran la portada con un acercamiento suave. Necesita correr
+  `supabase/migrations/20261023000000_video_clip_preview.sql` (sin eso todo sigue andando,
+  sin vista previa).
 
 ## Puesta en marcha
 

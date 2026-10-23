@@ -1,5 +1,5 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
-import { isDriveConfigured, uploadForShare } from './drive';
+import { isDriveConfigured, uploadBlobForShare } from './drive';
 import { baseMime } from './recorder';
 import { getVideoSettings } from './settings';
 
@@ -9,6 +9,11 @@ import { getVideoSettings } from './settings';
 
 interface VideoStoragePlugin {
   saveVideo(options: { data: string; folder: string; fileName: string; mime: string }): Promise<{ uri: string; folder: string }>;
+  // De a partes (videos largos sin llenar la memoria)
+  beginVideo(): Promise<{ id: string }>;
+  appendVideo(options: { id: string; data: string }): Promise<void>;
+  finishVideo(options: { id: string; folder: string; fileName: string; mime: string }): Promise<{ uri: string; folder: string }>;
+  abortVideo(options: { id: string }): Promise<void>;
 }
 const VideoStorage = registerPlugin<VideoStoragePlugin>('VideoStorage');
 
@@ -23,6 +28,15 @@ export const blobToDataUrl = (blob: Blob) => new Promise<string>((resolve, rejec
   r.onerror = () => reject(r.error);
   r.readAsDataURL(blob);
 });
+
+/** Un pedazo del archivo en base64 (sin el "data:…;base64,"). */
+export const blobToBase64 = async (blob: Blob) => {
+  const url = await blobToDataUrl(blob);
+  return url.slice(url.indexOf(',') + 1);
+};
+
+/** Partes de ~768 KB (múltiplo de 3: el base64 de cada parte se puede pegar seguido). */
+export const CHUNK_BYTES = 3 * 256 * 1024;
 
 const stamp = () => {
   const d = new Date();
@@ -81,8 +95,17 @@ export async function listWebVideos(folder = eventFolder(), limit = 60): Promise
 export async function saveVideoLocally(blob: Blob, fileName: string, folder = eventFolder()): Promise<string> {
   if (Capacitor.isNativePlatform() && Capacitor.isPluginAvailable('VideoStorage')) {
     try {
-      const data = await blobToDataUrl(blob);
-      return (await VideoStorage.saveVideo({ data, folder, fileName, mime: baseMime(blob.type) })).uri;
+      // De a partes: mandar el video entero de una vez cerraba la app con videos largos
+      const { id } = await VideoStorage.beginVideo();
+      try {
+        for (let i = 0; i < blob.size; i += CHUNK_BYTES) {
+          await VideoStorage.appendVideo({ id, data: await blobToBase64(blob.slice(i, i + CHUNK_BYTES)) });
+        }
+        return (await VideoStorage.finishVideo({ id, folder, fileName, mime: baseMime(blob.type) })).uri;
+      } catch (e) {
+        void VideoStorage.abortVideo({ id }).catch(() => {});
+        throw e;
+      }
     } catch (e) {
       // Si falla la galería del equipo, queda en la memoria de la app
       console.warn('[video] no se pudo guardar en la galería del equipo', e);
@@ -95,5 +118,5 @@ export async function saveVideoLocally(blob: Blob, fileName: string, folder = ev
 export async function uploadVideoForShare(blob: Blob, fileName: string, folder = eventFolder()) {
   if (!isDriveConfigured()) throw new Error('Falta configurar Google Drive en Ajustes → Nube');
   if (blob.size > 45 * 1024 * 1024) throw new Error('El video pesa demasiado para subirlo (más de 45 MB)');
-  return uploadForShare(await blobToDataUrl(blob), fileName, folder, baseMime(blob.type));
+  return uploadBlobForShare(blob, fileName, folder, baseMime(blob.type));
 }
