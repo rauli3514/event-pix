@@ -1,7 +1,7 @@
 import type { BufferedFrame } from './compositor';
 import type { Decor } from './decor';
 import { bitrateFor, ClipRecorder, mixAudio } from './recorder';
-import type { RampPreset, VideoBoothSettings, VideoEffect } from './settings';
+import type { ResolvedMode } from './settings';
 
 // Efectos después de grabar: cámara lenta, rampas de velocidad (360), reversa y
 // boomerang. El clip grabado se reproduce una sola vez hacia adelante cambiando
@@ -15,36 +15,32 @@ export interface Segment { until: number; speed: number }
 export interface Tail { parts: ('rev' | 'fwd')[]; speed: number; seconds: number }
 export interface EffectPlan { segments: Segment[]; tail: Tail | null }
 
-const RAMPS: Record<RampPreset, { segments: [number, number][]; tail: Omit<Tail, 'seconds'> | null }> = {
-  // [hasta (fracción del clip), velocidad]
-  clasica: { segments: [[0.35, 1], [0.75, 0.5], [1, 2]], tail: { parts: ['rev'], speed: 1.5 } },
-  epica: { segments: [[0.2, 2], [0.7, 0.35], [1, 1.6]], tail: { parts: ['rev', 'fwd'], speed: 2 } },
-  suave: { segments: [[1, 0.6]], tail: null },
-};
-
 /** Segundos de cuadros a guardar en memoria mientras se graba (0 = ninguno). */
-export function bufferSecondsFor(effect: VideoEffect, seconds: number, s: VideoBoothSettings) {
-  if (effect === 'boomerang') return seconds + 0.5;
-  if (effect === 'ramp' && RAMPS[s.rampPreset ?? 'clasica'].tail) return Math.min(2, seconds * 0.3);
+export function bufferSecondsFor(r: ResolvedMode, seconds: number) {
+  if (r.def.effect === 'boomerang') return seconds + 0.5;
+  if (r.def.effect === 'ramp' && r.ramp.tail.enabled) return Math.min(3, r.ramp.tail.seconds, seconds);
   return 0;
 }
 
 /** Plan de efectos para un clip que duró `actual` segundos (null = queda como se grabó). */
-export function effectPlan(effect: VideoEffect, actual: number, s: VideoBoothSettings): EffectPlan | null {
-  switch (effect) {
+export function effectPlan(r: ResolvedMode, actual: number): EffectPlan | null {
+  switch (r.def.effect) {
     case 'slowmo':
-      return { segments: [{ until: actual, speed: s.slowSpeed ?? 0.5 }], tail: null };
+      return { segments: [{ until: actual, speed: r.slowSpeed }], tail: null };
     case 'boomerang': {
-      const loops = Math.max(1, Math.min(6, s.boomerangLoops ?? 3));
       const parts: ('rev' | 'fwd')[] = [];
-      for (let i = 0; i < loops * 2 - 1; i++) parts.push(i % 2 === 0 ? 'rev' : 'fwd');
-      return { segments: [{ until: actual, speed: 1 }], tail: { parts, speed: 1, seconds: actual } };
+      for (let i = 0; i < r.loops * 2 - 1; i++) parts.push(i % 2 === 0 ? 'rev' : 'fwd');
+      return { segments: [{ until: actual, speed: r.speed }], tail: { parts, speed: r.speed, seconds: actual } };
     }
     case 'ramp': {
-      const r = RAMPS[s.rampPreset ?? 'clasica'];
+      // Tramos ordenados, el último llega al final del clip
+      const segs = [...r.ramp.segments].sort((x, y) => x.until - y.until).filter(sg => sg.until > 0 && sg.speed > 0);
+      if (!segs.length) segs.push({ until: 1, speed: 1 });
+      segs[segs.length - 1] = { ...segs[segs.length - 1], until: 1 };
+      const tail = r.ramp.tail;
       return {
-        segments: r.segments.map(([f, speed]) => ({ until: actual * f, speed })),
-        tail: r.tail ? { ...r.tail, seconds: Math.min(2, actual * 0.3) } : null,
+        segments: segs.map(sg => ({ until: actual * Math.min(1, sg.until), speed: sg.speed })),
+        tail: tail.enabled && tail.parts.length ? { parts: tail.parts, speed: tail.speed, seconds: Math.min(tail.seconds, actual) } : null,
       };
     }
     default:

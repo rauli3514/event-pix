@@ -18,52 +18,89 @@ export interface VideoModeDef {
   /** Se puede cortar antes de tiempo con "Terminar" */
   canStop?: boolean;
   defaults: VideoModeConfig;
-  /** Duraciones que se ofrecen en Ajustes */
-  secondsOptions: number[];
+  /** Duración que se puede elegir (segundos) */
+  minSeconds: number;
+  maxSeconds: number;
+  stepSeconds: number;
 }
 
+/** Rampa de velocidad: tramos hacia adelante y final con los cuadros guardados. */
+export interface RampConfig {
+  /** Tramos: hasta qué parte del clip (0 a 1) y a qué velocidad */
+  segments: { until: number; speed: number }[];
+  /** Final en reversa (y de nuevo adelante si se quiere) */
+  tail: { enabled: boolean; seconds: number; speed: number; parts: ('rev' | 'fwd')[] };
+}
+
+/**
+ * Ajustes de cada experiencia. Los opcionales que no se tocan usan los de
+ * "General" (así, por ejemplo, una canción para todas y otra solo para el 360).
+ */
 export interface VideoModeConfig {
   enabled: boolean;
   /** Segundos de grabación (lo que dura frente a la cámara) */
   seconds: number;
   /** Filtro de color (ver VIDEO_FILTERS) */
   filter: string;
-  /** Lleva la música cargada en Ajustes */
+  /** Lleva música */
   music: boolean;
   /** Graba el sonido del ambiente (micrófono) */
   mic: boolean;
+  /** Canción: un ID, 'random' (al azar) o 'guest' (la elige el invitado). Vacío = la de General */
+  songId?: string;
+  /** Marco propio de esta experiencia (vacío = el de General) */
+  overlay?: 'none' | 'title' | 'custom';
+  frameId?: string;
+  frameChoice?: boolean;
+  /** Animación: una, 'random' (una al azar de animationPool) o vacío = la de General */
+  animation?: AnimationKey | 'random';
+  /** Animaciones para "al azar" y para que el invitado elija en la pantalla */
+  animationPool?: AnimationKey[];
+  /** Accesorio en la cara: uno, 'random' o vacío = el de General */
+  accessory?: string;
+  /** El invitado puede cambiar la animación y el accesorio en la pantalla de la toma */
+  fxChoice?: boolean;
+  /** Cuenta regresiva propia (vacío = la de General) */
+  countdown?: number;
+  /** 360: rampa de velocidad */
+  ramp?: RampConfig;
+  /** Boomerang: vueltas y velocidad */
+  loops?: number;
+  speed?: number;
+  /** Cámara lenta / glam: velocidad (0.25 a 1) */
+  slowSpeed?: number;
 }
 
 export const VIDEO_MODES: VideoModeDef[] = [
   {
     key: 'clasico', label: 'Video', hint: 'Un clip con el marco del evento', effect: 'none', canStop: true,
     defaults: { enabled: true, seconds: 10, filter: 'none', music: false, mic: true },
-    secondsOptions: [5, 8, 10, 15, 20],
+    minSeconds: 3, maxSeconds: 60, stepSeconds: 1,
   },
   {
     key: 'boomerang', label: 'Boomerang', hint: 'Va y vuelve, en loop', effect: 'boomerang',
     defaults: { enabled: true, seconds: 2, filter: 'none', music: true, mic: false },
-    secondsOptions: [1, 2, 3],
+    minSeconds: 1, maxSeconds: 5, stepSeconds: 0.5,
   },
   {
     key: 'lenta', label: 'Cámara lenta', hint: 'Todo en slow motion', effect: 'slowmo',
     defaults: { enabled: true, seconds: 4, filter: 'none', music: true, mic: false },
-    secondsOptions: [3, 4, 5, 6, 8],
+    minSeconds: 2, maxSeconds: 15, stepSeconds: 1,
   },
   {
     key: '360', label: 'Plataforma 360', hint: 'Normal, lento, rápido y reversa', effect: 'ramp', canStop: true,
     defaults: { enabled: false, seconds: 8, filter: 'none', music: true, mic: false },
-    secondsOptions: [6, 8, 10, 12, 15],
+    minSeconds: 4, maxSeconds: 30, stepSeconds: 1,
   },
   {
     key: 'firmas', label: 'Libro de firmas', hint: 'Dejá un mensaje en video', effect: 'none', guestbook: true, canStop: true,
     defaults: { enabled: true, seconds: 30, filter: 'none', music: false, mic: true },
-    secondsOptions: [15, 30, 45, 60],
+    minSeconds: 10, maxSeconds: 180, stepSeconds: 5,
   },
   {
     key: 'glam', label: 'Glam', hint: 'Blanco y negro de revista, en cámara lenta', effect: 'slowmo',
     defaults: { enabled: true, seconds: 4, filter: 'glam-bw', music: true, mic: false },
-    secondsOptions: [3, 4, 5, 6],
+    minSeconds: 2, maxSeconds: 15, stepSeconds: 1,
   },
 ];
 
@@ -84,13 +121,28 @@ export const VIDEO_FILTERS = [
 ] as { value: string; label: string; css: string; glow: number; vignette?: boolean }[];
 export const videoFilter = (value?: string) => VIDEO_FILTERS.find(f => f.value === value) ?? VIDEO_FILTERS[0];
 
-/** Rampas de velocidad del 360 (como las de las apps de plataformas giratorias). */
-export const RAMP_PRESETS = [
-  { value: 'clasica', label: 'Clásica', hint: 'Normal → lento → rápido → reversa' },
-  { value: 'epica', label: 'Épica', hint: 'Rápido → muy lento → rápido → reversa' },
-  { value: 'suave', label: 'Suave', hint: 'Todo en cámara lenta, sin reversa' },
-] as const;
-export type RampPreset = typeof RAMP_PRESETS[number]['value'];
+/** Rampas de velocidad del 360 listas para usar (se pueden editar después). */
+export const RAMP_PRESETS: { value: string; label: string; hint: string; ramp: RampConfig }[] = [
+  {
+    value: 'clasica', label: 'Clásica', hint: 'Normal → lento → rápido → reversa',
+    ramp: { segments: [{ until: 0.35, speed: 1 }, { until: 0.75, speed: 0.5 }, { until: 1, speed: 2 }], tail: { enabled: true, seconds: 2, speed: 1.5, parts: ['rev'] } },
+  },
+  {
+    value: 'epica', label: 'Épica', hint: 'Rápido → muy lento → rápido → reversa y vuelta',
+    ramp: { segments: [{ until: 0.2, speed: 2 }, { until: 0.7, speed: 0.35 }, { until: 1, speed: 1.6 }], tail: { enabled: true, seconds: 2, speed: 2, parts: ['rev', 'fwd'] } },
+  },
+  {
+    value: 'suave', label: 'Suave', hint: 'Todo en cámara lenta, sin reversa',
+    ramp: { segments: [{ until: 1, speed: 0.6 }], tail: { enabled: false, seconds: 2, speed: 1, parts: ['rev'] } },
+  },
+  {
+    value: 'drop', label: 'Drop', hint: 'Lento, de golpe rápido y reversa en cámara lenta',
+    ramp: { segments: [{ until: 0.5, speed: 0.4 }, { until: 1, speed: 2.5 }], tail: { enabled: true, seconds: 2, speed: 0.6, parts: ['rev'] } },
+  },
+];
+export type RampPreset = string;
+export const SPEEDS = [0.25, 0.33, 0.5, 0.75, 1, 1.5, 2, 3];
+export const speedLabel = (v: number) => (v === 0.33 ? '⅓×' : v === 0.25 ? '¼×' : v === 0.5 ? '½×' : v === 0.75 ? '¾×' : `${v}×`);
 
 export const DEFAULT_PROMPTS = [
   'Dejales un mensaje a los protagonistas de la noche',
@@ -200,6 +252,10 @@ export interface VideoBoothSettings {
   delivery?: 'video' | 'gallery' | 'both';
   /** Código de la galería online del evento */
   galleryCode?: string;
+  /** Nombre del evento con el que se creó ese código (si cambia el evento, galería nueva) */
+  galleryEvent?: string;
+  /** La app busca e instala sola las versiones nuevas */
+  autoUpdate?: boolean;
   /** Galería: los videos aparecen solos ('post', se pueden ocultar después) o después de aprobarlos ('pre') */
   galleryModeration?: 'post' | 'pre';
   /** Botón "Enviar por WhatsApp" en el resultado */
@@ -220,9 +276,19 @@ export const ANIMATIONS = [
   { value: 'burbujas', label: 'Burbujas' },
   { value: 'nieve', label: 'Nieve' },
   { value: 'neon', label: 'Borde neón' },
+  { value: 'globos', label: 'Globos' },
+  { value: 'fuegos', label: 'Fuegos artificiales' },
+  { value: 'petalos', label: 'Pétalos' },
+  { value: 'luces', label: 'Luces bokeh' },
+  { value: 'dorado', label: 'Polvo dorado' },
+  { value: 'emojis', label: 'Emojis' },
+  { value: 'notas', label: 'Notas musicales' },
   { value: 'custom', label: 'Video propio' },
 ] as const;
 export type AnimationKey = typeof ANIMATIONS[number]['value'];
+/** Animaciones dibujadas por la app (las que entran en "al azar" y en el selector de la toma) */
+export const BUILT_IN_ANIMATIONS = ANIMATIONS.map(a => a.value).filter(v => v !== 'none' && v !== 'custom') as AnimationKey[];
+export const animationLabel = (v?: string) => ANIMATIONS.find(a => a.value === v)?.label ?? 'Sin animación';
 
 export const CORNERS: { value: Corner; label: string }[] = [
   { value: 'tl', label: 'Arriba izquierda' }, { value: 'top', label: 'Arriba al centro' }, { value: 'tr', label: 'Arriba derecha' },
@@ -236,21 +302,28 @@ export const LOGO_KEY = 'video:logo';
 export const ANIM_KEY = 'video:anim';
 export const newMediaId = () => Math.random().toString(36).slice(2, 10);
 
-/** Código nuevo para la galería online (8 letras y números, difícil de adivinar). */
-export const newGalleryCode = () => {
+/** Texto sin acentos ni símbolos, para direcciones (ej. "Boda Sofi & Juan" → "boda-sofi-juan"). */
+export const slugify = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 28).replace(/-+$/, '');
+
+/**
+ * Código nuevo para la galería online: el nombre del evento y 4 letras al azar
+ * (ej. "boda-sofi-juan-k7m2"), así se reconoce fácil y no se adivina.
+ */
+export const newGalleryCode = (eventTitle?: string) => {
   const abc = 'abcdefghjkmnpqrstuvwxyz23456789';
-  let s = '';
-  const rnd = crypto.getRandomValues(new Uint32Array(8));
-  for (const n of rnd) s += abc[n % abc.length];
-  return s;
+  const rnd = (n: number) => Array.from(crypto.getRandomValues(new Uint32Array(n)), x => abc[x % abc.length]).join('');
+  const base = slugify(eventTitle || '');
+  return base ? `${base}-${rnd(4)}` : rnd(8);
 };
 
-/** Código de la galería del evento (se crea la primera vez). */
+/** Código de la galería del evento: se crea solo y cambia cuando cambia el nombre del evento. */
 export const galleryCode = () => {
   const s = getVideoSettings();
-  if (s.galleryCode) return s.galleryCode;
-  const code = newGalleryCode();
-  saveVideoSettings({ galleryCode: code });
+  const event = (s.eventTitle || '').trim();
+  if (s.galleryCode && (s.galleryEvent ?? '') === event) return s.galleryCode;
+  const code = newGalleryCode(event);
+  saveVideoSettings({ galleryCode: code, galleryEvent: event });
   return code;
 };
 
@@ -275,6 +348,63 @@ export const modeConfig = (key: VideoModeKey, s: VideoBoothSettings = getVideoSe
   const def = VIDEO_MODES.find(m => m.key === key)!;
   return { ...def.defaults, ...(s.modes?.[key] ?? {}) };
 };
+
+/** Todo lo que usa una experiencia, con lo de General donde la experiencia no tiene algo propio. */
+export interface ResolvedMode {
+  def: VideoModeDef;
+  cfg: VideoModeConfig;
+  songMode: 'fixed' | 'random' | 'guest';
+  songId?: string;
+  overlay: 'none' | 'title' | 'custom';
+  frameId?: string;
+  frameChoice: boolean;
+  /** 'random' = se elige una de animationPool en cada video */
+  animation: AnimationKey | 'random';
+  animationPool: AnimationKey[];
+  accessory: string;
+  fxChoice: boolean;
+  countdown: number;
+  ramp: RampConfig;
+  loops: number;
+  speed: number;
+  slowSpeed: number;
+}
+
+export function resolveMode(key: VideoModeKey, s: VideoBoothSettings = getVideoSettings()): ResolvedMode {
+  const def = VIDEO_MODES.find(m => m.key === key)!;
+  const cfg = modeConfig(key, s);
+  const song = cfg.songId || '';
+  const legacyRamp = RAMP_PRESETS.find(r => r.value === s.rampPreset)?.ramp;
+  return {
+    def, cfg,
+    songMode: song === 'random' ? 'random' : song === 'guest' ? 'guest' : song ? 'fixed' : (s.songMode ?? 'fixed'),
+    songId: song && song !== 'random' && song !== 'guest' ? song : s.songId,
+    overlay: cfg.overlay ?? s.overlay ?? 'none',
+    frameId: cfg.frameId ?? s.frameId,
+    frameChoice: cfg.frameChoice ?? !!s.frameChoice,
+    animation: cfg.animation ?? s.animation ?? 'none',
+    animationPool: cfg.animationPool?.length ? cfg.animationPool : BUILT_IN_ANIMATIONS,
+    accessory: cfg.accessory ?? s.accessory ?? 'none',
+    fxChoice: !!cfg.fxChoice,
+    countdown: cfg.countdown ?? s.countdown ?? 3,
+    ramp: cfg.ramp ?? legacyRamp ?? RAMP_PRESETS[0].ramp,
+    loops: Math.max(1, Math.min(8, cfg.loops ?? s.boomerangLoops ?? 3)),
+    speed: cfg.speed ?? 1,
+    slowSpeed: cfg.slowSpeed ?? s.slowSpeed ?? 0.5,
+  };
+}
+
+/** Duración del video final (aproximada) para mostrar en Ajustes. */
+export function estimateDuration(r: ResolvedMode, seconds = r.cfg.seconds) {
+  if (r.def.effect === 'none') return seconds;
+  if (r.def.effect === 'slowmo') return seconds / r.slowSpeed;
+  if (r.def.effect === 'boomerang') return (seconds * r.loops * 2) / r.speed;
+  let total = 0;
+  let from = 0;
+  for (const seg of r.ramp.segments) { total += ((seg.until - from) * seconds) / seg.speed; from = seg.until; }
+  if (r.ramp.tail.enabled) total += (Math.min(r.ramp.tail.seconds, seconds) * r.ramp.tail.parts.length) / r.ramp.tail.speed;
+  return total;
+}
 
 export const saveModeConfig = (key: VideoModeKey, patch: Partial<VideoModeConfig>) => {
   const s = getVideoSettings();

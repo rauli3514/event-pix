@@ -127,3 +127,69 @@ export function startDeviceSync() {
   };
   syncTimer = window.setTimeout(tick, 0);
 }
+
+// ─── Actualización de la app ─────────────────────────────────────────
+// El workflow "APK de EventPix Video" publica cada versión en la release
+// video-latest. La app la busca, la descarga, verifica su huella y abre el
+// instalador de Android (hay que tocar "Instalar": Android no deja que una app
+// se instale sola). El estado llega como evento 'kioskupdate' (puente nativo).
+
+interface UpdateBridge {
+  canSelfUpdate?: () => boolean;
+  checkForUpdate?: () => void;
+  startUpdate?: () => void;
+  canInstallUpdates?: () => boolean;
+  openInstallPermission?: () => void;
+}
+const updateBridge = () => (window as unknown as { AndroidKiosk?: UpdateBridge }).AndroidKiosk;
+
+export const UPDATE_EVENT = 'kioskupdate';
+export interface AppVersion { code: number; name: string }
+export interface UpdateStatus {
+  state: 'idle' | 'checking' | 'available' | 'up_to_date' | 'downloading' | 'installing' | 'confirm' | 'error';
+  current?: AppVersion;
+  latest?: AppVersion;
+  progress?: number;
+  message?: string;
+}
+
+export const canSelfUpdate = () => {
+  try { return !!updateBridge()?.canSelfUpdate?.(); } catch { return false; }
+};
+export const checkForUpdate = () => updateBridge()?.checkForUpdate?.();
+export const startUpdate = () => updateBridge()?.startUpdate?.();
+/** Si Android ya deja que la app instale su actualización (null = no se sabe). */
+export const canInstallUpdates = (): boolean | null => {
+  const b = updateBridge();
+  if (!b?.canInstallUpdates) return null;
+  try { return !!b.canInstallUpdates(); } catch { return null; }
+};
+export const openInstallPermission = () => updateBridge()?.openInstallPermission?.();
+
+let lastStatus: UpdateStatus = { state: 'idle' };
+export const getUpdateStatus = () => lastStatus;
+/** Hay una versión nueva esperando (para el aviso en el engranaje). */
+export const updateAvailable = () => lastStatus.state === 'available' || lastStatus.state === 'confirm';
+
+let updateStarted = false;
+/**
+ * Busca versiones nuevas al abrir la app y cada 6 horas. Con "actualizar sola"
+ * (por defecto sí), si la encuentra en los primeros minutos después de abrir la
+ * app (cuando se prende el equipo, antes del evento) la instala sola; durante el
+ * evento solo avisa, para no tapar la pantalla de los invitados.
+ */
+export function startAutoUpdate(autoInstall: () => boolean) {
+  if (updateStarted || !canSelfUpdate()) return;
+  updateStarted = true;
+  const openedAt = Date.now();
+  let triggered = false;
+  window.addEventListener(UPDATE_EVENT, (e: Event) => {
+    lastStatus = { ...lastStatus, progress: undefined, message: undefined, ...(e as CustomEvent<UpdateStatus>).detail };
+    if (lastStatus.state === 'available' && !triggered && autoInstall() && Date.now() - openedAt < 10 * 60 * 1000) {
+      triggered = true;
+      startUpdate();
+    }
+  });
+  window.setTimeout(checkForUpdate, 20000);
+  window.setInterval(checkForUpdate, 6 * 60 * 60 * 1000);
+}

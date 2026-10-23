@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { CloudUpload, ImagePlus, Music, Play, Square, Trash2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
-import { BUILT_IN_ACCESSORIES } from '@/lib/faceFx';
+import { VIDEO_ACCESSORIES } from '@/lib/videoBooth/accessories';
 import { openCameraStream, stopStream } from '@/lib/videoBooth/camera';
 import { getMedia, MEDIA_EVENT, removeMedia, saveMedia } from '@/lib/videoBooth/mediaStore';
 import { isDriveConfigured } from '@/lib/videoBooth/drive';
@@ -84,8 +84,8 @@ export function FramesPanel({ s, update }: Props) {
     update({ frames: rest, frameId: s.frameId === id ? rest[0]?.id : s.frameId });
   };
   return (
-    <Panel title="Marcos" description="PNG con el centro transparente y la misma forma que el video (1080×1920 vertical). Podés cargar varios y que el invitado elija.">
-      <Choice label="Marco" value={s.overlay ?? 'none'} onChange={v => update({ overlay: v })}
+    <Panel title="Marcos (plantillas)" description="PNG con el centro transparente y la misma forma que el video (1080×1920 vertical). Podés cargar varios: cada experiencia puede usar uno distinto (en su pestaña) y el invitado puede elegir.">
+      <Choice label="Marco de General" value={s.overlay ?? 'none'} onChange={v => update({ overlay: v })}
         options={[{ value: 'none', label: 'Sin marco' }, { value: 'title', label: 'Nombre del evento' }, { value: 'custom', label: 'PNG' }]} />
       {(s.overlay ?? 'none') === 'title' && (
         <Field label="Texto (vacío = nombre del evento)">
@@ -110,14 +110,27 @@ export function FramesPanel({ s, update }: Props) {
 }
 
 export function LayersPanel({ s, update }: Props) {
+  return (
+    <Panel title="Animación y accesorio (General)" description="Los usan las experiencias que no tienen uno propio (cada experiencia tiene su pestaña). Los accesorios siguen la cara; en equipos lentos conviene no usarlos.">
+      <Choice label="Animación" value={s.animation ?? 'none'} onChange={v => update({ animation: v })}
+        options={ANIMATIONS.map(a => ({ value: a.value, label: a.label }))} />
+      <Choice label="Accesorio en la cara" value={s.accessory ?? 'none'} onChange={v => update({ accessory: v })}
+        options={[{ value: 'none', label: 'Ninguno' }, { value: 'random', label: 'Al azar' }, ...VIDEO_ACCESSORIES]} />
+      <div className="grid sm:grid-cols-2 gap-3">
+        <Toggle label="Zoom suave" hint="Se acerca de a poco (modos con efectos)" checked={!!s.zoomEffect} onChange={v => update({ zoomEffect: v })} />
+        <Toggle label="Destellos en el 360" hint="Un flash en cada cambio de velocidad" checked={!!s.flashEffect} onChange={v => update({ flashEffect: v })} />
+      </div>
+    </Panel>
+  );
+}
+
+/** Animación propia: un video corto que va encima (se elige como "Video propio"). */
+export function AnimVideoPanel({ s, update }: Props) {
   const input = useRef<HTMLInputElement>(null);
   const anim = useMediaUrl(ANIM_KEY);
   return (
-    <Panel title="Animaciones y accesorios" description="Se mueven encima del video. Los accesorios siguen la cara; en equipos lentos conviene no usarlos.">
-      <Choice label="Animación" value={s.animation ?? 'none'} onChange={v => update({ animation: v })}
-        options={ANIMATIONS.map(a => ({ value: a.value, label: a.label }))} />
-      {s.animation === 'custom' && (
-        <div className="space-y-3">
+    <Panel title="Animación propia (video)" description="Para usarla, elegí “Video propio” en la animación de General o de una experiencia.">
+      <div className="space-y-3">
           <p className="text-white/55 text-sm">Video corto en loop. WebM con transparencia, o MP4 con fondo negro (se mezcla en modo "pantalla": el negro desaparece).</p>
           <div className="flex flex-wrap items-center gap-4">
             {anim && <video src={anim} autoPlay loop muted playsInline className="h-32 rounded-xl bg-black" />}
@@ -128,13 +141,6 @@ export function LayersPanel({ s, update }: Props) {
           </div>
           <Choice label="Mezcla" value={s.animBlend ?? 'screen'} onChange={v => update({ animBlend: v })}
             options={[{ value: 'screen', label: 'Pantalla (fondo negro)' }, { value: 'normal', label: 'Normal (con transparencia)' }]} />
-        </div>
-      )}
-      <Choice label="Accesorio en la cara" value={s.accessory ?? 'none'} onChange={v => update({ accessory: v })}
-        options={[{ value: 'none', label: 'Ninguno' }, ...BUILT_IN_ACCESSORIES.map(a => ({ value: a.value as string, label: a.label }))]} />
-      <div className="grid sm:grid-cols-2 gap-3">
-        <Toggle label="Zoom suave" hint="Se acerca de a poco (modos con efectos)" checked={!!s.zoomEffect} onChange={v => update({ zoomEffect: v })} />
-        <Toggle label="Destellos en el 360" hint="Un flash en cada cambio de velocidad" checked={!!s.flashEffect} onChange={v => update({ flashEffect: v })} />
       </div>
     </Panel>
   );
@@ -243,7 +249,7 @@ export function MusicPanel({ s, update }: Props) {
       </div>
       <input ref={input} type="file" accept="audio/*" multiple className="hidden" onChange={e => { void add(e.target.files); e.target.value = ''; }} />
       <button className={buttonClass} onClick={() => input.current?.click()}><Upload className="w-5 h-5" /> Agregar canciones</button>
-      <Choice label="Qué canción suena" value={s.songMode ?? 'fixed'} onChange={v => update({ songMode: v })}
+      <Choice label="Qué canción suena (General; cada experiencia puede tener la suya)" value={s.songMode ?? 'fixed'} onChange={v => update({ songMode: v })}
         options={[{ value: 'fixed', label: 'Siempre la fija' }, { value: 'random', label: 'Una al azar' }, { value: 'guest', label: 'La elige el invitado' }]} />
       <Choice label="Volumen" value={s.musicVolume ?? 0.8} onChange={v => update({ musicVolume: v })}
         options={[0.4, 0.6, 0.8, 1].map(n => ({ value: n, label: `${Math.round(n * 100)}%` }))} />
@@ -377,8 +383,9 @@ export function DeliveryPanel({ s, update }: Props) {
           <div className="space-y-2 min-w-0">
             <p className="text-lg">Galería: <b className="font-mono">{code}</b></p>
             <p className="text-white/60 text-sm break-all">{url}</p>
+            <p className="text-white/60 text-sm">El código lleva el nombre del evento: al cambiar el evento se crea una galería nueva sola.</p>
             <p className="text-white/60 text-sm">Escaneá este QR con una tablet o tele del evento para mostrar la galería en pantalla (modo pantalla).</p>
-            <button className={buttonClass} onClick={() => update({ galleryCode: newGalleryCode() })}>Empezar galería nueva</button>
+            <button className={buttonClass} onClick={() => update({ galleryCode: newGalleryCode(s.eventTitle), galleryEvent: (s.eventTitle || '').trim() })}>Empezar galería nueva</button>
           </div>
         </div>
       ) : <p className="text-amber-200">La galería online necesita el servidor de EventPix configurado.</p>}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, Link2, Loader2, RefreshCw } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Download, Link2, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import {
@@ -7,8 +7,11 @@ import {
   type CameraOption, type VideoCameraSettings,
 } from '@/lib/videoBooth/camera';
 import {
-  checkinDevice, DEVICE_EVENT, getAppVersion, getCachedDeviceState, getDeviceCode, getPin, setPin, setStandalone,
+  canInstallUpdates, canSelfUpdate, checkForUpdate, checkinDevice, DEVICE_EVENT, getAppVersion, getCachedDeviceState,
+  getDeviceCode, getPin, getUpdateStatus, openInstallPermission, setPin, setStandalone, startUpdate, UPDATE_EVENT,
+  type UpdateStatus,
 } from '@/lib/videoBooth/device';
+import { DEFAULT_FOLDER } from '@/lib/videoBooth/drive';
 import { DEFAULT_SCRIPT_URL, isDriveConfigured, saveDriveConfig, testDrive } from '@/lib/videoBooth/drive';
 import { DEFAULT_PUBLIC_SITE } from '@/lib/videoBooth/share';
 import { eventFolder } from '@/lib/videoBooth/storage';
@@ -113,7 +116,7 @@ export function CloudPanel({ s, update }: Props) {
       <Field label={DEFAULT_SCRIPT_URL ? 'Dirección del Apps Script (vacío = el de la app)' : 'Dirección del Apps Script'}>
         <input className={inputClass} value={script} onChange={e => setScript(e.target.value)} placeholder="https://script.google.com/macros/s/…/exec" />
       </Field>
-      <Field label="Link de la carpeta de Drive">
+      <Field label={DEFAULT_FOLDER ? 'Link de la carpeta de Drive (vacío = la de la app)' : 'Link de la carpeta de Drive'}>
         <input className={inputClass} value={folder} onChange={e => setFolder(e.target.value)} placeholder="https://drive.google.com/drive/folders/…" />
       </Field>
       <div className="flex flex-wrap items-center gap-4">
@@ -183,6 +186,69 @@ export function CameraPanel({ s, update }: Props) {
         <Toggle label="Modo espejo" checked={!!cam.mirror} onChange={v => change({ mirror: v })} />
         <Toggle label="Enfoque fijo lejos" hint="Para webcams que pierden el foco con poca luz" checked={cam.focus === 'far'} onChange={v => change({ focus: v ? 'far' : 'auto' })} />
       </div>
+    </Panel>
+  );
+}
+
+/** Actualización de la app con la última versión publicada (solo en el APK). */
+export function UpdatePanel({ s, update }: Props) {
+  const [available] = useState(canSelfUpdate);
+  const [status, setStatus] = useState<UpdateStatus>(getUpdateStatus);
+  const [permission, setPermission] = useState(canInstallUpdates);
+  useEffect(() => {
+    if (!available) return;
+    const onUpdate = (e: Event) => setStatus(prev => ({ ...prev, progress: undefined, message: undefined, ...(e as CustomEvent<UpdateStatus>).detail }));
+    const onVisible = () => { if (document.visibilityState === 'visible') setPermission(canInstallUpdates()); };
+    window.addEventListener(UPDATE_EVENT, onUpdate);
+    document.addEventListener('visibilitychange', onVisible);
+    checkForUpdate();
+    return () => {
+      window.removeEventListener(UPDATE_EVENT, onUpdate);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [available]);
+  if (!available) return null;
+
+  const { state, current, latest } = status;
+  const busy = state === 'checking' || state === 'downloading' || state === 'installing';
+  const message =
+    state === 'idle' || state === 'checking' ? 'Buscando si hay una versión nueva…'
+    : state === 'available' ? `Hay una versión nueva: ${latest?.name}`
+    : state === 'up_to_date' ? `Tenés la última versión (${current?.name})`
+    : state === 'downloading' ? `Descargando la versión ${latest?.name}… ${status.progress ?? 0}%`
+    : state === 'installing' ? 'Verificada. Abriendo el instalador…'
+    : state === 'confirm' ? 'Tocá "Instalar" (o "Actualizar") en el cartel de Android. La app se vuelve a abrir sola.'
+    : `No se pudo actualizar: ${status.message || 'error'}`;
+  const tone = state === 'available' || state === 'confirm' ? 'bg-sky-500/15 text-sky-200'
+    : state === 'up_to_date' ? 'bg-emerald-500/15 text-emerald-200'
+    : state === 'error' ? 'bg-amber-500/15 text-amber-200'
+    : 'bg-black/20 text-white/80';
+  return (
+    <Panel title="Actualización" description="La app busca sola las versiones nuevas (al abrirse y cada 6 horas), las descarga y verifica que sean las oficiales. No se borran los videos ni los ajustes.">
+      <div className={`flex items-center gap-3 rounded-2xl px-5 py-4 ${tone}`}>
+        {state === 'up_to_date' ? <CheckCircle2 className="w-6 h-6 shrink-0" />
+          : state === 'error' ? <AlertTriangle className="w-6 h-6 shrink-0" />
+          : busy ? <RefreshCw className="w-6 h-6 shrink-0 animate-spin" />
+          : <Download className="w-6 h-6 shrink-0" />}
+        <p className="text-lg font-semibold">{message}</p>
+      </div>
+      {state === 'downloading' && (
+        <div className="h-3 rounded-full bg-white/10 overflow-hidden">
+          <div className="h-full bg-sky-400 transition-all" style={{ width: `${status.progress ?? 0}%` }} />
+        </div>
+      )}
+      <div className="flex flex-wrap gap-3">
+        {state === 'available' || (state === 'error' && latest && current && latest.code > current.code)
+          ? <button onClick={startUpdate} className={primaryClass}><Download className="w-5 h-5" /> Actualizar ahora</button>
+          : <button onClick={checkForUpdate} disabled={busy} className={`${buttonClass} disabled:opacity-40`}><RefreshCw className="w-5 h-5" /> Buscar de nuevo</button>}
+        {permission === false && <button onClick={openInstallPermission} className={buttonClass}>Permitir instalar actualizaciones</button>}
+      </div>
+      {permission === false && (
+        <p className="text-white/50">La primera vez Android pide permiso para que <b className="text-white/80">EventPix Video</b> instale actualizaciones ("Instalar apps desconocidas"). Se activa una sola vez.</p>
+      )}
+      <Toggle label="Actualizar sola al prender el equipo" hint="Si al abrir la app hay una versión nueva, la descarga y abre la instalación. Durante el evento solo avisa (punto en el engranaje)."
+        checked={s.autoUpdate !== false} onChange={v => update({ autoUpdate: v })} />
+      {current && <p className="text-white/40">Versión instalada: {current.name} ({current.code})</p>}
     </Panel>
   );
 }

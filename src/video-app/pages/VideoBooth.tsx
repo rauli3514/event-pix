@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
 import {
-  ArrowLeft, BookHeart, Check, CloudOff, Gem, Loader2, MessageCircle, Music, Play, RefreshCw, Repeat, Rotate3d, RotateCcw, Settings, Snail,
-  Square, Video, type LucideIcon,
+  ArrowLeft, BookHeart, Check, CloudOff, Dices, Gem, LayoutGrid, Loader2, Lock, LockOpen, MessageCircle, Music, Play, RefreshCw, Repeat, Rotate3d,
+  RotateCcw, Settings, Snail, Sparkles, Square, Video, type LucideIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
@@ -26,9 +26,11 @@ import { buildDecor, frameUrl, loadSong, pickSong, type DecorBundle } from '@/li
 import { MotionDetector, watchMotion } from '@/lib/videoBooth/motion';
 import { audioContext, bitrateFor, ClipRecorder, extensionFor, mixAudio, openMic, type AudioMix } from '@/lib/videoBooth/recorder';
 import {
-  DEFAULT_PROMPTS, enabledModes, galleryCode, getVideoSettings, modeConfig, outputSize, songKey,
-  type SongItem, type VideoModeDef, type VideoModeKey,
+  animationLabel, DEFAULT_PROMPTS, enabledModes, galleryCode, getVideoSettings, outputSize, resolveMode, songKey,
+  type AnimationKey, type SongItem, type VideoModeDef, type VideoModeKey,
 } from '@/lib/videoBooth/settings';
+import { accessoryLabel, VIDEO_ACCESSORIES } from '@/lib/videoBooth/accessories';
+import { UPDATE_EVENT, updateAvailable } from '@/lib/videoBooth/device';
 import { eventFolder, saveVideoLocally, videoFileName } from '@/lib/videoBooth/storage';
 
 // Cabina de video: el invitado elige la experiencia (video, boomerang, cámara lenta,
@@ -54,6 +56,15 @@ const GRADIENTS: Record<VideoModeKey, [string, string]> = {
 
 const btn = 'kiosk-glass rounded-full px-8 py-4 text-xl font-bold text-white flex items-center gap-3 focus:outline-none focus:ring-4 focus:ring-[#00d4ff] hover:bg-white/15 transition-transform focus:scale-105';
 const primaryBtn = 'rounded-full px-10 py-5 text-2xl font-black text-white flex items-center gap-3 bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7] shadow-[0_15px_40px_-10px_rgba(255,46,147,0.8)] focus:outline-none focus:ring-4 focus:ring-[#00d4ff] transition-transform focus:scale-105';
+
+// Experiencia bloqueada (como las secciones del espejo): la cabina trabaja siempre
+// en esa y para salir hay que tocar el candado y poner la clave.
+const LOCK_KEY = 'video_lock';
+const readLock = () => { try { return localStorage.getItem(LOCK_KEY) as VideoModeKey | null; } catch { return null; } };
+const writeLock = (key: VideoModeKey | null) => {
+  try { if (key) localStorage.setItem(LOCK_KEY, key); else localStorage.removeItem(LOCK_KEY); } catch { /* sin espacio */ }
+};
+const pick = <T,>(list: T[]) => list[Math.floor(Math.random() * list.length)];
 
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
@@ -84,6 +95,14 @@ export default function VideoBooth() {
   const [motionLevel, setMotionLevel] = useState(0);
   const [frameThumbs, setFrameThumbs] = useState<{ id: string; name: string; url: string }[]>([]);
   const [previewSong, setPreviewSong] = useState<string | null>(null);
+  // Experiencia en la que se queda la cabina (la última elegida) y la bloqueada
+  const [lockKey, setLockKey] = useState<VideoModeKey | null>(readLock);
+  const [stickyKey, setStickyKey] = useState<VideoModeKey | null>(readLock);
+  const [unlockOpen, setUnlockOpen] = useState(false);
+  // Animación y accesorio de esta toma (el invitado los puede cambiar en la pantalla)
+  const [fx, setFx] = useState<{ animation: AnimationKey; accessory: string }>({ animation: 'none', accessory: 'none' });
+  const [fxOpen, setFxOpen] = useState(false);
+  const [hasUpdate, setHasUpdate] = useState(updateAvailable);
 
   const rootRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -109,14 +128,27 @@ export default function VideoBooth() {
   const queueRef = useRef<PreStep[]>([]);
   const chosenFrameRef = useRef<string | null>(null);
   const chosenSongRef = useRef<string | null>(null);
+  const accessoryRef = useRef('none');
   useEffect(() => { resultRef.current = result; }, [result]);
   useEffect(() => { modeRef.current = mode; }, [mode]);
 
   useEffect(() => {
     const reload = () => setSettings(getVideoSettings());
     window.addEventListener('video-settings-changed', reload);
-    return () => window.removeEventListener('video-settings-changed', reload);
+    const onUpdate = () => setHasUpdate(updateAvailable());
+    window.addEventListener(UPDATE_EVENT, onUpdate);
+    return () => {
+      window.removeEventListener('video-settings-changed', reload);
+      window.removeEventListener(UPDATE_EVENT, onUpdate);
+    };
   }, []);
+
+  // La experiencia fija solo vale si sigue activada
+  const homeMode = useMemo(() => {
+    const key = lockKey ?? stickyKey;
+    return modes.find(m => m.key === key) ?? (modes.length === 1 ? modes[0] : null);
+  }, [modes, lockKey, stickyKey]);
+  const locked = !!lockKey && homeMode?.key === lockKey;
 
 
   // ─── Cámara ──────────────────────────────────────────────────────
@@ -145,7 +177,8 @@ export default function VideoBooth() {
 
   const openCamera = useCallback(async (m: VideoModeDef) => {
     const cam = getCameraSettings();
-    const cfg = modeConfig(m.key, settings);
+    const rm = resolveMode(m.key, settings);
+    const cfg = rm.cfg;
     const wantsFps = m.effect !== 'none' && settings.highFps !== false ? 60 : 30;
     const stream = await openCameraStream({ fps: wantsFps, facingMode: settings.facing });
     streamRef.current = stream;
@@ -157,7 +190,7 @@ export default function VideoBooth() {
     const comp = new Compositor(video, {
       width: size.width, height: size.height,
       mirror: !!cam.mirror, rotation: Number(cam.rotation) || 0,
-      filter: cfg.filter, accessory: settings.accessory,
+      filter: cfg.filter, accessory: accessoryRef.current,
       decor: m.effect === 'none' ? decor : null,
     });
     comp.thumbDecor = decor;
@@ -218,16 +251,25 @@ export default function VideoBooth() {
     setCount(null);
     setProgress(0);
     setError('');
+    setFxOpen(false);
     setStep('splash');
   }, [closeCamera]);
 
   const enterLive = useCallback(async (m: VideoModeDef) => {
     setStep('live');
     try {
-      const cfg = modeConfig(m.key, settings);
+      const rm = resolveMode(m.key, settings);
+      // Al azar: una animación y un accesorio distintos en cada video
+      const animation = rm.animation === 'random' ? pick(rm.animationPool) : rm.animation;
+      const accessory = rm.accessory === 'random' ? pick(VIDEO_ACCESSORIES).value : rm.accessory;
+      accessoryRef.current = accessory;
+      setFx({ animation, accessory });
+      setFxOpen(false);
       disposeDecor();
-      decorRef.current = await buildDecor(settings, size, { frameId: chosenFrameRef.current, eventTitle: settings.eventTitle });
-      songRef.current = cfg.music ? pickSong(settings, chosenSongRef.current) : null;
+      decorRef.current = await buildDecor(settings, size, {
+        frameId: chosenFrameRef.current ?? rm.frameId, eventTitle: settings.eventTitle, overlay: rm.overlay, animation,
+      });
+      songRef.current = rm.cfg.music ? pickSong(settings, chosenSongRef.current, rm) : null;
       musicRef.current = await loadSong(songRef.current);
       await openCamera(m);
     } catch (e) {
@@ -247,9 +289,10 @@ export default function VideoBooth() {
     audioContext(); // con el toque: Android deja usar el audio
     setMode(m);
     modeRef.current = m;
+    setStickyKey(m.key);
     chosenFrameRef.current = null;
     chosenSongRef.current = null;
-    const cfg = modeConfig(m.key, settings);
+    const rm = resolveMode(m.key, settings);
     const queue: PreStep[] = [];
     if (m.guestbook) {
       const list = (settings.prompts?.filter(p => p.trim()) ?? []);
@@ -257,17 +300,42 @@ export default function VideoBooth() {
       setPrompt(pool[Math.floor(Math.random() * pool.length)]);
       queue.push('prompt');
     }
-    if (settings.overlay === 'custom' && settings.frameChoice && (settings.frames?.length ?? 0) > 1) queue.push('frame');
-    if (cfg.music && settings.songMode === 'guest' && (settings.songs?.length ?? 0) > 1) queue.push('song');
+    if (rm.overlay === 'custom' && rm.frameChoice && (settings.frames?.length ?? 0) > 1) queue.push('frame');
+    if (rm.cfg.music && rm.songMode === 'guest' && (settings.songs?.length ?? 0) > 1) queue.push('song');
     queueRef.current = queue;
     nextPre(m);
   }, [settings, nextPre]);
 
+  // Con una experiencia elegida (o bloqueada) se entra directo a esa
   const start = useCallback(() => {
     audioContext();
-    if (modes.length === 1) chooseMode(modes[0]);
+    if (homeMode) chooseMode(homeMode);
     else setStep('modes');
-  }, [modes, chooseMode]);
+  }, [homeMode, chooseMode]);
+
+  const changeMode = () => {
+    if (locked) return;
+    setStickyKey(null);
+    setStep('modes');
+  };
+
+  const toggleLock = () => {
+    if (locked) { setUnlockOpen(true); return; }
+    if (!homeMode) return;
+    writeLock(homeMode.key);
+    setLockKey(homeMode.key);
+    toast.success(`Bloqueada en "${homeMode.label}". Para salir tocá el candado y poné la clave.`);
+  };
+
+  // Cambiar la animación o el accesorio en la pantalla de la toma
+  const changeFx = (patch: Partial<{ animation: AnimationKey; accessory: string }>) => {
+    if (patch.animation !== undefined) decorRef.current?.decor.setAnimation(patch.animation);
+    if (patch.accessory !== undefined) {
+      accessoryRef.current = patch.accessory;
+      compositorRef.current?.update({ accessory: patch.accessory });
+    }
+    setFx(f => ({ ...f, ...patch }));
+  };
 
   // Después del video: otra vez al inicio, o (360 continuo) directo a esperar el próximo giro
   const reset = useCallback(() => {
@@ -358,8 +426,9 @@ export default function VideoBooth() {
       setProgress(0);
       setStep('processing');
 
-      const cfg = modeConfig(mode.key, settings);
-      const plan = effectPlan(mode.effect, actual, settings);
+      const rm = resolveMode(mode.key, settings);
+      const cfg = rm.cfg;
+      const plan = effectPlan(rm, actual);
       let blob = raw;
       let mime = rec.mime;
       if (plan) {
@@ -399,9 +468,10 @@ export default function VideoBooth() {
   const startRecording = useCallback(() => {
     const comp = compositorRef.current;
     if (!comp || !mode) return;
-    const cfg = modeConfig(mode.key, settings);
+    const rm = resolveMode(mode.key, settings);
+    const cfg = rm.cfg;
     const planned = cfg.seconds;
-    const buffer = bufferSecondsFor(mode.effect, planned, settings);
+    const buffer = bufferSecondsFor(rm, planned);
     if (buffer) comp.startBuffer(buffer);
     const fps = Math.min(60, Math.round(streamRef.current?.getVideoTracks()[0]?.getSettings().frameRate || 30));
     const stream = comp.canvas.captureStream(fps);
@@ -436,9 +506,10 @@ export default function VideoBooth() {
   }, [mode, settings, size, finishRecording]);
 
   const startCountdown = useCallback(() => {
-    if (!cameraReady || step !== 'live') return;
+    if (!cameraReady || step !== 'live' || !mode) return;
     stopMotion();
-    const total = Math.max(0, settings.countdown ?? 3);
+    setFxOpen(false);
+    const total = Math.max(0, resolveMode(mode.key, settings).countdown);
     if (!total) { startRecording(); return; }
     setStep('countdown');
     setCount(total);
@@ -452,7 +523,7 @@ export default function VideoBooth() {
       } else setCount(n);
     }, 1000);
     tickRef.current = t;
-  }, [cameraReady, step, settings.countdown, startRecording, stopMotion]);
+  }, [cameraReady, step, mode, settings, startRecording, stopMotion]);
 
   // ─── 360: arranque y corte por movimiento ───────────────────────
   const autoStart = mode?.key === '360' && !!settings.autoStart360;
@@ -497,7 +568,7 @@ export default function VideoBooth() {
   const [waOpen, setWaOpen] = useState(false);
   const [waNumber, setWaNumber] = useState('');
   const [waStatus, setWaStatus] = useState<{ state: 'idle' | 'sending' | 'waiting' | 'sent' | 'queued' | 'error'; message?: string }>({ state: 'idle' });
-  useRemoteFocus(rootRef, [step, qr.state, frameThumbs.length, waOpen, waStatus.state], !pinOpen);
+  useRemoteFocus(rootRef, [step, qr.state, frameThumbs.length, waOpen, waStatus.state, fxOpen, homeMode?.key], !pinOpen && !unlockOpen);
   const waPrefix = settings.whatsappPrefix || DEFAULT_WA_PREFIX;
   const whatsappOn = !!settings.whatsappEnabled && isSupabaseConfigured && isDriveConfigured();
 
@@ -621,14 +692,15 @@ export default function VideoBooth() {
     else if (step === 'prompt' && mode) nextPre(mode);
     else if (step === 'frame' && frameThumbs[0]) chooseFrame(chosenFrameRef.current ?? frameThumbs[0].id);
     else if (step === 'song' && mode) chooseSong();
-    else if (step === 'live') startCountdown();
+    else if (step === 'live') { if (!fxOpen) startCountdown(); }
     else if (step === 'recording' && mode?.canStop) void finishRecording();
     else if (step === 'review') accept();
     else if (step === 'result' && !waOpen) reset();
-  }, !pinOpen);
+  }, !pinOpen && !unlockOpen);
 
   // ─── Pantallas ───────────────────────────────────────────────────
-  const cfg = mode ? modeConfig(mode.key, settings) : null;
+  const rmode = mode ? resolveMode(mode.key, settings) : null;
+  const cfg = rmode?.cfg ?? null;
   // Controles: abajo con la pantalla vertical; al costado con la horizontal (no tapan el marco)
   const side = 'absolute bottom-[6vmin] inset-x-0 landscape:inset-x-auto landscape:bottom-auto landscape:top-1/2 landscape:-translate-y-1/2 landscape:right-[4vmin]';
   const meter = (
@@ -658,6 +730,18 @@ export default function VideoBooth() {
           <AuroraBackground />
           <button onClick={start} className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-10 focus:outline-none" data-autofocus>
             <EventPixLogo size={64} subtitle="Cabina de video" />
+            {homeMode && (() => {
+              const Icon = ICONS[homeMode.key];
+              const [gradient] = GRADIENTS[homeMode.key];
+              return (
+                <span className="flex items-center gap-4 -mb-4">
+                  <span className={`w-16 h-16 rounded-[25%] bg-gradient-to-br ${gradient} flex items-center justify-center shadow-xl`}>
+                    <Icon className="w-9 h-9 text-white" strokeWidth={1.7} />
+                  </span>
+                  <span className="text-[clamp(1.4rem,4vmin,2.4rem)] font-black">{homeMode.label}</span>
+                </span>
+              );
+            })()}
             <motion.h1
               initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
               className="carlmarx-bold text-center text-[clamp(3rem,9vmin,7.5rem)] leading-tight px-8"
@@ -673,8 +757,21 @@ export default function VideoBooth() {
             {!modes.length && <p className="text-amber-200 text-xl">No hay experiencias activadas: entrá a Ajustes.</p>}
           </button>
           <div className="absolute top-6 right-6 flex gap-3 z-10">
-            <button onClick={() => setPinOpen(true)} className={btn} aria-label="Ajustes"><Settings className="w-6 h-6" /></button>
+            {homeMode && (
+              <button onClick={toggleLock} className={`${btn} ${locked ? 'opacity-50' : ''}`} aria-label={locked ? 'Desbloquear experiencia' : 'Bloquear en esta experiencia'}>
+                {locked ? <Lock className="w-6 h-6" /> : <LockOpen className="w-6 h-6" />}
+              </button>
+            )}
+            <button onClick={() => setPinOpen(true)} className={`${btn} relative`} aria-label={hasUpdate ? 'Ajustes (hay una versión nueva)' : 'Ajustes'}>
+              <Settings className="w-6 h-6" />
+              {hasUpdate && <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#ff2e93] ring-2 ring-[#07051a]" />}
+            </button>
           </div>
+          {homeMode && !locked && modes.length > 1 && (
+            <div className="absolute bottom-6 inset-x-0 flex justify-center z-10">
+              <button onClick={changeMode} className={btn}><LayoutGrid className="w-6 h-6" /> Cambiar experiencia</button>
+            </div>
+          )}
         </div>
       )}
 
@@ -793,12 +890,39 @@ export default function VideoBooth() {
             {mode.guestbook && prompt && step !== 'ending' && <p className="kiosk-glass rounded-3xl px-8 py-4 text-2xl font-semibold text-center max-w-4xl">{prompt}</p>}
           </div>
 
-          {step === 'live' && (
+          {step === 'live' && fxOpen && rmode && (
+            <div className="absolute inset-x-0 bottom-0 pointer-events-auto bg-black/65 backdrop-blur-md rounded-t-[2rem] px-[4vmin] pt-5 pb-[4vmin] space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-2xl font-black flex items-center gap-2"><Sparkles className="w-6 h-6 text-[#ffd23f]" /> Elegí tu efecto</h3>
+                <div className="flex gap-3">
+                  <button onClick={() => changeFx({ animation: pick(rmode.animationPool), accessory: pick(VIDEO_ACCESSORIES).value })} className={btn}>
+                    <Dices className="w-6 h-6" /> Sorpresa
+                  </button>
+                  <button onClick={() => setFxOpen(false)} className={primaryBtn} data-autofocus><Check className="w-7 h-7" /> Listo</button>
+                </div>
+              </div>
+              <FxRow
+                title="Animación" value={fx.animation}
+                options={['none', ...rmode.animationPool.filter(a => a !== 'custom' || fx.animation === 'custom')].map(v => ({ value: v, label: animationLabel(v) }))}
+                onPick={v => changeFx({ animation: v as AnimationKey })}
+              />
+              <FxRow
+                title="Accesorio" value={fx.accessory}
+                options={[{ value: 'none', label: 'Sin accesorio' }, ...VIDEO_ACCESSORIES.map(a => ({ value: a.value, label: accessoryLabel(a.value) }))]}
+                onPick={v => changeFx({ accessory: v })}
+              />
+            </div>
+          )}
+
+          {step === 'live' && !fxOpen && (
             <div className={`${side} flex flex-col items-center gap-5 pointer-events-auto`}>
               {mode.key === '360' && (autoStart && cameraReady ? meter
                 : <p className="kiosk-glass rounded-2xl px-6 py-3 text-xl max-w-xs text-center">Subite a la plataforma. Cuando estés listo, ¡a grabar!</p>)}
               <div className="flex items-center gap-5 landscape:flex-col-reverse">
                 <button onClick={goSplash} className={btn}><ArrowLeft className="w-6 h-6" /> Volver</button>
+                {rmode?.fxChoice && cameraReady && (
+                  <button onClick={() => setFxOpen(true)} className={btn}><Sparkles className="w-6 h-6" /> Efectos</button>
+                )}
                 <button onClick={startCountdown} disabled={!cameraReady} className={`${primaryBtn} disabled:opacity-50`} data-autofocus>
                   {cameraReady ? <span className="w-7 h-7 rounded-full bg-red-500 ring-4 ring-white" /> : <Loader2 className="w-7 h-7 animate-spin" />}
                   {cameraReady ? 'Grabar' : 'Abriendo cámara…'}
@@ -809,7 +933,7 @@ export default function VideoBooth() {
 
           {step === 'countdown' && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/25">
-              <CountdownRing value={count} total={settings.countdown ?? 3} />
+              <CountdownRing value={count} total={rmode?.countdown ?? 3} />
             </div>
           )}
 
@@ -960,6 +1084,35 @@ export default function VideoBooth() {
       )}
 
       {pinOpen && <PinDialog onCancel={() => setPinOpen(false)} onSuccess={() => navigate('/ajustes')} />}
+      {unlockOpen && (
+        <PinDialog
+          title="Clave para desbloquear"
+          onCancel={() => setUnlockOpen(false)}
+          onSuccess={() => {
+            writeLock(null);
+            setLockKey(null);
+            setUnlockOpen(false);
+            toast.success('Desbloqueada: ya se puede cambiar de experiencia');
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Fila de opciones de la pantalla de la toma (se recorre con el control remoto). */
+function FxRow({ title, value, options, onPick }: { title: string; value: string; options: { value: string; label: string }[]; onPick: (v: string) => void }) {
+  return (
+    <div className="space-y-2">
+      <p className="text-white/60 text-sm font-bold uppercase tracking-[0.2em]">{title}</p>
+      <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
+        {options.map(o => (
+          <button key={o.value} onClick={() => onPick(o.value)}
+            className={`shrink-0 rounded-full px-5 py-3 text-lg font-bold whitespace-nowrap focus:outline-none focus:ring-4 focus:ring-[#00d4ff] ${value === o.value ? 'bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7]' : 'bg-white/10 hover:bg-white/20'}`}>
+            {o.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
