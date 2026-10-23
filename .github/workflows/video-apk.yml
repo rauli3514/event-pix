@@ -16,13 +16,18 @@ on:
         required: false
         default: video-v1
       version_code:
-        description: 'Número de versión (sube de a uno con cada versión nueva)'
+        description: 'Número de versión (vacío = automático, sube con cada compilación)'
         required: false
-        default: '1'
+        default: ''
       version_name:
-        description: 'Nombre de la versión (ej. 1.0)'
+        description: 'Nombre de la versión (vacío = automático, ej. 1.5)'
         required: false
-        default: '1.0'
+        default: ''
+      publicar:
+        description: 'Publicar para que los equipos se actualicen solos (video-latest)'
+        type: boolean
+        required: false
+        default: true
 
 permissions:
   contents: write
@@ -58,6 +63,7 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           # Drive propio de la cabina (opcional: también se puede cargar en el panel)
           VITE_VIDEO_DRIVE_SCRIPT_URL: ${{ secrets.VITE_VIDEO_DRIVE_SCRIPT_URL }}
+          VITE_VIDEO_DRIVE_FOLDER: ${{ secrets.VITE_VIDEO_DRIVE_FOLDER }}
         run: |
           npx tsc -b
           npx vite build --config vite.video.config.ts
@@ -77,12 +83,16 @@ jobs:
           cp native/video/VideoStoragePlugin.java android/app/src/main/java/com/eventpix/app/video/
           sed -i 's#registerPlugin(KioskLinkPlugin.class);#&\n        registerPlugin(com.eventpix.app.video.VideoStoragePlugin.class);#' \
             android/app/src/main/java/com/eventpix/app/MainActivity.java
+          # Actualización desde el equipo: esta app busca su versión en video-latest
+          sed -i 's#endsWith(".kiosk") ? BASE + "kiosco-latest/kiosco-version.json"#endsWith(".video") ? BASE + "video-latest/video-version.json"#' \
+            android/app/src/main/java/com/eventpix/app/update/KioskUpdater.java
           # Micrófono para el libro de firmas
           sed -i 's#<uses-permission android:name="android.permission.CAMERA" />#&\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />\n    <uses-feature android:name="android.hardware.microphone" android:required="false" />#' \
             android/app/src/main/AndroidManifest.xml
           # Si cambió el proyecto y no se pudo agregar, el APK no se arma a medias
           grep -q 'VideoStoragePlugin' android/app/src/main/java/com/eventpix/app/MainActivity.java
           grep -q 'RECORD_AUDIO' android/app/src/main/AndroidManifest.xml
+          grep -q 'video-latest/video-version.json' android/app/src/main/java/com/eventpix/app/update/KioskUpdater.java
 
       - name: Firma de debug fija de EventPix Video
         uses: actions/cache@v4
@@ -98,6 +108,29 @@ jobs:
               -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
 
+      - name: Comprobar que es la firma de siempre
+        run: |
+          # Con otra firma Android no deja instalar encima (ni actualizar solo): los equipos
+          # tendrían que desinstalar y perder los ajustes. Mejor que falle acá.
+          EXPECTED="DB:AA:30:14:7C:E6:D5:D1:61:F8:01:4F:BE:0E:7C:D6:B6:84:2B:D8:DD:C5:C1:FE:B6:2B:04:7F:CA:13:06:20"
+          ACTUAL=$(keytool -list -v -keystore video-debug.keystore -storepass android -alias androiddebugkey \
+            | sed -n 's/.*SHA256: *//p' | tr -d '[:space:]')
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::La firma no es la de siempre ($ACTUAL). Los equipos no podrían actualizarse encima."
+            exit 1
+          fi
+
+      - name: Versión
+        id: version
+        run: |
+          # Automática: el número de compilación (las primeras dos fueron a mano)
+          CODE="${{ inputs.version_code }}"; NAME="${{ inputs.version_name }}"
+          [ -n "$CODE" ] || CODE=$(( ${{ github.run_number }} + 1 ))
+          [ -n "$NAME" ] || NAME="1.$CODE"
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "Versión $NAME ($CODE)"
+
       - name: Compilar el APK
         working-directory: android
         run: |
@@ -106,8 +139,8 @@ jobs:
             -PeventpixAppId=com.eventpix.video \
             "-PeventpixAppLabel=EventPix Video" \
             -PeventpixDedicated=false \
-            -PeventpixVersionCode=${{ inputs.version_code || '1' }} \
-            -PeventpixVersionName=${{ inputs.version_name || '1.0' }} \
+            -PeventpixVersionCode=${{ steps.version.outputs.code }} \
+            -PeventpixVersionName=${{ steps.version.outputs.name }} \
             -PeventpixDebugKeystore=$GITHUB_WORKSPACE/video-debug.keystore
           cp app/build/outputs/apk/debug/app-debug.apk $GITHUB_WORKSPACE/eventpix-video.apk
 
@@ -127,3 +160,22 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "EventPix Video ($RELEASE)" \
             --notes "App de la cabina de video: 360, boomerang, cámara lenta, glam y libro de firmas (commit ${GITHUB_SHA::7}). Se instala como \"EventPix Video\", aparte del kiosco."
+
+      - name: Publicar para los equipos (video-latest)
+        if: ${{ inputs.publicar }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHA=$(sha256sum eventpix-video.apk | cut -d' ' -f1)
+          jq -n --argjson code "${{ steps.version.outputs.code }}" --arg name "${{ steps.version.outputs.name }}" --arg sha "$SHA" \
+            --argjson size "$(stat -c %s eventpix-video.apk)" --arg commit "$GITHUB_SHA" \
+            --arg url "https://github.com/${{ github.repository }}/releases/download/video-latest/eventpix-video.apk" \
+            '{versionCode: $code, versionName: $name, apkUrl: $url, sha256: $sha, size: $size, commit: $commit, publishedAt: (now | todate)}' \
+            > video-version.json
+          cat video-version.json
+          gh release view video-latest >/dev/null 2>&1 || gh release create video-latest \
+            --prerelease --target "$GITHUB_SHA" --title "EventPix Video (última versión)" \
+            --notes "Última versión de EventPix Video. Los equipos se actualizan solos (o desde Ajustes → Equipo → Actualización)."
+          # Primero el APK y después el json: un equipo nunca ve una versión sin su APK
+          gh release upload video-latest eventpix-video.apk --clobber
+          gh release upload video-latest video-version.json --clobber

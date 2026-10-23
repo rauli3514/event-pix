@@ -1,4 +1,5 @@
-import { detectFaces, drawAccessory, loadCustomAccessory, type Face } from '@/lib/faceFx';
+import { detectFaces, type Face } from '@/lib/faceFx';
+import { drawVideoAccessory } from './accessories';
 import type { Decor } from './decor';
 import { videoFilter } from './settings';
 
@@ -59,7 +60,6 @@ export class Compositor {
   private faces: Face[] = [];
   private detecting = false;
   private lastDetect = 0;
-  private customAcc: Awaited<ReturnType<typeof loadCustomAccessory>>;
   /** Mientras corre la placa final no se dibuja la cámara */
   private paused = false;
 
@@ -83,12 +83,6 @@ export class Compositor {
 
   update(patch: Partial<CompositorOptions>) {
     this.opts = { ...this.opts, ...patch };
-    if (patch.accessory) void this.loadAccessory();
-  }
-
-  private async loadAccessory() {
-    const acc = this.opts.accessory;
-    this.customAcc = acc ? await loadCustomAccessory(acc).catch(() => undefined) : undefined;
   }
 
   /** Segundos desde que arrancó (para las animaciones en vivo). */
@@ -144,7 +138,6 @@ export class Compositor {
     if (this.running) return;
     this.running = true;
     this.startedAt = performance.now();
-    void this.loadAccessory();
     const v = this.video as VideoWithRvfc;
     const loop = () => {
       if (!this.running) return;
@@ -253,7 +246,7 @@ export class Compositor {
         .catch(() => { /* el detector todavía no está listo */ })
         .finally(() => { this.detecting = false; });
     }
-    for (const f of this.faces) drawAccessory(this.ctx, f, accessory, this.customAcc);
+    for (const f of this.faces) drawVideoAccessory(this.ctx, f, accessory);
   }
 
   private capture() {

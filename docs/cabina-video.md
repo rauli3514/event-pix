@@ -22,8 +22,20 @@ Android** (brazo de la plataforma 360, uso itinerante).
   y reversa), libro de firmas (pregunta al azar y micrófono) y glam (B&N de revista).
 - **360 automático:** graba sola cuando la plataforma gira, corta sola cuando para,
   modo continuo y calibración en Ajustes.
+- **Cada experiencia con lo suyo:** en Ajustes (y en el panel) hay una pestaña por
+  experiencia: duración (más larga y a gusto: video hasta 60 s, firmas hasta 3 min, 360
+  hasta 30 s), filtro, canción, marco, animación, accesorio, cuenta regresiva y sus efectos.
+  Lo que no se toca usa lo de **General**.
+- **Editor de rampa del 360:** tramos con su velocidad (¼× a 3×), final en reversa (o
+  reversa y vuelta), con una barra que muestra cómo queda. Boomerang: idas y vueltas y velocidad.
+- **Se queda en la experiencia:** después de cada video vuelve al inicio de esa misma
+  experiencia ("Cambiar experiencia" para otra). Con el **candado** queda bloqueada; para
+  salir pide la clave (como las secciones del espejo).
 - **Marcos y capas:** varios marcos PNG (el invitado elige), animaciones (confeti,
-  brillos, corazones, burbujas, nieve, neón o un video propio) y accesorios en la cara.
+  brillos, corazones, burbujas, nieve, neón, globos, fuegos artificiales, pétalos, luces,
+  polvo dorado, emojis, notas o un video propio) y accesorios en la cara (17). Animación y
+  accesorio pueden ir **al azar** (cambian en cada video) o que el invitado los elija en
+  la pantalla de la toma (botón **Efectos**).
 - **Marca:** logo, marca de agua, color y placa final.
 - **Música propia:** varias canciones con punto de inicio; fija, al azar o la elige el invitado.
 - **Entrega:** QR al video y/o a la galería del evento; **WhatsApp** al número del invitado.
@@ -35,12 +47,25 @@ Android** (brazo de la plataforma 360, uso itinerante).
 
 1. **Base de datos:** correr en Supabase (SQL Editor) `supabase/migrations/20261022000000_video_booth.sql`.
    Crea `video_devices`, `video_clips`, `video_sends`, sus funciones y el bucket `video-assets`.
-2. **Drive de la cabina:** publicar el Apps Script de EventPix (`docs/kiosco-drive-apps-script.gs`)
-   en la cuenta de Google de la cabina y crear una carpeta. Se carga en el panel
-   (equipo → Configurar → Nube) o en el equipo (Ajustes → Nube), o al compilar con el
-   secreto `VITE_VIDEO_DRIVE_SCRIPT_URL`.
+2. **Drive de la cabina (por defecto, como el espejo):** en GitHub → Settings → Secrets and
+   variables → Actions, crear `VITE_VIDEO_DRIVE_SCRIPT_URL` (dirección `/exec` del Apps Script)
+   y `VITE_VIDEO_DRIVE_FOLDER` (link de la carpeta). Van en el APK al compilar (no en el
+   código: el repositorio es público). También se puede cambiar por equipo en el panel o en
+   Ajustes → Equipo → Nube. Los videos quedan en una carpeta con el **nombre del evento** y la
+   galería online usa ese nombre en su código (ej. `boda-sofi-juan-k7m2`); al cambiar el
+   evento empieza una galería nueva.
 3. **APK:** GitHub → Actions → **"APK de EventPix Video"** → Run workflow. Se publica en la
-   release `video-v1` (o la que se elija). Se instala al lado del kiosco, sin pisarlo.
+   release `video-v1` y en `video-latest` (de ahí se actualizan los equipos). La versión sube
+   sola en cada compilación y el workflow frena si la firma no es la de siempre.
+
+### Actualización automática
+
+La app busca versiones nuevas en `video-latest` al abrirse y cada 6 horas. Si la encuentra
+en los primeros 10 minutos (al prender el equipo) la descarga, verifica la huella y abre
+el instalador de Android (hay que tocar "Instalar" la primera vez y dar permiso de
+"instalar apps desconocidas"). Durante el evento solo avisa con un punto en el engranaje.
+Se maneja en Ajustes → Equipo → Actualización (o "Actualizar sola" en el panel).
+La versión 1.0 no tenía esto: hay que instalar a mano la primera versión que lo trae.
 4. **Vincular:** abrir la app en el equipo (muestra un código) y en el panel
    **Cabina de video → Equipos → Vincular**. También se puede usar sin panel.
 5. Configurar desde **Equipos → Configurar** (o en el equipo: engranaje, clave 1234 → cambiarla).
@@ -88,7 +113,6 @@ Meta cobra cada conversación iniciada con plantilla.
 
 ## Próximos pasos (propuestos)
 
-- Actualizar la app desde Ajustes (como el kiosco) con su propia release.
 - Envío por mail.
 - Intro (pre-roll) además de la placa final.
 - Libro de firmas: compilado con todos los mensajes para los anfitriones.

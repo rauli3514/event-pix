@@ -24,6 +24,7 @@ export interface DecorOptions {
   endText?: string;
 }
 
+const EMOJIS = ['😍', '🥳', '🎉', '💃', '✨', '❤️', '😎', '🔥'];
 const COLORS = ['#ff2e93', '#ffd23f', '#00d4ff', '#7b2ff7', '#2ee6a6', '#ffffff', '#ff8a5b'];
 
 /** Número pseudoaleatorio estable para la partícula i (el mismo en cada cuadro). */
@@ -47,6 +48,13 @@ export class Decor {
     this.o = opts;
     this.count = Math.round(28 + (opts.width * opts.height) / 60000);
   }
+
+  /** Cambia la animación (al azar o la que elige el invitado en la pantalla de la toma). */
+  setAnimation(animation: AnimationKey | undefined) {
+    this.o = { ...this.o, animation };
+  }
+
+  get animation() { return this.o.animation; }
 
   get hasLayers() {
     const o = this.o;
@@ -105,6 +113,8 @@ export class Decor {
       ctx.restore();
       return;
     }
+    if (animation === 'fuegos') { this.fireworks(ctx, t, unit); return; }
+    if (animation === 'luces') { this.bokeh(ctx, t, unit); return; }
     ctx.save();
     for (let i = 0; i < this.count; i++) {
       const x0 = rnd(i, 1);
@@ -166,8 +176,168 @@ export class Decor {
           ctx.fill();
           break;
         }
+        case 'globos': {
+          if (i % 3) break; // pocos y grandes
+          const y = 1.15 - ((phase + t * speed * 0.9) % 1.35);
+          const x = x0 + Math.sin(t * 1.2 + i) * 0.025;
+          this.balloon(ctx, x * W, y * H, size * 3.2, COLORS[i % COLORS.length], t + i);
+          break;
+        }
+        case 'petalos': {
+          const y = ((phase + t * speed * 0.8) % 1.1) - 0.05;
+          const x = x0 + Math.sin(t * 1.3 + i * 2) * 0.05;
+          ctx.save();
+          ctx.translate(x * W, y * H);
+          ctx.rotate(Math.sin(t * 2 + i) * 1.2 + i);
+          ctx.scale(1, 0.55 + 0.45 * Math.abs(Math.sin(t * 2.5 + i)));
+          ctx.globalAlpha = 0.9;
+          ctx.fillStyle = i % 3 === 0 ? '#ffffff' : i % 2 ? '#ff8fb1' : '#ffc2d4';
+          ctx.beginPath();
+          ctx.ellipse(0, 0, size * 1.5, size * 0.8, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+          break;
+        }
+        case 'dorado': {
+          const y = ((phase + t * speed * 0.5) % 1.1) - 0.05;
+          const x = x0 + Math.sin(t * 0.9 + i) * 0.04;
+          const a = 0.4 + 0.6 * Math.abs(Math.sin(t * 3 + i));
+          ctx.save();
+          ctx.globalAlpha = a;
+          ctx.fillStyle = i % 3 ? '#ffd76a' : '#fff4c2';
+          ctx.shadowColor = '#ffcc33';
+          ctx.shadowBlur = size * 2;
+          ctx.beginPath();
+          ctx.arc(x * W, y * H, size * 0.45, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+          if (i % 5 === 0) this.star(ctx, x * W, y * H, size * 1.4 * a, a);
+          break;
+        }
+        case 'emojis': {
+          if (i % 2) break;
+          const y = 1.08 - ((phase + t * speed * 0.9) % 1.2);
+          const x = x0 + Math.sin(t * 1.4 + i) * 0.03;
+          ctx.save();
+          ctx.globalAlpha = Math.min(1, y * 3);
+          ctx.font = `${Math.round(size * 3.2)}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.translate(x * W, y * H);
+          ctx.rotate(Math.sin(t * 2 + i) * 0.3);
+          ctx.fillText(EMOJIS[i % EMOJIS.length], 0, 0);
+          ctx.restore();
+          break;
+        }
+        case 'notas': {
+          if (i % 2) break;
+          const y = 1.08 - ((phase + t * speed) % 1.2);
+          const x = x0 + Math.sin(t * 2 + i) * 0.04;
+          ctx.save();
+          ctx.globalAlpha = 0.9 * Math.min(1, y * 3);
+          ctx.font = `700 ${Math.round(size * 3)}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.fillStyle = COLORS[i % COLORS.length];
+          ctx.shadowColor = 'rgba(0,0,0,0.35)';
+          ctx.shadowBlur = size;
+          ctx.translate(x * W, y * H);
+          ctx.rotate(Math.sin(t * 3 + i) * 0.35);
+          ctx.fillText(i % 4 ? '♪' : '♫', 0, 0);
+          ctx.restore();
+          break;
+        }
       }
     }
+    ctx.restore();
+  }
+
+  /** Fuegos artificiales: cada uno sube, explota y se apaga (ciclo de 2,4 s). */
+  private fireworks(ctx: CanvasRenderingContext2D, t: number, unit: number) {
+    const { width: W, height: H } = this.o;
+    const CYCLE = 2.4;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let f = 0; f < 4; f++) {
+      const local = t + f * (CYCLE / 4);
+      const n = Math.floor(local / CYCLE);
+      const p = (local % CYCLE) / CYCLE;
+      // Siempre por los costados y arriba, para no tapar caras
+      const side = (n + f) % 2 === 0 ? rnd(n * 4 + f, 1) * 0.3 : 0.7 + rnd(n * 4 + f, 1) * 0.3;
+      const cx = side * W;
+      const cy = (0.12 + rnd(n * 4 + f, 2) * 0.25) * H;
+      const color = COLORS[(n + f) % COLORS.length];
+      if (p < 0.25) {
+        const k = p / 0.25;
+        ctx.globalAlpha = 0.9;
+        ctx.fillStyle = '#fff6c2';
+        ctx.beginPath();
+        ctx.arc(cx, H - (H - cy) * k, unit * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+        continue;
+      }
+      const k = (p - 0.25) / 0.75;
+      const r = unit * 18 * (1 - Math.pow(1 - k, 3));
+      ctx.globalAlpha = Math.max(0, 1 - k);
+      ctx.fillStyle = color;
+      for (let j = 0; j < 22; j++) {
+        const a = (j / 22) * Math.PI * 2;
+        const x = cx + Math.cos(a) * r;
+        const y = cy + Math.sin(a) * r + k * k * unit * 6;
+        ctx.beginPath();
+        ctx.arc(x, y, unit * 0.55 * (1 - k * 0.5), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
+  /** Luces desenfocadas que flotan despacio. */
+  private bokeh(ctx: CanvasRenderingContext2D, t: number, unit: number) {
+    const { width: W, height: H } = this.o;
+    const tones = ['#ffd76a', '#ff8fb1', '#8fd3ff', '#ffffff', this.o.brandColor || '#c49bff'];
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    for (let i = 0; i < 16; i++) {
+      const edge = i % 2 === 0 ? rnd(i, 6) * 0.3 : 0.7 + rnd(i, 6) * 0.3;
+      const x = edge + Math.sin(t * 0.3 + i) * 0.03;
+      const y = ((rnd(i, 7) - t * 0.02 * (1 + rnd(i, 2))) % 1 + 1) % 1;
+      const r = unit * (4 + rnd(i, 4) * 7);
+      const g = ctx.createRadialGradient(x * W, y * H, 0, x * W, y * H, r);
+      const c = tones[i % tones.length];
+      g.addColorStop(0, c);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.globalAlpha = 0.25 + 0.25 * Math.sin(t * 1.5 + i * 2);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x * W, y * H, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  private balloon(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string, t: number) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(Math.sin(t * 1.3) * 0.12);
+    ctx.globalAlpha = 0.92;
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = Math.max(1, r * 0.04);
+    ctx.beginPath();
+    ctx.moveTo(0, r * 1.2);
+    ctx.quadraticCurveTo(r * 0.25, r * 1.8, 0, r * 2.5);
+    ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r * 0.85, r * 1.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.15, r * 1.2);
+    ctx.lineTo(r * 0.15, r * 1.2);
+    ctx.lineTo(0, r * 1.05);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.beginPath();
+    ctx.ellipse(-r * 0.3, -r * 0.45, r * 0.18, r * 0.3, -0.5, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
   }
 

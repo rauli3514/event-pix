@@ -5,8 +5,13 @@ import { getVideoSettings, saveVideoSettings } from './settings';
 // cuenta de Drive de la cabina: cada video queda en una carpeta por evento y,
 // para el QR, compartido solo con el link.
 
-/** Script incluido al compilar la app (secreto VITE_VIDEO_DRIVE_SCRIPT_URL). */
+/**
+ * Script y carpeta incluidos al compilar la app (secretos de GitHub
+ * VITE_VIDEO_DRIVE_SCRIPT_URL y VITE_VIDEO_DRIVE_FOLDER): así anda sin configurar
+ * nada en el equipo. No van en el código porque el repositorio es público.
+ */
 export const DEFAULT_SCRIPT_URL = ((import.meta.env.VITE_VIDEO_DRIVE_SCRIPT_URL as string | undefined) || '').trim();
+export const DEFAULT_FOLDER = ((import.meta.env.VITE_VIDEO_DRIVE_FOLDER as string | undefined) || '').trim();
 
 export const folderIdFromLink = (link?: string) => {
   const s = (link || '').trim();
@@ -17,9 +22,11 @@ export const folderIdFromLink = (link?: string) => {
 
 export const driveConfig = () => {
   const s = getVideoSettings();
+  const scriptUrl = (s.driveScriptUrl || '').trim() || DEFAULT_SCRIPT_URL;
   return {
-    scriptUrl: (s.driveScriptUrl || '').trim() || DEFAULT_SCRIPT_URL,
-    folderId: folderIdFromLink(s.driveFolderLink),
+    scriptUrl,
+    // Con el script de la app, la carpeta de la app (si no se eligió otra)
+    folderId: folderIdFromLink(s.driveFolderLink) || (scriptUrl === DEFAULT_SCRIPT_URL ? folderIdFromLink(DEFAULT_FOLDER) : ''),
   };
 };
 
