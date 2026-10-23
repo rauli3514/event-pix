@@ -1,7 +1,7 @@
 import { getMedia, removeMedia, saveMedia } from './mediaStore';
 import { getCameraSettings, saveCameraSettings } from './camera';
 import {
-  ANIM_KEY, frameKey, getVideoSettings, LOGO_KEY, saveVideoSettings, songKey,
+  ANIM_KEY, END_KEY, frameKey, getVideoSettings, LOGO_KEY, saveVideoSettings, songKey,
   type MediaItem, type SongItem,
 } from './settings';
 
@@ -20,6 +20,8 @@ export interface VideoAssets {
   logo?: string | null;
   /** URL de la animación propia (null = quitar) */
   anim?: string | null;
+  /** URL de la imagen de fondo de la placa final (null = quitar) */
+  endcard?: string | null;
 }
 export interface RemoteVideoSettings {
   video?: Record<string, unknown>;
@@ -37,6 +39,7 @@ export const REMOTE_VIDEO_KEYS = [
   'endCard', 'endCardSeconds', 'endCardText', 'zoomEffect', 'flashEffect',
   'songMode', 'songId', 'autoStart360', 'autoStop360', 'motionThreshold', 'continuous360', 'delivery', 'galleryCode',
   'galleryModeration', 'whatsappEnabled', 'whatsappPrefix', 'galleryEvent', 'autoUpdate',
+  'overlayDateMode', 'overlayDate', 'frameText', 'textPosition', 'textColor', 'textScale', 'watermarkSize', 'watermarkOpacity', 'guestFrames', 'endCardOverlay',
 ] as const;
 export const REMOTE_CAMERA_KEYS = ['mirror', 'rotation', 'quality', 'focus'] as const;
 /** Se informan al panel pero no se pisan desde él */
@@ -108,6 +111,10 @@ async function applyAssets(assets: VideoAssets) {
     if (assets.logo !== undefined) {
       if (assets.logo) await download(LOGO_KEY, assets.logo, 'logo', applied);
       else await remove(LOGO_KEY, applied);
+    }
+    if (assets.endcard !== undefined) {
+      if (assets.endcard) await download(END_KEY, assets.endcard, 'placa-final', applied);
+      else await remove(END_KEY, applied);
     }
     if (assets.anim !== undefined) {
       if (assets.anim) await download(ANIM_KEY, assets.anim, 'animacion', applied);

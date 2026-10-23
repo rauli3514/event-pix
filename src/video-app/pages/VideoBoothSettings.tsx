@@ -7,7 +7,8 @@ import { useRemoteFocus } from '@/hooks/use-remote-focus';
 import { UPDATE_EVENT, updateAvailable } from '@/lib/videoBooth/device';
 import { recordingSupport } from '@/lib/videoBooth/recorder';
 import { REMOTE_APPLIED_EVENT } from '@/lib/videoBooth/remote';
-import { AnimVideoPanel, BrandPanel, DeliveryPanel, FramesPanel, LayersPanel, MotionPanel, MusicPanel } from './VideoSettingsPanels';
+import { AnimVideoPanel, BrandPanel, DeliveryPanel, FramesPanel, LayersPanel, MotionPanel, MusicPanel, PreviewPanel } from './VideoSettingsPanels';
+import { allFrames } from '@/lib/videoBooth/builtinFrames';
 import {
   DEFAULT_PROMPTS, getVideoSettings, modeConfig, saveModeConfig, saveVideoSettings,
   VIDEO_MODES, type VideoBoothSettings, type VideoModeKey,
@@ -64,7 +65,7 @@ export default function VideoBoothSettings() {
     };
   }, []);
 
-  const frames = (s.frames ?? []).map(f => ({ value: f.id, label: f.name }));
+  const frames = [{ value: 'random', label: 'Uno al azar' }, ...allFrames(s).map(f => ({ value: f.id, label: f.name }))];
   const songs = (s.songs ?? []).map(f => ({ value: f.id, label: f.name }));
   const isMode = VIDEO_MODES.some(m => m.key === tab);
 
@@ -124,6 +125,7 @@ export default function VideoBoothSettings() {
 
         {isMode && (
           <>
+            <PreviewPanel s={s} modeKey={tab as VideoModeKey} />
             <ModeEditor key={tab} modeKey={tab as VideoModeKey} s={s} frames={frames} songs={songs} kit={kit}
               onChange={patch => updateMode(tab as VideoModeKey, patch)} />
             {tab === '360' && <MotionPanel s={s} update={update} />}
@@ -139,6 +141,7 @@ export default function VideoBoothSettings() {
 
         {tab === 'biblioteca' && (
           <>
+            <PreviewPanel s={s} />
             <FramesPanel s={s} update={update} />
             <MusicPanel s={s} update={update} />
             <BrandPanel s={s} update={update} />

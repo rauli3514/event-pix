@@ -274,36 +274,6 @@ export class Compositor {
 // ─── Marcos ────────────────────────────────────────────────────────────────
 
 /** Marco "nombre del evento": franja abajo con el título y la fecha. */
-export function titleOverlay(width: number, height: number, title: string, subtitle?: string) {
-  const c = document.createElement('canvas');
-  c.width = width;
-  c.height = height;
-  const ctx = c.getContext('2d')!;
-  const band = Math.round(height * 0.2);
-  const g = ctx.createLinearGradient(0, height - band, 0, height);
-  g.addColorStop(0, 'rgba(0,0,0,0)');
-  g.addColorStop(1, 'rgba(0,0,0,0.7)');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, height - band, width, band);
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#fff';
-  ctx.shadowColor = 'rgba(0,0,0,0.5)';
-  ctx.shadowBlur = Math.round(width * 0.01);
-  let size = Math.round(Math.min(width, height) * 0.075);
-  ctx.font = `800 ${size}px 'CarlMarx', 'Montserrat', sans-serif`;
-  while (ctx.measureText(title).width > width * 0.88 && size > 12) {
-    size -= 2;
-    ctx.font = `800 ${size}px 'CarlMarx', 'Montserrat', sans-serif`;
-  }
-  const sub = subtitle ?? new Date().toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' });
-  const subSize = Math.round(size * 0.42);
-  ctx.fillText(title, width / 2, height - band * 0.32 - subSize);
-  ctx.font = `600 ${subSize}px 'Montserrat', sans-serif`;
-  ctx.globalAlpha = 0.8;
-  ctx.fillText(sub, width / 2, height - band * 0.18);
-  return c;
-}
-
 /** Abre una imagen (Blob guardado en el equipo) para usarla de marco. */
 export async function loadOverlayImage(blob: Blob): Promise<ImageBitmap | null> {
   try {

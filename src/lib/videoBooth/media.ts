@@ -1,8 +1,9 @@
 import { getMedia } from './mediaStore';
-import { titleOverlay } from './compositor';
-import { Decor, disposeAnimVideo, loadAnimVideo } from './decor';
+import { Decor, disposeAnimVideo, loadAnimVideo, type Caption } from './decor';
 import { decodeMusic } from './recorder';
-import { ANIM_KEY, frameKey, LOGO_KEY, songKey, type AnimationKey, type SongItem, type VideoBoothSettings } from './settings';
+import { ANIM_KEY, END_KEY, frameKey, LOGO_KEY, overlayDateText, songKey, type AnimationKey, type SongItem, type VideoBoothSettings } from './settings';
+
+import { allFrames, BUILT_IN_VIDEO_FRAMES, builtinFrameThumb, isBuiltinFrame, renderBuiltinFrame } from './builtinFrames';
 
 // Archivos de la cabina guardados en el equipo: marcos, logo, animación y música.
 
@@ -12,10 +13,20 @@ const bitmap = async (key: string) => {
   try { return await createImageBitmap(rec.blob); } catch { return null; }
 };
 
-export const frameUrl = async (id: string) => {
+/** Imagen de un marco para mostrarlo (los de fábrica, del tamaño del video). */
+export const frameUrl = async (id: string, size = { width: 1080, height: 1920 }) => {
+  if (isBuiltinFrame(id)) return builtinFrameThumb(id, size.width, size.height);
   const rec = await getMedia(frameKey(id)).catch(() => null);
   return rec ? URL.createObjectURL(rec.blob) : null;
 };
+
+/** Marcos para que elija el invitado o para "uno al azar". */
+export function framePool(s: VideoBoothSettings) {
+  const all = allFrames(s);
+  const picked = (s.guestFrames ?? []).filter(id => all.some(f => f.id === id));
+  if (picked.length) return all.filter(f => picked.includes(f.id));
+  return (s.frames?.length ? s.frames : BUILT_IN_VIDEO_FRAMES.map(f => ({ id: f.id, name: f.name })));
+}
 
 /** Canción que corresponde: la elegida por el invitado, una al azar o la fija (de la experiencia o de General). */
 export function pickSong(s: VideoBoothSettings, chosen?: string | null, mode?: { songMode: 'fixed' | 'random' | 'guest'; songId?: string }): SongItem | null {
@@ -43,16 +54,27 @@ export async function buildDecor(s: VideoBoothSettings, size: { width: number; h
   /** Marco y animación de la experiencia (si no, los de General) */
   overlay?: 'none' | 'title' | 'custom'; animation?: AnimationKey;
 }): Promise<DecorBundle> {
-  const title = s.overlayText || opts.eventTitle || 'EventPix';
   const overlay = opts.overlay ?? s.overlay;
   const animation = opts.animation ?? s.animation;
-  let frame: CanvasImageSource | null = null;
-  if (overlay === 'title') frame = titleOverlay(size.width, size.height, title);
-  else if (overlay === 'custom') {
-    const id = opts.frameId || s.frameId || s.frames?.[0]?.id;
-    if (id) frame = await bitmap(frameKey(id));
+  let frame: ImageBitmap | HTMLCanvasElement | null = null;
+  if (overlay === 'custom') {
+    const frames = allFrames(s);
+    let id = opts.frameId || s.frameId || frames[0]?.id;
+    if (id === 'random') {
+      const pool = framePool(s);
+      id = pool[Math.floor(Math.random() * pool.length)]?.id;
+    }
+    // Si el marco elegido ya no está, el primero
+    if (id && !frames.some(f => f.id === id)) id = frames[0]?.id;
+    if (id) frame = isBuiltinFrame(id) ? await renderBuiltinFrame(id, size.width, size.height) : await bitmap(frameKey(id));
   }
+  // Nombre y fecha: el marco "nombre del evento", o encima del PNG si se pidió
+  const title = (s.overlayText || opts.eventTitle || '').trim();
+  const caption: Caption | null = overlay === 'title' || (overlay === 'custom' && s.frameText)
+    ? { title: title || (overlay === 'title' ? 'EventPix' : ''), date: overlayDateText(s), position: s.textPosition, color: s.textColor, scale: s.textScale, band: overlay === 'title' }
+    : null;
   const logo = s.showLogo !== false ? await bitmap(LOGO_KEY) : null;
+  const endImage = s.endCard ? await bitmap(END_KEY) : null;
   let animVideo: HTMLVideoElement | null = null;
   if (animation === 'custom') {
     const rec = await getMedia(ANIM_KEY).catch(() => null);
@@ -60,16 +82,19 @@ export async function buildDecor(s: VideoBoothSettings, size: { width: number; h
   }
   const decor = new Decor({
     width: size.width, height: size.height, frame,
-    animation, animVideo, animBlend: s.animBlend,
+    animation, animVideo, animBlend: s.animBlend, caption,
     logo, logoPosition: s.logoPosition, logoSize: s.logoSize, logoOpacity: s.logoOpacity,
     watermark: s.watermark?.trim() || undefined, watermarkPosition: s.watermarkPosition,
+    watermarkSize: s.watermarkSize, watermarkOpacity: s.watermarkOpacity,
     brandColor: s.brandColor, title: opts.eventTitle || s.overlayText || '', endText: s.endCardText?.trim() || undefined,
+    endImage, endOverlay: s.endCardOverlay !== false,
   });
   return {
     decor,
     dispose: () => {
       disposeAnimVideo(animVideo);
-      if (frame && 'close' in frame) (frame as ImageBitmap).close();
+      if (frame && 'close' in frame) frame.close();
+      endImage?.close();
       logo?.close();
     },
   };

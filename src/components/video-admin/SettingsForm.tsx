@@ -6,10 +6,11 @@ import type { RemoteFile, RemoteVideoSettings, VideoAssets } from '@/lib/videoBo
 import { DEFAULT_PUBLIC_SITE } from '@/lib/videoBooth/share';
 import { VIDEO_ACCESSORIES } from '@/lib/videoBooth/accessories';
 import {
-  ANIMATIONS, CORNERS, DEFAULT_PROMPTS, newGalleryCode, VIDEO_MODES,
+  ANIMATIONS, CORNERS, DEFAULT_PROMPTS, LOGO_SIZES, newGalleryCode, TEXT_SCALES, VIDEO_MODES, WATERMARK_POSITIONS, WATERMARK_SIZES,
   type VideoBoothSettings, type VideoModeConfig, type VideoModeKey,
 } from '@/lib/videoBooth/settings';
 import ModeEditor, { type ModeKit } from '@/components/video-booth/ModeEditor';
+import { BUILT_IN_VIDEO_FRAMES } from '@/lib/videoBooth/builtinFrames';
 import { btnGhost, Check, Field, input, Section, Select } from './ui';
 
 // Configuración de un equipo de la cabina desde el panel: ajustes y archivos
@@ -79,6 +80,7 @@ export default function SettingsForm({ form, setForm }: { form: RemoteVideoSetti
   const songInput = useRef<HTMLInputElement>(null);
   const logoInput = useRef<HTMLInputElement>(null);
   const animInput = useRef<HTMLInputElement>(null);
+  const endInput = useRef<HTMLInputElement>(null);
 
   const set = (key: string, value: unknown) => setForm(f => ({ ...f, video: { ...(f.video ?? {}), [key]: value } }));
   const setAssets = (patch: Partial<VideoAssets>) => setForm(f => ({ ...f, assets: { ...(f.assets ?? {}), ...patch } }));
@@ -90,7 +92,7 @@ export default function SettingsForm({ form, setForm }: { form: RemoteVideoSetti
   const setMode = (key: VideoModeKey, patch: Partial<VideoModeConfig>) =>
     set('modes', { ...modes, [key]: { ...(modes[key] ?? {}), ...patch } });
 
-  const upload = async (kind: 'frames' | 'songs' | 'logo' | 'anim', files: FileList | null) => {
+  const upload = async (kind: 'frames' | 'songs' | 'logo' | 'anim' | 'endcard', files: FileList | null) => {
     if (!files?.length) return;
     setBusy(kind);
     try {
@@ -98,6 +100,14 @@ export default function SettingsForm({ form, setForm }: { form: RemoteVideoSetti
         const added: RemoteFile[] = [];
         for (const file of Array.from(files)) added.push({ id: uid(), name: file.name.replace(/\.\w+$/, ''), url: await uploadAsset(kind, file) });
         setAssets({ [kind]: [...(assets[kind] ?? []), ...added] });
+        // Con marcos nuevos, el equipo pasa a usar marco (el primero subido si no había uno elegido)
+        if (kind === 'frames') {
+          setForm(f => {
+            const video = f.video ?? {};
+            const hasOwn = (f.assets?.frames ?? []).length > added.length || ((video.frames ?? []) as { id: string }[]).some(x => !x.id.startsWith('r-'));
+            return { ...f, video: { ...video, overlay: 'custom', ...(hasOwn && video.frameId ? {} : { frameId: added[0].id }) } };
+          });
+        }
       } else {
         setAssets({ [kind]: await uploadAsset(kind, files[0]) });
       }
@@ -115,7 +125,10 @@ export default function SettingsForm({ form, setForm }: { form: RemoteVideoSetti
   const frameOptions = [
     ...localFrames.map(f => ({ value: f.id, label: `${f.name} (cargado en el equipo)` })),
     ...(assets.frames ?? []).map(f => ({ value: f.id, label: f.name })),
+    ...BUILT_IN_VIDEO_FRAMES.map(f => ({ value: f.id, label: `${f.name} (de fábrica)` })),
   ];
+  const overlay = val('overlay', 'none') as string;
+  const dateMode = val('overlayDateMode', 'auto') as string;
   const songOptions = [
     ...localSongs.map(f => ({ value: f.id, label: `${f.name} (cargada en el equipo)` })),
     ...(assets.songs ?? []).map(f => ({ value: f.id, label: f.name })),
@@ -278,14 +291,55 @@ export default function SettingsForm({ form, setForm }: { form: RemoteVideoSetti
         <div className="grid gap-5 lg:grid-cols-2">
           <Section title="Marcos (plantillas)">
             <Field label="Marco de General">
-              <Select value={val('overlay', 'none')} options={[{ value: 'none', label: 'Sin marco' }, { value: 'title', label: 'Nombre del evento' }, { value: 'custom', label: 'PNG' }]} onChange={x => set('overlay', x)} />
+              <Select value={overlay} options={[{ value: 'none', label: 'Sin marco' }, { value: 'title', label: 'Nombre y fecha' }, { value: 'custom', label: 'Marco (plantilla)' }]} onChange={x => set('overlay', x)} />
             </Field>
-            {frameOptions.length > 0 && (
-              <Field label="Marco PNG por defecto">
-                <Select value={val('frameId', frameOptions[0].value)} options={frameOptions} onChange={x => set('frameId', x)} />
-              </Field>
+            {overlay === 'custom' && (
+              <>
+                <Field label="Qué marco se usa" hint="Hay marcos de fábrica (con el logo de EventPix y los del espejo) y los que subas.">
+                  <Select value={val('frameId', frameOptions[0].value)} options={[{ value: 'random', label: 'Uno al azar en cada video' }, ...frameOptions]} onChange={x => set('frameId', x)} />
+                </Field>
+                <Check label="El invitado elige el marco" checked={val('frameChoice', false)} onChange={x => set('frameChoice', x)} />
+                {(val('frameChoice', false) || val<string>('frameId', '') === 'random') && (
+                  <Field label="Marcos para elegir o para el azar" hint="Sin marcar ninguno: los que subiste (o los de fábrica si no subiste).">
+                    <div className="flex flex-wrap gap-2">
+                      {frameOptions.map(o => {
+                        const list = (v.guestFrames ?? []) as string[];
+                        const on = list.includes(o.value);
+                        return (
+                          <button key={o.value} type="button" onClick={() => set('guestFrames', on ? list.filter(x => x !== o.value) : [...list, o.value])}
+                            className={`rounded-full border px-3 py-1.5 text-sm ${on ? 'border-violet-500 bg-violet-500/20 text-white' : 'border-slate-700 text-slate-400'}`}>{o.label}</button>
+                        );
+                      })}
+                    </div>
+                  </Field>
+                )}
+                <Check label="Nombre y fecha encima del marco" checked={val('frameText', false)} onChange={x => set('frameText', x)} />
+              </>
             )}
-            <Check label="El invitado elige el marco" checked={val('frameChoice', false)} onChange={x => set('frameChoice', x)} />
+            {(overlay === 'title' || (overlay === 'custom' && val('frameText', false))) && (
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Texto grande" hint="Vacío = nombre del evento">
+                  <input className={input} value={val('overlayText', '')} onChange={e => set('overlayText', e.target.value)} placeholder={String(v.eventTitle ?? 'Sofi & Juan')} />
+                </Field>
+                <Field label="Fecha">
+                  <Select value={dateMode} options={[{ value: 'auto', label: 'La de hoy (automática)' }, { value: 'custom', label: 'La escribo yo' }, { value: 'none', label: 'Sin fecha' }]} onChange={x => set('overlayDateMode', x)} />
+                </Field>
+                {dateMode === 'custom' && (
+                  <Field label="Fecha o texto chico">
+                    <input className={input} value={val('overlayDate', '')} onChange={e => set('overlayDate', e.target.value)} placeholder="14 de diciembre de 2026" />
+                  </Field>
+                )}
+                <Field label="Dónde">
+                  <Select value={val('textPosition', 'bottom')} options={[{ value: 'bottom', label: 'Abajo' }, { value: 'top', label: 'Arriba' }]} onChange={x => set('textPosition', x)} />
+                </Field>
+                <Field label="Tamaño del texto">
+                  <Select value={val('textScale', 1)} options={TEXT_SCALES} onChange={x => set('textScale', x)} />
+                </Field>
+                <Field label="Color del texto">
+                  <input type="color" className={`${input} h-11 p-1`} value={val('textColor', '#ffffff')} onChange={e => set('textColor', e.target.value)} />
+                </Field>
+              </div>
+            )}
             <div className="flex flex-wrap gap-3">
               {(assets.frames ?? []).map(f => (
                 <div key={f.id} className="relative">
@@ -295,8 +349,8 @@ export default function SettingsForm({ form, setForm }: { form: RemoteVideoSetti
               ))}
             </div>
             <input ref={frameInput} type="file" accept="image/png,image/webp" multiple className="hidden" onChange={e => { void upload('frames', e.target.files); e.target.value = ''; }} />
-            <button onClick={() => frameInput.current?.click()} disabled={!!busy} className={btnGhost}><ImagePlus className="h-4 w-4" /> {busy === 'frames' ? 'Subiendo…' : 'Subir marcos PNG'}</button>
-            <p className="text-xs text-slate-500">PNG con el centro transparente y la misma forma que el video (1080×1920 vertical, 1920×1080 horizontal o 1080×1080).</p>
+            <button onClick={() => frameInput.current?.click()} disabled={!!busy} className={btnGhost}><ImagePlus className="h-4 w-4" /> {busy === 'frames' ? 'Subiendo…' : 'Subir mis marcos PNG'}</button>
+            <p className="text-xs text-slate-500">PNG con el centro transparente y la misma forma que el video (1080×1920 vertical, 1920×1080 horizontal o 1080×1080). Al subirlos, el equipo pasa a usar marco.</p>
           </Section>
           <Section title="Música">
             <div className="space-y-2">
@@ -339,25 +393,40 @@ export default function SettingsForm({ form, setForm }: { form: RemoteVideoSetti
                 <Select value={val('logoPosition', 'tr')} options={CORNERS} onChange={x => set('logoPosition', x)} />
               </Field>
               <Field label="Tamaño del logo">
-                <Select value={val('logoSize', 0.22)} options={[0.12, 0.18, 0.22, 0.3, 0.4].map(n => ({ value: n, label: `${Math.round(n * 100)}% del ancho` }))} onChange={x => set('logoSize', x)} />
+                <Select value={val('logoSize', 0.22)} options={LOGO_SIZES.map(n => ({ value: n, label: `${Math.round(n * 100)}% del ancho` }))} onChange={x => set('logoSize', x)} />
               </Field>
               <Field label="Marca de agua (texto)">
                 <input className={input} value={val('watermark', '')} onChange={e => set('watermark', e.target.value)} placeholder="@tuempresa" />
               </Field>
               <Field label="Lugar de la marca de agua">
-                <Select value={val('watermarkPosition', 'bl')} options={CORNERS} onChange={x => set('watermarkPosition', x)} />
+                <Select value={val('watermarkPosition', 'bl')} options={WATERMARK_POSITIONS} onChange={x => set('watermarkPosition', x)} />
+              </Field>
+              <Field label="Tamaño de la marca de agua">
+                <Select value={val('watermarkSize', 0.035)} options={WATERMARK_SIZES} onChange={x => set('watermarkSize', x)} />
+              </Field>
+              <Field label="Transparencia de la marca de agua">
+                <Select value={val('watermarkOpacity', val<string>('watermarkPosition', 'bl') === 'tile' ? 0.3 : 0.85)} options={[0.15, 0.3, 0.5, 0.7, 0.85, 1].map(n => ({ value: n, label: `${Math.round(n * 100)}%` }))} onChange={x => set('watermarkOpacity', x)} />
               </Field>
               <Field label="Color de la marca">
                 <input type="color" className={`${input} h-11 p-1`} value={val('brandColor', '#7b2ff7')} onChange={e => set('brandColor', e.target.value)} />
               </Field>
               <Field label="Placa final">
-                <Select value={val('endCard', false) ? val('endCardSeconds', 2.5) : 0} options={[{ value: 0, label: 'Sin placa' }, { value: 2, label: '2 s' }, { value: 2.5, label: '2,5 s' }, { value: 3.5, label: '3,5 s' }]}
+                <Select value={val('endCard', false) ? val('endCardSeconds', 2.5) : 0} options={[{ value: 0, label: 'Sin placa' }, { value: 2, label: '2 s' }, { value: 2.5, label: '2,5 s' }, { value: 3.5, label: '3,5 s' }, { value: 5, label: '5 s' }]}
                   onChange={x => { set('endCard', x > 0); if (x > 0) set('endCardSeconds', x); }} />
               </Field>
             </div>
             <Field label="Texto de la placa final">
               <input className={input} value={val('endCardText', '')} onChange={e => set('endCardText', e.target.value)} placeholder="www.tuempresa.com" />
             </Field>
+            <Field label="Fondo de la placa final" hint="Sin imagen: degradé con el color de la marca. Conviene la forma del video (1080×1920).">
+              <div className="flex flex-wrap items-center gap-3">
+                {assets.endcard && <img src={assets.endcard} alt="Placa final" className="h-20 rounded object-cover" />}
+                <input ref={endInput} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={e => { void upload('endcard', e.target.files); e.target.value = ''; }} />
+                <button type="button" onClick={() => endInput.current?.click()} disabled={!!busy} className={btnGhost}><ImagePlus className="h-4 w-4" /> {busy === 'endcard' ? 'Subiendo…' : assets.endcard ? 'Cambiar imagen' : 'Subir imagen propia'}</button>
+                {assets.endcard && <button type="button" onClick={() => setAssets({ endcard: null })} className={btnGhost}><Trash2 className="h-4 w-4" /> Quitar</button>}
+              </div>
+            </Field>
+            {assets.endcard && <Check label="Logo y textos encima de la imagen" checked={val('endCardOverlay', true)} onChange={x => set('endCardOverlay', x)} />}
           </Section>
           <Section title="Animación propia (video)">
             <p className="-mt-2 text-sm text-slate-400">Video corto en loop (WebM con transparencia o MP4 con fondo negro). Se usa eligiendo “Video propio” como animación.</p>

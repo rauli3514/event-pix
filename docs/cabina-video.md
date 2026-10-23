@@ -36,7 +36,17 @@ Android** (brazo de la plataforma 360, uso itinerante).
   polvo dorado, emojis, notas o un video propio) y accesorios en la cara (17). Animación y
   accesorio pueden ir **al azar** (cambian en cada video) o que el invitado los elija en
   la pantalla de la toma (botón **Efectos**).
-- **Marca:** logo, marca de agua, color y placa final.
+- **Marcos de fábrica:** tres de EventPix (neón, clásico y dorado, con el logo; se adaptan a
+  vertical, horizontal y cuadrado) y cuatro del espejo (cumpleaños, flores, Navidad, monstruos).
+  Se puede usar uno fijo, uno al azar o que el invitado elija entre los marcados.
+- **Nombre y fecha:** marco "Nombre y fecha" o encima de cualquier marco. La fecha puede ser
+  la de hoy, la que se escriba (ej. "14 de diciembre de 2026") o ninguna; arriba o abajo,
+  tamaño y color a elección.
+- **Marca:** logo (hasta 90 % del ancho, también al medio), marca de agua de chica a gigante,
+  con transparencia y opción "repetida en toda la pantalla", color y placa final (degradé o
+  **imagen propia** de fondo, con o sin logo y textos encima).
+- **Vista previa** en Ajustes (Biblioteca y cada experiencia): cómo sale el video terminado
+  y la placa final, sin grabar.
 - **Música propia:** varias canciones con punto de inicio; fija, al azar o la elige el invitado.
 - **Entrega:** QR al video y/o a la galería del evento; **WhatsApp** al número del invitado.
 - **Sin internet:** todo queda en el equipo y se sube solo cuando vuelve la conexión.

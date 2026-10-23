@@ -87,7 +87,7 @@ export default function ModeEditor({ modeKey, s, frames, songs, onChange, kit }:
               options={[{ value: GENERAL, label: 'Como en General' }, ...frames]} />
             <Toggle label="El invitado elige el marco" hint="Con más de un marco cargado" checked={r.frameChoice} onChange={v => onChange({ frameChoice: v })} />
           </>
-        ) : <Note>Cargá marcos PNG en Biblioteca.</Note>)}
+        ) : <Note>Elegí o cargá marcos en Biblioteca.</Note>)}
       </Group>
 
       <Group title="Animación y accesorio" description="Se mueven encima del video. “Al azar” cambia en cada video.">
