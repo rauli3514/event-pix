@@ -15,7 +15,8 @@ export function ThemeLayer({ theme, className = '' }: { theme: ThemeBackground; 
       {BLOB_POS.map((k, i) => (
         <div key={k} className={`kiosk-aurora-blob ${k}`} style={{ background: `radial-gradient(circle, ${theme.blobs[i]}, transparent 62%)` }} />
       ))}
-      <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at center, transparent 40%, ${theme.base}cc)` }} />
+      {/* Viñeta suave en los bordes */}
+      <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at center, transparent 55%, ${theme.base}99)` }} />
     </div>
   );
 }

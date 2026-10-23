@@ -17,13 +17,13 @@ export interface ThemeBackground {
 export const AURORA = 'aurora';
 
 export const THEME_BACKGROUNDS: ThemeBackground[] = [
-  { id: 't-dorado', label: 'Dorado elegante', base: '#0b0805', blobs: ['rgba(212,175,55,0.45)', 'rgba(247,227,161,0.28)', 'rgba(160,110,30,0.4)', 'rgba(255,255,255,0.12)'] },
-  { id: 't-boda', label: 'Boda (bordó y rosa)', base: '#14060b', blobs: ['rgba(170,20,60,0.5)', 'rgba(255,170,190,0.32)', 'rgba(110,10,40,0.55)', 'rgba(230,190,120,0.25)'] },
-  { id: 't-quince', label: '15 años (rosa y lila)', base: '#1a0616', blobs: ['rgba(255,60,170,0.5)', 'rgba(200,120,255,0.4)', 'rgba(255,150,200,0.35)', 'rgba(255,215,120,0.25)'] },
-  { id: 't-fiesta', label: 'Fiesta (colores)', base: '#07061a', blobs: ['rgba(255,210,63,0.45)', 'rgba(0,212,255,0.45)', 'rgba(255,46,147,0.5)', 'rgba(46,230,166,0.35)'] },
-  { id: 't-azul', label: 'Empresa (azul)', base: '#020b1a', blobs: ['rgba(30,110,255,0.5)', 'rgba(0,212,255,0.35)', 'rgba(20,60,160,0.55)', 'rgba(255,255,255,0.1)'] },
-  { id: 't-verde', label: 'Natural (verde)', base: '#04110b', blobs: ['rgba(46,200,120,0.42)', 'rgba(180,230,120,0.3)', 'rgba(10,110,80,0.5)', 'rgba(255,220,150,0.2)'] },
-  { id: 't-noche', label: 'Noche (negro)', base: '#030303', blobs: ['rgba(255,255,255,0.1)', 'rgba(120,120,140,0.18)', 'rgba(60,60,80,0.3)', 'rgba(255,255,255,0.06)'] },
+  { id: 't-dorado', label: 'Dorado elegante', base: '#1c1307', blobs: ['rgba(230,180,60,0.85)', 'rgba(255,225,150,0.6)', 'rgba(170,110,30,0.8)', 'rgba(255,240,200,0.35)'] },
+  { id: 't-boda', label: 'Boda (bordó y rosa)', base: '#2a0a16', blobs: ['rgba(200,30,80,0.8)', 'rgba(255,170,195,0.6)', 'rgba(140,15,55,0.85)', 'rgba(240,200,130,0.45)'] },
+  { id: 't-quince', label: '15 años (rosa y lila)', base: '#2a0a24', blobs: ['rgba(255,60,170,0.8)', 'rgba(200,120,255,0.7)', 'rgba(255,150,205,0.6)', 'rgba(255,215,120,0.4)'] },
+  { id: 't-fiesta', label: 'Fiesta (colores)', base: '#0e0b2a', blobs: ['rgba(255,210,63,0.75)', 'rgba(0,212,255,0.7)', 'rgba(255,46,147,0.8)', 'rgba(46,230,166,0.6)'] },
+  { id: 't-azul', label: 'Empresa (azul)', base: '#06152e', blobs: ['rgba(40,120,255,0.8)', 'rgba(0,212,255,0.6)', 'rgba(30,70,180,0.85)', 'rgba(220,235,255,0.25)'] },
+  { id: 't-verde', label: 'Natural (verde)', base: '#082018', blobs: ['rgba(46,200,120,0.75)', 'rgba(190,235,130,0.55)', 'rgba(15,120,90,0.8)', 'rgba(255,225,150,0.35)'] },
+  { id: 't-noche', label: 'Noche (negro y plata)', base: '#050507', blobs: ['rgba(255,255,255,0.22)', 'rgba(150,150,175,0.35)', 'rgba(80,80,110,0.5)', 'rgba(255,255,255,0.14)'] },
 ];
 
 export const themeBackground = (id?: string) => THEME_BACKGROUNDS.find(t => t.id === id);
