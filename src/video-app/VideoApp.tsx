@@ -5,6 +5,7 @@ import { isSupabaseConfigured } from '@/lib/supabase';
 import { DEVICE_EVENT, getCachedDeviceState, isStandalone, startAutoUpdate, startDeviceSync } from '@/lib/videoBooth/device';
 import { getVideoSettings } from '@/lib/videoBooth/settings';
 import { startVideoSync } from '@/lib/videoBooth/cloud';
+import { startLibrarySync } from '@/lib/videoBooth/library';
 import PairingScreen from './PairingScreen';
 import VideoBooth from './pages/VideoBooth';
 import VideoBoothSettings from './pages/VideoBoothSettings';
@@ -29,6 +30,8 @@ export default function VideoApp() {
     startDeviceSync();
     // Videos pendientes de subir (sin internet): se suben solos cuando vuelve
     startVideoSync();
+    // Música, marcos y fondos de la biblioteca compartida (panel → Biblioteca)
+    startLibrarySync();
     // Versiones nuevas de la app (solo en el APK)
     startAutoUpdate(() => getVideoSettings().autoUpdate !== false);
   }, []);
