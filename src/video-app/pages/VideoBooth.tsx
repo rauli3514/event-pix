@@ -22,7 +22,7 @@ import { DEFAULT_WA_PREFIX, fullPhone, sendVideoWhatsApp, validPhone } from '@/l
 import { isDriveConfigured } from '@/lib/videoBooth/drive';
 import { Compositor } from '@/lib/videoBooth/compositor';
 import { bufferSecondsFor, effectPlan, renderEffects } from '@/lib/videoBooth/effects';
-import { buildDecor, frameUrl, loadSong, pickSong, type DecorBundle } from '@/lib/videoBooth/media';
+import { buildDecor, framePool, frameUrl, loadSong, pickSong, type DecorBundle } from '@/lib/videoBooth/media';
 import { MotionDetector, watchMotion } from '@/lib/videoBooth/motion';
 import { audioContext, bitrateFor, ClipRecorder, extensionFor, mixAudio, openMic, type AudioMix } from '@/lib/videoBooth/recorder';
 import {
@@ -300,7 +300,7 @@ export default function VideoBooth() {
       setPrompt(pool[Math.floor(Math.random() * pool.length)]);
       queue.push('prompt');
     }
-    if (rm.overlay === 'custom' && rm.frameChoice && (settings.frames?.length ?? 0) > 1) queue.push('frame');
+    if (rm.overlay === 'custom' && rm.frameChoice && framePool(settings).length > 1) queue.push('frame');
     if (rm.cfg.music && rm.songMode === 'guest' && (settings.songs?.length ?? 0) > 1) queue.push('song');
     queueRef.current = queue;
     nextPre(m);
@@ -359,9 +359,9 @@ export default function VideoBooth() {
     if (step !== 'frame') return;
     let alive = true;
     const urls: string[] = [];
-    void Promise.all((settings.frames ?? []).map(async f => ({ ...f, url: await frameUrl(f.id) }))).then(list => {
+    void Promise.all(framePool(settings).map(async f => ({ ...f, url: await frameUrl(f.id, size) }))).then(list => {
       const ok = list.filter((f): f is { id: string; name: string; url: string } => !!f.url);
-      urls.push(...ok.map(f => f.url));
+      urls.push(...ok.map(f => f.url).filter(u => u.startsWith('blob:')));
       if (alive) setFrameThumbs(ok);
       else urls.forEach(u => URL.revokeObjectURL(u));
     });
@@ -370,7 +370,7 @@ export default function VideoBooth() {
       urls.forEach(u => URL.revokeObjectURL(u));
       setFrameThumbs([]);
     };
-  }, [step, settings.frames]);
+  }, [step, settings, size]);
 
   const chooseFrame = (id: string) => {
     chosenFrameRef.current = id;

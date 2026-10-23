@@ -1,4 +1,4 @@
-import type { AnimationKey, Corner } from './settings';
+import type { AnimationKey, Corner, WatermarkPosition } from './settings';
 
 // Capas que van encima del video: marco PNG, animación (confeti, brillos…, o un
 // video propio), logo, marca de agua y la placa final. Todo se dibuja en función
@@ -17,11 +17,29 @@ export interface DecorOptions {
   logoSize?: number;
   logoOpacity?: number;
   watermark?: string;
-  watermarkPosition?: Corner;
+  watermarkPosition?: WatermarkPosition;
+  watermarkSize?: number;
+  watermarkOpacity?: number;
   brandColor?: string;
+  /** Nombre y fecha del marco */
+  caption?: Caption | null;
   /** Placa final */
   title?: string;
   endText?: string;
+  /** Imagen propia de fondo de la placa final */
+  endImage?: CanvasImageSource | null;
+  /** Logo y textos encima de la imagen propia */
+  endOverlay?: boolean;
+}
+
+export interface Caption {
+  title: string;
+  date?: string;
+  position?: 'bottom' | 'top';
+  color?: string;
+  scale?: number;
+  /** Franja oscura detrás (marco "nombre del evento"); encima de un PNG va sin franja */
+  band?: boolean;
 }
 
 const EMOJIS = ['😍', '🥳', '🎉', '💃', '✨', '❤️', '😎', '🔥'];
@@ -58,7 +76,7 @@ export class Decor {
 
   get hasLayers() {
     const o = this.o;
-    return !!(o.frame || (o.animation && o.animation !== 'none') || o.logo || o.watermark);
+    return !!(o.frame || (o.animation && o.animation !== 'none') || o.logo || o.watermark || o.caption);
   }
 
   /** Dibuja todas las capas para el segundo `t`. */
@@ -67,6 +85,7 @@ export class Decor {
     ctx.save();
     this.drawAnimation(ctx, t);
     if (this.o.frame) ctx.drawImage(this.o.frame, 0, 0, W, H);
+    if (this.o.caption) this.drawCaption(ctx, this.o.caption);
     if (this.o.logo) this.drawLogo(ctx);
     if (this.o.watermark) this.drawWatermark(ctx);
     ctx.restore();
@@ -385,14 +404,14 @@ export class Decor {
     const { width: W, height: H } = this.o;
     const m = Math.min(W, H) * 0.04;
     const x = pos === 'tl' || pos === 'bl' ? m : pos === 'tr' || pos === 'br' ? W - w - m : (W - w) / 2;
-    const y = pos === 'tl' || pos === 'tr' || pos === 'top' ? m : H - h - m;
+    const y = pos === 'tl' || pos === 'tr' || pos === 'top' ? m : pos === 'center' ? (H - h) / 2 : H - h - m;
     return { x, y };
   }
 
   private drawLogo(ctx: CanvasRenderingContext2D) {
     const logo = this.o.logo!;
     const { w: lw, h: lh } = imageSize(logo);
-    const w = this.o.width * Math.max(0.05, Math.min(0.6, this.o.logoSize ?? 0.22));
+    const w = this.o.width * Math.max(0.05, Math.min(0.95, this.o.logoSize ?? 0.22));
     const h = (w * lh) / lw;
     const { x, y } = this.place(this.o.logoPosition ?? 'tr', w, h);
     ctx.save();
@@ -402,18 +421,71 @@ export class Decor {
   }
 
   private drawWatermark(ctx: CanvasRenderingContext2D) {
+    const { width: W, height: H } = this.o;
     const text = this.o.watermark!;
-    const size = Math.round(Math.min(this.o.width, this.o.height) * 0.035);
+    const size = Math.round(Math.min(W, H) * Math.max(0.02, Math.min(0.3, this.o.watermarkSize ?? 0.035)));
+    const pos = this.o.watermarkPosition ?? 'bl';
     ctx.save();
-    ctx.font = `700 ${size}px 'Montserrat', sans-serif`;
-    const w = ctx.measureText(text).width;
-    const { x, y } = this.place(this.o.watermarkPosition ?? 'bl', w, size);
+    ctx.font = `800 ${size}px 'Montserrat', sans-serif`;
     ctx.textBaseline = 'top';
-    ctx.globalAlpha = 0.85;
     ctx.fillStyle = '#fff';
     ctx.shadowColor = 'rgba(0,0,0,0.6)';
-    ctx.shadowBlur = size * 0.4;
-    ctx.fillText(text, x, y);
+    ctx.shadowBlur = size * 0.3;
+    const w = ctx.measureText(text).width;
+    if (pos === 'tile') {
+      // Repetida en diagonal: tapa todo el video
+      ctx.globalAlpha = this.o.watermarkOpacity ?? 0.3;
+      ctx.translate(W / 2, H / 2);
+      ctx.rotate(-Math.PI / 6);
+      const stepX = w + size * 2;
+      const stepY = size * 3;
+      const R = Math.hypot(W, H) / 2 + stepX;
+      let row = 0;
+      for (let y = -R; y < R; y += stepY, row++) {
+        for (let x = -R + (row % 2) * (stepX / 2); x < R; x += stepX) ctx.fillText(text, x, y);
+      }
+    } else {
+      ctx.globalAlpha = this.o.watermarkOpacity ?? 0.85;
+      const { x, y } = this.place(pos, w, size);
+      ctx.fillText(text, x, y);
+    }
+    ctx.restore();
+  }
+
+  /** Nombre del evento y fecha: con franja oscura, o solos encima del marco PNG. */
+  private drawCaption(ctx: CanvasRenderingContext2D, c: Caption) {
+    const { width: W, height: H } = this.o;
+    if (!c.title && !c.date) return;
+    const top = c.position === 'top';
+    const scale = Math.max(0.5, Math.min(2.2, c.scale ?? 1));
+    const band = Math.round(H * 0.2 * Math.min(1.4, scale));
+    ctx.save();
+    if (c.band) {
+      const g = top ? ctx.createLinearGradient(0, band, 0, 0) : ctx.createLinearGradient(0, H - band, 0, H);
+      g.addColorStop(0, 'rgba(0,0,0,0)');
+      g.addColorStop(1, 'rgba(0,0,0,0.7)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, top ? 0 : H - band, W, band);
+    }
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = c.color || '#ffffff';
+    ctx.shadowColor = 'rgba(0,0,0,0.55)';
+    ctx.shadowBlur = Math.round(W * 0.012);
+    let size = Math.round(Math.min(W, H) * 0.075 * scale);
+    const font = (px: number) => `800 ${px}px 'CarlMarx', 'Montserrat', sans-serif`;
+    ctx.font = font(size);
+    while (c.title && ctx.measureText(c.title).width > W * 0.88 && size > 12) { size -= 2; ctx.font = font(size); }
+    const subSize = Math.round(Math.min(W, H) * 0.075 * scale * 0.42);
+    const m = H * 0.045;
+    // Renglones de abajo hacia arriba (abajo) o de arriba hacia abajo (arriba)
+    const titleY = top ? m + size : H - m - (c.date ? subSize * 1.5 : 0);
+    if (c.title) ctx.fillText(c.title, W / 2, titleY);
+    if (c.date) {
+      ctx.font = `600 ${subSize}px 'Montserrat', sans-serif`;
+      ctx.globalAlpha = 0.9;
+      ctx.fillText(c.date, W / 2, top ? (c.title ? titleY + subSize * 1.5 : m + subSize) : H - m);
+    }
     ctx.restore();
   }
 
@@ -425,15 +497,28 @@ export class Decor {
     const fade = Math.min(1, t / 0.35);
     ctx.save();
     ctx.globalAlpha = fade;
-    const g = ctx.createLinearGradient(0, 0, W, H);
-    g.addColorStop(0, '#07051a');
-    g.addColorStop(1, color);
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, W, H);
-    // Brillos de fondo
-    for (let i = 0; i < 18; i++) {
-      const a = Math.max(0, Math.sin(t * 3 + i));
-      this.star(ctx, rnd(i, 1) * W, rnd(i, 2) * H, Math.min(W, H) * 0.012 * a, a * fade);
+    const img = this.o.endImage;
+    if (img) {
+      // Imagen propia: cubre todo, con un acercamiento suave
+      const { w: iw, h: ih } = imageSize(img);
+      const k = Math.max(W / iw, H / ih) * (1 + 0.04 * Math.min(1, t / duration));
+      ctx.drawImage(img, (W - iw * k) / 2, (H - ih * k) / 2, iw * k, ih * k);
+    } else {
+      const g = ctx.createLinearGradient(0, 0, W, H);
+      g.addColorStop(0, '#07051a');
+      g.addColorStop(1, color);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+      // Brillos de fondo
+      for (let i = 0; i < 18; i++) {
+        const a = Math.max(0, Math.sin(t * 3 + i));
+        this.star(ctx, rnd(i, 1) * W, rnd(i, 2) * H, Math.min(W, H) * 0.012 * a, a * fade);
+      }
+    }
+    if (img && this.o.endOverlay === false) {
+      this.endFade(ctx, t, duration);
+      ctx.restore();
+      return;
     }
     const ease = 1 - Math.pow(1 - Math.min(1, t / 0.8), 3);
     let y = H * 0.38;
@@ -463,13 +548,16 @@ export class Decor {
       ctx.globalAlpha = fade * Math.min(1, Math.max(0, (t - 0.4) / 0.5));
       ctx.fillText(this.o.endText, W / 2, y + size);
     }
-    // Se apaga al final
-    if (t > duration - 0.3) {
-      ctx.globalAlpha = Math.min(1, (t - (duration - 0.3)) / 0.3) * 0.6;
-      ctx.fillStyle = '#000';
-      ctx.fillRect(0, 0, W, H);
-    }
+    this.endFade(ctx, t, duration);
     ctx.restore();
+  }
+
+  /** Se apaga al final. */
+  private endFade(ctx: CanvasRenderingContext2D, t: number, duration: number) {
+    if (t <= duration - 0.3) return;
+    ctx.globalAlpha = Math.min(1, (t - (duration - 0.3)) / 0.3) * 0.6;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, this.o.width, this.o.height);
   }
 }
 

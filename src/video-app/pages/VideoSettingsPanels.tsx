@@ -10,10 +10,12 @@ import { isSupabaseConfigured } from '@/lib/supabase';
 import { galleryUrl, pendingVideoCount, processVideoQueue, VIDEO_QUEUE_EVENT } from '@/lib/videoBooth/cloud';
 import { MotionDetector, suggestThreshold } from '@/lib/videoBooth/motion';
 import {
-  ANIM_KEY, ANIMATIONS, CORNERS, frameKey, galleryCode, LOGO_KEY, newGalleryCode, newMediaId, songKey,
-  type VideoBoothSettings,
+  ANIM_KEY, ANIMATIONS, CORNERS, END_KEY, frameKey, galleryCode, LOGO_KEY, LOGO_SIZES, newGalleryCode, newMediaId, outputSize, resolveMode, songKey,
+  TEXT_SCALES, videoFilter, WATERMARK_POSITIONS, WATERMARK_SIZES, type VideoBoothSettings, type VideoModeKey,
 } from '@/lib/videoBooth/settings';
-import { buttonClass, Choice, Field, inputClass, Panel, primaryClass, Toggle } from '../ui';
+import { buildDecor, framePool, type DecorBundle } from '@/lib/videoBooth/media';
+import { allFrames, builtinFrameThumb, isBuiltinFrame } from '@/lib/videoBooth/builtinFrames';
+import { buttonClass, Choice, Field, inputClass, MultiChoice, Panel, primaryClass, Toggle } from '../ui';
 
 // Paneles de Ajustes de la cabina de video: marcos, capas, marca, música, 360 y entrega.
 
@@ -54,15 +56,29 @@ const save = async (key: string, file: File) => {
   }
 };
 
-function FrameThumb({ id, name, active, onPick, onRemove }: { id: string; name: string; active: boolean; onPick: () => void; onRemove: () => void }) {
-  const url = useMediaUrl(frameKey(id));
+function FrameThumb({ id, name, active, size, onPick, onRemove }: {
+  id: string; name: string; active: boolean; size: { width: number; height: number }; onPick: () => void; onRemove?: () => void;
+}) {
+  const own = useMediaUrl(isBuiltinFrame(id) ? '' : frameKey(id));
+  const [builtin, setBuiltin] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isBuiltinFrame(id)) return;
+    let alive = true;
+    void builtinFrameThumb(id, size.width, size.height).then(u => { if (alive) setBuiltin(u); });
+    return () => { alive = false; };
+  }, [id, size.width, size.height]);
+  const url = isBuiltinFrame(id) ? builtin : own;
   return (
     <div className="flex flex-col items-center gap-2">
       <button onClick={onPick} className={`rounded-2xl p-1.5 focus:outline-none focus:ring-4 focus:ring-[#00d4ff] ${active ? 'bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7]' : 'bg-white/10'}`}>
-        {url ? <img src={url} alt={name} className="h-36 rounded-xl bg-[repeating-conic-gradient(#444_0_25%,#666_0_50%)] bg-[length:16px_16px]" /> : <span className="block h-36 w-20" />}
+        {url
+          ? <img src={url} alt={name} className="h-36 rounded-xl bg-gradient-to-br from-[#6b4a8a] to-[#d9937a] object-fill" style={{ aspectRatio: `${size.width} / ${size.height}` }} />
+          : <span className="block h-36 w-20" />}
       </button>
       <span className="text-sm max-w-[9rem] truncate">{name}{id.startsWith('r-') ? ' (panel)' : ''}</span>
-      <button onClick={onRemove} className="text-white/60 hover:text-white text-sm flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-[#00d4ff] rounded"><Trash2 className="w-4 h-4" /> Quitar</button>
+      {onRemove
+        ? <button onClick={onRemove} className="text-white/60 hover:text-white text-sm flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-[#00d4ff] rounded"><Trash2 className="w-4 h-4" /> Quitar</button>
+        : <span className="text-white/40 text-xs">De fábrica</span>}
     </div>
   );
 }
@@ -70,42 +86,88 @@ function FrameThumb({ id, name, active, onPick, onRemove }: { id: string; name: 
 export function FramesPanel({ s, update }: Props) {
   const input = useRef<HTMLInputElement>(null);
   const frames = s.frames ?? [];
+  const all = allFrames(s);
+  const size = outputSize(s);
+  const overlay = s.overlay ?? 'none';
+  const current = s.frameId === 'random' ? 'random' : all.some(f => f.id === s.frameId) ? s.frameId! : all[0]?.id;
   const add = async (files: FileList | null) => {
     const added = [];
     for (const file of Array.from(files ?? [])) {
       const id = newMediaId();
       if (await save(frameKey(id), file)) added.push({ id, name: file.name.replace(/\.\w+$/, '') });
     }
-    if (added.length) update({ frames: [...frames, ...added], frameId: s.frameId || added[0].id, overlay: 'custom' });
+    if (added.length) {
+      // El primer marco propio pasa a ser el que se usa
+      update({ frames: [...frames, ...added], frameId: frames.length ? current : added[0].id, overlay: 'custom' });
+      toast.success(added.length > 1 ? `${added.length} marcos cargados` : 'Marco cargado');
+    }
   };
   const remove = async (id: string) => {
     await removeMedia(frameKey(id)).catch(() => {});
     const rest = frames.filter(f => f.id !== id);
-    update({ frames: rest, frameId: s.frameId === id ? rest[0]?.id : s.frameId });
+    update({ frames: rest, frameId: s.frameId === id ? undefined : s.frameId, guestFrames: s.guestFrames?.filter(x => x !== id) });
   };
+  const pool = framePool(s);
   return (
-    <Panel title="Marcos (plantillas)" description="PNG con el centro transparente y la misma forma que el video (1080×1920 vertical). Podés cargar varios: cada experiencia puede usar uno distinto (en su pestaña) y el invitado puede elegir.">
-      <Choice label="Marco de General" value={s.overlay ?? 'none'} onChange={v => update({ overlay: v })}
-        options={[{ value: 'none', label: 'Sin marco' }, { value: 'title', label: 'Nombre del evento' }, { value: 'custom', label: 'PNG' }]} />
-      {(s.overlay ?? 'none') === 'title' && (
-        <Field label="Texto (vacío = nombre del evento)">
-          <input className={inputClass} value={s.overlayText ?? ''} onChange={e => update({ overlayText: e.target.value })} placeholder="Ej. Sofi & Juan" />
-        </Field>
-      )}
-      {s.overlay === 'custom' && (
+    <Panel title="Marcos (plantillas)" description="Tocá un marco para usarlo. Hay marcos de fábrica (con el logo de EventPix y los del espejo) y podés cargar los tuyos: PNG con el centro transparente y la misma forma que el video (1080×1920 vertical). Cada experiencia puede usar uno distinto (en su pestaña).">
+      <Choice label="Marco de General" value={overlay} onChange={v => update({ overlay: v })}
+        options={[{ value: 'none', label: 'Sin marco' }, { value: 'title', label: 'Nombre y fecha' }, { value: 'custom', label: 'Marco (plantilla)' }]} />
+      {overlay === 'custom' && (
         <>
           <div className="flex flex-wrap gap-4">
-            {frames.map(f => (
-              <FrameThumb key={f.id} id={f.id} name={f.name} active={(s.frameId ?? frames[0]?.id) === f.id}
-                onPick={() => update({ frameId: f.id })} onRemove={() => void remove(f.id)} />
+            {all.map(f => (
+              <FrameThumb key={f.id} id={f.id} name={f.name} size={size} active={current === f.id}
+                onPick={() => update({ frameId: f.id })} onRemove={f.builtin ? undefined : () => void remove(f.id)} />
             ))}
           </div>
           <input ref={input} type="file" accept="image/png,image/webp" multiple className="hidden" onChange={e => { void add(e.target.files); e.target.value = ''; }} />
-          <button className={buttonClass} onClick={() => input.current?.click()}><ImagePlus className="w-5 h-5" /> Agregar marcos PNG</button>
-          <Toggle label="El invitado elige el marco" hint="Antes de grabar ve los marcos y toca el que quiere (con más de uno)." checked={!!s.frameChoice} onChange={v => update({ frameChoice: v })} />
+          <button className={buttonClass} onClick={() => input.current?.click()}><ImagePlus className="w-5 h-5" /> Agregar mis marcos PNG</button>
+          <Choice label="Qué marco se usa" value={current === 'random' ? 'random' : 'fixed'}
+            onChange={v => update({ frameId: v === 'random' ? 'random' : all[0]?.id })}
+            options={[{ value: 'fixed', label: 'El marcado arriba' }, { value: 'random', label: 'Uno al azar en cada video' }]} />
+          <Toggle label="El invitado elige el marco" hint="Antes de grabar ve los marcos y toca el que quiere." checked={!!s.frameChoice} onChange={v => update({ frameChoice: v })} />
+          {(s.frameChoice || current === 'random') && (
+            <MultiChoice label={`Marcos para ${s.frameChoice ? 'elegir' : 'el azar'} (${pool.length})`} values={pool.map(f => f.id)}
+              options={all.map(f => ({ value: f.id, label: f.name }))} onChange={v => update({ guestFrames: v })} />
+          )}
         </>
       )}
+      {overlay !== 'none' && <CaptionFields s={s} update={update} />}
     </Panel>
+  );
+}
+
+/** Nombre y fecha del marco: el texto, la fecha que se quiera, dónde y cómo. */
+function CaptionFields({ s, update }: Props) {
+  const overlay = s.overlay ?? 'none';
+  const show = overlay === 'title' || !!s.frameText;
+  const dateMode = s.overlayDateMode ?? 'auto';
+  return (
+    <div className="space-y-4 rounded-2xl border border-white/10 bg-black/15 p-4">
+      {overlay === 'custom' && (
+        <Toggle label="Nombre y fecha encima del PNG" hint="Si tu PNG ya trae los textos, dejalo apagado." checked={!!s.frameText} onChange={v => update({ frameText: v })} />
+      )}
+      {show && (
+        <>
+          <Field label="Texto grande (vacío = nombre del evento)">
+            <input className={inputClass} value={s.overlayText ?? ''} onChange={e => update({ overlayText: e.target.value })} placeholder={s.eventTitle || 'Ej. Sofi & Juan'} />
+          </Field>
+          <Choice label="Fecha" value={dateMode} onChange={v => update({ overlayDateMode: v })}
+            options={[{ value: 'auto', label: 'La de hoy (automática)' }, { value: 'custom', label: 'La escribo yo' }, { value: 'none', label: 'Sin fecha' }]} />
+          {dateMode === 'custom' && (
+            <Field label="Fecha o texto chico (lo que quieras)">
+              <input className={inputClass} value={s.overlayDate ?? ''} onChange={e => update({ overlayDate: e.target.value })} placeholder="14 de diciembre de 2026" />
+            </Field>
+          )}
+          <Choice label="Dónde" value={s.textPosition ?? 'bottom'} onChange={v => update({ textPosition: v })}
+            options={[{ value: 'bottom', label: 'Abajo' }, { value: 'top', label: 'Arriba' }]} />
+          <Choice label="Tamaño del texto" value={s.textScale ?? 1} onChange={v => update({ textScale: v })} options={TEXT_SCALES} />
+          <Field label="Color del texto">
+            <input type="color" className="h-14 w-28 rounded-xl bg-transparent" value={s.textColor ?? '#ffffff'} onChange={e => update({ textColor: e.target.value })} />
+          </Field>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -146,6 +208,26 @@ export function AnimVideoPanel({ s, update }: Props) {
   );
 }
 
+/** Fondo de la placa final: color de la marca o una imagen propia. */
+function EndCardImage({ s, update }: Props) {
+  const input = useRef<HTMLInputElement>(null);
+  const img = useMediaUrl(END_KEY);
+  return (
+    <div className="space-y-3 rounded-2xl border border-white/10 bg-black/15 p-4">
+      <p className="text-white/70">Fondo de la placa final: {img ? 'tu imagen' : 'degradé con el color de la marca'}</p>
+      <div className="flex flex-wrap items-center gap-4">
+        {img && <img src={img} alt="Placa final" className="h-32 rounded-xl object-cover" style={{ aspectRatio: '9 / 16' }} />}
+        <input ref={input} type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
+          onChange={e => { const f = e.target.files?.[0]; if (f) void save(END_KEY, f); e.target.value = ''; }} />
+        <button className={buttonClass} onClick={() => input.current?.click()}><ImagePlus className="w-5 h-5" /> {img ? 'Cambiar imagen' : 'Usar una imagen propia'}</button>
+        {img && <button className={buttonClass} onClick={() => void removeMedia(END_KEY)}><Trash2 className="w-5 h-5" /> Quitar</button>}
+      </div>
+      {img && <Toggle label="Logo y textos encima de la imagen" hint="Apagalo si tu imagen ya trae todo (por ejemplo, un diseño hecho en Canva)." checked={s.endCardOverlay !== false} onChange={v => update({ endCardOverlay: v })} />}
+      <p className="text-white/45 text-sm">Conviene que tenga la forma del video (1080×1920 vertical); si no, se recorta para llenar la pantalla.</p>
+    </div>
+  );
+}
+
 export function BrandPanel({ s, update }: Props) {
   const input = useRef<HTMLInputElement>(null);
   const logo = useMediaUrl(LOGO_KEY);
@@ -162,24 +244,32 @@ export function BrandPanel({ s, update }: Props) {
         <>
           <Toggle label="Logo en los videos" checked={s.showLogo !== false} onChange={v => update({ showLogo: v })} />
           <Choice label="Lugar del logo" value={s.logoPosition ?? 'tr'} onChange={v => update({ logoPosition: v })} options={CORNERS} />
-          <Choice label="Tamaño" value={s.logoSize ?? 0.22} onChange={v => update({ logoSize: v })}
-            options={[0.12, 0.18, 0.22, 0.3, 0.4].map(n => ({ value: n, label: `${Math.round(n * 100)}%` }))} />
+          <Choice label="Tamaño (ancho del video)" value={s.logoSize ?? 0.22} onChange={v => update({ logoSize: v })}
+            options={LOGO_SIZES.map(n => ({ value: n, label: `${Math.round(n * 100)}%` }))} />
           <Choice label="Transparencia" value={s.logoOpacity ?? 0.9} onChange={v => update({ logoOpacity: v })}
             options={[0.5, 0.7, 0.9, 1].map(n => ({ value: n, label: `${Math.round(n * 100)}%` }))} />
         </>
       )}
-      <Field label="Marca de agua (texto chico, ej. @tuempresa)">
+      <Field label="Marca de agua (texto, ej. @tuempresa)">
         <input className={inputClass} value={s.watermark ?? ''} onChange={e => update({ watermark: e.target.value })} placeholder="@eventpix" />
       </Field>
-      {!!s.watermark && <Choice label="Lugar de la marca de agua" value={s.watermarkPosition ?? 'bl'} onChange={v => update({ watermarkPosition: v })} options={CORNERS} />}
+      {!!s.watermark && (
+        <>
+          <Choice label="Lugar de la marca de agua" value={s.watermarkPosition ?? 'bl'} onChange={v => update({ watermarkPosition: v })} options={WATERMARK_POSITIONS} />
+          <Choice label="Tamaño de la marca de agua" value={s.watermarkSize ?? 0.035} onChange={v => update({ watermarkSize: v })} options={WATERMARK_SIZES} />
+          <Choice label="Transparencia de la marca de agua" value={s.watermarkOpacity ?? (s.watermarkPosition === 'tile' ? 0.3 : 0.85)} onChange={v => update({ watermarkOpacity: v })}
+            options={[0.15, 0.3, 0.5, 0.7, 0.85, 1].map(n => ({ value: n, label: `${Math.round(n * 100)}%` }))} />
+        </>
+      )}
       <Field label="Color de la marca (placa final y borde neón)">
         <input type="color" className="h-14 w-28 rounded-xl bg-transparent" value={s.brandColor ?? '#7b2ff7'} onChange={e => update({ brandColor: e.target.value })} />
       </Field>
       <Toggle label="Placa final" hint="Al final de cada video: logo, nombre del evento y tu texto" checked={!!s.endCard} onChange={v => update({ endCard: v })} />
       {s.endCard && (
         <>
+          <EndCardImage s={s} update={update} />
           <Choice label="Duración de la placa" value={s.endCardSeconds ?? 2.5} onChange={v => update({ endCardSeconds: v })}
-            options={[2, 2.5, 3.5].map(n => ({ value: n, label: `${n} s` }))} />
+            options={[2, 2.5, 3.5, 5].map(n => ({ value: n, label: `${n} s` }))} />
           <Field label="Texto de la placa (ej. tu web o Instagram)">
             <input className={inputClass} value={s.endCardText ?? ''} onChange={e => update({ endCardText: e.target.value })} placeholder="www.tuempresa.com" />
           </Field>
@@ -396,6 +486,97 @@ export function DeliveryPanel({ s, update }: Props) {
             <CloudUpload className="w-5 h-5" /> {syncing ? 'Subiendo…' : 'Subir ahora'}
           </button>
         )}
+      </div>
+    </Panel>
+  );
+}
+
+/** Fondo de ejemplo para la vista previa: dos personas en un salón. */
+function drawSample(ctx: CanvasRenderingContext2D, W: number, H: number, filter: string) {
+  ctx.save();
+  ctx.filter = filter || 'none';
+  const g = ctx.createLinearGradient(0, 0, W, H);
+  g.addColorStop(0, '#3b2a5e');
+  g.addColorStop(0.55, '#a85b7a');
+  g.addColorStop(1, '#f2b880');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  for (let i = 0; i < 9; i++) {
+    ctx.fillStyle = `rgba(255,240,200,${0.08 + (i % 3) * 0.05})`;
+    ctx.beginPath();
+    ctx.arc(((i * 137) % 100) / 100 * W, ((i * 71) % 45) / 100 * H, Math.min(W, H) * (0.04 + (i % 4) * 0.02), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  const u = Math.min(W, H);
+  for (const [cx, tone] of [[0.38, '#2a1f33'], [0.62, '#33243d']] as const) {
+    ctx.fillStyle = tone;
+    ctx.beginPath();
+    ctx.arc(cx * W, H * 0.45, u * 0.11, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(cx * W, H * 0.45 + u * 0.5, u * 0.21, u * 0.36, 0, Math.PI, 0);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/**
+ * Vista previa del video terminado (marco, nombre y fecha, logo, marca de agua,
+ * animación y placa final) con los ajustes de ahora, sin tener que grabar.
+ */
+export function PreviewPanel({ s, modeKey }: { s: VideoBoothSettings; modeKey?: VideoModeKey }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [mediaRev, setMediaRev] = useState(0);
+  const [endCard, setEndCard] = useState(false);
+  const { width, height } = outputSize(s);
+  useEffect(() => {
+    const bump = () => setMediaRev(n => n + 1);
+    window.addEventListener(MEDIA_EVENT, bump);
+    return () => window.removeEventListener(MEDIA_EVENT, bump);
+  }, []);
+  useEffect(() => {
+    let alive = true;
+    let bundle: DecorBundle | null = null;
+    let raf = 0;
+    const timer = window.setTimeout(async () => {
+      const r = modeKey ? resolveMode(modeKey, s) : null;
+      const animation = r ? (r.animation === 'random' ? r.animationPool[0] : r.animation) : s.animation;
+      bundle = await buildDecor(s, { width, height }, { eventTitle: s.eventTitle, overlay: r?.overlay, frameId: r?.frameId, animation });
+      const canvas = canvasRef.current;
+      if (!alive || !canvas) { bundle.dispose(); return; }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d')!;
+      const filter = videoFilter(r?.cfg.filter).css;
+      const t0 = performance.now();
+      const endSeconds = s.endCardSeconds ?? 2.5;
+      const loop = () => {
+        const t = (performance.now() - t0) / 1000;
+        if (endCard) {
+          bundle!.decor.drawEndCard(ctx, t % (endSeconds + 0.8), endSeconds);
+        } else {
+          drawSample(ctx, width, height, filter);
+          bundle!.decor.draw(ctx, t);
+        }
+        raf = requestAnimationFrame(loop);
+      };
+      loop();
+    }, 250);
+    return () => {
+      alive = false;
+      window.clearTimeout(timer);
+      cancelAnimationFrame(raf);
+      bundle?.dispose();
+    };
+  }, [s, modeKey, width, height, mediaRev, endCard]);
+  return (
+    <Panel title="Vista previa" description="Así sale el video terminado con estos ajustes (las personas son de ejemplo). Se actualiza al cambiar algo.">
+      <div className="flex flex-wrap items-start gap-5">
+        <canvas ref={canvasRef} className="rounded-2xl ring-2 ring-white/15 bg-black" style={{ height: 'min(60vh, 34rem)', aspectRatio: `${width} / ${height}` }} />
+        <div className="space-y-3">
+          <button className={buttonClass} onClick={() => setEndCard(v => !v)}>{endCard ? 'Ver el video' : 'Ver la placa final'}</button>
+          {endCard && !s.endCard && <p className="text-amber-200 text-sm max-w-xs">La placa final está apagada (Marca → Placa final).</p>}
+        </div>
       </div>
     </Panel>
   );

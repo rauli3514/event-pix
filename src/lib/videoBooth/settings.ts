@@ -171,8 +171,19 @@ export interface VideoBoothSettings {
   countdown?: number;
   /** Marco: ninguno, el nombre del evento o un PNG propio */
   overlay?: 'none' | 'title' | 'custom';
-  /** Texto del marco "nombre del evento" (por defecto el título del evento) */
+  /** Texto grande del marco (por defecto el nombre del evento) */
   overlayText?: string;
+  /** Fecha del marco: la de hoy, la que se escribe o ninguna */
+  overlayDateMode?: 'auto' | 'custom' | 'none';
+  /** Fecha (o texto chico) escrita a mano, ej. "14 de diciembre de 2026" */
+  overlayDate?: string;
+  /** Nombre y fecha también encima del marco PNG */
+  frameText?: boolean;
+  /** Dónde van el nombre y la fecha */
+  textPosition?: 'bottom' | 'top';
+  textColor?: string;
+  /** Tamaño del texto (1 = normal) */
+  textScale?: number;
   /** Volumen de la música (0 a 1) */
   musicVolume?: number;
   /** Velocidad de la cámara lenta */
@@ -198,10 +209,12 @@ export interface VideoBoothSettings {
   // ─── Marcos y capas ───
   /** Marcos PNG cargados (el archivo está en el equipo: frameKey(id)) */
   frames?: MediaItem[];
-  /** Marco por defecto cuando overlay = 'custom' */
+  /** Marco por defecto cuando overlay = 'custom' ('random' = uno al azar en cada video) */
   frameId?: string;
   /** El invitado elige el marco (si hay más de uno) */
   frameChoice?: boolean;
+  /** Marcos para elegir o para "al azar" (vacío = los cargados; sin cargados, los de fábrica) */
+  guestFrames?: string[];
   /** Animación encima del video */
   animation?: AnimationKey;
   /** Animación propia (video): mezcla "pantalla" para videos con fondo negro */
@@ -215,15 +228,20 @@ export interface VideoBoothSettings {
   /** Ancho del logo (fracción del ancho del video) */
   logoSize?: number;
   logoOpacity?: number;
-  /** Texto chico encima del video (ej. @tuempresa) */
+  /** Texto encima del video (ej. @tuempresa) */
   watermark?: string;
-  watermarkPosition?: Corner;
+  watermarkPosition?: WatermarkPosition;
+  /** Alto de la letra (fracción del lado corto del video) */
+  watermarkSize?: number;
+  watermarkOpacity?: number;
   /** Color de la marca (placa final, neón, franja del nombre) */
   brandColor?: string;
   /** Placa final con el logo y el nombre del evento */
   endCard?: boolean;
   endCardSeconds?: number;
   endCardText?: string;
+  /** Con imagen propia de fondo (endCardKey): logo y textos encima o solo la imagen */
+  endCardOverlay?: boolean;
 
   // ─── Efectos ───
   /** Acercamiento suave durante el video (modos con efectos) */
@@ -266,7 +284,9 @@ export interface VideoBoothSettings {
 
 export interface MediaItem { id: string; name: string }
 export interface SongItem extends MediaItem { /** Segundo de la canción donde empieza */ start?: number }
-export type Corner = 'tl' | 'tr' | 'bl' | 'br' | 'top' | 'bottom';
+export type Corner = 'tl' | 'tr' | 'bl' | 'br' | 'top' | 'bottom' | 'center';
+/** 'tile' = repetida en diagonal por toda la pantalla */
+export type WatermarkPosition = Corner | 'tile';
 
 export const ANIMATIONS = [
   { value: 'none', label: 'Sin animación' },
@@ -293,13 +313,29 @@ export const animationLabel = (v?: string) => ANIMATIONS.find(a => a.value === v
 export const CORNERS: { value: Corner; label: string }[] = [
   { value: 'tl', label: 'Arriba izquierda' }, { value: 'top', label: 'Arriba al centro' }, { value: 'tr', label: 'Arriba derecha' },
   { value: 'bl', label: 'Abajo izquierda' }, { value: 'bottom', label: 'Abajo al centro' }, { value: 'br', label: 'Abajo derecha' },
+  { value: 'center', label: 'En el medio' },
 ];
+export const WATERMARK_POSITIONS: { value: WatermarkPosition; label: string }[] = [...CORNERS, { value: 'tile', label: 'Repetida en toda la pantalla' }];
+export const WATERMARK_SIZES = [
+  { value: 0.035, label: 'Chica' }, { value: 0.06, label: 'Mediana' }, { value: 0.1, label: 'Grande' }, { value: 0.16, label: 'Muy grande' }, { value: 0.24, label: 'Gigante' },
+];
+export const LOGO_SIZES = [0.15, 0.22, 0.35, 0.5, 0.7, 0.9];
+export const TEXT_SCALES = [{ value: 0.8, label: 'Chico' }, { value: 1, label: 'Normal' }, { value: 1.3, label: 'Grande' }, { value: 1.7, label: 'Muy grande' }];
+
+/** Fecha que va en el marco según Ajustes ('' = sin fecha). */
+export const overlayDateText = (s: VideoBoothSettings) => {
+  const mode = s.overlayDateMode ?? 'auto';
+  if (mode === 'none') return '';
+  if (mode === 'custom') return (s.overlayDate || '').trim();
+  return new Date().toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' });
+};
 
 // Archivos guardados en el equipo (mediaStore.ts)
 export const frameKey = (id: string) => `video:frame:${id}`;
 export const songKey = (id: string) => `video:song:${id}`;
 export const LOGO_KEY = 'video:logo';
 export const ANIM_KEY = 'video:anim';
+export const END_KEY = 'video:endcard';
 export const newMediaId = () => Math.random().toString(36).slice(2, 10);
 
 /** Texto sin acentos ni símbolos, para direcciones (ej. "Boda Sofi & Juan" → "boda-sofi-juan"). */
