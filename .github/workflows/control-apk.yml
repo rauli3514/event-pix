@@ -46,6 +46,9 @@ jobs:
         run: npm ci
 
       - name: Compilar la web de control
+        env:
+          # El compilado necesita más memoria que los ~2 GB que Node usa por defecto
+          NODE_OPTIONS: --max-old-space-size=4096
         run: |
           npx vite build --config vite.control.config.ts
           rm -rf dist && mv dist-control dist

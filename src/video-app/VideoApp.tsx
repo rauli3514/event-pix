@@ -1,0 +1,42 @@
+import { useEffect, useState } from 'react';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { Toaster } from 'sonner';
+import { isSupabaseConfigured } from '@/lib/supabase';
+import { DEVICE_EVENT, getCachedDeviceState, isStandalone, startDeviceSync } from '@/lib/videoBooth/device';
+import { startVideoSync } from '@/lib/videoBooth/cloud';
+import PairingScreen from './PairingScreen';
+import VideoBooth from './pages/VideoBooth';
+import VideoBoothSettings from './pages/VideoBoothSettings';
+
+// Rutas de la app EventPix Video. Al abrir: si el equipo no está vinculado al
+// panel de la cabina muestra su código (o se usa sin panel); si no, la cabina.
+
+function Home() {
+  const [linked, setLinked] = useState(() => getCachedDeviceState()?.pairingStatus === 'linked');
+  const [standalone, setStandaloneState] = useState(isStandalone);
+  useEffect(() => {
+    const update = () => setLinked(getCachedDeviceState()?.pairingStatus === 'linked');
+    window.addEventListener(DEVICE_EVENT, update);
+    return () => window.removeEventListener(DEVICE_EVENT, update);
+  }, []);
+  if (!linked && !standalone && isSupabaseConfigured) return <PairingScreen onSkip={() => setStandaloneState(true)} />;
+  return <VideoBooth />;
+}
+
+export default function VideoApp() {
+  useEffect(() => {
+    startDeviceSync();
+    // Videos pendientes de subir (sin internet): se suben solos cuando vuelve
+    startVideoSync();
+  }, []);
+  return (
+    <BrowserRouter>
+      <Toaster richColors position="top-center" />
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/ajustes" element={<VideoBoothSettings />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}

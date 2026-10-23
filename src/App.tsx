@@ -13,6 +13,9 @@ import KioskBox from "./pages/kiosk-box/KioskBox";
 import KioskBoxSettings from "./pages/kiosk-box/KioskBoxSettings";
 import KioskGallery from "./pages/kiosk-box/KioskGallery";
 import KioskVip from "./pages/kiosk-box/KioskVip";
+import GuestVideo from "./pages/GuestVideo";
+import VideoGallery from "./pages/VideoGallery";
+import VideoBoothAdmin from "./pages/admin/VideoBoothAdmin";
 import RemoteHost from "./components/kiosk/RemoteHost";
 import KioskAdmin from "./pages/admin/KioskAdmin";
 import KioskScreensaver from "./components/kiosk/KioskScreensaver";
@@ -85,6 +88,9 @@ const App = () => (
             <Route path="/box/ajustes" element={<KioskBoxSettings />} />
             <Route path="/box/galeria" element={<KioskGallery />} />
             <Route path="/box/vip" element={<KioskVip />} />
+            {/* Cabina de video (app EventPix Video): páginas del invitado */}
+            <Route path="/clip" element={<GuestVideo />} />
+            <Route path="/galeria-video/:code" element={<VideoGallery />} />
             {/* Tablet que maneja la pantalla del kiosco por Bluetooth */}
             {/* Página pública del QR del kiosco: el invitado baja o comparte su foto */}
             <Route path="/foto" element={<GuestPhoto />} />
@@ -103,6 +109,7 @@ const App = () => (
                 <Route path="/admin/kiosco-manager" element={<Navigate to="/admin/kioscos" replace />} />
                 <Route path="/admin/kiosco-anterior" element={<KioskManager />} />
                 <Route path="/admin/kioscos" element={<KioskAdmin />} />
+                <Route path="/admin/cabina-video" element={<VideoBoothAdmin />} />
                 <Route path="/admin/display" element={<DisplayHubMain />} />
                 <Route path="/intelligence" element={<ErrorBoundary><IntelligenceCanvasPage /></ErrorBoundary>} />
                 <Route path="/admin/intelligence" element={<ErrorBoundary><IntelligenceCanvasPage /></ErrorBoundary>} />

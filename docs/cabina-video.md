@@ -1,0 +1,96 @@
+# EventPix Video (cabina de video)
+
+App **aparte del kiosco**: su propio APK, su propio panel y sus propios datos. El kiosco
+de fotos no cambia.
+
+| | Kiosco de fotos | EventPix Video |
+|---|---|---|
+| App | `com.eventpix.kiosk` ("EventPix Kiosco") | `com.eventpix.video` ("EventPix Video") |
+| Web de la app | `index.html` (sitio) | `video.html` → `vite.video.config.ts` |
+| Workflow del APK | "APK del kiosco" | "APK de EventPix Video" (`.github/workflows/video-apk.yml`) |
+| Panel | `/admin/kioscos` | `/admin/cabina-video` (mismos administradores) |
+| Equipos | `kiosk_devices` | `video_devices` |
+| Archivos del panel | bucket `kiosk-assets` | bucket `video-assets` |
+| Drive | script/carpeta del kiosco | script/carpeta propios de la cabina |
+
+Sirve en **TV box con webcam** (cabina, glam, libro de firmas) y en **celular o tablet
+Android** (brazo de la plataforma 360, uso itinerante).
+
+## Qué hace
+
+- **Experiencias:** video, boomerang, cámara lenta, plataforma 360 (rampas de velocidad
+  y reversa), libro de firmas (pregunta al azar y micrófono) y glam (B&N de revista).
+- **360 automático:** graba sola cuando la plataforma gira, corta sola cuando para,
+  modo continuo y calibración en Ajustes.
+- **Marcos y capas:** varios marcos PNG (el invitado elige), animaciones (confeti,
+  brillos, corazones, burbujas, nieve, neón o un video propio) y accesorios en la cara.
+- **Marca:** logo, marca de agua, color y placa final.
+- **Música propia:** varias canciones con punto de inicio; fija, al azar o la elige el invitado.
+- **Entrega:** QR al video y/o a la galería del evento; **WhatsApp** al número del invitado.
+- **Sin internet:** todo queda en el equipo y se sube solo cuando vuelve la conexión.
+- **Galería online** `/galeria-video/<código>` (con `?pantalla=1` para una tele del evento)
+  y **moderación** desde el panel (ocultar, aprobar, aprobación previa).
+
+## Puesta en marcha
+
+1. **Base de datos:** correr en Supabase (SQL Editor) `supabase/migrations/20261022000000_video_booth.sql`.
+   Crea `video_devices`, `video_clips`, `video_sends`, sus funciones y el bucket `video-assets`.
+2. **Drive de la cabina:** publicar el Apps Script de EventPix (`docs/kiosco-drive-apps-script.gs`)
+   en la cuenta de Google de la cabina y crear una carpeta. Se carga en el panel
+   (equipo → Configurar → Nube) o en el equipo (Ajustes → Nube), o al compilar con el
+   secreto `VITE_VIDEO_DRIVE_SCRIPT_URL`.
+3. **APK:** GitHub → Actions → **"APK de EventPix Video"** → Run workflow. Se publica en la
+   release `video-v1` (o la que se elija). Se instala al lado del kiosco, sin pisarlo.
+4. **Vincular:** abrir la app en el equipo (muestra un código) y en el panel
+   **Cabina de video → Equipos → Vincular**. También se puede usar sin panel.
+5. Configurar desde **Equipos → Configurar** (o en el equipo: engranaje, clave 1234 → cambiarla).
+
+### Lo nativo, solo en este APK
+
+El proyecto Android es el mismo que usan las otras apps, pero lo propio de la cabina se
+agrega **solo al compilar EventPix Video** (paso "Agregar lo nativo de la cabina" del workflow):
+- `native/video/VideoStoragePlugin.java`: guarda cada video en la galería del equipo
+  (Películas/EventPix Video/<evento>).
+- Permiso de micrófono (`RECORD_AUDIO`) para el libro de firmas.
+
+Así el APK del kiosco sale igual que antes.
+
+## Envío por WhatsApp (opcional)
+
+Va por la **API oficial de WhatsApp (Meta Cloud API)** desde la función de Supabase
+`send-video-whatsapp`. Solo la pueden usar los equipos vinculados de la cabina (código +
+clave secreta) y hay un tope diario por equipo. Cada envío queda en `video_sends`.
+
+1. En Meta Business: app de WhatsApp, número de la empresa y **token permanente**
+   (usuario del sistema con `whatsapp_business_messaging`).
+2. Plantilla **`video_cabina`** (Español (ARG), categoría Utilidad), cuerpo:
+   `¡Hola! Acá está tu video de {{1}} 🎬 Miralo y bajalo acá: {{2}}`
+   (opcional: encabezado de Video y `WHATSAPP_VIDEO_HEADER=1`).
+3. Secrets y función:
+   ```
+   supabase secrets set WHATSAPP_TOKEN=… WHATSAPP_PHONE_ID=… PUBLIC_SITE_URL=https://app.event-pix.com.ar
+   supabase functions deploy send-video-whatsapp
+   ```
+   Opcionales: `WHATSAPP_TEMPLATE`, `WHATSAPP_TEMPLATE_LANG` (por defecto `es_AR`),
+   `WHATSAPP_DAILY_LIMIT` (por defecto 500 por equipo cada 24 h).
+4. Activar **Botón "Enviar por WhatsApp"** en la configuración del equipo (prefijo `549` = Argentina celulares).
+
+Meta cobra cada conversación iniciada con plantilla.
+
+## Código
+
+- `src/video-app/`: la app (entrada, rutas, vinculación, clave, Ajustes).
+- `src/lib/videoBooth/`: motor (compositor, efectos, capas, movimiento, grabación) y
+  módulos propios (equipo, cámara, archivos, Drive, enlaces, configuración remota, nube, WhatsApp).
+- `src/pages/admin/VideoBoothAdmin.tsx` y `src/components/video-admin/`: el panel.
+- `src/pages/GuestVideo.tsx` (`/clip`) y `src/pages/VideoGallery.tsx` (`/galeria-video/…`): páginas del invitado en el sitio.
+- Para probar en la compu: `npx vite --config vite.video.config.ts` y abrir `/video.html`.
+
+## Próximos pasos (propuestos)
+
+- Actualizar la app desde Ajustes (como el kiosco) con su propia release.
+- Envío por mail.
+- Intro (pre-roll) además de la placa final.
+- Libro de firmas: compilado con todos los mensajes para los anfitriones.
+- Recorte de fondo (chroma key) en vivo.
+- Borrar videos del Drive de la cabina desde el panel.
