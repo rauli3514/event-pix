@@ -448,3 +448,12 @@ body {
 .kiosk-lite .kiosk-saver-twinkle, .kiosk-lite .kiosk-saver-glint, .kiosk-lite .kiosk-saver-ring,
 .kiosk-lite .kiosk-saver-glow, .kiosk-lite .kiosk-saver-iris { animation: none !important; }
 .kiosk-lite .kiosk-saver-breathe { filter: none !important; }
+
+/* ── Fondos de fábrica de la cabina de video (ScreenBackground) ────────── */
+@keyframes vb-pan { to { background-position: 280px 160px, 0 0; } }
+@keyframes vb-pan-dots { to { background-position: 180px 360px, -260px 260px, 220px -440px, 0 0; } }
+@keyframes vb-sheen { from { transform: translateX(-60%) rotate(20deg); } to { transform: translateX(60%) rotate(20deg); } }
+@keyframes vb-glow { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
+@keyframes vb-road { to { background-position: 0 80px; } }
+@keyframes vb-float { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(2vmax, -2vmax); } }
+.kiosk-lite .vb-anim { animation: none !important; }

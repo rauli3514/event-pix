@@ -14,9 +14,8 @@ import {
   TEXT_SCALES, videoFilter, WATERMARK_POSITIONS, WATERMARK_SIZES, type VideoBoothSettings, type VideoModeKey,
 } from '@/lib/videoBooth/settings';
 import { buildDecor, framePool, type DecorBundle } from '@/lib/videoBooth/media';
-import { AURORA, backgroundOptions, bgKey, themeBackground } from '@/lib/videoBooth/backgrounds';
-import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
-import { ThemeLayer } from '@/components/video-booth/ScreenBackground';
+import { AURORA, backgroundOptions, bgKey, isBuiltinBackground } from '@/lib/videoBooth/backgrounds';
+import ScreenBackground from '@/components/video-booth/ScreenBackground';
 import { allFrames, builtinFrameThumb, isBuiltinFrame } from '@/lib/videoBooth/builtinFrames';
 import { buttonClass, Choice, Field, inputClass, MultiChoice, Note, Panel, primaryClass, Toggle } from '../ui';
 
@@ -626,21 +625,20 @@ export function PreviewPanel({ s, modeKey }: { s: VideoBoothSettings; modeKey?: 
 }
 
 function BackgroundThumb({ value, label, active, onPick, onRemove }: { value: string; label: string; active: boolean; onPick: () => void; onRemove?: () => void }) {
-  const theme = themeBackground(value);
-  const own = useMediaUrl(value !== AURORA && !theme ? bgKey(value) : '');
+  const builtin = isBuiltinBackground(value);
+  const own = useMediaUrl(builtin ? '' : bgKey(value));
   const [isVideo, setIsVideo] = useState(false);
   useEffect(() => {
-    if (value === AURORA || theme) return;
+    if (builtin) return;
     let alive = true;
     void getMedia(bgKey(value)).then(rec => { if (alive) setIsVideo(!!rec?.blob.type.startsWith('video/')); }).catch(() => {});
     return () => { alive = false; };
-  }, [value, theme]);
+  }, [value, builtin]);
   return (
     <div className="flex flex-col items-center gap-2">
       <button onClick={onPick} className={`rounded-2xl p-1.5 focus:outline-none focus:ring-4 focus:ring-[#00d4ff] ${active ? 'bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7]' : 'bg-white/10'}`}>
         <span className="relative block w-40 h-24 rounded-xl overflow-hidden">
-          {theme ? <ThemeLayer theme={theme} />
-            : value === AURORA ? <AuroraBackground />
+          {builtin ? <ScreenBackground value={value} />
             : own ? (isVideo ? <video src={own} autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover" /> : <img src={own} alt="" className="absolute inset-0 w-full h-full object-cover" />)
             : <span className="absolute inset-0 bg-black/40" />}
         </span>
