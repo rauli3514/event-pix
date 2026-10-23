@@ -1,6 +1,6 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
-import { ExternalLink, ImagePlus, Music, Trash2, Upload } from 'lucide-react';
+import { ImagePlus, Music, Trash2, Upload } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { RemoteFile, RemoteVideoSettings, VideoAssets } from '@/lib/videoBooth/remote';
 import { DEFAULT_PUBLIC_SITE } from '@/lib/videoBooth/share';
@@ -12,6 +12,7 @@ import {
 import ModeEditor, { type ModeKit } from '@/components/video-booth/ModeEditor';
 import { BUILT_IN_VIDEO_FRAMES } from '@/lib/videoBooth/builtinFrames';
 import { btnGhost, Check, Field, input, Section, Select } from './ui';
+import GalleryLinks from './GalleryLinks';
 
 // Configuración de un equipo de la cabina desde el panel: ajustes y archivos
 // (marcos, logo, música, animación). Los archivos se suben al bucket
@@ -254,12 +255,7 @@ export default function SettingsForm({ form, setForm }: { form: RemoteVideoSetti
                 <button onClick={() => { const ev = String(v.eventTitle ?? '').trim(); setForm(f => ({ ...f, video: { ...(f.video ?? {}), galleryCode: newGalleryCode(ev), galleryEvent: ev } })); }} className={btnGhost}>Nueva</button>
               </div>
             </Field>
-            {gallery && (
-              <div className="flex flex-wrap gap-2">
-                <a href={`${site}/galeria-video/${gallery}`} target="_blank" rel="noreferrer" className={btnGhost}><ExternalLink className="h-4 w-4" /> Galería</a>
-                <a href={`${site}/galeria-video/${gallery}?pantalla=1`} target="_blank" rel="noreferrer" className={btnGhost}><ExternalLink className="h-4 w-4" /> Modo pantalla</a>
-              </div>
-            )}
+            {gallery && <GalleryLinks site={site} code={gallery} />}
           </Section>
         </div>
       )}

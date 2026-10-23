@@ -7,7 +7,7 @@ import { useRemoteFocus } from '@/hooks/use-remote-focus';
 import { UPDATE_EVENT, updateAvailable } from '@/lib/videoBooth/device';
 import { recordingSupport } from '@/lib/videoBooth/recorder';
 import { REMOTE_APPLIED_EVENT } from '@/lib/videoBooth/remote';
-import { AnimVideoPanel, BrandPanel, DeliveryPanel, FramesPanel, LayersPanel, MotionPanel, MusicPanel, PreviewPanel } from './VideoSettingsPanels';
+import { AnimVideoPanel, BrandPanel, DeliveryPanel, FramesPanel, GalleryPanel, LayersPanel, MotionPanel, MusicPanel, PreviewPanel } from './VideoSettingsPanels';
 import { allFrames } from '@/lib/videoBooth/builtinFrames';
 import {
   DEFAULT_PROMPTS, getVideoSettings, modeConfig, saveModeConfig, saveVideoSettings,
@@ -114,6 +114,7 @@ export default function VideoBoothSettings() {
             </Panel>
             <LayersPanel s={s} update={update} />
             <DeliveryPanel s={s} update={update} />
+            <GalleryPanel s={s} update={update} />
             <Panel title="Pantalla de inicio">
               <Field label="Texto grande (vacío = nombre del evento)">
                 <input className={inputClass} value={s.title ?? ''} onChange={e => update({ title: e.target.value })} placeholder="¡Grabá tu video!" />

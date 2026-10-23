@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Check, ExternalLink, Eye, EyeOff, Loader2, MessageCircle, Play, RefreshCw, Trash2, Video } from 'lucide-react';
+import { Check, Eye, EyeOff, Loader2, MessageCircle, Play, RefreshCw, Trash2, Video } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { DEFAULT_PUBLIC_SITE, driveImageUrl } from '@/lib/videoBooth/share';
+import GalleryLinks from './GalleryLinks';
 import { btnDanger, btnGhost, btnPrimary, card } from './ui';
 import type { VideoDeviceRow } from './types';
 
@@ -152,9 +153,8 @@ export default function GalleryTab({ devices }: { devices: VideoDeviceRow[] }) {
             </select>
           </label>
           <button onClick={() => { void loadGalleries(); void loadClips(); }} className={btnGhost}><RefreshCw className="h-4 w-4" /> Actualizar</button>
-          <a href={`${siteUrl}/galeria-video/${code}`} target="_blank" rel="noreferrer" className={btnGhost}><ExternalLink className="h-4 w-4" /> Ver galería</a>
-          <a href={`${siteUrl}/galeria-video/${code}?pantalla=1`} target="_blank" rel="noreferrer" className={btnGhost}><ExternalLink className="h-4 w-4" /> Modo pantalla</a>
         </div>
+        <GalleryLinks site={siteUrl} code={code} />
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-slate-400">
           <span>{current?.count ?? clips.length} videos{hiddenIds.length ? ` · ${hiddenIds.length} ocultos o pendientes` : ''}</span>
           {sends && <span className="flex items-center gap-1.5"><MessageCircle className="h-4 w-4 text-emerald-400" /> {sends.sent} enviados por WhatsApp{sends.failed ? ` · ${sends.failed} fallidos` : ''}</span>}

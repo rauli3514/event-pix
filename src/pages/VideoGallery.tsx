@@ -1,66 +1,22 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { QRCodeSVG } from 'qrcode.react';
 import { Loader2, Play, Video } from 'lucide-react';
 import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
 import { EventPixLogo } from '@/components/kiosk/brand/EventPixLogo';
 import { driveImageUrl } from '@/lib/kioskShare';
-import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { isSupabaseConfigured } from '@/lib/supabase';
+import { clipPage, clipTime, MODE_LABEL, useGalleryClips, type Clip } from '@/lib/videoBooth/galleryClips';
+import GalleryScreen, { type ScreenView } from './VideoGalleryScreen';
 
-// Galería online de la cabina de video: todos los videos del evento.
-// En el celular: grilla para ver y bajar cada video. Con ?pantalla=1 (una tele
-// o tablet en el evento): el último video en grande, la grilla y el QR.
+// Galería online de la cabina de video: todos los videos del evento, sin entrar
+// al panel. En el celular: grilla para ver y bajar cada video. Con ?pantalla=1
+// (una tele, tablet o compu en el evento): portadas con su QR y los videos de
+// demostración (VideoGalleryScreen).
 
-interface Clip { id: string; drive_id: string; thumb_id: string | null; title: string | null; mode: string | null; created_at: string }
-
-const MODE_LABEL: Record<string, string> = {
-  clasico: 'Video', boomerang: 'Boomerang', lenta: 'Cámara lenta', '360': '360', firmas: 'Libro de firmas', glam: 'Glam',
-};
-
-const videoUrl = (id: string) => `https://drive.usercontent.google.com/download?id=${id}&export=download`;
-const clipPage = (c: Clip) => `/clip?${new URLSearchParams({ d: c.drive_id, ...(c.title ? { t: c.title } : {}) }).toString()}`;
-
-function useClips(code: string) {
-  const [clips, setClips] = useState<Clip[] | null>(() => (!isSupabaseConfigured || !code ? [] : null));
-  const [error, setError] = useState('');
-  useEffect(() => {
-    if (!isSupabaseConfigured || !code) return;
-    let alive = true;
-    const load = async () => {
-      const query = () => supabase.from('video_clips')
-        .select('id, drive_id, thumb_id, title, mode, created_at')
-        .eq('gallery', code).order('created_at', { ascending: false }).limit(300);
-      // Solo los aprobados (aunque mire alguien logueado en el panel)
-      let { data, error: e } = await query().eq('hidden', false);
-      // Base sin la migración de moderación: no hay columna "hidden"
-      if (e && /hidden/i.test(e.message)) ({ data, error: e } = await query());
-      if (!alive) return;
-      if (e) setError(e.message);
-      else { setError(''); setClips(data as Clip[]); }
-    };
-    void load();
-    // En vivo: videos nuevos, aprobados, ocultos o borrados (y por las dudas, cada 30 s)
-    let pending = 0;
-    const reload = () => { window.clearTimeout(pending); pending = window.setTimeout(load, 400); };
-    const channel = supabase.channel(`video_clips:${code}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'video_clips', filter: `gallery=eq.${code}` }, reload)
-      .subscribe();
-    const timer = window.setInterval(load, 30000);
-    return () => {
-      alive = false;
-      window.clearInterval(timer);
-      window.clearTimeout(pending);
-      void supabase.removeChannel(channel);
-    };
-  }, [code]);
-  return { clips, error };
-}
-
-function Thumb({ clip, big }: { clip: Clip; big?: boolean }) {
+function Thumb({ clip }: { clip: Clip }) {
   const [failed, setFailed] = useState(false);
   return (
-    <span className={`relative block w-full aspect-[9/16] overflow-hidden rounded-2xl bg-black/40 border border-white/15 ${big ? 'rounded-3xl' : ''}`}>
+    <span className={`relative block w-full aspect-[9/16] overflow-hidden rounded-2xl bg-black/40 border border-white/15`}>
       {clip.thumb_id && !failed ? (
         <img src={driveImageUrl(clip.thumb_id, 480)} alt="" loading="lazy" onError={() => setFailed(true)} className="absolute inset-0 w-full h-full object-cover" />
       ) : (
@@ -78,43 +34,13 @@ export default function VideoGallery() {
   const { code = '' } = useParams();
   const [params] = useSearchParams();
   const screen = params.get('pantalla') === '1';
-  const { clips, error } = useClips(code);
+  const { clips, error } = useGalleryClips(code);
   const title = useMemo(() => clips?.find(c => c.title)?.title ?? '', [clips]);
   const shareUrl = `${window.location.origin}/galeria-video/${encodeURIComponent(code)}`;
 
   if (screen) {
-    const latest = clips?.[0];
-    return (
-      <div className="relative h-screen overflow-hidden text-white">
-        <AuroraBackground />
-        <div className="relative h-full grid grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] portrait:grid-cols-1 portrait:grid-rows-[auto_1fr] gap-[3vmin] p-[4vmin]">
-          <div className="flex flex-col items-center justify-center gap-[3vmin] min-h-0">
-            <EventPixLogo size={48} subtitle="Cabina de video" />
-            {title && <h1 className="carlmarx-bold text-[clamp(2rem,6vmin,5rem)] text-center leading-tight">{title}</h1>}
-            {latest ? (
-              <motion.video key={latest.drive_id} src={videoUrl(latest.drive_id)} autoPlay loop muted playsInline
-                initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-                className="max-h-[52vh] portrait:max-h-[34vh] rounded-3xl ring-4 ring-white/20 shadow-2xl bg-black" />
-            ) : (
-              <p className="text-white/60 text-2xl">Los videos van a aparecer acá</p>
-            )}
-            <div className="flex items-center gap-5 kiosk-glass rounded-3xl p-4 pr-7">
-              <span className="bg-white p-3 rounded-2xl"><QRCodeSVG value={shareUrl} size={150} /></span>
-              <span className="text-xl font-bold max-w-[16rem]">Escaneá y buscá tu video para bajarlo</span>
-            </div>
-          </div>
-          <div className="min-h-0 overflow-hidden">
-            <div className="grid grid-cols-4 portrait:grid-cols-5 gap-3">
-              {(clips ?? []).slice(1, 21).map((c, i) => (
-                <motion.div key={c.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
-                  <Thumb clip={c} />
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    const view = (['completa', 'portadas', 'videos'] as ScreenView[]).find(v => v === params.get('vista')) ?? 'completa';
+    return <GalleryScreen clips={clips} title={title} galleryUrl={shareUrl} view={view} />;
   }
 
   return (
@@ -136,9 +62,7 @@ export default function VideoGallery() {
               {clips.map(c => (
                 <Link key={c.id} to={clipPage(c)} className="block focus:outline-none focus:ring-4 focus:ring-[#00d4ff] rounded-2xl">
                   <Thumb clip={c} />
-                  <span className="block text-xs text-white/50 mt-1 text-center">
-                    {new Date(c.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
-                  </span>
+                  <span className="block text-xs text-white/50 mt-1 text-center">{clipTime(c)}</span>
                 </Link>
               ))}
             </div>
