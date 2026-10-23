@@ -109,7 +109,7 @@ export default function VideoBoothSettings() {
                 options={[{ value: 720, label: 'HD 720p (recomendada en TV box)' }, { value: 1080, label: 'Full HD 1080p' }]} />
               <Choice label="Cuenta regresiva (General)" value={s.countdown ?? 3} onChange={v => update({ countdown: v })}
                 options={[0, 3, 5, 10].map(n => ({ value: n, label: n ? `${n} s` : 'Sin cuenta' }))} />
-              <Toggle label="El invitado revisa su video" hint="Puede repetirlo antes de llevárselo" checked={s.review !== false} onChange={v => update({ review: v })} />
+              <Toggle label="El invitado revisa su video (General)" hint="Puede repetirlo antes de llevárselo. Cada experiencia puede cambiarlo en su pestaña." checked={s.review !== false} onChange={v => update({ review: v })} />
               <Choice label="Tiempo del resultado en pantalla" value={s.resultSeconds ?? 45} onChange={v => update({ resultSeconds: v })}
                 options={[30, 45, 60, 90, 120].map(n => ({ value: n, label: `${n} s` }))} />
             </Panel>

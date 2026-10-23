@@ -470,7 +470,7 @@ export default function VideoBooth() {
         console.error('[video] no se pudo guardar', e);
         toast.error('No se pudo guardar el video en el equipo');
       });
-      setStep(settings.review === false ? 'result' : 'review');
+      setStep(rm.review ? 'review' : 'result');
     } catch (e) {
       closeCamera();
       setError(e instanceof Error ? e.message : String(e));
@@ -687,7 +687,7 @@ export default function VideoBooth() {
 
   // Sin revisión: el resultado sale directo (y se entrega)
   useEffect(() => {
-    if (step === 'result' && qr.state === 'off' && resultRef.current && settings.review === false) void deliver(resultRef.current);
+    if (step === 'result' && qr.state === 'off' && resultRef.current && modeRef.current && !resolveMode(modeRef.current.key, settings).review) void deliver(resultRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 

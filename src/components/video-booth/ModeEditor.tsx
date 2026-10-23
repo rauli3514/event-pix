@@ -54,6 +54,9 @@ export default function ModeEditor({ modeKey, s, frames, songs, backgrounds = []
         <Pick label="Filtro" value={c.filter} options={VIDEO_FILTERS.map(f => ({ value: f.value, label: f.label }))} onChange={v => onChange({ filter: v })} />
         <Pick label="Cuenta regresiva" value={own.countdown ?? -1} onChange={v => onChange({ countdown: v < 0 ? undefined : v })}
           options={[{ value: -1, label: `Como en General (${s.countdown ?? 3 ? `${s.countdown ?? 3} s` : 'sin cuenta'})` }, ...[0, 3, 5, 10].map(n => ({ value: n, label: n ? `${n} s` : 'Sin cuenta' }))]} />
+        <Pick label="El invitado revisa su video (y puede repetirlo)" value={own.review === undefined ? GENERAL : own.review ? 'si' : 'no'}
+          onChange={v => onChange({ review: v === GENERAL ? undefined : v === 'si' })}
+          options={[{ value: GENERAL, label: `Como en General (${s.review !== false ? 'sí' : 'no'})` }, { value: 'si', label: 'Sí' }, { value: 'no', label: 'No, va directo al QR' }]} />
         {backgrounds.length > 0 && (
           <Pick label="Fondo de las pantallas (inicio, pregunta, resultado)" value={own.background ?? GENERAL} onChange={v => onChange({ background: v || undefined })}
             options={[{ value: GENERAL, label: 'Como en General' }, ...backgrounds]} />
