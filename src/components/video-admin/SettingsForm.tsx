@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { ImagePlus, Music, Trash2, Upload } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -12,6 +12,7 @@ import {
 import ModeEditor, { type ModeKit } from '@/components/video-booth/ModeEditor';
 import { BUILT_IN_VIDEO_FRAMES } from '@/lib/videoBooth/builtinFrames';
 import { backgroundOptions } from '@/lib/videoBooth/backgrounds';
+import { fetchLibrary, isLibraryId, type VideoLibrary } from '@/lib/videoBooth/library';
 import { btnGhost, Check, Field, input, Section, Select } from './ui';
 import GalleryLinks from './GalleryLinks';
 
@@ -78,6 +79,9 @@ export default function SettingsForm({ form, setForm }: { form: RemoteVideoSetti
   const setCam = (key: string, value: unknown) => setForm(f => ({ ...f, camera: { ...(f.camera ?? {}), [key]: value } }));
   const [busy, setBusy] = useState('');
   const [tab, setTab] = useState<Tab>('general');
+  // Biblioteca compartida (para elegir sus canciones, marcos y fondos)
+  const [library, setLibrary] = useState<VideoLibrary | null>(null);
+  useEffect(() => { fetchLibrary().then(setLibrary).catch(() => {}); }, []);
   const frameInput = useRef<HTMLInputElement>(null);
   const bgInput = useRef<HTMLInputElement>(null);
   const songInput = useRef<HTMLInputElement>(null);
@@ -129,24 +133,31 @@ export default function SettingsForm({ form, setForm }: { form: RemoteVideoSetti
     }
   };
 
-  // Marcos y canciones que el equipo tiene cargados por su cuenta (no se manejan desde acá)
-  const localFrames = ((v.frames ?? []) as { id: string; name: string }[]).filter(f => !f.id.startsWith('r-'));
-  const localSongs = ((v.songs ?? []) as { id: string; name: string }[]).filter(f => !f.id.startsWith('r-'));
+  // Marcos, canciones y fondos que el equipo tiene cargados por su cuenta (no se manejan
+  // desde acá) y los de la biblioteca compartida (los tienen todos los equipos)
+  const own = (list: unknown) => ((list ?? []) as { id: string; name: string }[]).filter(f => !f.id.startsWith('r-') && !isLibraryId(f.id));
+  const localFrames = own(v.frames);
+  const localSongs = own(v.songs);
+  const libFrames = (library?.frames ?? []).map(f => ({ value: f.id, label: `${f.name} (biblioteca)` }));
+  const libSongs = (library?.songs ?? []).map(f => ({ value: f.id, label: `${f.name} (biblioteca)` }));
   const frameOptions = [
     ...localFrames.map(f => ({ value: f.id, label: `${f.name} (cargado en el equipo)` })),
+    ...libFrames,
     ...(assets.frames ?? []).map(f => ({ value: f.id, label: f.name })),
     ...BUILT_IN_VIDEO_FRAMES.map(f => ({ value: f.id, label: `${f.name} (de fábrica)` })),
   ];
   const overlay = val('overlay', 'none') as string;
   const dateMode = val('overlayDateMode', 'auto') as string;
   // Fondos: los de fábrica, los cargados en el equipo y los subidos acá
-  const localBackgrounds = ((v.backgrounds ?? []) as { id: string; name: string }[]).filter(f => !f.id.startsWith('r-'));
+  const localBackgrounds = own(v.backgrounds);
   const bgOptions = backgroundOptions({}, [
     ...localBackgrounds.map(f => ({ id: f.id, name: `${f.name} (cargado en el equipo)` })),
+    ...(library?.backgrounds ?? []).map(f => ({ id: f.id, name: `${f.name} (biblioteca)` })),
     ...(assets.backgrounds ?? []).map(f => ({ id: f.id, name: f.name })),
   ]);
   const songOptions = [
     ...localSongs.map(f => ({ value: f.id, label: `${f.name} (cargada en el equipo)` })),
+    ...libSongs,
     ...(assets.songs ?? []).map(f => ({ value: f.id, label: f.name })),
   ];
   const gallery = String(v.galleryCode ?? '');
@@ -375,6 +386,7 @@ export default function SettingsForm({ form, setForm }: { form: RemoteVideoSetti
             <p className="text-xs text-slate-500">PNG con el centro transparente y la misma forma que el video (1080×1920 vertical, 1920×1080 horizontal o 1080×1080). Al subirlos, el equipo pasa a usar marco.</p>
           </Section>
           <Section title="Música">
+            <p className="-mt-2 text-sm text-slate-400">Estas son solo para este equipo. Para que las tengan <b>todos</b> los equipos (también los nuevos), subilas en la pestaña <b>Biblioteca</b> de arriba.</p>
             <div className="space-y-2">
               {(assets.songs ?? []).map(sg => (
                 <div key={sg.id} className="flex items-center gap-2">

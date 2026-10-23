@@ -14,6 +14,7 @@ import {
   TEXT_SCALES, videoFilter, WATERMARK_POSITIONS, WATERMARK_SIZES, type VideoBoothSettings, type VideoModeKey,
 } from '@/lib/videoBooth/settings';
 import { buildDecor, framePool, type DecorBundle } from '@/lib/videoBooth/media';
+import { isLibraryId } from '@/lib/videoBooth/library';
 import { AURORA, backgroundOptions, bgKey, isBuiltinBackground } from '@/lib/videoBooth/backgrounds';
 import ScreenBackground from '@/components/video-booth/ScreenBackground';
 import { allFrames, builtinFrameThumb, isBuiltinFrame } from '@/lib/videoBooth/builtinFrames';
@@ -23,6 +24,9 @@ import { buttonClass, Choice, Field, inputClass, MultiChoice, Note, Panel, prima
 
 type Update = (patch: Partial<VideoBoothSettings>) => void;
 interface Props { s: VideoBoothSettings; update: Update }
+
+/** De dónde vino un archivo: el panel de este equipo o la biblioteca compartida. */
+const originTag = (id: string) => (isLibraryId(id) ? ' (biblioteca)' : id.startsWith('r-') ? ' (panel)' : '');
 
 /** URL de un archivo guardado en el equipo (se libera sola). */
 function useMediaUrl(key: string) {
@@ -77,7 +81,7 @@ function FrameThumb({ id, name, active, size, onPick, onRemove }: {
           ? <img src={url} alt={name} className="h-36 rounded-xl bg-gradient-to-br from-[#6b4a8a] to-[#d9937a] object-fill" style={{ aspectRatio: `${size.width} / ${size.height}` }} />
           : <span className="block h-36 w-20" />}
       </button>
-      <span className="text-sm max-w-[9rem] truncate">{name}{id.startsWith('r-') ? ' (panel)' : ''}</span>
+      <span className="text-sm max-w-[9rem] truncate">{name}{originTag(id)}</span>
       {onRemove
         ? <button onClick={onRemove} className="text-white/60 hover:text-white text-sm flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-[#00d4ff] rounded"><Trash2 className="w-4 h-4" /> Quitar</button>
         : <span className="text-white/40 text-xs">De fábrica</span>}
@@ -119,7 +123,7 @@ export function FramesPanel({ s, update }: Props) {
           <div className="flex flex-wrap gap-4">
             {all.map(f => (
               <FrameThumb key={f.id} id={f.id} name={f.name} size={size} active={current === f.id}
-                onPick={() => update({ frameId: f.id })} onRemove={f.builtin ? undefined : () => void remove(f.id)} />
+                onPick={() => update({ frameId: f.id })} onRemove={f.builtin || isLibraryId(f.id) ? undefined : () => void remove(f.id)} />
             ))}
           </div>
           <input ref={input} type="file" accept="image/png,image/webp" multiple className="hidden" onChange={e => { void add(e.target.files); e.target.value = ''; }} />
@@ -301,14 +305,14 @@ function SongRow({ id, name, start, onStart, onRemove, active, onDefault }: {
       <button onClick={toggle} className="rounded-full bg-white/10 p-3 focus:outline-none focus:ring-4 focus:ring-[#00d4ff]" aria-label="Escuchar">
         {playing ? <Square className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5" />}
       </button>
-      <span className="flex-1 min-w-[8rem] font-semibold truncate">{name}{id.startsWith('r-') ? ' (panel)' : ''}</span>
+      <span className="flex-1 min-w-[8rem] font-semibold truncate">{name}{originTag(id)}</span>
       <label className="flex items-center gap-2 text-white/70">
         Empieza en
-        <input type="number" min={0} value={start} onChange={e => onStart(Math.max(0, Number(e.target.value) || 0))} className="w-20 rounded-xl bg-black/30 border border-white/15 px-3 py-2 focus:outline-none focus:ring-4 focus:ring-[#00d4ff]" />
+        <input type="number" min={0} value={start} disabled={isLibraryId(id)} title={isLibraryId(id) ? 'Se ajusta en el panel (Biblioteca)' : undefined} onChange={e => onStart(Math.max(0, Number(e.target.value) || 0))} className="w-20 rounded-xl bg-black/30 border border-white/15 px-3 py-2 focus:outline-none focus:ring-4 focus:ring-[#00d4ff]" />
         s
       </label>
       <button onClick={onDefault} className={`rounded-xl px-4 py-2 font-semibold focus:outline-none focus:ring-4 focus:ring-[#00d4ff] ${active ? 'bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7]' : 'bg-white/10'}`}>{active ? 'Fija' : 'Usar fija'}</button>
-      <button onClick={onRemove} className="rounded-xl bg-white/10 p-2 focus:outline-none focus:ring-4 focus:ring-[#00d4ff]" aria-label="Quitar"><Trash2 className="w-5 h-5" /></button>
+      {!isLibraryId(id) && <button onClick={onRemove} className="rounded-xl bg-white/10 p-2 focus:outline-none focus:ring-4 focus:ring-[#00d4ff]" aria-label="Quitar"><Trash2 className="w-5 h-5" /></button>}
     </div>
   );
 }
@@ -330,7 +334,7 @@ export function MusicPanel({ s, update }: Props) {
     update({ songs: rest, songId: s.songId === id ? rest[0]?.id : s.songId });
   };
   return (
-    <Panel title="Tu música" description="Subí tus canciones (MP3): suenan en los videos que tienen música activada. Quedan guardadas en el equipo.">
+    <Panel title="Tu música" description="Subí tus canciones (MP3): suenan en los videos que tienen música activada. Quedan guardadas en el equipo. Las de la biblioteca del panel (las tienen todos los equipos) aparecen solas, marcadas “(biblioteca)”.">
       <div className="space-y-3">
         {songs.map(sg => (
           <SongRow key={sg.id} id={sg.id} name={sg.name} start={sg.start ?? 0} active={(s.songId ?? songs[0]?.id) === sg.id}
@@ -675,7 +679,7 @@ export function BackgroundsPanel({ s, update }: Props) {
         {backgroundOptions(s).map(o => (
           <BackgroundThumb key={o.value} value={o.value} label={o.label} active={current === o.value}
             onPick={() => update({ background: o.value })}
-            onRemove={list.some(b => b.id === o.value) ? () => void remove(o.value) : undefined} />
+            onRemove={list.some(b => b.id === o.value) && !isLibraryId(o.value) ? () => void remove(o.value) : undefined} />
         ))}
       </div>
       <input ref={input} type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm" multiple className="hidden" onChange={e => { void add(e.target.files); e.target.value = ''; }} />

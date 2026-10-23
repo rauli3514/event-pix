@@ -1,18 +1,19 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, Clapperboard, MonitorSmartphone, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Clapperboard, Library, MonitorSmartphone, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import DevicesTab from '@/components/video-admin/DevicesTab';
 import DeviceConfig from '@/components/video-admin/DeviceConfig';
 import GalleryTab from '@/components/video-admin/GalleryTab';
+import LibraryTab from '@/components/video-admin/LibraryTab';
 import { btnGhost } from '@/components/video-admin/ui';
 import type { VideoDeviceRow } from '@/components/video-admin/types';
 
 // Panel de la cabina de video (/admin/cabina-video): equipos de la app EventPix
 // Video, su configuración a distancia y las galerías online. Separado del kiosco.
 
-type Tab = 'devices' | 'galleries';
+type Tab = 'devices' | 'galleries' | 'library';
 
 export default function VideoBoothAdmin() {
   const [tab, setTab] = useState<Tab>('devices');
@@ -49,13 +50,14 @@ export default function VideoBoothAdmin() {
             <Link to="/admin" className={btnGhost}><ArrowLeft className="h-4 w-4" /> Admin</Link>
             <div>
               <h1 className="text-xl font-bold text-white">Cabina de video</h1>
-              <p className="text-xs text-slate-400">App EventPix Video: equipos, configuración y galerías</p>
+              <p className="text-xs text-slate-400">App EventPix Video: equipos, configuración, galerías y biblioteca</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <nav className="flex rounded-xl border border-slate-800 p-1">
               <button onClick={() => { setTab('devices'); setConfiguring(null); }} className={tabClass('devices')}><MonitorSmartphone className="h-4 w-4" /> Equipos</button>
               <button onClick={() => { setTab('galleries'); setConfiguring(null); }} className={tabClass('galleries')}><Clapperboard className="h-4 w-4" /> Galerías</button>
+              <button onClick={() => { setTab('library'); setConfiguring(null); }} className={tabClass('library')}><Library className="h-4 w-4" /> Biblioteca</button>
             </nav>
             <button onClick={() => void load()} disabled={loading} className={btnGhost} aria-label="Actualizar"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></button>
           </div>
@@ -73,6 +75,7 @@ export default function VideoBoothAdmin() {
           ? <DeviceConfig key={device.id} device={device} onClose={() => setConfiguring(null)} onSaved={() => { setConfiguring(null); void load(); }} />
           : <DevicesTab devices={devices} loadedAt={loadedAt} onChange={() => void load()} onConfigure={d => setConfiguring(d.id)} />)}
         {tab === 'galleries' && <GalleryTab devices={devices} />}
+        {tab === 'library' && <LibraryTab />}
       </main>
     </div>
   );

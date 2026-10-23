@@ -55,6 +55,11 @@ Android** (brazo de la plataforma 360, uso itinerante).
   General y, si se quiere, otro por experiencia. Los propios se oscurecen un poco para que se
   lean los textos (ajustable).
 - **Libro de firmas:** título y texto propios en la pantalla de la pregunta.
+- **Biblioteca compartida** (panel → Biblioteca): música, marcos y fondos que se suben una sola
+  vez y que **todos los equipos** bajan solos (al abrir la app, cada 10 minutos y al volver
+  internet), también los que se instalan después. Se guarda en el bucket `video-assets`
+  (`library/…` y la lista `library/library.json`); en el equipo aparecen marcados
+  "(biblioteca)" y no se borran desde ahí. Hasta 15 MB por canción (conviene 10 MB).
 - **Música propia:** varias canciones con punto de inicio; fija, al azar o la elige el invitado.
 - **Entrega:** QR al video y/o a la galería del evento; **WhatsApp** al número del invitado.
 - **Sin internet:** todo queda en el equipo y se sube solo cuando vuelve la conexión.
