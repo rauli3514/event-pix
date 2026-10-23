@@ -52,6 +52,34 @@ export async function testDrive(folder: string) {
   return res.folder || '';
 }
 
+/**
+ * Sube un archivo grande (video) compartido con link, sin armar un texto gigante:
+ * el pedido se arma con el base64 en partes (cada parte es múltiplo de 3 bytes,
+ * así pegadas forman el base64 del archivo entero). Devuelve su ID de Drive.
+ */
+export async function uploadBlobForShare(blob: Blob, name: string, folder: string, type: string) {
+  const { scriptUrl, folderId } = driveConfig();
+  const CHUNK = 3 * 256 * 1024;
+  const toBase64 = (part: Blob) => new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => { const u = r.result as string; resolve(u.slice(u.indexOf(',') + 1)); };
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(part);
+  });
+  const head = JSON.stringify({ folderId, folder, name, type, share: true, data: '' }).slice(0, -2);
+  const pieces: BlobPart[] = [head];
+  for (let i = 0; i < blob.size; i += CHUNK) pieces.push(await toBase64(blob.slice(i, i + CHUNK)));
+  pieces.push('"}');
+  const body = new Blob(pieces, { type: 'text/plain;charset=utf-8' });
+  pieces.length = 0;
+  // text/plain: pedido "simple", sin consulta previa de CORS (Apps Script no la responde)
+  const res = await fetch(scriptUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body });
+  const json = await res.json().catch(() => null) as { ok?: boolean; error?: string; id?: string } | null;
+  if (!json?.ok) throw new Error(json?.error || `Drive respondió ${res.status}`);
+  if (!json.id) throw new Error('Drive no devolvió el archivo (actualizá el script)');
+  return json.id;
+}
+
 /** Sube un archivo (data URL) compartido con link y devuelve su ID de Drive. */
 export async function uploadForShare(dataUrl: string, name: string, folder: string, type: string) {
   const res = await post({ folderId: driveConfig().folderId, folder, name, type, share: true, data: dataUrl.slice(dataUrl.indexOf(',') + 1) });

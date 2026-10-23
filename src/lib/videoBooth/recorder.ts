@@ -29,8 +29,9 @@ export const recordingSupport = () => {
  * de ~35 MB (lo que se sube a Drive para el QR tiene que ser liviano).
  */
 export function bitrateFor(width: number, height: number, seconds: number) {
-  const base = width * height >= 1920 * 1080 * 0.9 ? 9_000_000 : 5_500_000;
-  return Math.max(1_500_000, Math.min(base, Math.floor((35e6 * 8) / Math.max(1, seconds))));
+  // 720p a 4 Mbps se ve bien y pesa la mitad (los libros de firmas son largos)
+  const base = width * height >= 1920 * 1080 * 0.9 ? 8_000_000 : 4_000_000;
+  return Math.max(1_500_000, Math.min(base, Math.floor((30e6 * 8) / Math.max(1, seconds))));
 }
 
 export class ClipRecorder {
