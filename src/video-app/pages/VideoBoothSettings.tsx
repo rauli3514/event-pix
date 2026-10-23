@@ -7,8 +7,9 @@ import { useRemoteFocus } from '@/hooks/use-remote-focus';
 import { UPDATE_EVENT, updateAvailable } from '@/lib/videoBooth/device';
 import { recordingSupport } from '@/lib/videoBooth/recorder';
 import { REMOTE_APPLIED_EVENT } from '@/lib/videoBooth/remote';
-import { AnimVideoPanel, BrandPanel, DeliveryPanel, FramesPanel, GalleryPanel, LayersPanel, MotionPanel, MusicPanel, PreviewPanel } from './VideoSettingsPanels';
+import { AnimVideoPanel, BackgroundsPanel, BrandPanel, DeliveryPanel, FramesPanel, GalleryPanel, LayersPanel, MotionPanel, MusicPanel, PreviewPanel } from './VideoSettingsPanels';
 import { allFrames } from '@/lib/videoBooth/builtinFrames';
+import { backgroundOptions } from '@/lib/videoBooth/backgrounds';
 import {
   DEFAULT_PROMPTS, getVideoSettings, modeConfig, saveModeConfig, saveVideoSettings,
   VIDEO_MODES, type VideoBoothSettings, type VideoModeKey,
@@ -127,15 +128,24 @@ export default function VideoBoothSettings() {
         {isMode && (
           <>
             <PreviewPanel s={s} modeKey={tab as VideoModeKey} />
-            <ModeEditor key={tab} modeKey={tab as VideoModeKey} s={s} frames={frames} songs={songs} kit={kit}
+            <ModeEditor key={tab} modeKey={tab as VideoModeKey} s={s} frames={frames} songs={songs} backgrounds={backgroundOptions(s)} kit={kit}
               onChange={patch => updateMode(tab as VideoModeKey, patch)} />
             {tab === '360' && <MotionPanel s={s} update={update} />}
-            {tab === 'firmas' && (
+            {tab === 'firmas' && (<>
+              <Panel title="Pantalla del libro de firmas" description="Lo que ve el invitado antes de grabar. El fondo se elige arriba (o en Biblioteca → Fondos).">
+                <Field label="Título (vacío = Libro de firmas)">
+                  <input className={inputClass} value={s.guestbookTitle ?? ''} onChange={e => update({ guestbookTitle: e.target.value })} placeholder="Libro de firmas" />
+                </Field>
+                <Field label="Texto propio (opcional)">
+                  <input className={inputClass} value={s.guestbookText ?? ''} onChange={e => update({ guestbookText: e.target.value })} placeholder="Dejales un mensaje a Roxana y Martín" />
+                </Field>
+              </Panel>
               <Panel title="Preguntas del libro de firmas" description="Una por renglón. A cada invitado le toca una al azar.">
                 <textarea className={`${inputClass} min-h-48`} value={promptsText}
                   onChange={e => setPromptsText(e.target.value)}
                   onBlur={() => update({ prompts: promptsText.split('\n').map(p => p.trim()).filter(Boolean) })} />
               </Panel>
+            </>
             )}
           </>
         )}
@@ -144,6 +154,7 @@ export default function VideoBoothSettings() {
           <>
             <PreviewPanel s={s} />
             <FramesPanel s={s} update={update} />
+            <BackgroundsPanel s={s} update={update} />
             <MusicPanel s={s} update={update} />
             <BrandPanel s={s} update={update} />
             <AnimVideoPanel s={s} update={update} />

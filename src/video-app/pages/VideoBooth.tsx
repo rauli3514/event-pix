@@ -7,7 +7,7 @@ import {
   RotateCcw, Settings, Snail, Sparkles, Square, Video, type LucideIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
+import ScreenBackground from '@/components/video-booth/ScreenBackground';
 import { EventPixLogo } from '@/components/kiosk/brand/EventPixLogo';
 import { AIProcessing, CountdownRing } from '@/components/kiosk/KioskAnimations';
 import PinDialog from '../PinDialog';
@@ -725,6 +725,9 @@ export default function VideoBooth() {
 
   // ─── Pantallas ───────────────────────────────────────────────────
   const rmode = mode ? resolveMode(mode.key, settings) : null;
+  // Inicio: el de la experiencia fija; elegir experiencia: el de General
+  const bgMode = step === 'splash' ? homeMode : step === 'modes' ? null : mode;
+  const screenBackground = bgMode ? resolveMode(bgMode.key, settings).background : settings.background || 'aurora';
   const cfg = rmode?.cfg ?? null;
   // Controles: abajo con la pantalla vertical; al costado con la horizontal (no tapan el marco)
   const side = 'absolute bottom-[6vmin] inset-x-0 landscape:inset-x-auto landscape:bottom-auto landscape:top-1/2 landscape:-translate-y-1/2 landscape:right-[4vmin]';
@@ -750,9 +753,11 @@ export default function VideoBooth() {
       </div>
       <audio ref={audioRef} className="hidden" />
 
+      {/* Fondo de las pantallas: el de la experiencia (o el de General) */}
+      {!showCamera && <ScreenBackground value={screenBackground} dim={settings.backgroundDim} />}
+
       {step === 'splash' && (
         <div className="absolute inset-0">
-          <AuroraBackground />
           <button onClick={start} className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-10 focus:outline-none" data-autofocus>
             <EventPixLogo size={64} subtitle="Cabina de video" />
             {homeMode && (() => {
@@ -802,7 +807,6 @@ export default function VideoBooth() {
 
       {step === 'modes' && (
         <div className="absolute inset-0 flex flex-col">
-          <AuroraBackground />
           <header className="relative flex items-center justify-between px-[5vmin] pt-[4vmin]">
             <button onClick={goSplash} className={btn}><ArrowLeft className="w-6 h-6" /> Volver</button>
             <h2 className="carlmarx-bold text-[clamp(2rem,6vmin,4.5rem)]">¿Qué video hacemos?</h2>
@@ -844,14 +848,16 @@ export default function VideoBooth() {
 
       {step === 'prompt' && mode && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-10 px-[6vmin] text-center">
-          <AuroraBackground />
-          <BookHeart className="relative w-24 h-24 text-[#ff8a5b]" strokeWidth={1.4} />
-          <p className="relative text-white/70 text-2xl uppercase tracking-[0.3em]">Libro de firmas</p>
+          <BookHeart className="relative w-24 h-24 text-[#ff8a5b] drop-shadow-[0_4px_16px_rgba(0,0,0,0.5)]" strokeWidth={1.4} />
+          <p className="relative text-white/80 text-2xl uppercase tracking-[0.3em] drop-shadow-[0_2px_10px_rgba(0,0,0,0.6)]">{settings.guestbookTitle?.trim() || 'Libro de firmas'}</p>
+          {settings.guestbookText?.trim() && (
+            <p className="relative text-[clamp(1.3rem,3.6vmin,2.4rem)] font-semibold max-w-4xl -mt-4 drop-shadow-[0_2px_10px_rgba(0,0,0,0.6)]">{settings.guestbookText}</p>
+          )}
           <motion.h2 initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-            className="relative carlmarx-bold text-[clamp(2.2rem,7vmin,5.5rem)] leading-tight max-w-5xl">
+            className="relative carlmarx-bold text-[clamp(2.2rem,7vmin,5.5rem)] leading-tight max-w-5xl drop-shadow-[0_4px_18px_rgba(0,0,0,0.6)]">
             {prompt}
           </motion.h2>
-          <p className="relative text-white/70 text-2xl">Tenés hasta {fmt(cfg?.seconds ?? 30)} para tu mensaje. Podés terminar antes.</p>
+          <p className="relative text-white/80 text-2xl drop-shadow-[0_2px_10px_rgba(0,0,0,0.6)]">Tenés hasta {fmt(cfg?.seconds ?? 30)} para tu mensaje. Podés terminar antes.</p>
           <div className="relative flex gap-5">
             <button onClick={goSplash} className={btn}><ArrowLeft className="w-6 h-6" /> Volver</button>
             <button onClick={() => nextPre(mode)} className={primaryBtn} data-autofocus><Video className="w-8 h-8" /> Grabar mensaje</button>
@@ -861,7 +867,6 @@ export default function VideoBooth() {
 
       {step === 'frame' && (
         <div className="absolute inset-0 flex flex-col">
-          <AuroraBackground />
           <header className="relative flex items-center justify-between px-[5vmin] pt-[4vmin]">
             <button onClick={goSplash} className={btn}><ArrowLeft className="w-6 h-6" /> Volver</button>
             <h2 className="carlmarx-bold text-[clamp(2rem,6vmin,4.5rem)]">Elegí tu marco</h2>
@@ -889,7 +894,6 @@ export default function VideoBooth() {
 
       {step === 'song' && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-8 px-[5vmin]">
-          <AuroraBackground />
           <h2 className="relative carlmarx-bold text-[clamp(2rem,6vmin,4.5rem)]">Elegí la música</h2>
           <div className="relative grid gap-3 w-[min(40rem,90vw)] max-h-[55vh] overflow-y-auto p-1">
             {(settings.songs ?? []).map((sg, i) => (
@@ -988,14 +992,12 @@ export default function VideoBooth() {
 
       {step === 'processing' && (
         <div className="absolute inset-0">
-          <AuroraBackground />
           <AIProcessing title="Armando tu video" subtitle={progress > 0 ? `${Math.round(progress * 100)}%` : 'Un momento…'} />
         </div>
       )}
 
       {(step === 'review' || step === 'result') && result && (
         <div className="absolute inset-0 flex items-center justify-center gap-[5vmin] p-[5vmin] portrait:flex-col">
-          <AuroraBackground />
           <motion.video
             key={result.url}
             src={result.url} autoPlay loop playsInline muted={!cfg?.mic}
@@ -1064,7 +1066,6 @@ export default function VideoBooth() {
 
       {step === 'error' && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-8 p-10 text-center">
-          <AuroraBackground />
           <h2 className="relative carlmarx-bold text-5xl">Algo falló</h2>
           <p className="relative text-xl text-white/80 max-w-3xl">{error}</p>
           <button onClick={goSplash} className={`relative ${primaryBtn}`} data-autofocus><RotateCcw className="w-7 h-7" /> Volver al inicio</button>

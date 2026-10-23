@@ -69,6 +69,8 @@ export interface VideoModeConfig {
   speed?: number;
   /** Cámara lenta / glam: velocidad (0.25 a 1) */
   slowSpeed?: number;
+  /** Fondo de las pantallas de esta experiencia (vacío = el de General) */
+  background?: string;
 }
 
 export const VIDEO_MODES: VideoModeDef[] = [
@@ -199,6 +201,15 @@ export interface VideoBoothSettings {
   resultSeconds?: number;
   /** Texto grande de la pantalla de inicio */
   title?: string;
+  /** Fondo de las pantallas: 'aurora' (el de siempre), uno de fábrica (t-…) o un fondo propio (ID) */
+  background?: string;
+  /** Fondos propios (imágenes o videos; el archivo está en el equipo: bgKey(id)) */
+  backgrounds?: MediaItem[];
+  /** Cuánto se oscurece un fondo propio para que se lean los textos (0 a 0.8) */
+  backgroundDim?: number;
+  /** Libro de firmas: título (por defecto "Libro de firmas") y un texto propio */
+  guestbookTitle?: string;
+  guestbookText?: string;
   /** Celular / tablet itinerante: cámara de adelante o de atrás (si no se eligió una en Ajustes del kiosco) */
   facing?: 'user' | 'environment';
   /** Pedir 60 cuadros por segundo para las cámaras lentas (si la cámara lo da) */
@@ -404,6 +415,7 @@ export interface ResolvedMode {
   loops: number;
   speed: number;
   slowSpeed: number;
+  background: string;
 }
 
 export function resolveMode(key: VideoModeKey, s: VideoBoothSettings = getVideoSettings()): ResolvedMode {
@@ -427,6 +439,7 @@ export function resolveMode(key: VideoModeKey, s: VideoBoothSettings = getVideoS
     loops: Math.max(1, Math.min(8, cfg.loops ?? s.boomerangLoops ?? 3)),
     speed: cfg.speed ?? 1,
     slowSpeed: cfg.slowSpeed ?? s.slowSpeed ?? 0.5,
+    background: cfg.background || s.background || 'aurora',
   };
 }
 
