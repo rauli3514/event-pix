@@ -73,6 +73,9 @@ export interface VideoModeConfig {
   background?: string;
   /** El invitado ve su video y elige quedárselo o repetir (vacío = como en General) */
   review?: boolean;
+  /** Aura de neón / rayos alrededor de las personas (vacío = como en General) */
+  aura?: string;
+  auraColor?: string;
 }
 
 export const VIDEO_MODES: VideoModeDef[] = [
@@ -234,6 +237,9 @@ export interface VideoBoothSettings {
   animBlend?: 'screen' | 'normal';
   /** Accesorio que sigue la cara (los del kiosco de fotos) */
   accessory?: string;
+  /** Aura de neón o rayos alrededor de las personas (ver AURA_STYLES) y su color */
+  aura?: string;
+  auraColor?: string;
 
   // ─── Marca ───
   showLogo?: boolean;
@@ -419,6 +425,8 @@ export interface ResolvedMode {
   slowSpeed: number;
   background: string;
   review: boolean;
+  aura: string;
+  auraColor: string;
 }
 
 export function resolveMode(key: VideoModeKey, s: VideoBoothSettings = getVideoSettings()): ResolvedMode {
@@ -444,6 +452,8 @@ export function resolveMode(key: VideoModeKey, s: VideoBoothSettings = getVideoS
     slowSpeed: cfg.slowSpeed ?? s.slowSpeed ?? 0.5,
     background: cfg.background || s.background || 'aurora',
     review: cfg.review ?? s.review !== false,
+    aura: cfg.aura ?? s.aura ?? 'none',
+    auraColor: cfg.auraColor ?? s.auraColor ?? '#00e5ff',
   };
 }
 

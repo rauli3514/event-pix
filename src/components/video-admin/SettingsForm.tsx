@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import type { RemoteFile, RemoteVideoSettings, VideoAssets } from '@/lib/videoBooth/remote';
 import { DEFAULT_PUBLIC_SITE } from '@/lib/videoBooth/share';
 import { VIDEO_ACCESSORIES } from '@/lib/videoBooth/accessories';
+import { AURA_COLORS, AURA_STYLES } from '@/lib/videoBooth/aura';
 import {
   ANIMATIONS, CORNERS, DEFAULT_PROMPTS, LOGO_SIZES, newGalleryCode, TEXT_SCALES, VIDEO_MODES, WATERMARK_POSITIONS, WATERMARK_SIZES,
   type VideoBoothSettings, type VideoModeConfig, type VideoModeKey,
@@ -246,7 +247,7 @@ export default function SettingsForm({ form, setForm }: { form: RemoteVideoSetti
             </div>
             <Check label="El invitado revisa su video y puede repetirlo (General; cada experiencia puede cambiarlo)" checked={val('review', true)} onChange={x => set('review', x)} />
           </Section>
-          <Section title="Animación y accesorio (General)">
+          <Section title="Animación, accesorio y aura (General)">
             <p className="-mt-2 text-sm text-slate-400">Los usan las experiencias que no tienen uno propio.</p>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Animación encima">
@@ -254,6 +255,12 @@ export default function SettingsForm({ form, setForm }: { form: RemoteVideoSetti
               </Field>
               <Field label="Accesorio que sigue la cara">
                 <Select value={val('accessory', 'none')} options={[{ value: 'none', label: 'Ninguno' }, { value: 'random', label: 'Al azar' }, ...VIDEO_ACCESSORIES]} onChange={x => set('accessory', x)} />
+              </Field>
+              <Field label="Aura (neón y rayos)">
+                <Select value={val('aura', 'none')} options={AURA_STYLES.map(a => ({ value: a.value as string, label: a.label }))} onChange={x => set('aura', x)} />
+              </Field>
+              <Field label="Color del aura">
+                <Select value={val('auraColor', '#00e5ff')} options={AURA_COLORS.map(c => ({ value: c.value as string, label: c.label }))} onChange={x => set('auraColor', x)} />
               </Field>
             </div>
             <div className="grid grid-cols-2 gap-2">

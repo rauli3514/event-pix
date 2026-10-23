@@ -3,6 +3,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { CloudUpload, Copy, ExternalLink, ImagePlus, Music, Play, Square, Trash2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { VIDEO_ACCESSORIES } from '@/lib/videoBooth/accessories';
+import { AURA_COLORS, AURA_STYLES } from '@/lib/videoBooth/aura';
 import { openCameraStream, stopStream } from '@/lib/videoBooth/camera';
 import { getMedia, MEDIA_EVENT, removeMedia, saveMedia } from '@/lib/videoBooth/mediaStore';
 import { isDriveConfigured } from '@/lib/videoBooth/drive';
@@ -179,11 +180,17 @@ function CaptionFields({ s, update }: Props) {
 
 export function LayersPanel({ s, update }: Props) {
   return (
-    <Panel title="Animación y accesorio (General)" description="Los usan las experiencias que no tienen uno propio (cada experiencia tiene su pestaña). Los accesorios siguen la cara; en equipos lentos conviene no usarlos.">
+    <Panel title="Animación, accesorio y aura (General)" description="Los usan las experiencias que no tienen uno propio (cada experiencia tiene su pestaña). Los accesorios siguen la cara; en equipos lentos conviene no usarlos.">
       <Choice label="Animación" value={s.animation ?? 'none'} onChange={v => update({ animation: v })}
         options={ANIMATIONS.map(a => ({ value: a.value, label: a.label }))} />
       <Choice label="Accesorio en la cara" value={s.accessory ?? 'none'} onChange={v => update({ accessory: v })}
         options={[{ value: 'none', label: 'Ninguno' }, { value: 'random', label: 'Al azar' }, ...VIDEO_ACCESSORIES]} />
+      <Choice label="Aura alrededor de las personas (neón y rayos)" value={s.aura ?? 'none'} onChange={v => update({ aura: v })}
+        options={AURA_STYLES.map(a => ({ value: a.value as string, label: a.label }))} />
+      {(s.aura ?? 'none') !== 'none' && (
+        <Choice label="Color del aura" value={s.auraColor ?? '#00e5ff'} onChange={v => update({ auraColor: v })}
+          options={AURA_COLORS.map(c => ({ value: c.value as string, label: c.label }))} />
+      )}
       <div className="grid sm:grid-cols-2 gap-3">
         <Toggle label="Zoom suave" hint="Se acerca de a poco (modos con efectos)" checked={!!s.zoomEffect} onChange={v => update({ zoomEffect: v })} />
         <Toggle label="Destellos en el 360" hint="Un flash en cada cambio de velocidad" checked={!!s.flashEffect} onChange={v => update({ flashEffect: v })} />

@@ -1,6 +1,7 @@
 import type { ReactElement, ReactNode } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { VIDEO_ACCESSORIES } from '@/lib/videoBooth/accessories';
+import { AURA_COLORS, AURA_STYLES } from '@/lib/videoBooth/aura';
 import {
   ANIMATIONS, BUILT_IN_ANIMATIONS, estimateDuration, RAMP_PRESETS, resolveMode, SPEEDS, speedLabel, VIDEO_FILTERS, VIDEO_MODES,
   type AnimationKey, type RampConfig, type VideoBoothSettings, type VideoModeConfig, type VideoModeKey,
@@ -99,7 +100,7 @@ export default function ModeEditor({ modeKey, s, frames, songs, backgrounds = []
         ) : <Note>Elegí o cargá marcos en Biblioteca.</Note>)}
       </Group>
 
-      <Group title="Animación y accesorio" description="Se mueven encima del video. “Al azar” cambia en cada video.">
+      <Group title="Animación, accesorio y aura" description="Se mueven encima del video. “Al azar” cambia en cada video.">
         <Pick label="Animación" value={own.animation ?? GENERAL} onChange={v => onChange({ animation: (v || undefined) as VideoModeConfig['animation'] })}
           options={[{ value: GENERAL, label: 'Como en General' }, { value: 'random', label: 'Al azar' }, ...ANIMATIONS.map(a => ({ value: a.value as string, label: a.label }))]} />
         {(r.animation === 'random' || r.fxChoice) && (
@@ -108,7 +109,14 @@ export default function ModeEditor({ modeKey, s, frames, songs, backgrounds = []
         )}
         <Pick label="Accesorio en la cara" value={own.accessory ?? GENERAL} onChange={v => onChange({ accessory: v || undefined })}
           options={[{ value: GENERAL, label: 'Como en General' }, { value: 'none', label: 'Ninguno' }, { value: 'random', label: 'Al azar' }, ...VIDEO_ACCESSORIES]} />
-        <Toggle label="El invitado elige en la pantalla de la toma" hint="Botón “Efectos” antes de grabar: cambia la animación y el accesorio en vivo"
+        <Pick label="Aura alrededor de las personas" value={own.aura ?? GENERAL} onChange={v => onChange({ aura: v || undefined })}
+          options={[{ value: GENERAL, label: `Como en General (${AURA_STYLES.find(a => a.value === (s.aura ?? 'none'))?.label ?? 'Sin aura'})` }, ...AURA_STYLES.map(a => ({ value: a.value as string, label: a.label }))]} />
+        {r.aura !== 'none' && (
+          <Pick label="Color del aura" value={own.auraColor ?? GENERAL} onChange={v => onChange({ auraColor: v || undefined })}
+            options={[{ value: GENERAL, label: 'Como en General' }, ...AURA_COLORS.map(c => ({ value: c.value as string, label: c.label }))]} />
+        )}
+        {r.aura !== 'none' && <Note>El aura usa un detector de personas: en equipos lentos puede ir un poco atrasada. Probala antes del evento.</Note>}
+        <Toggle label="El invitado elige en la pantalla de la toma" hint="Botón “Efectos” antes de grabar: cambia la animación, el accesorio y el aura en vivo"
           checked={r.fxChoice} onChange={v => onChange({ fxChoice: v })} />
       </Group>
     </>

@@ -31,6 +31,7 @@ import {
   type AnimationKey, type SongItem, type VideoModeDef, type VideoModeKey,
 } from '@/lib/videoBooth/settings';
 import { accessoryLabel, VIDEO_ACCESSORIES } from '@/lib/videoBooth/accessories';
+import { AURA_STYLES, preloadAura, type AuraStyle } from '@/lib/videoBooth/aura';
 import { UPDATE_EVENT, updateAvailable } from '@/lib/videoBooth/device';
 import { eventFolder, saveVideoLocally, videoFileName } from '@/lib/videoBooth/storage';
 
@@ -101,7 +102,7 @@ export default function VideoBooth() {
   const [stickyKey, setStickyKey] = useState<VideoModeKey | null>(readLock);
   const [unlockOpen, setUnlockOpen] = useState(false);
   // Animación y accesorio de esta toma (el invitado los puede cambiar en la pantalla)
-  const [fx, setFx] = useState<{ animation: AnimationKey; accessory: string }>({ animation: 'none', accessory: 'none' });
+  const [fx, setFx] = useState<{ animation: AnimationKey; accessory: string; aura: string }>({ animation: 'none', accessory: 'none', aura: 'none' });
   const [fxOpen, setFxOpen] = useState(false);
   const [hasUpdate, setHasUpdate] = useState(updateAvailable);
 
@@ -133,6 +134,7 @@ export default function VideoBooth() {
   const chosenFrameRef = useRef<string | null>(null);
   const chosenSongRef = useRef<string | null>(null);
   const accessoryRef = useRef('none');
+  const auraRef = useRef({ style: 'none', color: '#00e5ff' });
   useEffect(() => { resultRef.current = result; }, [result]);
   useEffect(() => { modeRef.current = mode; }, [mode]);
 
@@ -196,6 +198,7 @@ export default function VideoBooth() {
       width: size.width, height: size.height,
       mirror: !!cam.mirror, rotation: Number(cam.rotation) || 0,
       filter: cfg.filter, accessory: accessoryRef.current,
+      aura: auraRef.current.style as AuraStyle, auraColor: auraRef.current.color,
       decor: m.effect === 'none' ? decor : null,
     });
     comp.thumbDecor = decor;
@@ -268,7 +271,9 @@ export default function VideoBooth() {
       const animation = rm.animation === 'random' ? pick(rm.animationPool) : rm.animation;
       const accessory = rm.accessory === 'random' ? pick(VIDEO_ACCESSORIES).value : rm.accessory;
       accessoryRef.current = accessory;
-      setFx({ animation, accessory });
+      auraRef.current = { style: rm.aura, color: rm.auraColor };
+      if (rm.aura !== 'none') preloadAura();
+      setFx({ animation, accessory, aura: rm.aura });
       setFxOpen(false);
       disposeDecor();
       decorRef.current = await buildDecor(settings, size, {
@@ -333,7 +338,12 @@ export default function VideoBooth() {
   };
 
   // Cambiar la animación o el accesorio en la pantalla de la toma
-  const changeFx = (patch: Partial<{ animation: AnimationKey; accessory: string }>) => {
+  const changeFx = (patch: Partial<{ animation: AnimationKey; accessory: string; aura: string }>) => {
+    if (patch.aura !== undefined) {
+      auraRef.current = { ...auraRef.current, style: patch.aura };
+      if (patch.aura !== 'none') preloadAura();
+      compositorRef.current?.update({ aura: patch.aura as AuraStyle });
+    }
     if (patch.animation !== undefined) decorRef.current?.decor.setAnimation(patch.animation);
     if (patch.accessory !== undefined) {
       accessoryRef.current = patch.accessory;
@@ -939,6 +949,11 @@ export default function VideoBooth() {
                 title="Accesorio" value={fx.accessory}
                 options={[{ value: 'none', label: 'Sin accesorio' }, ...VIDEO_ACCESSORIES.map(a => ({ value: a.value, label: accessoryLabel(a.value) }))]}
                 onPick={v => changeFx({ accessory: v })}
+              />
+              <FxRow
+                title="Aura" value={fx.aura}
+                options={AURA_STYLES.map(a => ({ value: a.value, label: a.label }))}
+                onPick={v => changeFx({ aura: v })}
               />
             </div>
           )}
