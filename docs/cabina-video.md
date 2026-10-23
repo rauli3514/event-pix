@@ -47,6 +47,11 @@ Android** (brazo de la plataforma 360, uso itinerante).
   **imagen propia** de fondo, con o sin logo y textos encima).
 - **Vista previa** en Ajustes (Biblioteca y cada experiencia): cómo sale el video terminado
   y la placa final, sin grabar.
+- **Aura (neón y rayos):** contorno de neón que sigue a las personas, con rayos eléctricos que
+  saltan por el borde (o solo rayos), en 7 colores o arcoíris. Usa el detector de personas de
+  MediaPipe (`public/mediapipe/selfie_segmenter.tflite`, ~250 KB) sobre una copia chica del
+  cuadro ~10 veces por segundo; queda grabado en el video (también en cámara lenta, boomerang
+  y 360). En General, por experiencia o elegible por el invitado en "Efectos".
 - **Fondos de las pantallas** (inicio, pregunta del libro de firmas, marcos, resultado): el de
   siempre, siete de colores (dorado, boda, 15 años, fiesta, empresa, natural, noche), seis claros
   (rayas champagne, boda clara, salvia, dorado claro, confeti pastel, minimalista), tres de neón

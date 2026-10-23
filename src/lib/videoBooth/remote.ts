@@ -43,7 +43,7 @@ export const REMOTE_VIDEO_KEYS = [
   'songMode', 'songId', 'autoStart360', 'autoStop360', 'motionThreshold', 'continuous360', 'delivery', 'galleryCode',
   'galleryModeration', 'whatsappEnabled', 'whatsappPrefix', 'galleryEvent', 'autoUpdate',
   'overlayDateMode', 'overlayDate', 'frameText', 'textPosition', 'textColor', 'textScale', 'watermarkSize', 'watermarkOpacity', 'guestFrames', 'endCardOverlay',
-  'background', 'backgroundDim', 'guestbookTitle', 'guestbookText',
+  'background', 'backgroundDim', 'guestbookTitle', 'guestbookText', 'aura', 'auraColor',
 ] as const;
 export const REMOTE_CAMERA_KEYS = ['mirror', 'rotation', 'quality', 'focus'] as const;
 /** Se informan al panel pero no se pisan desde él */

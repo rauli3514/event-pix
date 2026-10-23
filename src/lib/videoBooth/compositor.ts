@@ -1,5 +1,6 @@
 import { detectFaces, type Face } from '@/lib/faceFx';
 import { drawVideoAccessory } from './accessories';
+import { AuraEffect, type AuraStyle } from './aura';
 import type { Decor } from './decor';
 import { videoFilter } from './settings';
 
@@ -18,6 +19,9 @@ export interface CompositorOptions {
   decor?: Decor | null;
   /** Accesorio que sigue la cara ('none' o vacío = sin accesorio) */
   accessory?: string;
+  /** Aura de neón / rayos alrededor de las personas */
+  aura?: AuraStyle;
+  auraColor?: string;
 }
 
 /** Un cuadro guardado para la reversa (boomerang / final del 360). */
@@ -58,6 +62,7 @@ export class Compositor {
   private startedAt = performance.now();
   // Accesorios: se buscan caras ~8 veces por segundo y se dibujan en cada cuadro
   private faces: Face[] = [];
+  private auraFx: AuraEffect | null = null;
   private detecting = false;
   private lastDetect = 0;
   /** Mientras corre la placa final no se dibuja la cámara */
@@ -228,6 +233,16 @@ export class Compositor {
     if (fx.vignette && this.vignette) {
       ctx.fillStyle = this.vignette;
       ctx.fillRect(0, 0, W, H);
+    }
+    const aura = this.opts.aura;
+    if (aura && aura !== 'none') {
+      const color = this.opts.auraColor || '#00e5ff';
+      if (!this.auraFx) this.auraFx = new AuraEffect(W, H, aura, color);
+      this.auraFx.style = aura;
+      this.auraFx.color = color;
+      // Busca a las personas en el cuadro limpio (antes del aura, el accesorio y las capas)
+      this.auraFx.update(this.canvas, this.time);
+      this.auraFx.draw(ctx, this.time);
     }
     if (accessory && accessory !== 'none') this.drawAccessories(accessory);
     if (decor) decor.draw(ctx, this.time);

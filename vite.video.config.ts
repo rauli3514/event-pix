@@ -7,7 +7,7 @@ import fs from 'fs'
 // sitio y del kiosco. Sin la carpeta public (imágenes del kiosco): copia solo lo que
 // usa (tipografías y el detector de caras de MediaPipe) y deja la página como
 // index.html (lo pide Capacitor).
-const PUBLIC_FILES = ['fonts/poppins-800.woff2', 'CarlMarx-Bold.ttf', 'CarlMarx-Regular.ttf', 'mediapipe/blaze_face_short_range.tflite']
+const PUBLIC_FILES = ['fonts/poppins-800.woff2', 'CarlMarx-Bold.ttf', 'CarlMarx-Regular.ttf', 'mediapipe/blaze_face_short_range.tflite', 'mediapipe/selfie_segmenter.tflite']
 const MEDIAPIPE_DIR = path.resolve(__dirname, 'node_modules/@mediapipe/tasks-vision/wasm')
 const MEDIAPIPE_FILES = ['vision_wasm_internal.js', 'vision_wasm_internal.wasm', 'vision_wasm_nosimd_internal.js', 'vision_wasm_nosimd_internal.wasm']
 
