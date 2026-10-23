@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Download, MessageCircle, Share2 } from 'lucide-react';
 import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
@@ -19,6 +19,25 @@ export default function GuestVideo() {
   const playUrls = clipPlayUrls(id);
   const [attempt, setAttempt] = useState(0);
   const useDrivePlayer = attempt >= playUrls.length;
+  // Diagnóstico (?diag=1): qué contesta cada dirección y por qué no se reproduce
+  const diag = params.get('diag') === '1';
+  const [report, setReport] = useState<string[]>([]);
+  const note = (line: string) => setReport(r => [...r, line]);
+  useEffect(() => {
+    if (!diag || !id) return;
+    note(`Clave de Google en el sitio: ${playUrls.length > 1 ? 'sí' : 'NO (falta VITE_GOOGLE_API_KEY o el redeploy)'}`);
+    note(`Navegador: ${navigator.userAgent}`);
+    for (const [i, url] of playUrls.entries()) {
+      const name = url.includes('googleapis') ? 'API de Drive' : 'Drive directo';
+      fetch(url, { headers: { Range: 'bytes=0-1' } })
+        .then(async r => {
+          const body = r.ok ? '' : (await r.text()).replace(/\s+/g, ' ').slice(0, 300);
+          note(`${i + 1}. ${name}: ${r.status} ${r.headers.get('content-type') ?? ''} ${body}`);
+        })
+        .catch(e => note(`${i + 1}. ${name}: no se pudo pedir (${e instanceof Error ? e.message : e})`));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [diag, id]);
   const contactPhone = EVENTPIX_WHATSAPP;
 
   const share = async () => {
@@ -46,8 +65,16 @@ export default function GuestVideo() {
               <iframe src={`https://drive.google.com/file/d/${id}/preview`} allow="autoplay" title="Tu video"
                 className="w-full aspect-[9/16] rounded-3xl shadow-2xl border border-white/20 bg-black" />
             ) : (
-              <video key={attempt} src={playUrls[attempt]} controls autoPlay loop playsInline muted onError={() => setAttempt(a => a + 1)}
+              <video key={attempt} src={playUrls[attempt]} controls autoPlay loop playsInline muted onError={e => {
+                const err = e.currentTarget.error;
+                if (diag) note(`Reproductor, intento ${attempt + 1}: error ${err?.code ?? '?'} ${err?.message ?? ''}`);
+                setAttempt(a => a + 1);
+              }}
+              onLoadedData={() => { if (diag) note(`Reproductor: se reproduce con el intento ${attempt + 1}`); }}
                 className="w-full rounded-3xl shadow-2xl border border-white/20 bg-black" />
+            )}
+            {diag && (
+              <pre className="w-full whitespace-pre-wrap break-all rounded-2xl bg-black/60 p-3 text-xs text-white/80">{report.join('\n') || 'Probando…'}</pre>
             )}
             <div className="w-full space-y-3">
               <a href={fileUrl} className={`${button} bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7]`}>
