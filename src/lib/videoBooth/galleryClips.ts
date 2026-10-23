@@ -3,7 +3,11 @@ import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
 // Videos de una galería online de la cabina (solo los aprobados), en vivo.
 
-export interface Clip { id: string; drive_id: string; thumb_id: string | null; title: string | null; mode: string | null; created_at: string }
+export interface Clip {
+  id: string; drive_id: string; thumb_id: string | null; title: string | null; mode: string | null; created_at: string;
+  /** Vista previa animada: imagen con 24 cuadros (6 × 4) del video */
+  preview_id?: string | null;
+}
 
 export const MODE_LABEL: Record<string, string> = {
   clasico: 'Video', boomerang: 'Boomerang', lenta: 'Cámara lenta', '360': '360', firmas: 'Libro de firmas', glam: 'Glam',
@@ -21,16 +25,18 @@ export function useGalleryClips(code: string) {
     if (!isSupabaseConfigured || !code) return;
     let alive = true;
     const load = async () => {
-      const query = () => supabase.from('video_clips')
-        .select('id, drive_id, thumb_id, title, mode, created_at')
+      const query = (cols: string) => supabase.from('video_clips')
+        .select(cols)
         .eq('gallery', code).order('created_at', { ascending: false }).limit(300);
+      const base = 'id, drive_id, thumb_id, title, mode, created_at';
       // Solo los aprobados (aunque mire alguien logueado en el panel)
-      let { data, error: e } = await query().eq('hidden', false);
-      // Base sin la migración de moderación: no hay columna "hidden"
-      if (e && /hidden/i.test(e.message)) ({ data, error: e } = await query());
+      let { data, error: e } = await query(`${base}, preview_id`).eq('hidden', false);
+      // Base sin la vista previa (falta su SQL) o sin la moderación
+      if (e && /preview_id/i.test(e.message)) ({ data, error: e } = await query(base).eq('hidden', false));
+      if (e && /hidden/i.test(e.message)) ({ data, error: e } = await query(base));
       if (!alive) return;
       if (e) setError(e.message);
-      else { setError(''); setClips(data as Clip[]); }
+      else { setError(''); setClips((data ?? []) as unknown as Clip[]); }
     };
     void load();
     // En vivo: videos nuevos, aprobados, ocultos o borrados (y por las dudas, cada 30 s)

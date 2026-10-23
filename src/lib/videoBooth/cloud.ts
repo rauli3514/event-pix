@@ -17,6 +17,8 @@ export interface PendingUpload {
   folder: string;
   blob: Blob;
   thumb?: Blob | null;
+  /** Vista previa animada (24 cuadros en una imagen) para la pantalla de la galería */
+  preview?: Blob | null;
   title?: string;
   mode: string;
   gallery: string;
@@ -40,15 +42,18 @@ export const galleryScreenUrl = (code: string, view: ScreenViewKey = 'completa')
 export const canUpload = () => isDriveConfigured() && !getVideoSettings().offline && navigator.onLine;
 
 /** Anota el video en la galería online (el equipo se identifica con su clave). No corta si falla. */
-async function registerClip(item: PendingUpload, driveId: string, thumbId: string | null) {
+async function registerClip(item: PendingUpload, driveId: string, thumbId: string | null, previewId: string | null) {
   if (!isSupabaseConfigured || !item.gallery) return;
-  const { error } = await supabase.rpc('video_clip_add', {
+  const args = {
     p_code: getDeviceCode(), p_secret: getDeviceSecret(),
     p_gallery: item.gallery, p_drive_id: driveId, p_thumb_id: thumbId,
     p_title: item.title?.slice(0, 120) || null, p_mode: item.mode,
     // Con aprobación previa el video entra oculto hasta que se apruebe en el panel
     p_hidden: getVideoSettings().galleryModeration === 'pre',
-  });
+  };
+  let { error } = await supabase.rpc('video_clip_add', previewId ? { ...args, p_preview_id: previewId } : args);
+  // Base sin la vista previa (falta correr 20261023000000_video_clip_preview.sql): sin ella
+  if (error && previewId) ({ error } = await supabase.rpc('video_clip_add', args));
   if (error) console.warn('[video] no se pudo anotar en la galería', error.message);
 }
 
@@ -77,7 +82,16 @@ async function uploadOne(item: PendingUpload) {
       console.warn('[video] miniatura', e);
     }
   }
-  await registerClip(item, driveId, thumbId).catch(() => {});
+  let previewId: string | null = null;
+  if (item.preview) {
+    try {
+      const previewName = `vista-previa-${item.name.replace(/\.\w+$/, '')}.jpg`;
+      previewId = await uploadForShare(await blobToDataUrl(item.preview), previewName, item.folder, 'image/jpeg');
+    } catch (e) {
+      console.warn('[video] vista previa', e);
+    }
+  }
+  await registerClip(item, driveId, thumbId, previewId).catch(() => {});
   if (item.phones?.length) await sendToPhones(item, driveId, item.phones);
   return driveId;
 }

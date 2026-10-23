@@ -74,6 +74,8 @@ export interface RenderExtras {
   zoom?: boolean;
   /** Destello en cada cambio de velocidad */
   flash?: boolean;
+  /** Cada cuadro dibujado (para la vista previa animada): t en segundos del video final */
+  onFrame?: (canvas: HTMLCanvasElement, t: number, total: number) => void;
 }
 
 /**
@@ -195,11 +197,12 @@ export async function renderEffects(opts: {
         // 30 cuadros por segundo
         if (t - lastPaint >= 1 / 31) {
           lastPaint = t;
-          if (phase === 'forward') { paint(v, t); paintTop(t); }
-          else if (phase === 'tail' && tail.length) { paint(tail[tailIdx].frame.bitmap, t); paintTop(t); }
+          if (phase === 'forward') { paint(v, t); paintTop(t); opts.onFrame?.(canvas, t, total); }
+          else if (phase === 'tail' && tail.length) { paint(tail[tailIdx].frame.bitmap, t); paintTop(t); opts.onFrame?.(canvas, t, total); }
           else if (phase === 'end') {
             const te = t - forwardEnd;
             if (endSeconds && decor) decor.drawEndCard(ctx, Math.min(te, endSeconds), endSeconds);
+            opts.onFrame?.(canvas, t, total);
             if (te >= endSeconds) {
               done = true;
               window.clearTimeout(safety);

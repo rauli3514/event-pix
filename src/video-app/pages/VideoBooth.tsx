@@ -24,6 +24,7 @@ import { Compositor } from '@/lib/videoBooth/compositor';
 import { bufferSecondsFor, effectPlan, renderEffects } from '@/lib/videoBooth/effects';
 import { buildDecor, framePool, frameUrl, loadSong, pickSong, type DecorBundle } from '@/lib/videoBooth/media';
 import { MotionDetector, watchMotion } from '@/lib/videoBooth/motion';
+import { PreviewSampler } from '@/lib/videoBooth/preview';
 import { audioContext, bitrateFor, ClipRecorder, extensionFor, mixAudio, openMic, type AudioMix } from '@/lib/videoBooth/recorder';
 import {
   animationLabel, DEFAULT_PROMPTS, enabledModes, galleryCode, getVideoSettings, outputSize, resolveMode, songKey,
@@ -68,7 +69,7 @@ const pick = <T,>(list: T[]) => list[Math.floor(Math.random() * list.length)];
 
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
-interface Result { blob: Blob; url: string; name: string; thumb: Blob | null }
+interface Result { blob: Blob; url: string; name: string; thumb: Blob | null; preview: Blob | null }
 type Qr =
   | { state: 'off' }
   | { state: 'uploading' }
@@ -120,6 +121,9 @@ export default function VideoBooth() {
   const mixRef = useRef<AudioMix | null>(null);
   const motionRef = useRef<MotionDetector | null>(null);
   const thumbRef = useRef<Blob | null>(null);
+  // Vista previa animada para la pantalla de la galería
+  const samplerRef = useRef<PreviewSampler | null>(null);
+  const samplerTimerRef = useRef(0);
   const tickRef = useRef(0);
   const recStartRef = useRef(0);
   const finishingRef = useRef(false);
@@ -159,6 +163,7 @@ export default function VideoBooth() {
 
   const closeCamera = useCallback(() => {
     stopMotion();
+    window.clearInterval(samplerTimerRef.current);
     compositorRef.current?.stop();
     compositorRef.current?.clearBuffer();
     compositorRef.current?.canvas.remove();
@@ -417,6 +422,7 @@ export default function VideoBooth() {
         await comp.playEndCard(decor, endSeconds);
       }
       const raw = await rec.stop();
+      window.clearInterval(samplerTimerRef.current);
       mixRef.current?.stop();
       mixRef.current = null;
       recStreamRef.current?.getTracks().forEach(t => t.stop());
@@ -432,12 +438,20 @@ export default function VideoBooth() {
       let blob = raw;
       let mime = rec.mime;
       if (plan) {
+        // Con efectos, la vista previa sale del video final
+        const sampler = new PreviewSampler(size.width, size.height);
+        let timed = false;
+        samplerRef.current = sampler;
         try {
           const out = await renderEffects({
             source: raw, frames, plan, width: size.width, height: size.height,
             music: cfg.music ? musicRef.current : null, musicVolume: settings.musicVolume, musicStart: songRef.current?.start,
             decor, endCard: endSeconds, zoom: settings.zoomEffect, flash: settings.flashEffect && mode.effect === 'ramp',
             onProgress: setProgress,
+            onFrame: (canvas, t, total) => {
+              if (!timed) { sampler.setDuration(total); timed = true; }
+              sampler.sample(canvas, t);
+            },
           });
           blob = out.blob;
           mime = out.mime;
@@ -447,7 +461,9 @@ export default function VideoBooth() {
       }
       if (!blob.size) throw new Error('El video salió vacío. Probá de nuevo.');
       const name = videoFileName(mode.key, extensionFor(mime || blob.type));
-      const res: Result = { blob, url: URL.createObjectURL(blob), name, thumb: thumbRef.current };
+      const preview = await samplerRef.current?.toBlob().catch(() => null) ?? null;
+      samplerRef.current = null;
+      const res: Result = { blob, url: URL.createObjectURL(blob), name, thumb: thumbRef.current, preview };
       setResult(res);
       // Respaldo en el equipo, siempre
       saveVideoLocally(blob, name).catch(e => {
@@ -492,6 +508,15 @@ export default function VideoBooth() {
     recStartRef.current = startedAt;
     recorderRef.current = rec;
     thumbRef.current = null;
+    // Sin efectos, la vista previa se toma mientras se graba (con la placa final)
+    window.clearInterval(samplerTimerRef.current);
+    samplerRef.current = null;
+    if (mode.effect === 'none') {
+      const sampler = new PreviewSampler(size.width, size.height);
+      sampler.setDuration(planned + endSeconds);
+      samplerRef.current = sampler;
+      samplerTimerRef.current = window.setInterval(() => sampler.sample(comp.canvas, (performance.now() - startedAt) / 1000), 100);
+    }
     // Miniatura para la galería: un cuadro al rato de empezar
     window.setTimeout(() => {
       if (recorderRef.current === rec) void comp.snapshot().then(b => { if (b) thumbRef.current = b; });
@@ -585,7 +610,7 @@ export default function VideoBooth() {
     setQr(showQr ? { state: 'uploading' } : { state: 'off' });
     try {
       const driveId = await deliverVideo({
-        name: res.name, folder: eventFolder(), blob: res.blob, thumb: res.thumb,
+        name: res.name, folder: eventFolder(), blob: res.blob, thumb: res.thumb, preview: res.preview,
         title, mode, gallery: code, created: Date.now(),
       });
       uploadingRef.current = false;
