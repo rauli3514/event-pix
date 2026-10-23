@@ -14,6 +14,9 @@ import {
   TEXT_SCALES, videoFilter, WATERMARK_POSITIONS, WATERMARK_SIZES, type VideoBoothSettings, type VideoModeKey,
 } from '@/lib/videoBooth/settings';
 import { buildDecor, framePool, type DecorBundle } from '@/lib/videoBooth/media';
+import { AURORA, backgroundOptions, bgKey, themeBackground } from '@/lib/videoBooth/backgrounds';
+import AuroraBackground from '@/components/kiosk/brand/AuroraBackground';
+import { ThemeLayer } from '@/components/video-booth/ScreenBackground';
 import { allFrames, builtinFrameThumb, isBuiltinFrame } from '@/lib/videoBooth/builtinFrames';
 import { buttonClass, Choice, Field, inputClass, MultiChoice, Note, Panel, primaryClass, Toggle } from '../ui';
 
@@ -618,6 +621,72 @@ export function PreviewPanel({ s, modeKey }: { s: VideoBoothSettings; modeKey?: 
           {endCard && !s.endCard && <p className="text-amber-200 text-sm max-w-xs">La placa final está apagada (Marca → Placa final).</p>}
         </div>
       </div>
+    </Panel>
+  );
+}
+
+function BackgroundThumb({ value, label, active, onPick, onRemove }: { value: string; label: string; active: boolean; onPick: () => void; onRemove?: () => void }) {
+  const theme = themeBackground(value);
+  const own = useMediaUrl(value !== AURORA && !theme ? bgKey(value) : '');
+  const [isVideo, setIsVideo] = useState(false);
+  useEffect(() => {
+    if (value === AURORA || theme) return;
+    let alive = true;
+    void getMedia(bgKey(value)).then(rec => { if (alive) setIsVideo(!!rec?.blob.type.startsWith('video/')); }).catch(() => {});
+    return () => { alive = false; };
+  }, [value, theme]);
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <button onClick={onPick} className={`rounded-2xl p-1.5 focus:outline-none focus:ring-4 focus:ring-[#00d4ff] ${active ? 'bg-gradient-to-r from-[#ff2e93] to-[#7b2ff7]' : 'bg-white/10'}`}>
+        <span className="relative block w-40 h-24 rounded-xl overflow-hidden">
+          {theme ? <ThemeLayer theme={theme} />
+            : value === AURORA ? <AuroraBackground />
+            : own ? (isVideo ? <video src={own} autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover" /> : <img src={own} alt="" className="absolute inset-0 w-full h-full object-cover" />)
+            : <span className="absolute inset-0 bg-black/40" />}
+        </span>
+      </button>
+      <span className="text-sm max-w-[10rem] truncate">{label}</span>
+      {onRemove && <button onClick={onRemove} className="text-white/60 hover:text-white text-sm flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-[#00d4ff] rounded"><Trash2 className="w-4 h-4" /> Quitar</button>}
+    </div>
+  );
+}
+
+/** Fondos de las pantallas: de fábrica o propios (imágenes o videos en loop). */
+export function BackgroundsPanel({ s, update }: Props) {
+  const input = useRef<HTMLInputElement>(null);
+  const list = s.backgrounds ?? [];
+  const current = s.background || AURORA;
+  const add = async (files: FileList | null) => {
+    const added = [];
+    for (const file of Array.from(files ?? [])) {
+      const id = newMediaId();
+      if (await save(bgKey(id), file)) added.push({ id, name: file.name.replace(/\.\w+$/, '') });
+    }
+    if (added.length) {
+      update({ backgrounds: [...list, ...added], background: added[0].id });
+      toast.success(added.length > 1 ? `${added.length} fondos cargados` : 'Fondo cargado');
+    }
+  };
+  const remove = async (id: string) => {
+    await removeMedia(bgKey(id)).catch(() => {});
+    update({ backgrounds: list.filter(b => b.id !== id), background: s.background === id ? AURORA : s.background });
+  };
+  return (
+    <Panel title="Fondos de las pantallas" description="El fondo del inicio, de la pregunta del libro de firmas, de los marcos y del resultado. Tocá uno para usarlo en General; cada experiencia puede tener el suyo (en su pestaña). Podés cargar imágenes o un video corto que se repite.">
+      <div className="flex flex-wrap gap-4">
+        {backgroundOptions(s).map(o => (
+          <BackgroundThumb key={o.value} value={o.value} label={o.label} active={current === o.value}
+            onPick={() => update({ background: o.value })}
+            onRemove={list.some(b => b.id === o.value) ? () => void remove(o.value) : undefined} />
+        ))}
+      </div>
+      <input ref={input} type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm" multiple className="hidden" onChange={e => { void add(e.target.files); e.target.value = ''; }} />
+      <button className={buttonClass} onClick={() => input.current?.click()}><ImagePlus className="w-5 h-5" /> Cargar mis fondos (imagen o video)</button>
+      <p className="text-white/45 text-sm">Conviene que tengan la forma de la pantalla del equipo (horizontal 1920×1080 en una tele, vertical en una tablet parada). Los videos, cortos y livianos.</p>
+      {list.length > 0 && (
+        <Choice label="Oscurecer los fondos propios (para que se lean los textos)" value={s.backgroundDim ?? 0.35} onChange={v => update({ backgroundDim: v })}
+          options={[0, 0.2, 0.35, 0.5, 0.65].map(n => ({ value: n, label: n ? `${Math.round(n * 100)}%` : 'Nada' }))} />
+      )}
     </Panel>
   );
 }

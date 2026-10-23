@@ -11,6 +11,7 @@ import {
 } from '@/lib/videoBooth/settings';
 import ModeEditor, { type ModeKit } from '@/components/video-booth/ModeEditor';
 import { BUILT_IN_VIDEO_FRAMES } from '@/lib/videoBooth/builtinFrames';
+import { backgroundOptions } from '@/lib/videoBooth/backgrounds';
 import { btnGhost, Check, Field, input, Section, Select } from './ui';
 import GalleryLinks from './GalleryLinks';
 
@@ -78,6 +79,7 @@ export default function SettingsForm({ form, setForm }: { form: RemoteVideoSetti
   const [busy, setBusy] = useState('');
   const [tab, setTab] = useState<Tab>('general');
   const frameInput = useRef<HTMLInputElement>(null);
+  const bgInput = useRef<HTMLInputElement>(null);
   const songInput = useRef<HTMLInputElement>(null);
   const logoInput = useRef<HTMLInputElement>(null);
   const animInput = useRef<HTMLInputElement>(null);
@@ -93,14 +95,21 @@ export default function SettingsForm({ form, setForm }: { form: RemoteVideoSetti
   const setMode = (key: VideoModeKey, patch: Partial<VideoModeConfig>) =>
     set('modes', { ...modes, [key]: { ...(modes[key] ?? {}), ...patch } });
 
-  const upload = async (kind: 'frames' | 'songs' | 'logo' | 'anim' | 'endcard', files: FileList | null) => {
+  const upload = async (kind: 'frames' | 'songs' | 'backgrounds' | 'logo' | 'anim' | 'endcard', files: FileList | null) => {
     if (!files?.length) return;
     setBusy(kind);
     try {
-      if (kind === 'frames' || kind === 'songs') {
+      if (kind === 'frames' || kind === 'songs' || kind === 'backgrounds') {
         const added: RemoteFile[] = [];
         for (const file of Array.from(files)) added.push({ id: uid(), name: file.name.replace(/\.\w+$/, ''), url: await uploadAsset(kind, file) });
         setAssets({ [kind]: [...(assets[kind] ?? []), ...added] });
+        // Con fondos nuevos y sin uno elegido, el primero subido pasa a ser el de General
+        if (kind === 'backgrounds') {
+          setForm(f => {
+            const video = f.video ?? {};
+            return video.background && video.background !== 'aurora' ? f : { ...f, video: { ...video, background: added[0].id } };
+          });
+        }
         // Con marcos nuevos, el equipo pasa a usar marco (el primero subido si no había uno elegido)
         if (kind === 'frames') {
           setForm(f => {
@@ -130,6 +139,12 @@ export default function SettingsForm({ form, setForm }: { form: RemoteVideoSetti
   ];
   const overlay = val('overlay', 'none') as string;
   const dateMode = val('overlayDateMode', 'auto') as string;
+  // Fondos: los de fábrica, los cargados en el equipo y los subidos acá
+  const localBackgrounds = ((v.backgrounds ?? []) as { id: string; name: string }[]).filter(f => !f.id.startsWith('r-'));
+  const bgOptions = backgroundOptions({}, [
+    ...localBackgrounds.map(f => ({ id: f.id, name: `${f.name} (cargado en el equipo)` })),
+    ...(assets.backgrounds ?? []).map(f => ({ id: f.id, name: f.name })),
+  ]);
   const songOptions = [
     ...localSongs.map(f => ({ value: f.id, label: `${f.name} (cargada en el equipo)` })),
     ...(assets.songs ?? []).map(f => ({ value: f.id, label: f.name })),
@@ -261,7 +276,7 @@ export default function SettingsForm({ form, setForm }: { form: RemoteVideoSetti
       )}
       {isMode && (
         <div className="grid gap-5 lg:grid-cols-2">
-          <ModeEditor key={tab} modeKey={tab as VideoModeKey} s={v as VideoBoothSettings} frames={frameOptions} songs={songOptions} kit={kit}
+          <ModeEditor key={tab} modeKey={tab as VideoModeKey} s={v as VideoBoothSettings} frames={frameOptions} songs={songOptions} backgrounds={bgOptions} kit={kit}
             onChange={patch => setMode(tab as VideoModeKey, patch)} />
           {tab === '360' && (
             <Section title="Arranque automático del 360">
@@ -271,6 +286,17 @@ export default function SettingsForm({ form, setForm }: { form: RemoteVideoSetti
               <Field label="Sensibilidad del movimiento" hint="Lo ideal es calibrarla en el equipo (Ajustes → 360). Más bajo = arranca con menos movimiento.">
                 <input type="range" min={2} max={60} value={val('motionThreshold', 14)} onChange={e => set('motionThreshold', Number(e.target.value))} className="w-full accent-violet-500" />
               </Field>
+            </Section>
+          )}
+          {tab === 'firmas' && (
+            <Section title="Pantalla del libro de firmas">
+              <Field label="Título" hint="Vacío = Libro de firmas">
+                <input className={input} value={val('guestbookTitle', '')} onChange={e => set('guestbookTitle', e.target.value)} placeholder="Libro de firmas" />
+              </Field>
+              <Field label="Texto propio (opcional)">
+                <input className={input} value={val('guestbookText', '')} onChange={e => set('guestbookText', e.target.value)} placeholder="Dejales un mensaje a Roxana y Martín" />
+              </Field>
+              <p className="text-xs text-slate-500">El fondo se elige en la otra tarjeta (Fondo de las pantallas) o en Biblioteca.</p>
             </Section>
           )}
           {tab === 'firmas' && (
@@ -423,6 +449,30 @@ export default function SettingsForm({ form, setForm }: { form: RemoteVideoSetti
               </div>
             </Field>
             {assets.endcard && <Check label="Logo y textos encima de la imagen" checked={val('endCardOverlay', true)} onChange={x => set('endCardOverlay', x)} />}
+          </Section>
+          <Section title="Fondos de las pantallas">
+            <p className="-mt-2 text-sm text-slate-400">El fondo del inicio, de la pregunta del libro de firmas, de los marcos y del resultado. Cada experiencia puede tener el suyo (en su pestaña).</p>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Fondo de General">
+                <Select value={val('background', 'aurora')} options={bgOptions} onChange={x => set('background', x)} />
+              </Field>
+              <Field label="Oscurecer los fondos propios">
+                <Select value={val('backgroundDim', 0.35)} options={[0, 0.2, 0.35, 0.5, 0.65].map(n => ({ value: n, label: n ? `${Math.round(n * 100)}%` : 'Nada' }))} onChange={x => set('backgroundDim', x)} />
+              </Field>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              {(assets.backgrounds ?? []).map(f => (
+                <div key={f.id} className="relative">
+                  {/\.(mp4|webm)(\?|$)/i.test(f.url)
+                    ? <video src={f.url} muted loop autoPlay playsInline className="h-20 rounded-lg border border-slate-700" />
+                    : <img src={f.url} alt={f.name} className="h-20 rounded-lg border border-slate-700 object-cover" />}
+                  <button onClick={() => setAssets({ backgrounds: (assets.backgrounds ?? []).filter(x => x.id !== f.id) })} className="absolute -top-2 -right-2 rounded-full bg-red-600 p-1" aria-label="Quitar"><Trash2 className="h-3 w-3" /></button>
+                </div>
+              ))}
+            </div>
+            <input ref={bgInput} type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm" multiple className="hidden" onChange={e => { void upload('backgrounds', e.target.files); e.target.value = ''; }} />
+            <button onClick={() => bgInput.current?.click()} disabled={!!busy} className={btnGhost}><ImagePlus className="h-4 w-4" /> {busy === 'backgrounds' ? 'Subiendo…' : 'Subir fondos (imagen o video)'}</button>
+            <p className="text-xs text-slate-500">Conviene la forma de la pantalla del equipo (1920×1080 en una tele horizontal). Videos cortos y livianos.</p>
           </Section>
           <Section title="Animación propia (video)">
             <p className="-mt-2 text-sm text-slate-400">Video corto en loop (WebM con transparencia o MP4 con fondo negro). Se usa eligiendo “Video propio” como animación.</p>

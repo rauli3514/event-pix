@@ -4,6 +4,7 @@ import {
   ANIM_KEY, END_KEY, frameKey, getVideoSettings, LOGO_KEY, saveVideoSettings, songKey,
   type MediaItem, type SongItem,
 } from './settings';
+import { bgKey } from './backgrounds';
 
 // Configuración a distancia desde el panel de la cabina (/admin/cabina-video):
 // el panel guarda en video_devices.settings lo que quiere cambiar y sube
@@ -22,6 +23,8 @@ export interface VideoAssets {
   anim?: string | null;
   /** URL de la imagen de fondo de la placa final (null = quitar) */
   endcard?: string | null;
+  /** Fondos de las pantallas (imágenes o videos) */
+  backgrounds?: RemoteFile[];
 }
 export interface RemoteVideoSettings {
   video?: Record<string, unknown>;
@@ -40,10 +43,11 @@ export const REMOTE_VIDEO_KEYS = [
   'songMode', 'songId', 'autoStart360', 'autoStop360', 'motionThreshold', 'continuous360', 'delivery', 'galleryCode',
   'galleryModeration', 'whatsappEnabled', 'whatsappPrefix', 'galleryEvent', 'autoUpdate',
   'overlayDateMode', 'overlayDate', 'frameText', 'textPosition', 'textColor', 'textScale', 'watermarkSize', 'watermarkOpacity', 'guestFrames', 'endCardOverlay',
+  'background', 'backgroundDim', 'guestbookTitle', 'guestbookText',
 ] as const;
 export const REMOTE_CAMERA_KEYS = ['mirror', 'rotation', 'quality', 'focus'] as const;
 /** Se informan al panel pero no se pisan desde él */
-const REPORT_ONLY_KEYS = ['frames', 'songs'] as const;
+const REPORT_ONLY_KEYS = ['frames', 'songs', 'backgrounds'] as const;
 
 const pick = (src: Record<string, unknown>, keys: readonly string[]) => {
   const out: Record<string, unknown> = {};
@@ -100,6 +104,13 @@ async function applyAssets(assets: VideoAssets) {
       for (const old of (s.frames ?? []).filter(f => isRemoteId(f.id) && !remote.some(r => r.id === f.id))) await remove(frameKey(old.id), applied);
       const local = (s.frames ?? []).filter(f => !isRemoteId(f.id));
       saveVideoSettings({ frames: [...local, ...remote.map<MediaItem>(f => ({ id: f.id, name: f.name }))] });
+    }
+    if (assets.backgrounds) {
+      const remote = assets.backgrounds.map(f => ({ ...f, id: isRemoteId(f.id) ? f.id : `r-${f.id}` }));
+      for (const f of remote) await download(bgKey(f.id), f.url, f.name, applied);
+      for (const old of (s.backgrounds ?? []).filter(f => isRemoteId(f.id) && !remote.some(r => r.id === f.id))) await remove(bgKey(old.id), applied);
+      const local = (s.backgrounds ?? []).filter(f => !isRemoteId(f.id));
+      saveVideoSettings({ backgrounds: [...local, ...remote.map<MediaItem>(f => ({ id: f.id, name: f.name }))] });
     }
     if (assets.songs) {
       const remote = assets.songs.map(f => ({ ...f, id: isRemoteId(f.id) ? f.id : `r-${f.id}` }));

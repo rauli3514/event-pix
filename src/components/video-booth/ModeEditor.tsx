@@ -25,12 +25,14 @@ export interface ModeKit {
 const GENERAL = '';
 const fmtSeconds = (n: number) => (n >= 60 ? `${Math.floor(n / 60)}:${String(Math.round(n % 60)).padStart(2, '0')} min` : `${Math.round(n * 10) / 10} s`);
 
-export default function ModeEditor({ modeKey, s, frames, songs, onChange, kit }: {
+export default function ModeEditor({ modeKey, s, frames, songs, backgrounds = [], onChange, kit }: {
   modeKey: VideoModeKey;
   /** Ajustes completos (para ver lo de General) */
   s: VideoBoothSettings;
   frames: Opt<string>[];
   songs: Opt<string>[];
+  /** Fondos de las pantallas para elegir */
+  backgrounds?: Opt<string>[];
   onChange: (patch: Partial<VideoModeConfig>) => void;
   kit: ModeKit;
 }) {
@@ -52,6 +54,10 @@ export default function ModeEditor({ modeKey, s, frames, songs, onChange, kit }:
         <Pick label="Filtro" value={c.filter} options={VIDEO_FILTERS.map(f => ({ value: f.value, label: f.label }))} onChange={v => onChange({ filter: v })} />
         <Pick label="Cuenta regresiva" value={own.countdown ?? -1} onChange={v => onChange({ countdown: v < 0 ? undefined : v })}
           options={[{ value: -1, label: `Como en General (${s.countdown ?? 3 ? `${s.countdown ?? 3} s` : 'sin cuenta'})` }, ...[0, 3, 5, 10].map(n => ({ value: n, label: n ? `${n} s` : 'Sin cuenta' }))]} />
+        {backgrounds.length > 0 && (
+          <Pick label="Fondo de las pantallas (inicio, pregunta, resultado)" value={own.background ?? GENERAL} onChange={v => onChange({ background: v || undefined })}
+            options={[{ value: GENERAL, label: 'Como en General' }, ...backgrounds]} />
+        )}
       </Group>
 
       {def.effect === 'ramp' && <RampEditor ramp={r.ramp} seconds={seconds} onChange={ramp => onChange({ ramp })} kit={kit} />}

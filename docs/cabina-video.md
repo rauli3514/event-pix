@@ -47,6 +47,12 @@ Android** (brazo de la plataforma 360, uso itinerante).
   **imagen propia** de fondo, con o sin logo y textos encima).
 - **Vista previa** en Ajustes (Biblioteca y cada experiencia): cómo sale el video terminado
   y la placa final, sin grabar.
+- **Fondos de las pantallas** (inicio, pregunta del libro de firmas, marcos, resultado): el de
+  siempre, siete de fábrica (dorado, boda, 15 años, fiesta, empresa, natural, noche) o fondos
+  propios (imágenes o un video corto en loop) cargados en Biblioteca o desde el panel. Uno en
+  General y, si se quiere, otro por experiencia. Los propios se oscurecen un poco para que se
+  lean los textos (ajustable).
+- **Libro de firmas:** título y texto propios en la pantalla de la pregunta.
 - **Música propia:** varias canciones con punto de inicio; fija, al azar o la elige el invitado.
 - **Entrega:** QR al video y/o a la galería del evento; **WhatsApp** al número del invitado.
 - **Sin internet:** todo queda en el equipo y se sube solo cuando vuelve la conexión.
