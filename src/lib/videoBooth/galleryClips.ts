@@ -14,6 +14,18 @@ export const MODE_LABEL: Record<string, string> = {
 };
 
 export const clipVideoUrl = (id: string) => `https://drive.usercontent.google.com/download?id=${id}&export=download`;
+
+/**
+ * Clave de Google (secreto VITE_GOOGLE_API_KEY, restringida al sitio y a Drive):
+ * con ella los videos de Drive se reproducen en nuestro propio reproductor.
+ */
+const GOOGLE_API_KEY = ((import.meta.env.VITE_GOOGLE_API_KEY as string | undefined) || '').trim();
+
+/** Direcciones para reproducir un video de Drive, de la mejor a la peor. */
+export const clipPlayUrls = (id: string) => [
+  ...(GOOGLE_API_KEY ? [`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?alt=media&key=${GOOGLE_API_KEY}`] : []),
+  clipVideoUrl(id),
+];
 /** Página del invitado para ver y bajar un video (relativa al sitio). */
 export const clipPage = (c: Clip) => `/clip?${new URLSearchParams({ d: c.drive_id, ...(c.title ? { t: c.title } : {}) }).toString()}`;
 export const clipTime = (c: Clip) => new Date(c.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
