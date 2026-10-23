@@ -233,7 +233,7 @@ export default function SettingsForm({ form, setForm }: { form: RemoteVideoSetti
                 <Select value={val('resultSeconds', 45)} options={[30, 45, 60, 90, 120].map(n => ({ value: n, label: `${n} s` }))} onChange={x => set('resultSeconds', x)} />
               </Field>
             </div>
-            <Check label="El invitado revisa su video y puede repetirlo" checked={val('review', true)} onChange={x => set('review', x)} />
+            <Check label="El invitado revisa su video y puede repetirlo (General; cada experiencia puede cambiarlo)" checked={val('review', true)} onChange={x => set('review', x)} />
           </Section>
           <Section title="Animación y accesorio (General)">
             <p className="-mt-2 text-sm text-slate-400">Los usan las experiencias que no tienen uno propio.</p>

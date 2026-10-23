@@ -71,6 +71,8 @@ export interface VideoModeConfig {
   slowSpeed?: number;
   /** Fondo de las pantallas de esta experiencia (vacío = el de General) */
   background?: string;
+  /** El invitado ve su video y elige quedárselo o repetir (vacío = como en General) */
+  review?: boolean;
 }
 
 export const VIDEO_MODES: VideoModeDef[] = [
@@ -416,6 +418,7 @@ export interface ResolvedMode {
   speed: number;
   slowSpeed: number;
   background: string;
+  review: boolean;
 }
 
 export function resolveMode(key: VideoModeKey, s: VideoBoothSettings = getVideoSettings()): ResolvedMode {
@@ -440,6 +443,7 @@ export function resolveMode(key: VideoModeKey, s: VideoBoothSettings = getVideoS
     speed: cfg.speed ?? 1,
     slowSpeed: cfg.slowSpeed ?? s.slowSpeed ?? 0.5,
     background: cfg.background || s.background || 'aurora',
+    review: cfg.review ?? s.review !== false,
   };
 }
 
