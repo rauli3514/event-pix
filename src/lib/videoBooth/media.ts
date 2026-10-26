@@ -3,6 +3,7 @@ import { Decor, disposeAnimVideo, loadAnimVideo, type Caption } from './decor';
 import { decodeMusic } from './recorder';
 import { ANIM_KEY, END_KEY, frameKey, LOGO_KEY, overlayDateText, songKey, type AnimationKey, type SongItem, type VideoBoothSettings } from './settings';
 
+import { isLicensed } from './device';
 import { allFrames, BUILT_IN_VIDEO_FRAMES, builtinFrameThumb, isBuiltinFrame, renderBuiltinFrame } from './builtinFrames';
 
 // Archivos de la cabina guardados en el equipo: marcos, logo, animación y música.
@@ -88,6 +89,7 @@ export async function buildDecor(s: VideoBoothSettings, size: { width: number; h
     watermarkSize: s.watermarkSize, watermarkOpacity: s.watermarkOpacity,
     brandColor: s.brandColor, title: opts.eventTitle || s.overlayText || '', endText: s.endCardText?.trim() || undefined,
     endImage, endOverlay: s.endCardOverlay !== false,
+    demo: !isLicensed(),
   });
   return {
     decor,

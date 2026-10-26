@@ -15,7 +15,7 @@ import {
   VIDEO_MODES, type VideoBoothSettings, type VideoModeKey,
 } from '@/lib/videoBooth/settings';
 import { buttonClass, Choice, Field, inputClass, MultiChoice, Note, Panel, Stepper, Tabs, Toggle } from '../ui';
-import { CameraPanel, CloudPanel, DevicePanel, EventPanel, UpdatePanel } from './DevicePanels';
+import { CameraPanel, CloudPanel, DevicePanel, EventPanel, LicensePanel, UpdatePanel } from './DevicePanels';
 
 // Ajustes de la app EventPix Video (detrás de la clave del equipo), en pestañas:
 // General, una por experiencia, Biblioteca (marcos, música, marca) y Equipo.
@@ -167,6 +167,7 @@ export default function VideoBoothSettings() {
               Formato de video de este equipo: <b>{support.format}</b>
               {support.ok && !support.mp4 && ' — los iPhone no reproducen WebM: conviene actualizar el WebView del equipo (Chrome 126 o más nuevo graba MP4).'}
             </div>
+            <LicensePanel />
             <DevicePanel onLink={() => navigate('/')} />
             <UpdatePanel s={s} update={update} />
             <CloudPanel s={s} update={update} />

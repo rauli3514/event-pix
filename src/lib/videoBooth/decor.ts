@@ -30,6 +30,8 @@ export interface DecorOptions {
   endImage?: CanvasImageSource | null;
   /** Logo y textos encima de la imagen propia */
   endOverlay?: boolean;
+  /** Versión demo (sin licencia): marca "DEMO" en todo el video */
+  demo?: boolean;
 }
 
 export interface Caption {
@@ -76,7 +78,7 @@ export class Decor {
 
   get hasLayers() {
     const o = this.o;
-    return !!(o.frame || (o.animation && o.animation !== 'none') || o.logo || o.watermark || o.caption);
+    return !!(o.frame || (o.animation && o.animation !== 'none') || o.logo || o.watermark || o.caption || o.demo);
   }
 
   /** Dibuja todas las capas para el segundo `t`. */
@@ -88,6 +90,47 @@ export class Decor {
     if (this.o.caption) this.drawCaption(ctx, this.o.caption);
     if (this.o.logo) this.drawLogo(ctx);
     if (this.o.watermark) this.drawWatermark(ctx);
+    if (this.o.demo) this.drawDemo(ctx);
+    ctx.restore();
+  }
+
+  /** Versión demo: "DEMO · EventPix Video" repetido en diagonal y una franja abajo. */
+  private drawDemo(ctx: CanvasRenderingContext2D) {
+    const { width: W, height: H } = this.o;
+    const u = Math.min(W, H);
+    const text = 'DEMO · EventPix Video';
+    ctx.save();
+    const size = Math.round(u * 0.07);
+    ctx.font = `900 ${size}px 'Montserrat', sans-serif`;
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    ctx.lineWidth = Math.max(1, size * 0.06);
+    ctx.globalAlpha = 0.38;
+    ctx.translate(W / 2, H / 2);
+    ctx.rotate(-Math.PI / 7);
+    const w = ctx.measureText(text).width;
+    const stepX = w + size * 1.5;
+    const stepY = size * 3.2;
+    const R = Math.hypot(W, H) / 2 + stepX;
+    let row = 0;
+    for (let y = -R; y < R; y += stepY, row++) {
+      for (let x = -R + (row % 2) * (stepX / 2); x < R; x += stepX) {
+        ctx.strokeText(text, x, y);
+        ctx.fillText(text, x, y);
+      }
+    }
+    ctx.restore();
+    // Franja de abajo
+    const band = Math.round(u * 0.075);
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(0, H - band, W, band);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `700 ${Math.round(band * 0.42)}px 'Montserrat', sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Versión de prueba · EventPix Video', W / 2, H - band / 2);
     ctx.restore();
   }
 

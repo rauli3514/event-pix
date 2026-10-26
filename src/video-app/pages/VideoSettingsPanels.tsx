@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { isLicensed } from '@/lib/videoBooth/device';
 import { QRCodeSVG } from 'qrcode.react';
 import { CloudUpload, Copy, ExternalLink, ImagePlus, Music, Play, Square, Trash2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
@@ -525,7 +526,7 @@ export function DeliveryPanel({ s, update }: Props) {
         options={[{ value: 'video', label: 'Su video' }, { value: 'gallery', label: 'La galería del evento' }, { value: 'both', label: 'Los dos (dos QR)' }]} />
       <Choice label="Videos en la galería" value={s.galleryModeration ?? 'post'} onChange={v => update({ galleryModeration: v })}
         options={[{ value: 'post', label: 'Aparecen solos (se pueden ocultar desde el panel)' }, { value: 'pre', label: 'Aparecen cuando los apruebo en el panel' }]} />
-      <Toggle label="Botón “Enviar por WhatsApp”" hint="El invitado escribe su número y le llega el video. Necesita el WhatsApp de la empresa configurado en el servidor (ver docs/cabina-video.md)."
+      <Toggle label="Botón “Enviar por WhatsApp”" hint={isLicensed() ? 'El invitado escribe su número y le llega el video. Necesita el WhatsApp de la empresa configurado en el servidor (ver docs/cabina-video.md).' : 'Disponible con la licencia de EventPix Video (Ajustes → Equipo).'}
         checked={!!s.whatsappEnabled} onChange={v => update({ whatsappEnabled: v })} />
       {s.whatsappEnabled && (
         <Field label="Prefijo del país (va antes del número; 549 = Argentina celulares)">

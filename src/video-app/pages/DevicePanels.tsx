@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Download, Link2, Loader2, RefreshCw } from 'lucide-react';
+import { AlertTriangle, BadgeCheck, CheckCircle2, Download, KeyRound, Link2, Loader2, MessageCircle, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import {
@@ -8,8 +8,8 @@ import {
 } from '@/lib/videoBooth/camera';
 import {
   canInstallUpdates, canSelfUpdate, checkForUpdate, checkinDevice, DEVICE_EVENT, getAppVersion, getCachedDeviceState,
-  getDeviceCode, getPin, getUpdateStatus, openInstallPermission, setPin, setStandalone, startUpdate, UPDATE_EVENT,
-  type UpdateStatus,
+  getDeviceCode, getLicense, getPin, getUpdateStatus, isLicensed, LICENSE_EVENT, licenseWhatsAppUrl, openInstallPermission,
+  setPin, setStandalone, startUpdate, UPDATE_EVENT, type UpdateStatus,
 } from '@/lib/videoBooth/device';
 import { DEFAULT_FOLDER } from '@/lib/videoBooth/drive';
 import { DEFAULT_SCRIPT_URL, isDriveConfigured, saveDriveConfig, testDrive } from '@/lib/videoBooth/drive';
@@ -23,6 +23,60 @@ import { buttonClass, Choice, Field, inputClass, Panel, primaryClass, Toggle } f
 
 type Update = (patch: Partial<VideoBoothSettings>) => void;
 interface Props { s: VideoBoothSettings; update: Update }
+
+/** Licencia del equipo: demo (marca DEMO en los videos) o cliente. */
+export function LicensePanel() {
+  const [licensed, setLicensed] = useState(isLicensed);
+  const [checking, setChecking] = useState(false);
+  useEffect(() => {
+    const on = () => setLicensed(isLicensed());
+    window.addEventListener(LICENSE_EVENT, on);
+    return () => window.removeEventListener(LICENSE_EVENT, on);
+  }, []);
+  const license = getLicense();
+  const until = license?.until ? new Date(license.until) : null;
+  const expired = license?.license === 'full' && !!until && until.getTime() < Date.now();
+  const check = async () => {
+    setChecking(true);
+    try {
+      await checkinDevice();
+      setLicensed(isLicensed());
+      toast.success(isLicensed() ? '¡Licencia activa!' : 'Todavía está en versión demo');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Sin conexión con el servidor');
+    } finally {
+      setChecking(false);
+    }
+  };
+  if (!isSupabaseConfigured) return null;
+  return (
+    <Panel title="Licencia" description={licensed ? undefined : 'En versión demo funciona todo, pero los videos salen con la marca “DEMO · EventPix Video”. Con la licencia salen limpios y se activa el envío por WhatsApp.'}>
+      {licensed ? (
+        <div className="flex items-center gap-3 rounded-2xl bg-emerald-500/15 text-emerald-200 px-5 py-4">
+          <BadgeCheck className="w-7 h-7 shrink-0" />
+          <p className="text-lg font-semibold">Licencia activa{until ? ` hasta el ${until.toLocaleDateString('es-AR')}` : ''}</p>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center gap-3 rounded-2xl bg-amber-500/15 text-amber-100 px-5 py-4">
+            <KeyRound className="w-7 h-7 shrink-0" />
+            <p className="text-lg font-semibold">{expired ? `La licencia venció el ${until!.toLocaleDateString('es-AR')}` : 'Versión demo'}</p>
+          </div>
+          <p className="text-lg">Código del equipo: <b className="font-mono text-2xl tracking-[0.2em]">{getDeviceCode()}</b></p>
+          <div className="flex flex-wrap gap-3">
+            <a href={licenseWhatsAppUrl()} target="_blank" rel="noreferrer" className={`${primaryClass} bg-none bg-[#25D366] text-[#05300f]`}>
+              <MessageCircle className="w-5 h-5" /> Activar licencia por WhatsApp
+            </a>
+            <button onClick={() => void check()} disabled={checking} className={buttonClass}>
+              {checking ? <Loader2 className="w-5 h-5 animate-spin" /> : <RefreshCw className="w-5 h-5" />} Ya pagué: revisar
+            </button>
+          </div>
+          <p className="text-white/50 text-sm">Al activarla se desbloquea sola en menos de un minuto (con internet).</p>
+        </>
+      )}
+    </Panel>
+  );
+}
 
 export function DevicePanel({ onLink }: { onLink: () => void }) {
   const [state, setState] = useState(getCachedDeviceState);

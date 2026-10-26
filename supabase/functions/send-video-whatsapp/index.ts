@@ -34,6 +34,7 @@ const reply = (body: Record<string, unknown>, status = 200) =>
 const ERRORS: Record<string, string> = {
   device_auth: 'El equipo no está autorizado (volvé a vincularlo en el panel de la cabina).',
   device_not_linked: 'El equipo no está vinculado al panel de la cabina.',
+  license_required: 'El envío por WhatsApp está disponible con la licencia de EventPix Video.',
 }
 
 serve(async (req) => {

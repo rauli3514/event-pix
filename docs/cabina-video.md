@@ -126,10 +126,27 @@ agrega **solo al compilar EventPix Video** (paso "Agregar lo nativo de la cabina
 
 Así el APK del kiosco sale igual que antes.
 
+## Licencias (venta de la app)
+
+Correr `supabase/migrations/20261026000000_video_licenses.sql`. Desde ahí:
+- Cada equipo nuevo arranca en **demo**: todo funciona, pero los videos salen con la marca
+  "DEMO · EventPix Video" en diagonal y la franja "Versión de prueba", y no hay envío por
+  WhatsApp. La pantalla de inicio muestra "VERSIÓN DEMO".
+- Los equipos que ya existían quedan como **cliente** (son de EventPix).
+- El cliente pide la licencia desde **Ajustes → Equipo → Licencia** (botón de WhatsApp con el
+  código del equipo; el número está en `LICENSE_WHATSAPP` de `src/lib/videoBooth/device.ts`).
+- En el panel, **Cabina de video → Equipos → Licencias**: buscar el código, pasar a
+  *Cliente*, elegir plan/vencimiento (vacío = no vence) y datos del cliente. No hace falta
+  vincularlo: el cliente maneja todo desde su app (la biblioteca la maneja solo EventPix).
+- El equipo se entera en su próximo aviso (~1 minuto) o con "Ya pagué: revisar". Sin
+  internet, una licencia de cliente sigue valiendo 21 días desde el último aviso.
+- Galería online: funciona para todos (vinculados o no). WhatsApp: solo con licencia vigente
+  (lo controla el servidor).
+
 ## Envío por WhatsApp (opcional)
 
 Va por la **API oficial de WhatsApp (Meta Cloud API)** desde la función de Supabase
-`send-video-whatsapp`. Solo la pueden usar los equipos vinculados de la cabina (código +
+`send-video-whatsapp`. Solo la pueden usar los equipos con licencia de cliente (código +
 clave secreta) y hay un tope diario por equipo. Cada envío queda en `video_sends`.
 
 1. En Meta Business: app de WhatsApp, número de la empresa y **token permanente**

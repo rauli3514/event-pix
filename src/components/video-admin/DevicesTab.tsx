@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Link2, Settings2, Trash2, Unlink } from 'lucide-react';
+import { KeyRound, Link2, Settings2, Trash2, Unlink } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import GalleryLinks from './GalleryLinks';
+import LicenseEditor, { LicenseBadge } from './LicenseEditor';
 import { DEFAULT_PUBLIC_SITE } from '@/lib/videoBooth/share';
 import { btnDanger, btnGhost, btnPrimary, card, Field, input } from './ui';
 import { ONLINE_WINDOW_MS, type VideoDeviceRow } from './types';
 
 // Equipos de la cabina: vincular con el código que muestra la app EventPix Video,
-// nombre y estado.
+// nombre, estado y licencia (demo / cliente). Los equipos de clientes no hace
+// falta vincularlos: se manejan desde su app; acá solo se les da la licencia.
 
 const relative = (iso: string | null, now: number) => {
   if (!iso) return 'nunca';
@@ -29,6 +31,22 @@ export default function DevicesTab({ devices, loadedAt, onChange, onConfigure }:
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
+  const [licenseCode, setLicenseCode] = useState('');
+  const [editing, setEditing] = useState<string | null>(null);
+  const editingDevice = devices.find(d => d.id === editing) ?? null;
+
+  const openLicense = (id: string) => {
+    setEditing(id);
+    window.setTimeout(() => document.getElementById('license-editor')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60);
+  };
+
+  const findLicense = () => {
+    const c = licenseCode.trim().toUpperCase();
+    const d = devices.find(x => x.device_code === c);
+    if (!d) { toast.error('No aparece ese código: el equipo tiene que haberse prendido con internet al menos una vez.'); return; }
+    openLicense(d.id);
+    setLicenseCode('');
+  };
 
   const link = async () => {
     const deviceCode = code.trim().toUpperCase();
@@ -91,6 +109,21 @@ export default function DevicesTab({ devices, loadedAt, onChange, onConfigure }:
         </div>
       </section>
 
+      <section className={`${card} space-y-4`}>
+        <h2 className="flex items-center gap-2 text-base font-bold text-white"><KeyRound className="h-4 w-4 text-violet-300" /> Licencias</h2>
+        <p className="text-sm text-slate-400">Los equipos nuevos arrancan en <b>demo</b> (todo funciona, los videos salen con la marca “DEMO”). Cuando el cliente paga, buscá el código que te mandó y pasalo a <b>cliente</b>. No hace falta vincularlo.</p>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="w-40">
+            <Field label="Código del equipo">
+              <input className={`${input} font-mono uppercase tracking-widest`} value={licenseCode} maxLength={6}
+                onChange={e => setLicenseCode(e.target.value.toUpperCase())} onKeyDown={e => { if (e.key === 'Enter') findLicense(); }} placeholder="ABC234" />
+            </Field>
+          </div>
+          <button onClick={findLicense} className={btnGhost}>Buscar</button>
+        </div>
+        {editingDevice && <div id="license-editor"><LicenseEditor key={editingDevice.id} device={editingDevice} onSaved={onChange} onClose={() => setEditing(null)} /></div>}
+      </section>
+
       <section className="space-y-3">
         <h2 className="text-base font-bold text-white">Equipos vinculados ({linked.length})</h2>
         {!linked.length && <p className="text-sm text-slate-500">Todavía no hay equipos vinculados.</p>}
@@ -108,9 +141,12 @@ export default function DevicesTab({ devices, loadedAt, onChange, onConfigure }:
                     <p className="font-bold text-white">{d.name || 'Sin nombre'}</p>
                     <p className="font-mono text-xs text-slate-400">{d.device_code}{d.app_version ? ` · v${d.app_version}` : ''}</p>
                   </div>
+                  <div className="flex flex-wrap justify-end gap-1.5">
+                  <LicenseBadge device={d} />
                   <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${online ? 'bg-emerald-500/15 text-emerald-300' : 'bg-slate-700/50 text-slate-400'}`}>
                     {online ? 'En línea' : `Visto ${relative(d.last_seen, loadedAt)}`}
                   </span>
+                  </div>
                 </div>
                 <p className="text-sm text-slate-400">
                   {event ? <>Evento: <span className="text-slate-200">{event}</span></> : 'Sin evento'}
@@ -119,6 +155,7 @@ export default function DevicesTab({ devices, loadedAt, onChange, onConfigure }:
                 <div className="flex flex-wrap gap-2">
                   <button onClick={() => onConfigure(d)} className={btnPrimary}><Settings2 className="h-4 w-4" /> Configurar</button>
                   {gallery && <GalleryLinks site={site} code={gallery} compact />}
+                  <button onClick={() => openLicense(d.id)} className={btnGhost}><KeyRound className="h-4 w-4" /> Licencia</button>
                   <button onClick={() => { const n = window.prompt('Nombre del equipo', d.name ?? ''); if (n !== null) void update(d, { name: n.trim() || null }, 'Nombre cambiado'); }} disabled={busy === d.id} className={btnGhost}>Renombrar</button>
                   <button onClick={() => void update(d, { pairing_status: 'pending' }, 'Equipo desvinculado')} disabled={busy === d.id} className={btnGhost}><Unlink className="h-4 w-4" /> Desvincular</button>
                 </div>
@@ -130,14 +167,19 @@ export default function DevicesTab({ devices, loadedAt, onChange, onConfigure }:
 
       {pending.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-base font-bold text-white">Esperando vinculación ({pending.length})</h2>
-          <div className="flex flex-wrap gap-2">
+          <h2 className="text-base font-bold text-white">Sin vincular: demos y clientes ({pending.length})</h2>
+          <p className="text-sm text-slate-500">Equipos que se manejan solos desde su app. Tocá el código para vincularlo a tu panel.</p>
+          <div className="grid gap-2 md:grid-cols-2">
             {pending.map(d => (
-              <span key={d.id} className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2 text-sm">
-                <button onClick={() => setCode(d.device_code)} className="font-mono text-slate-200 hover:text-white" title="Usar este código">{d.device_code}</button>
-                <span className="text-slate-500">{relative(d.last_seen, loadedAt)}</span>
+              <div key={d.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2 text-sm">
+                <button onClick={() => setCode(d.device_code)} className="font-mono text-slate-200 hover:text-white" title="Usar este código para vincular">{d.device_code}</button>
+                <LicenseBadge device={d} />
+                <span className="min-w-0 flex-1 truncate text-slate-400">
+                  {d.customer_name || ''}{d.customer_name ? ' · ' : ''}{relative(d.last_seen, loadedAt)}{d.app_version ? ` · v${d.app_version}` : ''}
+                </span>
+                <button onClick={() => openLicense(d.id)} className={`${btnGhost} px-2 py-1`} aria-label="Licencia" title="Licencia"><KeyRound className="h-3.5 w-3.5" /></button>
                 <button onClick={() => void remove(d)} disabled={busy === d.id} className={`${btnDanger} px-2 py-1`} aria-label="Borrar"><Trash2 className="h-3.5 w-3.5" /></button>
-              </span>
+              </div>
             ))}
           </div>
         </section>
