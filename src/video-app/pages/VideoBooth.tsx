@@ -32,7 +32,7 @@ import {
 } from '@/lib/videoBooth/settings';
 import { accessoryLabel, VIDEO_ACCESSORIES } from '@/lib/videoBooth/accessories';
 import { AURA_STYLES, preloadAura, type AuraStyle } from '@/lib/videoBooth/aura';
-import { UPDATE_EVENT, updateAvailable } from '@/lib/videoBooth/device';
+import { isLicensed, LICENSE_EVENT, UPDATE_EVENT, updateAvailable } from '@/lib/videoBooth/device';
 import { eventFolder, saveVideoLocally, videoFileName } from '@/lib/videoBooth/storage';
 
 // Cabina de video: el invitado elige la experiencia (video, boomerang, cámara lenta,
@@ -105,6 +105,7 @@ export default function VideoBooth() {
   const [fx, setFx] = useState<{ animation: AnimationKey; accessory: string; aura: string }>({ animation: 'none', accessory: 'none', aura: 'none' });
   const [fxOpen, setFxOpen] = useState(false);
   const [hasUpdate, setHasUpdate] = useState(updateAvailable);
+  const [licensed, setLicensed] = useState(isLicensed);
 
   const rootRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -143,9 +144,12 @@ export default function VideoBooth() {
     window.addEventListener('video-settings-changed', reload);
     const onUpdate = () => setHasUpdate(updateAvailable());
     window.addEventListener(UPDATE_EVENT, onUpdate);
+    const onLicense = () => setLicensed(isLicensed());
+    window.addEventListener(LICENSE_EVENT, onLicense);
     return () => {
       window.removeEventListener('video-settings-changed', reload);
       window.removeEventListener(UPDATE_EVENT, onUpdate);
+      window.removeEventListener(LICENSE_EVENT, onLicense);
     };
   }, []);
 
@@ -605,7 +609,8 @@ export default function VideoBooth() {
   const [waStatus, setWaStatus] = useState<{ state: 'idle' | 'sending' | 'waiting' | 'sent' | 'queued' | 'error'; message?: string }>({ state: 'idle' });
   useRemoteFocus(rootRef, [step, qr.state, frameThumbs.length, waOpen, waStatus.state, fxOpen, homeMode?.key], !pinOpen && !unlockOpen);
   const waPrefix = settings.whatsappPrefix || DEFAULT_WA_PREFIX;
-  const whatsappOn = !!settings.whatsappEnabled && isSupabaseConfigured && isDriveConfigured();
+  // El WhatsApp (cada mensaje cuesta) solo con licencia
+  const whatsappOn = !!settings.whatsappEnabled && isSupabaseConfigured && isDriveConfigured() && licensed;
 
   const deliver = useCallback(async (res: Result) => {
     const showQr = settings.showQr !== false;
@@ -770,6 +775,7 @@ export default function VideoBooth() {
         <div className="absolute inset-0">
           <button onClick={start} className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-10 focus:outline-none" data-autofocus>
             <EventPixLogo size={64} subtitle="Cabina de video" />
+            {!licensed && <span className="-mt-6 rounded-full bg-amber-400/90 px-4 py-1 text-sm font-black tracking-[0.2em] text-black">VERSIÓN DEMO</span>}
             {homeMode && (() => {
               const Icon = ICONS[homeMode.key];
               const [gradient] = GRADIENTS[homeMode.key];

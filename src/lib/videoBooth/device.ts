@@ -91,6 +91,8 @@ const rpcCheckin = async (linked: boolean) => {
   }
   return (Array.isArray(data) ? data[0] : data) as {
     name: string | null; pairing_status: string; settings: RemoteVideoSettings | null; settings_rev: number | null;
+    /** Sin la migración de licencias no vienen (todo como cliente) */
+    license?: 'demo' | 'full'; license_until?: string | null;
   } | null;
 };
 
@@ -106,6 +108,7 @@ export async function checkinDevice(): Promise<VideoDeviceState> {
       console.warn('[video] no se pudo aplicar la configuración del panel', e);
     }
   }
+  saveLicense(row ? row.license ?? 'full' : 'demo', row?.license_until ?? null);
   const state: VideoDeviceState = {
     deviceCode: getDeviceCode(),
     name: row?.name ?? null,
@@ -123,7 +126,8 @@ export function startDeviceSync() {
   const tick = async () => {
     try { await checkinDevice(); } catch { /* sin internet: se reintenta */ }
     const linked = getCachedDeviceState()?.pairingStatus === 'linked';
-    syncTimer = window.setTimeout(tick, linked ? 60000 : 10000);
+    // Esperando que lo vinculen: más seguido; vinculado o usado sin panel: cada minuto
+    syncTimer = window.setTimeout(tick, linked || isStandalone() ? 60000 : 10000);
   };
   syncTimer = window.setTimeout(tick, 0);
 }
@@ -193,3 +197,51 @@ export function startAutoUpdate(autoInstall: () => boolean) {
   window.setTimeout(checkForUpdate, 20000);
   window.setInterval(checkForUpdate, 6 * 60 * 60 * 1000);
 }
+
+// ─── Licencia ────────────────────────────────────────────────────────
+// La decide el servidor (panel → Equipos → Licencia) y llega en cada checkin.
+// DEMO: todo funciona pero los videos salen con la marca "DEMO". Sin internet,
+// una licencia de cliente sigue valiendo LICENSE_GRACE_DAYS desde el último checkin.
+
+const LICENSE_KEY = 'video_license';
+export const LICENSE_EVENT = 'video-license-changed';
+const LICENSE_GRACE_DAYS = 21;
+/** WhatsApp de EventPix para pedir la licencia */
+export const LICENSE_WHATSAPP = '5493624547382';
+
+export interface LicenseState { license: 'demo' | 'full'; until: string | null; checkedAt: number }
+
+export const getLicense = (): LicenseState | null => {
+  try {
+    const saved = JSON.parse(read(LICENSE_KEY) || 'null') as LicenseState | null;
+    if (saved) return saved;
+  } catch { /* se rehace */ }
+  // Equipos que ya andaban antes de las licencias (son de EventPix): siguen sin
+  // marca hasta su próximo checkin, aunque se actualicen sin internet
+  if (getCachedDeviceState()) {
+    const seeded: LicenseState = { license: 'full', until: null, checkedAt: Date.now() };
+    write(LICENSE_KEY, JSON.stringify(seeded));
+    return seeded;
+  }
+  return null;
+};
+
+function saveLicense(license: 'demo' | 'full', until: string | null) {
+  const prev = getLicense();
+  write(LICENSE_KEY, JSON.stringify({ license, until, checkedAt: Date.now() } satisfies LicenseState));
+  if (prev?.license !== license || prev?.until !== until) window.dispatchEvent(new Event(LICENSE_EVENT));
+}
+
+/** Si los videos salen sin la marca DEMO. */
+export function isLicensed(): boolean {
+  if (!isSupabaseConfigured) return true;
+  const l = getLicense();
+  if (!l || l.license !== 'full') return false;
+  if (l.until && Date.parse(l.until) < Date.now()) return false;
+  return Date.now() - l.checkedAt < LICENSE_GRACE_DAYS * 24 * 60 * 60 * 1000;
+}
+
+/** Enlace de WhatsApp para pedir la licencia con el código del equipo. */
+export const licenseWhatsAppUrl = () => `https://wa.me/${LICENSE_WHATSAPP}?text=${encodeURIComponent(
+  `Hola! Quiero activar la licencia de EventPix Video. Código del equipo: ${getDeviceCode()}`,
+)}`;
