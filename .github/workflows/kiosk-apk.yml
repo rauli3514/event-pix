@@ -61,29 +61,23 @@ jobs:
           # Los nombres con espacios rompen Gradle (igual que en build-mobile-apk.sh)
           find android -name '* *' -exec rm -rf {} + || true
 
-      - name: Firma de debug fija
-        uses: actions/cache@v4
-        with:
-          path: kiosk-debug.keystore
-          key: kiosk-debug-keystore-v1
-
-      - name: Crear la firma si no existe
+      - name: Firma del kiosco (secret KIOSK_KEYSTORE_B64)
+        env:
+          KIOSK_KEYSTORE_B64: ${{ secrets.KIOSK_KEYSTORE_B64 }}
         run: |
-          if [ ! -f kiosk-debug.keystore ]; then
-            keytool -genkeypair -keystore kiosk-debug.keystore -storepass android \
-              -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
-              -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          # La firma vive en un secret del repo (no en la caché, que GitHub borra a los
+          # 7 días sin uso). Con otra firma Android no deja instalar encima: los equipos
+          # tendrían que desinstalar y perder los ajustes. Mejor que falle acá.
+          if [ -z "$KIOSK_KEYSTORE_B64" ]; then
+            echo "::error::Falta el secret KIOSK_KEYSTORE_B64 con la firma del kiosco"
+            exit 1
           fi
-
-      - name: Comprobar que es la firma de siempre
-        run: |
-          # Con otra firma Android no deja instalar encima: los equipos tendrían que
-          # desinstalar (y perder los ajustes). Mejor que falle acá.
-          EXPECTED="6C:A0:E0:90:64:0F:29:63:84:61:8E:0B:38:80:30:D1:E2:61:E3:85:9B:A1:41:F7:60:A2:17:41:59:E4:42:B1"
+          echo "$KIOSK_KEYSTORE_B64" | base64 -d > kiosk-debug.keystore
+          EXPECTED="E7:7B:93:73:C7:EF:B3:E4:F2:0D:B5:5D:FE:5A:BF:77:2E:B0:43:65:C4:13:DD:B3:DB:E3:4A:30:50:DF:6F:82"
           ACTUAL=$(keytool -list -v -keystore kiosk-debug.keystore -storepass android -alias androiddebugkey \
             | sed -n 's/.*SHA256: *//p' | tr -d '[:space:]')
           if [ "$ACTUAL" != "$EXPECTED" ]; then
-            echo "::error::La firma no es la de siempre ($ACTUAL). Generá el APK desde la rama que tiene la firma guardada."
+            echo "::error::La firma del secret no es la de siempre ($ACTUAL)"
             exit 1
           fi
 
