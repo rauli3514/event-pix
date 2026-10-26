@@ -121,7 +121,7 @@ async function falBalance(key: string) {
   })
   const data = await res.json().catch(() => ({}))
   if (res.status === 401 || res.status === 403) {
-    throw new Error('La clave de fal no puede ver el saldo: creá una clave de tipo ADMIN en fal y guardala en Supabase como FAL_ADMIN_KEY')
+    throw new Error('La clave de fal no puede ver el saldo: creá en fal una clave con permiso Billing (o Full access) y guardala en Supabase como FAL_ADMIN_KEY')
   }
   if (!res.ok) throw new Error(data?.detail || data?.error?.message || `fal respondió ${res.status}`)
   const credits = data?.credits ?? data

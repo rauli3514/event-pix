@@ -8,7 +8,7 @@ import {
   calibrateTouch, canCalibrateTouch, checkinDevice, getAutostartStatus, getDiagnostics, getTapStabilize, isTouchCalibrated,
   resetTouchCalibration, setTapStabilize, TOUCH_CALIBRATED_EVENT, getCachedDeviceState, openHomeAppSettings, openStartOnBootSettings,
   renameDevice, setBoxPin, type KioskDeviceState, canSelfUpdate, checkForUpdate, startUpdate, canInstallUpdates,
-  openInstallPermission, KIOSK_UPDATE_EVENT, type KioskUpdateStatus,
+  openInstallPermission, KIOSK_UPDATE_EVENT, type KioskUpdateStatus, type BootInfo,
 } from '@/lib/kioskDevice';
 import { eventFolder } from '@/lib/kioskStorage';
 import { formatArs, getCachedStore, loadStore, whatsappLink } from '@/lib/kioskStore';
@@ -333,6 +333,7 @@ function DiagnosticsPanel() {
         <Info label="App abierta hace" value={ago(diag.appUptimeMs)} />
         <Info label="Memoria libre" value={diag.memAvailMb != null ? `${diag.memAvailMb} de ${diag.memTotalMb} MB${diag.lowMemory ? ' (¡poca!)' : ''}` : '—'} />
       </div>
+      {diag.boot && <BootStatus boot={diag.boot} uptimeMs={diag.uptimeMs} />}
       {diag.exits.length > 0 ? (
         <div className="space-y-2">
           <p className="text-white/60">Últimos cierres de la app:</p>
@@ -350,6 +351,33 @@ function DiagnosticsPanel() {
       )}
       <button onClick={() => setDiag(getDiagnostics())} className={buttonClass}><RefreshCw className="w-5 h-5" /> Actualizar</button>
     </Panel>
+  );
+}
+
+const secs = (ms: number) => `${Math.round(ms / 1000)} s`;
+
+/** Último encendido: si Android avisó a la app y si el kiosco se abrió solo. */
+function BootStatus({ boot, uptimeMs }: { boot: BootInfo; uptimeMs: number }) {
+  const update = boot.action.endsWith('MY_PACKAGE_REPLACED');
+  let text: string;
+  let ok = false;
+  if (!boot.thisBoot) {
+    text = uptimeMs < 120000
+      ? 'Todavía esperando el aviso de encendido de Android…'
+      : 'En este encendido Android no le avisó a la app (pasa si se la cerró con "Forzar detención" o un limpiador de memoria). Abrila una vez a mano y probá apagar y prender.';
+  } else if (boot.openedAtMs >= 0) {
+    ok = true;
+    text = update
+      ? `Después de actualizar, el kiosco se volvió a abrir solo.`
+      : `Aviso de encendido a los ${secs(boot.receivedAtMs)} de prender; el kiosco quedó al frente a los ${secs(boot.openedAtMs)}${boot.attempts > 1 ? ` (hubo que insistir ${boot.attempts} veces: el inicio del equipo se ponía encima)` : ''}.`;
+  } else {
+    text = `Llegó el aviso de encendido a los ${secs(boot.receivedAtMs)}, pero Android no dejó abrir el kiosco (${boot.attempts} intentos${boot.error ? `: ${boot.error}` : ''}). Revisá "Arranque automático".`;
+  }
+  return (
+    <div className={`rounded-xl px-4 py-3 ${ok ? 'bg-emerald-500/10 text-emerald-200' : 'bg-amber-500/10 text-amber-200'}`}>
+      <p className="font-semibold">Último encendido</p>
+      <p className="text-sm">{text}</p>
+    </div>
   );
 }
 

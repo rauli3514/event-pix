@@ -245,6 +245,19 @@ export interface DeviceDiagnostics {
   memTotalMb?: number;
   lowMemory?: boolean;
   exits: AppExit[];
+  /** Último aviso de encendido (APK 3.1+) */
+  boot?: BootInfo;
+}
+/** Qué pasó en el último encendido: si llegó el aviso y si se abrió el kiosco */
+export interface BootInfo {
+  /** El registro es de este encendido (si es false, en este encendido no llegó el aviso) */
+  thisBoot: boolean;
+  action: string;
+  /** Milisegundos desde que prendió el equipo */
+  receivedAtMs: number;
+  attempts: number;
+  openedAtMs: number;
+  error: string;
 }
 /** Diagnóstico del equipo (APK 3.0+). null = no disponible. */
 export const getDiagnostics = (): DeviceDiagnostics | null => {

@@ -34,6 +34,12 @@ public class MainActivity extends BridgeActivity {
     /** La pantalla abierta, para avisarle a la página desde receptores (p. ej. el instalador) */
     private static WeakReference<MainActivity> current = new WeakReference<>(null);
     private KioskUpdater updater;
+    /** Si la pantalla del kiosco está al frente (lo mira BootCompletedReceiver) */
+    private static volatile boolean inForeground = false;
+
+    public static boolean isInForeground() {
+        return inForeground;
+    }
     private BluetoothServer bluetoothServer;
     private BluetoothClient bluetoothClient;
     // Disparador Bluetooth: mientras el kiosco lo pide, Volumen +/- y Cámara sacan la foto
@@ -273,6 +279,8 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onResume() {
         super.onResume();
+        inForeground = true;
+        BootLog.opened(this);
         registerJsInterfaces();
         ensureBridgeLoaded();
     }
@@ -316,6 +324,12 @@ public class MainActivity extends BridgeActivity {
                     bridgeReloaded = true;
                     web.reload();
                 }), 4000);
+    }
+
+    @Override
+    public void onPause() {
+        inForeground = false;
+        super.onPause();
     }
 
     @Override
@@ -438,6 +452,7 @@ public class MainActivity extends BridgeActivity {
                     }
                 }
                 out.put("exits", exits);
+                out.put("boot", BootLog.toJson(context));
             } catch (Exception ignored) {
                 // Lo que se pudo juntar
             }
