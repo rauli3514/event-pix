@@ -66,6 +66,8 @@ export const setPin = (pin: string) => write(PIN_KEY, pin);
 /** Se usa sin panel (sin vincular): no vuelve a mostrar la pantalla del código. */
 export const isStandalone = () => read(STANDALONE_KEY) === '1';
 export const setStandalone = (on: boolean) => write(STANDALONE_KEY, on ? '1' : '0');
+/** Pidió vincularse desde Ajustes (la bienvenida abre directo el código). */
+export const wantsPairing = () => read(STANDALONE_KEY) === '0';
 
 export const getAppVersion = async () => {
   if (!Capacitor.isNativePlatform()) return undefined;

@@ -112,8 +112,10 @@ el instalador de Android (hay que tocar "Instalar" la primera vez y dar permiso 
 "instalar apps desconocidas"). Durante el evento solo avisa con un punto en el engranaje.
 Se maneja en Ajustes → Equipo → Actualización (o "Actualizar sola" en el panel).
 La versión 1.0 no tenía esto: hay que instalar a mano la primera versión que lo trae.
-4. **Vincular:** abrir la app en el equipo (muestra un código) y en el panel
-   **Cabina de video → Equipos → Vincular**. También se puede usar sin panel.
+4. **Vincular:** al abrir la app por primera vez aparece la bienvenida: **Empezar** (se usa
+   sola, en demo hasta activar la licencia; así arrancan los clientes) o **Vincular a un panel**,
+   que muestra el código para cargarlo en **Cabina de video → Equipos → Vincular**. Más tarde
+   también se puede vincular desde Ajustes → Equipo.
 5. Configurar desde **Equipos → Configurar** (o en el equipo: engranaje, clave 1234 → cambiarla).
 
 ### Lo nativo, solo en este APK
