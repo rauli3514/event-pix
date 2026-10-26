@@ -11,7 +11,8 @@ import VideoBooth from './pages/VideoBooth';
 import VideoBoothSettings from './pages/VideoBoothSettings';
 
 // Rutas de la app EventPix Video. Al abrir: si el equipo no está vinculado al
-// panel de la cabina muestra su código (o se usa sin panel); si no, la cabina.
+// panel y nunca se eligió usarlo solo, muestra la bienvenida ("Empezar" o
+// "Vincular a un panel"); si no, la cabina.
 
 function Home() {
   const [linked, setLinked] = useState(() => getCachedDeviceState()?.pairingStatus === 'linked');
