@@ -547,4 +547,16 @@ class TvBridge(private val activity: MainActivity) {
 
     @JavascriptInterface
     fun resetTelemetry(token: String?) = call(token, "resetTelemetry") { resetTelemetry() }
+
+    // Foto de lo que se ve (para el panel). Responde con el evento "tvscreenshot"
+    // { id, image } (JPEG en base64, o null si no se pudo).
+    @JavascriptInterface
+    fun requestScreenshot(token: String?, requestId: String?, maxWidth: Int) = call(token, "requestScreenshot") {
+        ScreenCapture.capture(activity, maxWidth) { image ->
+            activity.emitToWeb(
+                "tvscreenshot",
+                JSONObject().put("id", requestId ?: "").put("image", image ?: JSONObject.NULL)
+            )
+        }
+    }
 }

@@ -4,10 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, Copy, Image as ImageIcon, Save, FolderOpen } from 'lucide-react';
+import { Plus, Trash2, Copy, Image as ImageIcon, Save, FolderOpen, Sheet, Loader2 } from 'lucide-react';
 import { MediaPickerModal } from '../../MediaPickerModal';
 import { toast } from 'sonner';
 import { useDisplayLabelGroups, useCreateLabelGroup } from '@/hooks/use-display-labels';
+import { normalizeLabelName, useLiveLabelTexts, useSheetPrices } from '@/hooks/use-live-label-texts';
+import { SHEET_ERRORS, type SheetPrice, toSheetCsvUrl } from '@/lib/googleSheets';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { DynamicLabel } from '@/types/display';
@@ -17,6 +19,8 @@ export interface DynamicMenuConfig {
     backgroundMediaUrl?: string;
     backgroundMediaType?: string;
     labels: DynamicLabel[];
+    // Planilla de Google con los precios (columna A nombre, B precio).
+    sheetUrl?: string;
 }
 
 const FONTS = [
@@ -39,15 +43,47 @@ export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Part
     // DB Labels Integration
     const { data: savedGroups = [] } = useDisplayLabelGroups(commerceId);
     
-    const liveTextMap = useMemo(() => {
-        const map: Record<string, string> = {};
-        savedGroups.forEach(g => {
-            g.labels?.forEach((l: any) => {
-                if (l.name) map[l.name] = l.text;
-            });
-        });
-        return map;
-    }, [savedGroups]);
+    // Precios en vivo (planilla de Google o página Etiquetas), por nombre.
+    const liveTexts = useLiveLabelTexts(commerceId, config.sheetUrl);
+    const sheet = useSheetPrices(config.sheetUrl);
+    const [sheetInput, setSheetInput] = useState(config.sheetUrl || '');
+    const sheetNames = new Set((sheet.data || []).map(p => normalizeLabelName(p.name)));
+    const labelNames = new Set(labels.map(l => normalizeLabelName(l.name)).filter(Boolean));
+    const unmatched = (sheet.data || []).filter(p => !labelNames.has(normalizeLabelName(p.name)));
+    const matchedCount = (sheet.data || []).length - unmatched.length;
+
+    const connectSheet = () => {
+        const url = sheetInput.trim();
+        if (!url) {
+            onChange({ ...config, sheetUrl: undefined });
+            return;
+        }
+        if (!toSheetCsvUrl(url)) {
+            toast.error(SHEET_ERRORS.not_sheet);
+            return;
+        }
+        onChange({ ...config, sheetUrl: url });
+    };
+
+    // Una etiqueta por cada producto de la planilla que todavía no tiene una
+    // (en columna, para después acomodarlas arrastrando).
+    const addSheetLabels = (prices: SheetPrice[]) => {
+        const newLabels: DynamicLabel[] = prices.map((p, i) => ({
+            id: crypto.randomUUID(),
+            name: p.name,
+            text: p.text,
+            x: 50,
+            y: Math.min(90, 15 + ((labels.length + i) % 10) * 8),
+            color: '#ffffff',
+            fontFamily: 'Montserrat',
+            fontSize: 3,
+            fontWeight: 'bold',
+            fontStyle: 'normal',
+            animation: 'none',
+        }));
+        onChange({ ...config, labels: [...labels, ...newLabels] });
+        toast.success(newLabels.length === 1 ? 'Etiqueta agregada' : `${newLabels.length} etiquetas agregadas`);
+    };
 
     const createGroup = useCreateLabelGroup();
 
@@ -182,6 +218,65 @@ export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Part
                     )}
                 </div>
 
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+                    <div>
+                        <h3 className="font-semibold text-white flex items-center gap-2"><Sheet className="w-4 h-4 text-emerald-400" /> Precios desde una planilla de Google</h3>
+                        <p className="text-xs text-slate-400 mt-1">Cambiás el precio en la planilla (hasta desde el celular) y las pantallas se actualizan solas en unos minutos.</p>
+                    </div>
+                    <div className="flex gap-2">
+                        <Input
+                            placeholder="Pegá el link de la planilla"
+                            value={sheetInput}
+                            onChange={e => setSheetInput(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') connectSheet(); }}
+                            className="bg-slate-950 border-slate-700"
+                        />
+                        <Button size="sm" onClick={connectSheet} className="h-9 bg-emerald-600 hover:bg-emerald-700 text-white shrink-0">
+                            {config.sheetUrl && sheetInput.trim() === config.sheetUrl ? 'Conectada' : 'Conectar'}
+                        </Button>
+                    </div>
+                    {config.sheetUrl && (
+                        <div className="text-xs space-y-2">
+                            {sheet.isFetching && !sheet.data ? (
+                                <p className="text-slate-400 flex items-center gap-1.5"><Loader2 className="w-3 h-3 animate-spin" /> Leyendo la planilla…</p>
+                            ) : sheet.error ? (
+                                <p className="text-rose-400">{SHEET_ERRORS[(sheet.error as Error).message] || SHEET_ERRORS.fetch_failed}</p>
+                            ) : sheet.data ? (
+                                <>
+                                    <p className="text-emerald-400">
+                                        ✓ {sheet.data.length} {sheet.data.length === 1 ? 'producto' : 'productos'} en la planilla · {matchedCount} con etiqueta en esta pantalla
+                                    </p>
+                                    {unmatched.length > 0 && (
+                                        <div className="rounded-lg border border-slate-800 bg-slate-950 p-2 space-y-1.5">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="text-slate-300">Sin etiqueta todavía:</span>
+                                                <button onClick={() => addSheetLabels(unmatched)} className="text-emerald-400 hover:underline">Agregar todas</button>
+                                            </div>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {unmatched.slice(0, 20).map(p => (
+                                                    <button key={p.name} onClick={() => addSheetLabels([p])} className="rounded-md border border-slate-700 px-2 py-0.5 text-slate-300 hover:border-emerald-500 hover:text-white" title="Agregar como etiqueta">
+                                                        + {p.name} <span className="text-slate-500">{p.text}</span>
+                                                    </button>
+                                                ))}
+                                                {unmatched.length > 20 && <span className="text-slate-500">y {unmatched.length - 20} más</span>}
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            ) : null}
+                            <button onClick={() => { setSheetInput(''); onChange({ ...config, sheetUrl: undefined }); }} className="text-slate-500 hover:text-slate-300 hover:underline">Desconectar la planilla</button>
+                        </div>
+                    )}
+                    <details className="text-xs text-slate-400">
+                        <summary className="cursor-pointer text-slate-300">¿Cómo armo la planilla?</summary>
+                        <ol className="list-decimal pl-5 mt-2 space-y-1">
+                            <li>En la <b>columna A</b> el nombre del producto (el mismo que el "Identificador" de la etiqueta) y en la <b>columna B</b> el precio, por ejemplo <i>Asado</i> · <i>$ 9.500</i>.</li>
+                            <li>En Google Sheets tocá <b>Compartir</b> → Acceso general: <b>"Cualquier persona con el enlace"</b> → Lector.</li>
+                            <li>Copiá el link de la barra del navegador y pegalo acá.</li>
+                        </ol>
+                    </details>
+                </div>
+
                 <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex-1 flex flex-col">
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="font-semibold text-white">Etiquetas Dinámicas</h3>
@@ -233,14 +328,18 @@ export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Part
                             </div>
                             <div className="col-span-2 space-y-2">
                                 <Label>Texto / Precio</Label>
-                                {selectedLabel.name && liveTextMap[selectedLabel.name] !== undefined ? (
+                                {selectedLabel.name && liveTexts.get(normalizeLabelName(selectedLabel.name)) !== undefined ? (
                                     <div className="space-y-1">
                                         <Input 
-                                            value={liveTextMap[selectedLabel.name]} 
+                                            value={liveTexts.get(normalizeLabelName(selectedLabel.name))} 
                                             disabled 
                                             className="bg-slate-900 border-emerald-500/50 text-emerald-400 font-bold" 
                                         />
-                                        <p className="text-xs text-emerald-500">Este precio se sincroniza en vivo desde la pestaña "Etiquetas"</p>
+                                        <p className="text-xs text-emerald-500">
+                                            {sheetNames.has(normalizeLabelName(selectedLabel.name))
+                                                ? 'Este precio viene de la planilla de Google: cambialo ahí.'
+                                                : 'Este precio se sincroniza en vivo desde la página "Etiquetas".'}
+                                        </p>
                                     </div>
                                 ) : (
                                     <Input value={selectedLabel.text} onChange={e => updateLabel(selectedLabel.id, { text: e.target.value })} className="bg-slate-950 border-slate-700" />
@@ -318,30 +417,16 @@ export const DynamicMenuPreview = ({ config, onChange, isEditing = false, commer
     const containerRef = useRef<HTMLDivElement>(null);
     const params = useParams<{ commerceId: string }>();
     const effectiveCommerceId = commerceId || params.commerceId || '';
-    const { data: savedGroups = [] } = useDisplayLabelGroups(effectiveCommerceId);
+    // Precios en vivo: planilla de Google conectada o página Etiquetas (por nombre).
+    const liveTexts = useLiveLabelTexts(effectiveCommerceId, config.sheetUrl);
 
     const displayLabels = useMemo(() => {
-        if (!labels.length || !savedGroups.length) return labels;
-        
-        const liveTextMap = new Map();
-        savedGroups.forEach(g => {
-            if (Array.isArray(g.labels)) {
-                g.labels.forEach((l: any) => {
-                    if (l.name) liveTextMap.set(l.name.toLowerCase().trim(), l.text);
-                });
-            }
-        });
-
+        if (!labels.length || liveTexts.size === 0) return labels;
         return labels.map(label => {
-            if (label.name) {
-                const liveText = liveTextMap.get(label.name.toLowerCase().trim());
-                if (liveText !== undefined) {
-                    return { ...label, text: liveText };
-                }
-            }
-            return label;
+            const liveText = label.name ? liveTexts.get(normalizeLabelName(label.name)) : undefined;
+            return liveText !== undefined ? { ...label, text: liveText } : label;
         });
-    }, [labels, savedGroups]);
+    }, [labels, liveTexts]);
     
     // Convert animations to CSS classes or motion props if needed
     // For TvPlayer we can just use tailwind animate classes

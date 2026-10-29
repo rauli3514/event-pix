@@ -5,6 +5,7 @@ import { useCacheManager } from './useCacheManager';
 import { findActiveScheduleEvent, pickActiveAssignment } from '@/lib/displaySchedule';
 import { getOrCreateCommandSecret, openSignedCommand, registerCommandSecret } from '@/lib/displayCommands';
 import { callTvBridge, hasTvBridgeMethod } from '@/lib/tvBridge';
+import { SCREENSHOT_REQUEST_EVENT } from '@/lib/tvScreenshot';
 import { collectAssignmentMediaUrls, mediaItemUrls, orderMediaUrls } from '@/lib/displayMediaUrls';
 
 type PlayerStatus = 'loading' | 'playing' | 'offline_playing' | 'no_content' | 'error';
@@ -318,6 +319,11 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
                 // Pedidos inofensivos (solo vuelven a consultar el contenido): se aceptan sin firma.
                 if (raw?.action === 'sync' || raw?.action === 'rotate_screen') {
                     scheduleFetch();
+                    return;
+                }
+                // Pedido de foto de la pantalla (solo lee lo que se ve): también sin firma.
+                if (raw?.action === 'screenshot') {
+                    window.dispatchEvent(new Event(SCREENSHOT_REQUEST_EVENT));
                     return;
                 }
 
