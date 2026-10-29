@@ -133,3 +133,38 @@ export function formatClock(seconds: number): string {
     const s = Math.round(seconds);
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
+
+// ---- Fechas de cada item ("Mostrar desde / hasta") ----
+// validFrom / validUntil: "AAAA-MM-DD", inclusivos, en la hora del equipo.
+
+const pad = (n: number) => String(n).padStart(2, '0');
+
+// Día de hoy (u otra fecha) como "AAAA-MM-DD" en hora local.
+export const localDayKey = (date: Date = new Date()) =>
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+
+export type ItemDateStatus = 'active' | 'upcoming' | 'expired';
+
+export function itemDateStatus(item: AnyItem, today: string = localDayKey()): ItemDateStatus {
+    if (item?.validFrom && today < item.validFrom) return 'upcoming';
+    if (item?.validUntil && today > item.validUntil) return 'expired';
+    return 'active';
+}
+
+// Lo que se muestra hoy: sin los vencidos ni los que todavía no empiezan.
+export const itemsActiveOn = <T,>(items: T[], today: string = localDayKey()): T[] =>
+    items.filter(item => itemDateStatus(item, today) === 'active');
+
+// "2026-11-30" -> "30/11"
+export const formatDayShort = (key?: string | null) => {
+    if (!key) return '';
+    const [, m, d] = key.split('-');
+    return `${d}/${m}`;
+};
+
+// "AAAA-MM-DD" sumando días a hoy.
+export const dayKeyPlus = (days: number, from: Date = new Date()) => {
+    const d = new Date(from);
+    d.setDate(d.getDate() + days);
+    return localDayKey(d);
+};

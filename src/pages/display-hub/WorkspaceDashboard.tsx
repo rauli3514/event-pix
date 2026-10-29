@@ -1,13 +1,15 @@
 import { useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { CalendarClock, ChevronDown, FolderOpen, ListVideo, MonitorPlay, Plus, RefreshCw, Upload } from 'lucide-react';
+import { Bell, BellOff, CalendarClock, ChevronDown, FolderOpen, ListVideo, MonitorPlay, Plus, RefreshCw, Upload } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { useDisplayCampaigns, useDisplayDevices, useDisplaySchedules } from '@/hooks/use-display-hub';
 import { useDisplayMedia } from '@/hooks/use-display-media';
 import { assignmentContentNow } from '@/lib/displaySchedule';
-import { playlistItems } from '@/lib/playlistItems';
-import { formatDownFor } from '@/lib/screenAlerts';
+import { itemsActiveOn, playlistItems } from '@/lib/playlistItems';
+import { describeAlertSchedule, formatDownFor } from '@/lib/screenAlerts';
+import { useAlertSettings } from '@/hooks/use-alert-settings';
+import { AlertSettingsModal } from '@/components/display/AlertSettingsModal';
 import { ContentThumb } from '@/components/display/ContentThumb';
 import { ChangeScreenContentModal } from '@/components/display/ChangeScreenContentModal';
 import { OnboardingWizardWidget } from '@/components/display/OnboardingWizardWidget';
@@ -29,7 +31,7 @@ function downText(d: AnyDevice, now: number): string {
 // Lo que pasa una pantalla, listo para mostrar.
 function describeContent(d: AnyDevice, now: Date) {
     const { campaign, media, schedule } = assignmentContentNow(d.assignment, now);
-    const items = campaign ? playlistItems(campaign.items_json) : media ? [media] : [];
+    const items = campaign ? itemsActiveOn(playlistItems(campaign.items_json)) : media ? [media] : [];
     const title = campaign?.name || media?.name || null;
     let detail = 'Sin contenido asignado';
     if (schedule) detail = `Programación: ${schedule.name || 'sin nombre'}`;
@@ -63,6 +65,8 @@ export default function WorkspaceDashboard() {
     const [openHelp, setOpenHelp] = useState<string | null>(null);
     const [changing, setChanging] = useState<AnyDevice | null>(null);
     const [showAllDown, setShowAllDown] = useState(false);
+    const { data: alertSettings } = useAlertSettings(commerceId);
+    const [alertsOpen, setAlertsOpen] = useState(false);
 
     const now = new Date();
     const nowMs = now.getTime();
@@ -175,6 +179,19 @@ export default function WorkspaceDashboard() {
                                     <Link to={`${base}/screens`} className="text-indigo-600 dark:text-indigo-400 hover:underline">Pantallas</Link>.
                                 </p>
                             )}
+                            {alertSettings && (
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border pt-3 text-sm">
+                                    {alertSettings.alerts_enabled ? <Bell className="w-4 h-4 text-indigo-500" /> : <BellOff className="w-4 h-4 text-muted-foreground" />}
+                                    <span className="text-muted-foreground">
+                                        {alertSettings.alerts_enabled && (alertSettings.alert_email || alertSettings.email)
+                                            ? <>Avisos por email a <span className="text-foreground font-medium">{alertSettings.alert_email || alertSettings.email}</span> · {describeAlertSchedule(alertSettings)}</>
+                                            : 'Los avisos por email están apagados'}
+                                    </span>
+                                    <button onClick={() => setAlertsOpen(true)} className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
+                                        {alertSettings.alerts_enabled ? 'Cambiar' : 'Activar'}
+                                    </button>
+                                </div>
+                            )}
                         </>
                     )}
                 </section>
@@ -275,6 +292,10 @@ export default function WorkspaceDashboard() {
                         })}
                     </div>
                 </section>
+            )}
+
+            {alertSettings && alertsOpen && (
+                <AlertSettingsModal isOpen onClose={() => setAlertsOpen(false)} commerceId={commerceId} settings={alertSettings} />
             )}
 
             <ChangeScreenContentModal

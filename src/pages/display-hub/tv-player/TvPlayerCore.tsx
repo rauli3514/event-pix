@@ -1,4 +1,4 @@
-import { useState, useEffect, Component, ErrorInfo, ReactNode } from 'react';
+import { useState, useEffect, useMemo, Component, ErrorInfo, ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
 import { TvSettingsMenu } from '@/components/display/TvSettingsMenu';
 import { useTelemetry } from './useTelemetry';
@@ -7,6 +7,8 @@ import { MediaRenderer } from './MediaRenderer';
 import { usePlaylistRotation } from '@/hooks/use-playlist-rotation';
 import { callTvBridge, hasTvBridgeMethod, onTvBridgeReady } from '@/lib/tvBridge';
 import { useLiteMode } from '@/lib/tvPerformance';
+import { useLocalDay } from '@/hooks/use-local-day';
+import { itemsActiveOn } from '@/lib/playlistItems';
 
 // Identidad de Display Digital para las pantallas de espera de la TV. En la app
 // Android el logo sale del APK (WebViewManager intercepta /edm-assets/).
@@ -59,7 +61,7 @@ const TvPlayerCore = () => {
 
     // 2. Sync Engine (WebSockets + Polling fallback)
     const {
-        items,
+        items: allItems,
         status,
         setStatus,
         deviceSettings,
@@ -70,6 +72,12 @@ const TvPlayerCore = () => {
         contentKey,
         shuffle
     } = useSyncEngine(deviceCode, sendHeartbeat);
+
+    // Solo lo que está en fecha hoy (los vencidos y los que todavía no
+    // empiezan se saltean); se vuelve a calcular a la medianoche.
+    const today = useLocalDay();
+    const items = useMemo(() => itemsActiveOn(allItems, today), [allItems, today]);
+    const nothingToday = allItems.length > 0 && items.length === 0;
 
     // Modo liviano en equipos con poca memoria (ver tvPerformance.ts).
     const { lite } = useLiteMode();
@@ -274,6 +282,16 @@ const TvPlayerCore = () => {
                 >
                     Reintentar
                 </button>
+                <TvSettingsMenu deviceCode={deviceCode!} onRefresh={() => fetchCampaign()} />
+            </div>
+        );
+    }
+
+    if (nothingToday && (status === 'playing' || status === 'offline_playing')) {
+        // Todo lo de la playlist está fuera de fecha: solo el logo.
+        return (
+            <div className="fixed inset-0 w-full h-full flex items-center justify-center" style={BRAND_BACKGROUND}>
+                <img src={BRAND_LOGO} alt="Display Digital" className="w-[18vw] max-w-[360px] opacity-80" style={BRAND_LOGO_STYLE} />
                 <TvSettingsMenu deviceCode={deviceCode!} onRefresh={() => fetchCampaign()} />
             </div>
         );

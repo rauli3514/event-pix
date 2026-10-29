@@ -97,6 +97,8 @@ export interface UniversalElement {
     alignment?: ElementAlignment;
     margin?: ElementMargin;
     metadata?: any;            // Para configuración de Apps y Widgets
+    validFrom?: string;        // "AAAA-MM-DD": se muestra desde ese día (inclusive)
+    validUntil?: string;       // "AAAA-MM-DD": se deja de mostrar después de ese día
     
     // Configuraciones específicas
     mute?: boolean;            // Para video

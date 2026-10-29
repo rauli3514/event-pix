@@ -56,3 +56,29 @@ export function formatDownFor(ms: number): string {
 // Clave del conjunto de pantallas caídas: si cambia (cae otra), la alerta
 // vuelve a mostrarse aunque se haya ocultado.
 export const downScreensKey = (screens: DownScreen[]) => screens.map(s => s.id).sort().join(',');
+
+// Avisos por email: días y horario del local (0 = domingo).
+export const ALERT_DAYS = [
+    { value: 1, label: 'Lun' }, { value: 2, label: 'Mar' }, { value: 3, label: 'Mié' }, { value: 4, label: 'Jue' },
+    { value: 5, label: 'Vie' }, { value: 6, label: 'Sáb' }, { value: 0, label: 'Dom' },
+];
+
+export const hhmm = (t?: string | null) => (t || '').slice(0, 5);
+
+// "lun a sáb, de 9 a 21 h"
+export function describeAlertSchedule(s: { alert_days: number[]; alert_from: string; alert_to: string }): string {
+    const days = [...(s.alert_days || [])].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7));
+    const names = days.map(d => ALERT_DAYS.find(x => x.value === d)?.label.toLowerCase() || '');
+    const hour = (t: string) => {
+        const [h, m] = hhmm(t).split(':');
+        return m === '00' ? String(Number(h)) : `${Number(h)}:${m}`;
+    };
+    // Días seguidos: "lun a sáb".
+    const order = days.map(d => (d + 6) % 7);
+    const consecutive = order.every((v, i) => i === 0 || v === order[i - 1] + 1);
+    const dayText = days.length === 7 ? 'todos los días'
+        : days.length === 0 ? 'ningún día'
+            : consecutive && days.length > 2 ? `${names[0]} a ${names[names.length - 1]}` : names.join(', ');
+    return `${dayText}, de ${hour(s.alert_from)} a ${hour(s.alert_to)} h`;
+}
+
