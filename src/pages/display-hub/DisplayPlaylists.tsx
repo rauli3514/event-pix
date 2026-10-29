@@ -11,38 +11,13 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { SendToScreensModal } from '@/components/display/SendToScreensModal';
 
 import { useDisplayCampaigns, useCreateCampaign, useDeleteCampaign, useDisplayDevices } from "@/hooks/use-display-hub";
-import { playlistItems } from '@/lib/playlistItems';
+import { formatDuration, loopDuration, playlistItems } from '@/lib/playlistItems';
 import type { DisplayCampaign } from '@/types/display';
 
 type Filter = 'all' | 'live' | 'unused';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyItem = any;
-
-// Duración de una vuelta. Los videos usan su duración real si se conoce (la
-// guarda el análisis al subirlos); si falta alguna, se avisa con "~".
-function loopDuration(items: AnyItem[]): { seconds: number; exact: boolean } {
-    let seconds = 0;
-    let exact = true;
-    for (const item of items) {
-        if (item?.type === 'video' || item?.type === 'video_ad') {
-            const real = Number(item?.metadata?.video?.duration_sec);
-            if (Number.isFinite(real) && real > 0) seconds += real;
-            else { seconds += Number(item?.duration) || 0; exact = false; }
-        } else {
-            seconds += Number(item?.duration) || 10;
-        }
-    }
-    return { seconds, exact };
-}
-
-function formatDuration(seconds: number): string {
-    const s = Math.round(seconds);
-    if (s < 60) return `${s} s`;
-    const m = Math.floor(s / 60);
-    const rest = s % 60;
-    return rest ? `${m} min ${rest} s` : `${m} min`;
-}
 
 function Thumb({ item }: { item: AnyItem }) {
     const url = item?.imageUrl || item?.url;
