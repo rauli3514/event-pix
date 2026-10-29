@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { Bell, BellOff, CalendarClock, ChevronDown, FolderOpen, ListVideo, MonitorPlay, Plus, RefreshCw, Upload } from 'lucide-react';
+import { Bell, BellOff, CalendarClock, Megaphone, ChevronDown, FolderOpen, ListVideo, MonitorPlay, Plus, RefreshCw, Upload } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { useDisplayCampaigns, useDisplayDevices, useDisplaySchedules } from '@/hooks/use-display-hub';
@@ -10,6 +10,9 @@ import { itemsActiveOn, playlistItems } from '@/lib/playlistItems';
 import { describeAlertSchedule, formatDownFor } from '@/lib/screenAlerts';
 import { useAlertSettings } from '@/hooks/use-alert-settings';
 import { AlertSettingsModal } from '@/components/display/AlertSettingsModal';
+import { UrgentAlertModal } from '@/components/display/UrgentAlertModal';
+import { useActiveUrgentAlerts, useCancelUrgentAlert } from '@/hooks/use-urgent-alerts';
+import { toast } from 'sonner';
 import { ContentThumb } from '@/components/display/ContentThumb';
 import { ScreenPhoto } from '@/components/display/ScreenPhoto';
 import { useDeviceScreens } from '@/hooks/use-device-screens';
@@ -69,6 +72,9 @@ export default function WorkspaceDashboard() {
     const [showAllDown, setShowAllDown] = useState(false);
     const { data: alertSettings } = useAlertSettings(commerceId);
     const [alertsOpen, setAlertsOpen] = useState(false);
+    const { data: urgent } = useActiveUrgentAlerts(commerceId);
+    const cancelUrgent = useCancelUrgentAlert();
+    const [urgentOpen, setUrgentOpen] = useState(false);
 
     const now = new Date();
     const nowMs = now.getTime();
@@ -120,6 +126,11 @@ export default function WorkspaceDashboard() {
                     <p className="text-muted-foreground mt-1">Así están tus pantallas ahora.</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                    {urgent?.available && screens.length > 0 && (
+                        <Button variant="outline" onClick={() => setUrgentOpen(true)} className="h-11 px-4 border-rose-500/50 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 hover:text-rose-600">
+                            <Megaphone className="w-4 h-4 mr-2" /> Aviso urgente
+                        </Button>
+                    )}
                     <Button variant="outline" asChild className="h-11 px-4">
                         <Link to={`${base}/library?subir=1`}><Upload className="w-4 h-4 mr-2" /> Subir contenido</Link>
                     </Button>
@@ -128,6 +139,34 @@ export default function WorkspaceDashboard() {
                     </Button>
                 </div>
             </div>
+
+            {/* Avisos urgentes activos */}
+            {(urgent?.alerts || []).map(a => {
+                const count = a.device_ids ? a.device_ids.length : screens.length;
+                const codes = screens.filter(d => !a.device_ids || a.device_ids.includes(d.id)).map(d => d.device_id);
+                return (
+                    <div key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3">
+                        <Megaphone className="w-5 h-5 text-rose-500 shrink-0 animate-pulse" />
+                        <div className="flex-1 min-w-0">
+                            <p className="font-semibold truncate">“{a.message}”</p>
+                            <p className="text-sm text-muted-foreground">
+                                Aviso en {a.device_ids ? (count === 1 ? '1 pantalla' : `${count} pantallas`) : 'todas las pantallas'} · hasta las {new Date(a.ends_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                            </p>
+                        </div>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={cancelUrgent.isPending}
+                            onClick={() => cancelUrgent.mutate({ id: a.id, commerceId, notifyCodes: codes }, {
+                                onSuccess: () => toast.success('Aviso quitado: las pantallas vuelven a lo programado'),
+                                onError: () => toast.error('No se pudo quitar el aviso'),
+                            })}
+                        >
+                            Quitar ya
+                        </Button>
+                    </div>
+                );
+            })}
 
             {/* Estado + resumen */}
             <div className="flex flex-wrap gap-5">
@@ -308,6 +347,15 @@ export default function WorkspaceDashboard() {
                         })}
                     </div>
                 </section>
+            )}
+
+            {urgentOpen && (
+                <UrgentAlertModal
+                    isOpen
+                    onClose={() => setUrgentOpen(false)}
+                    commerceId={commerceId}
+                    screens={screens.map(d => ({ id: d.id, device_id: d.device_id, name: screenName(d) }))}
+                />
             )}
 
             {alertSettings && alertsOpen && (
