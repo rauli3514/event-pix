@@ -21,6 +21,12 @@ const SCHEDULE_TICK_MS = 30 * 1000;
 // Cada cuánto la TV vuelve a registrar su clave de comandos.
 const COMMAND_SECRET_RETRY_MS = 5 * 60 * 1000;
 
+// Cuánto se espera a que baje el contenido nuevo antes de mostrarlo. En el
+// primer arranque no hay nada en pantalla y conviene esperar más; con algo ya
+// reproduciéndose, un cambio desde el panel tiene que verse enseguida.
+const PRELOAD_WAIT_FIRST_MS = 45 * 1000;
+const PRELOAD_WAIT_UPDATE_MS = 10 * 1000;
+
 // Agrupa ráfagas de cambios (ej.: guardar una playlist toca varias filas) en una sola consulta.
 const REFETCH_DEBOUNCE_MS = 1500;
 
@@ -58,6 +64,8 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
     const [contentKey, setContentKey] = useState<string | null>(null);
     const [shuffle, setShuffle] = useState(false);
     const offlineRef = useRef(false);
+    // Ya hay contenido en pantalla (los cambios siguientes no esperan tanto la descarga).
+    const hasShownContentRef = useRef(false);
 
     // Arma la playlist de lo que toca mostrar ahora según la asignación y la publica.
     const applyAssignment = async (assignment: any, isStale: () => boolean) => {
@@ -128,7 +136,9 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
         const oldItemsString = localStorage.getItem(cacheKey(deviceCode!));
         
         if (oldItemsString !== newItemsString) {
-            if (!offlineRef.current) await preloadAssets(compiledItems);
+            if (!offlineRef.current) {
+                await preloadAssets(compiledItems, hasShownContentRef.current ? PRELOAD_WAIT_UPDATE_MS : PRELOAD_WAIT_FIRST_MS);
+            }
             if (isStale()) return;
             try {
                 localStorage.setItem(cacheKey(deviceCode!), newItemsString);
@@ -142,6 +152,7 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
         setShuffle(playlistShuffle);
         setItems(compiledItems);
         setStatus(offlineRef.current ? 'offline_playing' : 'playing');
+        hasShownContentRef.current = true;
     };
 
     const fetchCampaign = async () => {
@@ -247,6 +258,7 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
                     if (parsedItems.length > 0) {
                         setItems(parsedItems);
                         setStatus('offline_playing');
+                        hasShownContentRef.current = true;
                         return;
                     }
                 } catch (e) { /* caché inválida */ }
