@@ -177,8 +177,10 @@ export const AppEditorModal = ({ isOpen, onClose, onBack, appId, commerceId, cur
                     {/* Right Panel: Live Preview */}
                     <div className="flex-1 bg-black relative flex flex-col">
                         <div className="absolute inset-0 p-8 flex items-center justify-center overflow-auto">
-                            {/* 16:9 Aspect Ratio Container simulating a TV */}
-                            <div className="relative w-full max-w-5xl aspect-video bg-slate-900 rounded-xl overflow-hidden shadow-2xl ring-1 ring-slate-800">
+                            {/* TV simulada: horizontal (16:9) o vertical (9:16) según la app */}
+                            <div className={`relative bg-slate-900 rounded-xl overflow-hidden shadow-2xl ring-1 ring-slate-800 ${(appConfig as { orientation?: string })?.orientation === 'portrait'
+                                ? 'h-full max-h-[80vh] aspect-[9/16]'
+                                : 'w-full max-w-5xl aspect-video'}`}>
                                 {renderPreview()}
                             </div>
                         </div>
