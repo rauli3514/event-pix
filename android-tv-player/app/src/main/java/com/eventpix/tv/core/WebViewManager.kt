@@ -78,6 +78,13 @@ class WebViewManager(
                 request: WebResourceRequest
             ): WebResourceResponse? {
                 val url = request.url.toString()
+
+                // Videos e imágenes del contenido ya guardados en el equipo (MediaCache).
+                try {
+                    MediaCache.serve(request)?.let { return it }
+                } catch (t: Throwable) {
+                    Log.w("WebViewManager", "Caché de medios: se sigue por internet", t)
+                }
                 
                 // Interceptar únicamente los archivos pesados (logo, fondos, animaciones)
                 if (url.contains("/edm-assets/")) {

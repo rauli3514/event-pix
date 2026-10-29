@@ -5,6 +5,7 @@ import { useCacheManager } from './useCacheManager';
 import { findActiveScheduleEvent, pickActiveAssignment } from '@/lib/displaySchedule';
 import { getOrCreateCommandSecret, openSignedCommand, registerCommandSecret } from '@/lib/displayCommands';
 import { callTvBridge, hasTvBridgeMethod } from '@/lib/tvBridge';
+import { collectAssignmentMediaUrls, mediaItemUrls, orderMediaUrls } from '@/lib/displayMediaUrls';
 
 type PlayerStatus = 'loading' | 'playing' | 'offline_playing' | 'no_content' | 'error';
 
@@ -26,6 +27,13 @@ const COMMAND_SECRET_RETRY_MS = 5 * 60 * 1000;
 // reproduciéndose, un cambio desde el panel tiene que verse enseguida.
 const PRELOAD_WAIT_FIRST_MS = 45 * 1000;
 const PRELOAD_WAIT_UPDATE_MS = 10 * 1000;
+
+// Cada cuánto se le vuelve a pasar la lista a la caché de la app TV (reintenta
+// lo que no se pudo bajar, por ejemplo por un corte de internet).
+const MEDIA_CACHE_RESYNC_MS = 5 * 60 * 1000;
+
+// App TV 2.3+: guarda videos e imágenes en el equipo (MediaCache.kt).
+const hasNativeMediaCache = () => hasTvBridgeMethod('cacheMedia');
 
 // Agrupa ráfagas de cambios (ej.: guardar una playlist toca varias filas) en una sola consulta.
 const REFETCH_DEBOUNCE_MS = 1500;
@@ -66,6 +74,8 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
     const offlineRef = useRef(false);
     // Ya hay contenido en pantalla (los cambios siguientes no esperan tanto la descarga).
     const hasShownContentRef = useRef(false);
+    // Última lista de archivos pasada a la caché de la app TV.
+    const mediaUrlsRef = useRef<string[]>([]);
 
     // Arma la playlist de lo que toca mostrar ahora según la asignación y la publica.
     const applyAssignment = async (assignment: any, isStale: () => boolean) => {
@@ -132,12 +142,23 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
             return;
         }
 
+        // App TV: guardar en el equipo todo lo que puede mostrar esta asignación
+        // (todas las franjas), empezando por lo que se ve ahora.
+        if (hasNativeMediaCache()) {
+            mediaUrlsRef.current = orderMediaUrls(compiledItems.flatMap(mediaItemUrls), collectAssignmentMediaUrls(assignment));
+            callTvBridge('cacheMedia', JSON.stringify(mediaUrlsRef.current));
+        }
+
         const newItemsString = JSON.stringify(compiledItems);
         const oldItemsString = localStorage.getItem(cacheKey(deviceCode!));
         
         if (oldItemsString !== newItemsString) {
             if (!offlineRef.current) {
-                await preloadAssets(compiledItems, hasShownContentRef.current ? PRELOAD_WAIT_UPDATE_MS : PRELOAD_WAIT_FIRST_MS);
+                // Con la caché de la app TV los videos los baja la app: acá solo imágenes.
+                const toPreload = hasNativeMediaCache()
+                    ? compiledItems.filter((item: any) => item.type !== 'video')
+                    : compiledItems;
+                await preloadAssets(toPreload, hasShownContentRef.current ? PRELOAD_WAIT_UPDATE_MS : PRELOAD_WAIT_FIRST_MS);
             }
             if (isStale()) return;
             try {
@@ -386,6 +407,17 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
         };
         register();
         const interval = setInterval(register, COMMAND_SECRET_RETRY_MS);
+        return () => clearInterval(interval);
+    }, [deviceCode]);
+
+    // Reintento periódico de la caché de la app TV (lo que no bajó por falta de red).
+    useEffect(() => {
+        if (!deviceCode) return;
+        const interval = setInterval(() => {
+            if (hasNativeMediaCache() && mediaUrlsRef.current.length > 0) {
+                callTvBridge('cacheMedia', JSON.stringify(mediaUrlsRef.current));
+            }
+        }, MEDIA_CACHE_RESYNC_MS);
         return () => clearInterval(interval);
     }, [deviceCode]);
 

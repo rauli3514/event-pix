@@ -90,6 +90,13 @@ class MainActivity : AppCompatActivity() {
         
         Log.d("MainActivity", "Initializing EventPix TV Player V2...")
 
+        // Contenido guardado en el equipo para reproducir sin internet.
+        try {
+            MediaCache.init(applicationContext)
+        } catch (t: Throwable) {
+            Log.e("MainActivity", "No se pudo iniciar la caché de medios", t)
+        }
+
         // Si el WebView del equipo falta, está desactivado o falla al crearse,
         // se muestra el motivo en vez de cerrarse.
         try {
