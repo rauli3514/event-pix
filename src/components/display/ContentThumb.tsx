@@ -1,10 +1,15 @@
 import { Globe, Image as ImageIcon, LayoutGrid, Video } from 'lucide-react';
+import { AppCover, WebCover } from '@/components/display/AppCover';
+import { isAppItem, isWebItem } from '@/lib/appCovers';
 
 // Miniatura de un item de playlist o archivo de la biblioteca.
+// large: portada completa de las apps y webs (si no, solo color e ícono).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function ContentThumb({ item, className = '', iconClassName = 'w-5 h-5' }: { item: any; className?: string; iconClassName?: string }) {
+export function ContentThumb({ item, className = '', iconClassName = 'w-5 h-5', large }: { item: any; className?: string; iconClassName?: string; large?: boolean }) {
     const url = item?.imageUrl || item?.url;
     const type = item?.type;
+    if (isAppItem(item)) return <AppCover item={item} className={className} compact={!large} />;
+    if (isWebItem(item)) return <WebCover item={item} className={className} compact={!large} />;
     if ((type === 'image' || type === 'image_ad') && url) {
         return <img src={url} alt="" loading="lazy" className={`object-cover ${className}`} />;
     }

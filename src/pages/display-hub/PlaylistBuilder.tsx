@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
-    ArrowDown, ArrowLeft, ArrowUp, Check, ChevronDown, Globe, GripVertical, Image as ImageIcon,
-    LayoutGrid, Maximize2, MonitorPlay, Plus, Search, Send, Upload, Video, X,
+    ArrowDown, ArrowLeft, ArrowUp, Check, ChevronDown, GripVertical,
+    Maximize2, MonitorPlay, Plus, Search, Send, Upload, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -18,6 +18,8 @@ import { UploadMediaModal } from '@/components/display/UploadMediaModal';
 import { PlaylistPreviewModal } from '@/components/display/PlaylistPreviewModal';
 import { PlaylistMiniPreview } from '@/components/display/PlaylistMiniPreview';
 import { HeavyVideoBadge } from '@/components/display/HeavyVideoBadge';
+import { ContentThumb } from '@/components/display/ContentThumb';
+import { appKindOf } from '@/lib/appCovers';
 import {
     DEFAULT_ITEM_DURATION, formatClock, formatDuration, isVideoItem, itemSeconds, loopDuration,
     mediaToPlaylistItem, toPlaylistV2, videoSeconds,
@@ -38,6 +40,9 @@ const kindOf = (type?: string): Exclude<Kind, 'all'> | null => {
 };
 
 const KIND_LABEL: Record<Exclude<Kind, 'all'>, string> = { video: 'Video', image: 'Imagen', web: 'Página web', app: 'App' };
+// "Imagen", "Video", "Página web" o el tipo de app ("Clima", "Dólar"…).
+const kindText = (item: AnyItem) => (kindOf(item?.type) === 'app' ? appKindOf(item).label : KIND_LABEL[kindOf(item?.type) || 'image']);
+
 const CHIPS: { id: Kind; label: string }[] = [
     { id: 'all', label: 'Todo' },
     { id: 'video', label: 'Videos' },
@@ -63,16 +68,11 @@ const FIT_MODES: { value: DisplayFitMode; label: string; hint: string }[] = [
 ];
 
 function Thumb({ item, className = 'w-14 h-9' }: { item: AnyItem; className?: string }) {
-    const url = item?.imageUrl || item?.url;
-    const kind = kindOf(item?.type);
-    let inner;
-    if (kind === 'image' && url) inner = <img src={url} alt="" loading="lazy" className="w-full h-full object-cover pointer-events-none" />;
-    else if (kind === 'video' && url) inner = <video src={`${url}#t=0.5`} className="w-full h-full object-cover pointer-events-none" muted playsInline preload="metadata" />;
-    else {
-        const Icon = kind === 'video' ? Video : kind === 'web' ? Globe : kind === 'image' ? ImageIcon : LayoutGrid;
-        inner = <Icon className="w-4 h-4 text-muted-foreground" />;
-    }
-    return <div className={`${className} shrink-0 rounded-md overflow-hidden bg-muted border border-border flex items-center justify-center`}>{inner}</div>;
+    return (
+        <div className={`${className} shrink-0 rounded-md overflow-hidden bg-muted border border-border`}>
+            <ContentThumb item={item} className="w-full h-full pointer-events-none" iconClassName="w-4 h-4" />
+        </div>
+    );
 }
 
 function StepTitle({ n, children, done }: { n: number; children: React.ReactNode; done?: boolean }) {
@@ -428,7 +428,7 @@ const PlaylistBuilder = () => {
                                     <span className="flex-1 min-w-0">
                                         <span className="block text-sm font-medium truncate">{media.name}</span>
                                         <span className="flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap overflow-hidden">
-                                            {KIND_LABEL[kindOf(media.type)!]}{real ? ` · ${formatClock(real)}` : ''}
+                                            {kindText(media)}{real ? ` · ${formatClock(real)}` : ''}
                                             {times > 0 && (
                                                 <span className="flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400" title={times > 1 ? `Está ${times} veces en la playlist` : 'Ya está en la playlist'}>
                                                     <Check className="w-3.5 h-3.5" />{times > 1 ? `×${times}` : ''}
@@ -532,7 +532,7 @@ const PlaylistBuilder = () => {
                                                     <div className="flex-1 min-w-0">
                                                         <p className="text-sm font-medium truncate">{item.content || 'Sin nombre'}</p>
                                                         <button onClick={() => setExpandedId(expanded ? null : item.id)} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-                                                            <span className="hidden sm:inline">{itemKind ? KIND_LABEL[itemKind] : 'Contenido'} · más opciones</span>
+                                                            <span className="hidden sm:inline">{itemKind ? kindText(item) : 'Contenido'} · más opciones</span>
                                                             <span className="sm:hidden">Opciones</span>
                                                             <ChevronDown className={`w-3 h-3 transition-transform ${expanded ? 'rotate-180' : ''}`} />
                                                         </button>

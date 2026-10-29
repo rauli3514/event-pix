@@ -236,6 +236,7 @@ export default function WorkspaceDashboard() {
                                     <Link to={`/admin/display/${d.id}`} className="relative block aspect-video bg-zinc-900 overflow-hidden group" title="Ver detalles de la pantalla">
                                         {content.cover ? (
                                             <ContentThumb
+                                                large
                                                 item={content.cover}
                                                 className={`w-full h-full ${isOnline ? '' : 'grayscale opacity-60'} group-hover:scale-[1.02] transition-transform`}
                                                 iconClassName="w-8 h-8"
