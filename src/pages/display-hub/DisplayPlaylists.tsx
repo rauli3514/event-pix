@@ -12,7 +12,7 @@ import { SendToScreensModal } from '@/components/display/SendToScreensModal';
 import { ContentThumb } from '@/components/display/ContentThumb';
 
 import { useDisplayCampaigns, useCreateCampaign, useDeleteCampaign, useDisplayDevices } from "@/hooks/use-display-hub";
-import { formatDuration, loopDuration, playlistItems } from '@/lib/playlistItems';
+import { formatDuration, itemsActiveOn, loopDuration, playlistItems } from '@/lib/playlistItems';
 import type { DisplayCampaign } from '@/types/display';
 
 type Filter = 'all' | 'live' | 'unused';
@@ -139,7 +139,8 @@ const DisplayPlaylists = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                 {visible.map(campaign => {
                     const items = playlistItems(campaign.items_json);
-                    const { seconds, exact } = loopDuration(items);
+                    const offDate = items.length - itemsActiveOn(items).length;
+                    const { seconds, exact } = loopDuration(itemsActiveOn(items));
                     const screens = screensByPlaylist.get(campaign.id) || [];
                     const editUrl = `/admin/display/commerce/${effectiveCommerceId}/playlists/${campaign.id}`;
                     const preview = items.slice(0, 4);
@@ -170,6 +171,11 @@ const DisplayPlaylists = () => {
                                                 ? 'Vacía: agregale contenido'
                                                 : `${items.length} ${items.length === 1 ? 'elemento' : 'elementos'} · ${exact ? '' : '~'}${formatDuration(seconds)} por vuelta`}
                                         </p>
+                                        {offDate > 0 && (
+                                            <p className="text-xs text-amber-600 dark:text-amber-400">
+                                                {offDate === 1 ? '1 fuera de fecha (hoy no se ve)' : `${offDate} fuera de fecha (hoy no se ven)`}
+                                            </p>
+                                        )}
                                     </div>
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
