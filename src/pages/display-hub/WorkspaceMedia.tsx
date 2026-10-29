@@ -7,6 +7,8 @@ import { Search, Upload, LayoutGrid, List as ListIcon, Image as ImageIcon, Video
 import { SendToScreensModal } from '@/components/display/SendToScreensModal';
 import { UploadMediaModal } from '@/components/display/UploadMediaModal';
 import { useDisplayMedia, useUploadDisplayMedia, useDeleteDisplayMedia, useUpdateDisplayMedia } from '@/hooks/use-display-media';
+import { useVideoUploadCheck } from '@/hooks/use-video-upload-check';
+import { HeavyVideoBadge } from '@/components/display/HeavyVideoBadge';
 import { toast } from 'sonner';
 import { DisplayMedia } from '@/types/display';
 import { MediaFolderSidebar } from '@/components/display/MediaFolderSidebar';
@@ -35,6 +37,8 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
 
     const { data: mediaFiles = [], isLoading } = useDisplayMedia(commerceId);
     const { mutateAsync: uploadMedia } = useUploadDisplayMedia();
+    // Aviso si un video es pesado para los TV box (4K, H.265, mucho bitrate).
+    const { prepare: prepareUploads, dialog: videoCheckDialog } = useVideoUploadCheck();
     const { mutateAsync: deleteMedia } = useDeleteDisplayMedia();
     const { mutateAsync: updateMedia } = useUpdateDisplayMedia();
 
@@ -75,14 +79,17 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
         const files = Array.from(fileList);
         if (files.length === 0) return;
 
+        const prepared = await prepareUploads(files);
+        if (!prepared) return;
+
         let successCount = 0;
         let failCount = 0;
         
         const toastId = toast.loading(`Subiendo ${files.length} archivo(s)...`);
 
-        for (let i = 0; i < files.length; i++) {
+        for (const { file, metadata } of prepared) {
             try {
-                await uploadMedia({ commerceId, file: files[i], folderPath: currentFolder });
+                await uploadMedia({ commerceId, file, folderPath: currentFolder, metadata });
                 successCount++;
             } catch (error) {
                 console.error("Upload error:", error);
@@ -167,6 +174,7 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
 
     return (
         <div className="min-h-full md:h-full flex flex-col bg-background text-foreground transition-colors duration-300">
+            {videoCheckDialog}
             {/* Descriptive Top Banner */}
             <div className="p-3 md:p-6 md:px-8 pt-3 md:pt-6 pb-2 shrink-0">
                 <div className="relative overflow-hidden rounded-3xl bg-card border border-border shadow-xl flex items-center min-h-[100px] md:min-h-[140px] px-4 md:px-8 py-4 md:py-6 transition-colors duration-300">
@@ -437,6 +445,7 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                                                                 )}
                                                             </div>
                                                             <span className="font-medium text-foreground truncate max-w-sm" title={file.name}>{file.name}</span>
+                                                            <HeavyVideoBadge media={file} />
                                                         </div>
                                                     </td>
                                                     {search && (
@@ -562,7 +571,10 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                                                 {file.type === 'image' && file.url ? (
                                                     <img src={file.url} alt={file.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                                                 ) : file.type === 'video' && file.url ? (
-                                                    <video src={file.url} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" muted playsInline preload="metadata" />
+                                                    <>
+                                                        <video src={file.url} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" muted playsInline preload="metadata" />
+                                                        <HeavyVideoBadge media={file} className="absolute bottom-2 left-2" />
+                                                    </>
                                                 ) : (
                                                     <div className="w-16 h-16 rounded-2xl bg-card border border-border/50 shadow-inner flex items-center justify-center transform transition-transform group-hover:scale-110 group-hover:-rotate-3">
                                                         <FileIcon className={`w-8 h-8 ${isFolder ? 'text-primary fill-primary/20' : 'text-muted-foreground'}`} />

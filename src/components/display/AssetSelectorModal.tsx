@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Search, Image as ImageIcon, Folder, PlaySquare, Settings2, Plus, LayoutGrid, List, Globe, Upload, FolderPlus, X } from 'lucide-react';
 import { useDisplayMedia, useUploadDisplayMedia } from '@/hooks/use-display-media';
+import { useVideoUploadCheck } from '@/hooks/use-video-upload-check';
 import { useDisplayCampaigns, useCreateCampaign } from '@/hooks/use-display-hub';
 import { getIconForType } from '@/pages/display-hub/WorkspaceMedia';
 
@@ -33,6 +34,7 @@ export const AssetSelectorModal = ({ isOpen, onClose, onSelect }: AssetSelectorM
     }, [isOpen]);
 
     const uploadMedia = useUploadDisplayMedia();
+    const { prepare: prepareUploads, dialog: videoCheckDialog } = useVideoUploadCheck();
     const createCampaign = useCreateCampaign();
 
     const { data: mediaFiles = [], isLoading: isLoadingMedia } = useDisplayMedia(commerceId);
@@ -44,9 +46,14 @@ export const AssetSelectorModal = ({ isOpen, onClose, onSelect }: AssetSelectorM
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (!files || !commerceId) return;
-        for (const file of Array.from(files)) {
+        const prepared = await prepareUploads(Array.from(files));
+        if (!prepared) {
+            e.target.value = '';
+            return;
+        }
+        for (const { file, metadata } of prepared) {
             try {
-                await uploadMedia.mutateAsync({ file, commerceId, folderPath: '/' });
+                await uploadMedia.mutateAsync({ file, commerceId, folderPath: '/', metadata });
             } catch (err) {
                 console.error('Upload error:', err);
             }
@@ -341,6 +348,7 @@ export const AssetSelectorModal = ({ isOpen, onClose, onSelect }: AssetSelectorM
                         </div>
                     </div>
                 </div>
+                {videoCheckDialog}
             </DialogContent>
         </Dialog>
     );
