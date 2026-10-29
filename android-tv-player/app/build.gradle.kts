@@ -35,6 +35,13 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+    // CI corre lintDebug solo con NewApi: frena el APK si se usa una función de
+    // Android más nueva que minSdk (21) sin chequear la versión. Esos errores
+    // cierran la app al instante en equipos con Android viejo.
+    lint {
+        checkOnly += "NewApi"
+        abortOnError = true
+    }
 }
 
 dependencies {

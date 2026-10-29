@@ -1,6 +1,7 @@
 package com.eventpix.tv.core
 
 import android.annotation.SuppressLint
+import android.annotation.TargetApi
 import android.content.Context
 import android.net.Uri
 import android.net.ConnectivityManager
@@ -125,6 +126,8 @@ class WebViewManager(
                 injectBridgeToken(view, url)
             }
 
+            // Android 6+ llama a esta variante (con WebResourceError).
+            @TargetApi(Build.VERSION_CODES.M)
             override fun onReceivedError(
                 view: WebView?,
                 request: WebResourceRequest?,
@@ -134,10 +137,15 @@ class WebViewManager(
                 Log.e("WebViewManager", "Error loading web content: ${error?.description}")
                 
                 // Si falla la carga del frame principal por estar sin red, cargar fallback local
-                if (request?.isForMainFrame == true && view?.url?.startsWith("file:///android_asset/") != true) {
-                    Log.d("WebViewManager", "Main frame load failed offline. Loading local asset offline_boot.html...")
-                    view?.loadUrl("file:///android_asset/offline_boot.html")
-                }
+                if (request?.isForMainFrame == true) loadOfflineFallback(view)
+            }
+
+            // Android 5 usa esta otra (solo errores del frame principal): sin
+            // ella, sin red mostraba la página de error del navegador.
+            @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
+            override fun onReceivedError(view: WebView?, errorCode: Int, description: String?, failingUrl: String?) {
+                Log.e("WebViewManager", "Error loading web content ($errorCode): $description")
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) loadOfflineFallback(view)
             }
 
             override fun onRenderProcessGone(view: WebView?, detail: android.webkit.RenderProcessGoneDetail?): Boolean {
@@ -152,6 +160,12 @@ class WebViewManager(
                 return true
             }
         }
+    }
+
+    private fun loadOfflineFallback(view: WebView?) {
+        if (view?.url?.startsWith("file:///android_asset/") == true) return
+        Log.d("WebViewManager", "Main frame load failed offline. Loading local asset offline_boot.html...")
+        view?.loadUrl("file:///android_asset/offline_boot.html")
     }
 
     private fun isOnline(): Boolean {

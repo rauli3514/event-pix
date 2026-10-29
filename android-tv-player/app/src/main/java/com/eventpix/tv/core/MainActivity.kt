@@ -1,18 +1,20 @@
 package com.eventpix.tv.core
 
-import android.app.AlarmManager
-import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
-import android.content.SharedPreferences
-
-import android.net.Uri
 import android.content.pm.ApplicationInfo
+import android.graphics.Color
+import android.graphics.Typeface
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
+import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
+import android.widget.Button
 import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.webkit.WebView
 import androidx.activity.OnBackPressedCallback
@@ -47,11 +49,16 @@ class MainActivity : AppCompatActivity() {
     
     private val scope = CoroutineScope(Dispatchers.Main + Job())
 
+    private val uiHandler = Handler(Looper.getMainLooper())
+    private val markStableRunnable = Runnable { CrashReporter.markStable(this) }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Setup Uncaught Exception Handler for auto-restart on crash (Watchdog)
-        setupCrashHandler()
+        // Registro de errores: guarda el motivo de cada cierre y corta el loop
+        // de reaperturas si la app falla al arrancar (ver CrashReporter).
+        CrashReporter.install(this)
+        val startup = CrashReporter.onLaunch(this)
         
         // Apply saved settings
         val prefs = getSharedPreferences("TvSettings", Context.MODE_PRIVATE)
@@ -64,9 +71,58 @@ class MainActivity : AppCompatActivity() {
         } else {
             android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
         }
+
+        // Puente con la web. Solo expone métodos que exigen el token de sesión,
+        // que WebViewManager inyecta únicamente en nuestras páginas.
+        appUpdater = AppUpdater(this) { state, extra -> emitToWeb("tvupdate", extra.put("state", state)) }
+        tvBridge = TvBridge(this)
+        current = WeakReference(this)
+        setupBackHandling()
+
+        if (startup.inLoop) {
+            Log.e("MainActivity", "La app se cerró ${startup.quickDeaths} veces al arrancar: pantalla de diagnóstico")
+            showDiagnosticScreen(
+                "EventPix TV se cerró al arrancar ${startup.quickDeaths} veces seguidas",
+                startup.reason
+            )
+            return
+        }
         
         Log.d("MainActivity", "Initializing EventPix TV Player V2...")
 
+        // Si el WebView del equipo falta, está desactivado o falla al crearse,
+        // se muestra el motivo en vez de cerrarse.
+        try {
+            setupWebView()
+        } catch (t: Throwable) {
+            Log.e("MainActivity", "No se pudo crear el WebView", t)
+            showDiagnosticScreen(
+                "No se pudo abrir el navegador interno (WebView) de este equipo",
+                "${t.javaClass.name}: ${t.message}\n\n" +
+                    "Revisá en Ajustes → Apps que \"Android System WebView\" (o Chrome) esté " +
+                    "instalado, activado y actualizado."
+            )
+            return
+        }
+
+        // Ensure daily restart is scheduled on boot based on saved settings
+        try {
+            tvBridge.scheduleDailyRestart(tvBridge.getRebootHour(), tvBridge.getRebootMinute())
+        } catch (t: Throwable) {
+            Log.e("MainActivity", "No se pudo programar el reinicio diario", t)
+        }
+
+        // Vigila que el hilo de la UI no quede bloqueado (antes nunca se iniciaba).
+        watchdog = WatchdogService(this, webViewManager).also { it.start() }
+
+        setImmersiveMode()
+        startBootSequence()
+
+        // Al minuto abierta, la app se considera estable.
+        uiHandler.postDelayed(markStableRunnable, 60_000)
+    }
+
+    private fun setupWebView() {
         setContentView(R.layout.activity_main)
         
         webView = findViewById(R.id.webView)
@@ -78,12 +134,6 @@ class MainActivity : AppCompatActivity() {
         if ((applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
             WebView.setWebContentsDebuggingEnabled(true)
         }
-
-        // Puente con la web. Solo expone métodos que exigen el token de sesión,
-        // que WebViewManager inyecta únicamente en nuestras páginas.
-        appUpdater = AppUpdater(this) { state, extra -> emitToWeb("tvupdate", extra.put("state", state)) }
-        tvBridge = TvBridge(this)
-        current = WeakReference(this)
 
         webViewManager = WebViewManager(webView, { tvBridge.tokenInjectionScript() }) {
             runOnUiThread {
@@ -98,18 +148,68 @@ class MainActivity : AppCompatActivity() {
         
         // Expose Javascript Interface to React
         webView.addJavascriptInterface(tvBridge, "TvBridge")
-        
-        // Ensure daily restart is scheduled on boot based on saved settings
-        tvBridge.scheduleDailyRestart(tvBridge.getRebootHour(), tvBridge.getRebootMinute())
-
-        // Vigila que el hilo de la UI no quede bloqueado (antes nunca se iniciaba).
-        watchdog = WatchdogService(this, webViewManager).also { it.start() }
-
-        setupBackHandling()
-        setImmersiveMode()
-        startBootSequence()
     }
-    
+
+    // Pantalla nativa (sin WebView) con el motivo del cierre, para sacarle una
+    // foto. Se arma por código: tiene que funcionar aunque falle el layout o el WebView.
+    private fun showDiagnosticScreen(title: String, reason: String?) {
+        val density = resources.displayMetrics.density
+        fun dp(v: Int) = (v * density).toInt()
+
+        val details = TextView(this).apply {
+            text = (reason ?: "Sin detalle del error.").lineSequence().take(18).joinToString("\n") +
+                "\n\n" + CrashReporter.deviceSummary(this@MainActivity)
+            setTextColor(0xFFCBD5E1.toInt())
+            textSize = 12f
+            typeface = Typeface.MONOSPACE
+        }
+        val retry = Button(this).apply {
+            text = "Reintentar"
+            setOnClickListener {
+                CrashReporter.resetLoop(this@MainActivity)
+                recreate()
+            }
+        }
+        val settings = Button(this).apply {
+            text = "Ajustes de Android"
+            setOnClickListener { tvBridge.openSettings() }
+        }
+        val buttons = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            addView(retry)
+            addView(settings, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { leftMargin = dp(16) })
+        }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(48), dp(32), dp(48), dp(32))
+            addView(TextView(this@MainActivity).apply {
+                text = title
+                setTextColor(Color.WHITE)
+                textSize = 22f
+                setTypeface(typeface, Typeface.BOLD)
+            })
+            addView(TextView(this@MainActivity).apply {
+                text = "Sacale una foto a esta pantalla y mandásela a soporte de EventPix."
+                setTextColor(0xFF94A3B8.toInt())
+                textSize = 14f
+                setPadding(0, dp(8), 0, dp(16))
+            })
+            addView(details)
+            addView(buttons, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(24) })
+        }
+        val root = ScrollView(this).apply {
+            setBackgroundColor(0xFF020617.toInt())
+            addView(content)
+        }
+        setContentView(root)
+        retry.requestFocus()
+    }
+
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) {
@@ -182,38 +282,22 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        CrashReporter.markForeground(this, true)
+    }
+
+    // Salir con HOME o abrir otra app no es un cierre inesperado.
+    override fun onStop() {
+        CrashReporter.markForeground(this, false)
+        super.onStop()
+    }
+
     override fun onDestroy() {
+        uiHandler.removeCallbacks(markStableRunnable)
         if (current?.get() === this) current = null
         super.onDestroy()
         watchdog?.stop()
         scope.cancel()
-    }
-    
-    private fun setupCrashHandler() {
-        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
-        Thread.setDefaultUncaughtExceptionHandler { thread, exception ->
-            Log.e("MainActivity", "CRITICAL UNCAUGHT EXCEPTION", exception)
-            
-            val prefs = getSharedPreferences("TvSettings", Context.MODE_PRIVATE)
-            val currentCrashCount = prefs.getInt("crashCount", 0)
-            prefs.edit().putInt("crashCount", currentCrashCount + 1).apply()
-            
-            if (prefs.getBoolean("watchdogEnabled", true)) {
-                Log.e("MainActivity", "Watchdog enabled. Scheduling emergency restart...")
-                val intent = Intent(this@MainActivity, AppRestartReceiver::class.java).apply {
-                    putExtra("killProcess", true)
-                }
-                val pendingIntent = PendingIntent.getBroadcast(
-                    this@MainActivity, 
-                    99, 
-                    intent, 
-                    PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
-                )
-                val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
-                alarmManager.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 2000, pendingIntent)
-            }
-            
-            defaultHandler?.uncaughtException(thread, exception)
-        }
     }
 }

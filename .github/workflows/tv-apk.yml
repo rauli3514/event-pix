@@ -76,10 +76,19 @@ jobs:
         working-directory: android-tv-player
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace -PtvBuildNumber=${{ github.run_number }}
+          # lintDebug: funciones de Android que no existen en equipos viejos (NewApi).
+          ./gradlew lintDebug assembleDebug --no-daemon --stacktrace -PtvBuildNumber=${{ github.run_number }}
           cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/eventpix-tv.apk"
           echo "VERSION_CODE=$((100 + ${{ github.run_number }}))" >> "$GITHUB_ENV"
           echo "VERSION_NAME=2.2.${{ github.run_number }}" >> "$GITHUB_ENV"
+
+      - name: Reporte de lint
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-report
+          path: android-tv-player/app/build/reports/lint-results-debug.*
+          if-no-files-found: ignore
 
       - uses: actions/upload-artifact@v4
         with:
