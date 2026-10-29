@@ -29,7 +29,7 @@ import { ScreenDownAlert } from '@/components/display/ScreenDownAlert';
 import { useDownScreens } from '@/hooks/use-down-screens';
 
 const MENU_ITEMS = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: 'dashboard' },
+  { id: 'dashboard', label: 'Inicio', icon: LayoutDashboard, path: 'dashboard' },
   { id: 'screens', label: 'Pantallas', icon: Monitor, path: 'screens' },
   { id: 'library', label: 'Medios', icon: FolderOpen, path: 'library' },
   { id: 'playlists', label: 'Playlists', icon: ListVideo, path: 'playlists' },
@@ -223,7 +223,7 @@ export default function DisplayWorkspaceLayout() {
         <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] bg-indigo-600/5 rounded-full mix-blend-screen filter blur-[100px] pointer-events-none" />
         
         <div className="flex-1 overflow-y-auto">
-          <ScreenDownAlert commerceId={commerceId} />
+          <ScreenDownAlert commerceId={commerceId} hideBanner={location.pathname.endsWith('/dashboard')} />
           <Outlet />
         </div>
       </main>

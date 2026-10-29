@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Plus, MoreVertical, Trash2, Edit2, Send, ListVideo, Image as ImageIcon, Video, Globe, LayoutGrid } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -49,7 +49,9 @@ const DisplayPlaylists = () => {
     const deleteCampaign = useDeleteCampaign();
 
     const [filter, setFilter] = useState<Filter>('all');
-    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    // ?nueva=1 (botón "Nueva playlist" de Inicio) abre directo el formulario.
+    const [searchParams] = useSearchParams();
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(() => searchParams.get('nueva') === '1');
     const [newCampaignData, setNewCampaignData] = useState({ name: '', description: '' });
     const [sending, setSending] = useState<DisplayCampaign | null>(null);
 

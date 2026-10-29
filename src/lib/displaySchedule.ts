@@ -99,3 +99,27 @@ export function pickActiveAssignment<T extends AssignmentLike>(
         || (groupId ? candidates.find(a => a.group_id === groupId) : undefined)
         || null;
 }
+
+// Qué muestra ahora una pantalla según su asignación (la misma regla que el
+// reproductor): la playlist o el archivo directo, o el de la franja de su
+// programación que toca ahora (si no toca ninguna, el predeterminado).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function assignmentContentNow(assignment: any, now: Date = new Date()): {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    campaign: any | null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    media: any | null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    schedule: any | null;
+} {
+    if (!assignment) return { campaign: null, media: null, schedule: null };
+    const schedule = assignment.schedule;
+    if (schedule) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const event = findActiveScheduleEvent<any>(schedule.events, now);
+        return event
+            ? { campaign: event.campaign || null, media: event.media || null, schedule }
+            : { campaign: schedule.default_campaign || null, media: schedule.default_media || null, schedule };
+    }
+    return { campaign: assignment.campaign || null, media: assignment.media || null, schedule: null };
+}
