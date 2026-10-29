@@ -8,6 +8,23 @@ import android.util.Log
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        // Un error acá (al prender el equipo) no tiene que cerrar la app.
+        try {
+            handle(context, intent)
+        } catch (t: Throwable) {
+            Log.e("BootReceiver", "Falló el arranque automático (${intent.action})", t)
+        }
+    }
+
+    private fun handle(context: Context, intent: Intent) {
+        // Android 7+ manda LOCKED_BOOT_COMPLETED antes de desbloquear el
+        // almacenamiento: leer los ajustes ahí tira IllegalStateException. Se
+        // espera al BOOT_COMPLETED, que llega enseguida.
+        if (intent.action == "android.intent.action.LOCKED_BOOT_COMPLETED") {
+            Log.d("BootReceiver", "LOCKED_BOOT_COMPLETED: se espera a BOOT_COMPLETED")
+            return
+        }
+
         // Después de actualizarse desde la TV, volver a abrir la app.
         if (intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
             Log.d("BootReceiver", "App actualizada: reabriendo EventPix TV")
@@ -19,8 +36,7 @@ class BootReceiver : BroadcastReceiver() {
         }
 
         if (intent.action == Intent.ACTION_BOOT_COMPLETED || 
-            intent.action == "android.intent.action.QUICKBOOT_POWERON" ||
-            intent.action == "android.intent.action.LOCKED_BOOT_COMPLETED") {
+            intent.action == "android.intent.action.QUICKBOOT_POWERON") {
             
             Log.d("BootReceiver", "Boot completed detected! Checking autoBoot preference...")
             

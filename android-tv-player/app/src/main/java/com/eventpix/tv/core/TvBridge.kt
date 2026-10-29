@@ -24,6 +24,7 @@ import java.net.InetAddress
 import java.net.NetworkInterface
 import java.security.MessageDigest
 import java.security.SecureRandom
+import org.json.JSONObject
 
 // Puente entre la web (React) y Android.
 //
@@ -351,10 +352,25 @@ class TvBridge(private val activity: MainActivity) {
         
         try {
             val cm = activity.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-            val activeNetwork = cm.activeNetwork
-            val capabilities = cm.getNetworkCapabilities(activeNetwork)
-            
-            if (capabilities != null) {
+            // activeNetwork recién existe desde Android 6 (API 23): en Android 5
+            // tiraba NoSuchMethodError y cerraba la app.
+            val capabilities = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                cm.getNetworkCapabilities(cm.activeNetwork)
+            } else null
+
+            if (capabilities == null && Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+                @Suppress("DEPRECATION")
+                val info = cm.activeNetworkInfo
+                @Suppress("DEPRECATION")
+                if (info?.isConnected == true) {
+                    networkType = when (info.type) {
+                        ConnectivityManager.TYPE_WIFI -> "wifi"
+                        ConnectivityManager.TYPE_ETHERNET -> "ethernet"
+                        ConnectivityManager.TYPE_MOBILE -> "cellular"
+                        else -> "other"
+                    }
+                }
+            } else if (capabilities != null) {
                 if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
                     networkType = "wifi"
                     val wifiManager = activity.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
@@ -366,7 +382,7 @@ class TvBridge(private val activity: MainActivity) {
                     networkType = "cellular"
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e("TvBridge", "Error reading network state", e)
         }
         
@@ -396,7 +412,9 @@ class TvBridge(private val activity: MainActivity) {
             },
             "app_version": "$appVersionName",
             "app_version_code": ${getAppVersionCode()},
-            "android_version": "$androidVersion (SDK $sdkVersion)"
+            "android_version": "$androidVersion (SDK $sdkVersion)",
+            "webview": ${JSONObject.quote(CrashReporter.webViewVersion(activity))},
+            "last_crash": ${CrashReporter.lastReason(activity)?.take(1500)?.let { JSONObject.quote(it) } ?: "null"}
         }
         """.trimIndent()
         
@@ -414,88 +432,108 @@ class TvBridge(private val activity: MainActivity) {
     // API para JavaScript: mismos nombres que antes, con el token como primer
     // argumento. Sin token válido no hacen nada y los getters devuelven el valor
     // por defecto. (src/lib/tvBridge.ts agrega el token solo.)
+    //
+    // Todo pasa por safe(): un error dentro de un método llamado desde la web
+    // (por ejemplo, una función de Android que no existe en la versión del
+    // equipo) cerraría la app entera. Así solo se registra y se devuelve el
+    // valor por defecto.
     // -------------------------------------------------------------------------
+
+    private inline fun <T> safe(method: String, fallback: T, block: () -> T): T {
+        return try {
+            block()
+        } catch (t: Throwable) {
+            Log.e("TvBridge", "Falló $method", t)
+            fallback
+        }
+    }
+
+    private inline fun call(token: String?, method: String, block: () -> Unit) {
+        safe(method, Unit) { if (authorized(token)) block() }
+    }
+
+    private inline fun <T> get(token: String?, method: String, fallback: T, block: () -> T): T =
+        safe(method, fallback) { if (authorized(token)) block() else fallback }
 
     // Única llamada sin token: le indica a la web que esta app exige token.
     @JavascriptInterface
     fun getApiVersion(): Int = 2
 
     @JavascriptInterface
-    fun exitApp(token: String) { if (authorized(token)) exitApp() }
+    fun exitApp(token: String?) = call(token, "exitApp") { exitApp() }
 
     @JavascriptInterface
-    fun openWifiSettings(token: String) { if (authorized(token)) openWifiSettings() }
+    fun openWifiSettings(token: String?) = call(token, "openWifiSettings") { openWifiSettings() }
 
     @JavascriptInterface
-    fun openSettings(token: String) { if (authorized(token)) openSettings() }
+    fun openSettings(token: String?) = call(token, "openSettings") { openSettings() }
 
     @JavascriptInterface
-    fun openHomeSettings(token: String) { if (authorized(token)) openHomeSettings() }
+    fun openHomeSettings(token: String?) = call(token, "openHomeSettings") { openHomeSettings() }
 
     @JavascriptInterface
-    fun canAutoStart(token: String): Boolean = authorized(token) && canAutoStart()
+    fun canAutoStart(token: String?): Boolean = get(token, "canAutoStart", false) { canAutoStart() }
 
     @JavascriptInterface
-    fun openAutoStartSettings(token: String) { if (authorized(token)) openAutoStartSettings() }
+    fun openAutoStartSettings(token: String?) = call(token, "openAutoStartSettings") { openAutoStartSettings() }
 
     // Actualización de la app (ver AppUpdater). El resultado llega como evento 'tvupdate'.
     @JavascriptInterface
-    fun checkForUpdate(token: String) { if (authorized(token)) activity.appUpdater.check() }
+    fun checkForUpdate(token: String?) = call(token, "checkForUpdate") { activity.appUpdater.check() }
 
     @JavascriptInterface
-    fun startUpdate(token: String) { if (authorized(token)) activity.appUpdater.start() }
+    fun startUpdate(token: String?) = call(token, "startUpdate") { activity.appUpdater.start() }
 
     @JavascriptInterface
-    fun getAppVersionCode(token: String): Int = if (authorized(token)) getAppVersionCode() else 0
+    fun getAppVersionCode(token: String?): Int = get(token, "getAppVersionCode", 0) { getAppVersionCode() }
 
     @JavascriptInterface
-    fun getDeviceCode(token: String): String = if (authorized(token)) getDeviceCode() else ""
+    fun getDeviceCode(token: String?): String = get(token, "getDeviceCode", "") { getDeviceCode() }
 
     @JavascriptInterface
-    fun setAutoBoot(token: String, enabled: Boolean) { if (authorized(token)) setAutoBoot(enabled) }
+    fun setAutoBoot(token: String?, enabled: Boolean) = call(token, "setAutoBoot") { setAutoBoot(enabled) }
 
     @JavascriptInterface
-    fun getAutoBoot(token: String): Boolean = if (authorized(token)) getAutoBoot() else true
+    fun getAutoBoot(token: String?): Boolean = get(token, "getAutoBoot", true) { getAutoBoot() }
 
     @JavascriptInterface
-    fun setWatchdog(token: String, enabled: Boolean) { if (authorized(token)) setWatchdog(enabled) }
+    fun setWatchdog(token: String?, enabled: Boolean) = call(token, "setWatchdog") { setWatchdog(enabled) }
 
     @JavascriptInterface
-    fun getWatchdog(token: String): Boolean = if (authorized(token)) getWatchdog() else true
+    fun getWatchdog(token: String?): Boolean = get(token, "getWatchdog", true) { getWatchdog() }
 
     @JavascriptInterface
-    fun setKeepAwake(token: String, enabled: Boolean) { if (authorized(token)) setKeepAwake(enabled) }
+    fun setKeepAwake(token: String?, enabled: Boolean) = call(token, "setKeepAwake") { setKeepAwake(enabled) }
 
     @JavascriptInterface
-    fun getKeepAwake(token: String): Boolean = if (authorized(token)) getKeepAwake() else true
+    fun getKeepAwake(token: String?): Boolean = get(token, "getKeepAwake", true) { getKeepAwake() }
 
     @JavascriptInterface
-    fun setOrientation(token: String, landscape: Boolean) { if (authorized(token)) setOrientation(landscape) }
+    fun setOrientation(token: String?, landscape: Boolean) = call(token, "setOrientation") { setOrientation(landscape) }
 
     @JavascriptInterface
-    fun getOrientation(token: String): Boolean = if (authorized(token)) getOrientation() else true
+    fun getOrientation(token: String?): Boolean = get(token, "getOrientation", true) { getOrientation() }
 
     @JavascriptInterface
-    fun scheduleDailyRestart(token: String, hour: Int, minute: Int) {
-        if (authorized(token)) scheduleDailyRestart(hour, minute)
-    }
+    fun scheduleDailyRestart(token: String?, hour: Int, minute: Int) =
+        call(token, "scheduleDailyRestart") { scheduleDailyRestart(hour, minute) }
 
     @JavascriptInterface
-    fun getRebootHour(token: String): Int = if (authorized(token)) getRebootHour() else 3
+    fun getRebootHour(token: String?): Int = get(token, "getRebootHour", 3) { getRebootHour() }
 
     @JavascriptInterface
-    fun getRebootMinute(token: String): Int = if (authorized(token)) getRebootMinute() else 0
+    fun getRebootMinute(token: String?): Int = get(token, "getRebootMinute", 0) { getRebootMinute() }
 
     @JavascriptInterface
-    fun setVolume(token: String, volumePercent: Int) { if (authorized(token)) setVolume(volumePercent) }
+    fun setVolume(token: String?, volumePercent: Int) = call(token, "setVolume") { setVolume(volumePercent) }
 
     @JavascriptInterface
-    fun connectToWifi(token: String, ssid: String, psk: String): Boolean =
-        authorized(token) && connectToWifi(ssid, psk)
+    fun connectToWifi(token: String?, ssid: String, psk: String): Boolean =
+        get(token, "connectToWifi", false) { connectToWifi(ssid, psk) }
 
     @JavascriptInterface
-    fun getTelemetry(token: String): String = if (authorized(token)) getTelemetry() else "{}"
+    fun getTelemetry(token: String?): String = get(token, "getTelemetry", "{}") { getTelemetry() }
 
     @JavascriptInterface
-    fun resetTelemetry(token: String) { if (authorized(token)) resetTelemetry() }
+    fun resetTelemetry(token: String?) = call(token, "resetTelemetry") { resetTelemetry() }
 }
