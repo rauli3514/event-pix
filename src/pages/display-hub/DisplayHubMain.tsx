@@ -3,6 +3,7 @@ import { Monitor, ArrowLeft, Activity, Tv, ServerCrash, Building2, ChevronRight 
 import { Button } from '@/components/ui/button';
 import { useIsSuperAdmin } from "@/hooks/use-roles";
 import { useDisplayDevices, useCommerces } from "@/hooks/use-display-hub";
+import { ScreenDownAlert } from "@/components/display/ScreenDownAlert";
 
 const DisplayHubMain = () => {
     const navigate = useNavigate();
@@ -61,6 +62,9 @@ const DisplayHubMain = () => {
                         </div>
                     </div>
                 </header>
+
+                {/* Pantallas sin conexión hace más de 10 min, de todos los negocios */}
+                <ScreenDownAlert commerceId={null} showCommerce className="" />
 
                 {/* Dashboard Metrics (Globales) */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

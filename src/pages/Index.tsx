@@ -29,9 +29,12 @@ const Index = () => {
     const { data: settings } = useEventSettings(event?.id);
     const params = useParams<{ slug?: string }>();
 
-    // Si el slug termina en .apk, redirigir directamente al archivo para descarga directa
+    // Si el slug termina en .apk, redirigir directamente al archivo para descarga directa.
+    // La app de las TVs ya no vive en la web: se publica en GitHub (release tv-latest).
     if (params.slug && params.slug.toLowerCase().endsWith('.apk')) {
-        window.location.href = '/' + params.slug;
+        window.location.href = /^eventpix-tv/i.test(params.slug)
+            ? 'https://github.com/rauli3514/event-pix/releases/download/tv-latest/eventpix-tv.apk'
+            : '/' + params.slug;
         return (
             <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-black text-white font-sans">
                 <div className="text-center space-y-4">
