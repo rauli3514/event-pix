@@ -4,11 +4,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Search, Image as ImageIcon, Folder, PlaySquare, Settings2, Plus, LayoutGrid, List, Globe, Upload, FolderPlus, X } from 'lucide-react';
+import { Search, Image as ImageIcon, Folder, PlaySquare, Settings2, Plus, LayoutGrid, List, Globe, Upload, FolderPlus, X, CalendarClock } from 'lucide-react';
 import { useDisplayMedia, useUploadDisplayMedia } from '@/hooks/use-display-media';
 import { useVideoUploadCheck } from '@/hooks/use-video-upload-check';
 import { useDisplayCampaigns, useCreateCampaign } from '@/hooks/use-display-hub';
 import { getIconForType } from '@/pages/display-hub/WorkspaceMedia';
+import { ContentThumb } from '@/components/display/ContentThumb';
+import { playlistItems } from '@/lib/playlistItems';
 
 interface AssetSelectorModalProps {
     isOpen: boolean;
@@ -75,7 +77,8 @@ export const AssetSelectorModal = ({ isOpen, onClose, onSelect }: AssetSelectorM
 
     const filteredAssets = useMemo(() => {
         if (activeTab === 'archivos') {
-            return mediaFiles.filter(a => a.name.toLowerCase().includes(search.toLowerCase()));
+            // Las carpetas no se pueden mandar a una pantalla.
+            return mediaFiles.filter(a => a.type !== 'folder' && a.name.toLowerCase().includes(search.toLowerCase()));
         } else if (activeTab === 'listas') {
             return campaigns.filter(c => c.name.toLowerCase().includes(search.toLowerCase())).map(c => ({
                 ...c,
@@ -92,6 +95,22 @@ export const AssetSelectorModal = ({ isOpen, onClose, onSelect }: AssetSelectorM
             }));
         }
     }, [mediaFiles, campaigns, schedules, search, activeTab]);
+
+    // Miniatura: la foto, el video, la portada de la app o web, o la primera
+    // imagen de la lista.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const assetThumb = (asset: any, className: string) => {
+        if (asset.type === 'schedule') {
+            return <div className={`${className} flex items-center justify-center`}><CalendarClock className="w-10 h-10 text-muted-foreground/50" /></div>;
+        }
+        if (asset.type === 'campaign') {
+            const first = playlistItems(asset.items_json)[0];
+            return first
+                ? <ContentThumb large item={first} className={className} iconClassName="w-8 h-8" />
+                : <div className={`${className} flex items-center justify-center`}><PlaySquare className="w-10 h-10 text-muted-foreground/50" /></div>;
+        }
+        return <ContentThumb large item={asset} className={className} iconClassName="w-8 h-8" />;
+    };
 
     const formatBytes = (bytes: number) => {
         if (bytes === 0) return '0 Bytes';
@@ -237,14 +256,9 @@ export const AssetSelectorModal = ({ isOpen, onClose, onSelect }: AssetSelectorM
                                             className={`bg-card rounded-xl border ${selectedAsset?.id === asset.id ? 'border-emerald-500 ring-1 ring-emerald-500 shadow-md' : 'border-border hover:border-emerald-300 hover:shadow-sm'} overflow-hidden cursor-pointer transition-all flex flex-col group`}
                                         >
                                             <div className="aspect-video bg-muted relative overflow-hidden flex items-center justify-center border-b border-border">
-                                                {asset.type === 'image' && asset.url ? (
-                                                    <img src={asset.url} alt={asset.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                                                ) : (
-                                                    <FileIcon className="w-10 h-10 text-muted-foreground/50" />
-                                                )}
-                                                
+                                                {assetThumb(asset, 'absolute inset-0 w-full h-full group-hover:scale-105 transition-transform duration-300')}
                                                 {asset.type === 'video' && (
-                                                    <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                                                    <div className="absolute inset-0 bg-black/20 flex items-center justify-center pointer-events-none">
                                                         <PlaySquare className="w-8 h-8 text-white opacity-80" />
                                                     </div>
                                                 )}
@@ -276,11 +290,8 @@ export const AssetSelectorModal = ({ isOpen, onClose, onSelect }: AssetSelectorM
                                             <img src={selectedAsset.url} alt={selectedAsset.name} className="w-full h-full object-contain" />
                                         ) : selectedAsset.type === 'video' && selectedAsset.url ? (
                                             <video src={selectedAsset.url} className="w-full h-full object-contain bg-black" controls />
-                                        ) : selectedAsset.type === 'campaign' ? (
-                                            <div className="text-emerald-500 flex flex-col items-center">
-                                                <PlaySquare className="w-8 h-8 md:w-16 md:h-16 mb-2" />
-                                                <span className="text-xs md:text-sm font-medium text-center leading-tight">Lista de Rep.</span>
-                                            </div>
+                                        ) : selectedAsset.type !== 'schedule' ? (
+                                            <div className="relative w-full h-full">{assetThumb(selectedAsset, 'absolute inset-0 w-full h-full')}</div>
                                         ) : (
                                             <div className="text-muted-foreground flex flex-col items-center">
                                                 <Globe className="w-8 h-8 md:w-12 md:h-12 mb-2" />

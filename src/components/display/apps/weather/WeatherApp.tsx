@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Cloud, CloudRain, CloudLightning, Sun, Search, MapPin, X, Wind, Droplets, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { FitBox } from '../FitBox';
 
 export interface WeatherConfig {
     locationName?: string; // Legacy
@@ -255,11 +256,15 @@ export const WeatherPreview = ({ config }: { config: Partial<WeatherConfig> }) =
         const { width, height } = dimensions;
         if (width === 0 || height === 0) return null;
 
-        const isMicro = width < 250 && height < 250;
+        // Siempre hay un diseño que entra (cada ciudad se achica con FitBox):
+        // franja finita → texto deslizante; recuadro chico → tarjeta simple;
+        // varias ciudades → lado a lado si es ancho, una abajo de otra si es alto.
         const isTicker = height < 150;
-        const isColumn = width < 400 && height >= 150;
-        const isSquare = width >= 250 && width < 500 && height >= 150 && height < 400;
-        const isMain = width >= 400 && height >= 400;
+        const isMicro = !isTicker && width < 250 && height < 250;
+        const several = weatherDataList.length > 1;
+        const isSquare = !isTicker && !isMicro && !several && width < 500 && height < 400;
+        const isColumn = !isTicker && !isMicro && several && width < height;
+        const isMain = !isTicker && !isMicro && !isSquare && !isColumn;
 
         const unitStr = config.unit === 'fahrenheit' ? '°F' : '°C';
         const theme = config.theme || 'dynamic';
@@ -360,7 +365,7 @@ const getBackgroundImage = (code: number, isDay: boolean) => {
     return 'https://images.unsplash.com/photo-1514454529242-9e4677563e7b?auto=format&fit=crop&w=1920&q=80';
 };
 
-const WeatherCard = ({ data, unitStr, mode, theme, containerWidth = 1920, customBgImage }: { data: any, unitStr: string, mode: 'micro' | 'square' | 'column' | 'main', theme: string, containerWidth?: number, customBgImage?: string }) => {
+const WeatherCard = ({ data, unitStr, mode, theme, customBgImage }: { data: any, unitStr: string, mode: 'micro' | 'square' | 'column' | 'main', theme: string, containerWidth?: number, customBgImage?: string }) => {
     const { code, temp, isDay, windSpeed, humidity, feelsLike, cloudCover, rain } = parseWeatherData(data);
     const Icon = getWeatherIcon(code, isDay);
     const desc = getWeatherDesc(code);
@@ -398,10 +403,9 @@ const WeatherCard = ({ data, unitStr, mode, theme, containerWidth = 1920, custom
     const timeString = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
     const dateString = new Date().toLocaleDateString('es-ES', { weekday: 'long', month: 'long', day: 'numeric' });
 
-    // JS based responsiveness to avoid viewport media query bleeding in preview modals
-    const isLg = containerWidth >= 1024;
-
-    const renderMainLayout = () => {
+    // Diseño grande desde 1024 px de ancho (se decide con el ancho virtual del FitBox).
+    const renderMainLayout = (layoutWidth: number) => {
+        const isLg = layoutWidth >= 1024;
         if (theme === 'vibrant') {
             return (
                 <div className={cn("w-full h-full flex flex-col relative overflow-hidden z-10", isLg ? "p-12" : "p-8")}>
@@ -536,9 +540,9 @@ const WeatherCard = ({ data, unitStr, mode, theme, containerWidth = 1920, custom
                 </div>
 
                 <div className={cn("w-full max-w-5xl rounded-[2rem] mt-auto flex flex-col", cardStyle, isLg ? "p-8 gap-6" : "p-4 gap-4")}>
-                    <div className={cn("flex justify-between opacity-90 font-medium", isLg ? "text-xl px-4" : "text-sm px-2")}>
-                        <span>{timeString}</span>
-                        <span className="capitalize">{dateString}</span>
+                    <div className={cn("flex justify-between gap-3 opacity-90 font-medium", isLg ? "text-xl px-4" : "text-sm px-2")}>
+                        <span className="shrink-0">{timeString}</span>
+                        <span className="truncate first-letter:uppercase">{dateString}</span>
                     </div>
                     <div className="flex justify-between gap-2">
                         {data.daily.time.slice(0, 6).map((time: string, idx: number) => {
@@ -550,7 +554,7 @@ const WeatherCard = ({ data, unitStr, mode, theme, containerWidth = 1920, custom
                                 <div key={time} className={cn("flex-1 flex flex-col items-center", isLg ? "gap-4" : "gap-2")}>
                                     <span className={cn("font-medium capitalize", isLg ? "text-2xl" : "text-sm")}>{dayName}</span>
                                     <DIcon className={isLg ? "w-12 h-12" : "w-6 h-6"} />
-                                    <div className={cn("font-bold", isLg ? "text-2xl" : "text-sm")}>{max}° <span className="opacity-60 font-normal ml-1">{min}°</span></div>
+                                    <div className={cn("font-bold flex flex-col items-center leading-tight", isLg ? "text-2xl" : "text-sm")}>{max}°<span className="opacity-60 font-normal">{min}°</span></div>
                                 </div>
                             );
                         })}
@@ -569,7 +573,13 @@ const WeatherCard = ({ data, unitStr, mode, theme, containerWidth = 1920, custom
                 />
             )}
             
-            {mode === 'main' && renderMainLayout()}
+            {/* Se dibuja a un tamaño mínimo y se achica para que entre entero en su
+                recuadro (por ejemplo, tres ciudades una al lado de la otra en la TV). */}
+            {mode === 'main' && (
+                <FitBox minSize={w => (w >= 1024 ? { width: 1024, height: 900 } : { width: 400, height: 620 })}>
+                    {({ width }) => renderMainLayout(width)}
+                </FitBox>
+            )}
 
             {mode === 'micro' && (
                 <div className="w-full h-full flex flex-col items-center justify-center p-2 relative z-10">
