@@ -25,6 +25,8 @@ import { Capacitor } from '@capacitor/core';
 import { BluetoothProvisioningModal } from '@/components/display/BluetoothProvisioningModal';
 import { AIAssistantPanel } from '@/components/display/ai/AIAssistantPanel';
 import { IntelligenceStorageService } from '@/services/intelligence/IntelligenceStorageService';
+import { ScreenDownAlert } from '@/components/display/ScreenDownAlert';
+import { useDownScreens } from '@/hooks/use-down-screens';
 
 const MENU_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: 'dashboard' },
@@ -52,6 +54,8 @@ export default function DisplayWorkspaceLayout() {
   };
   
   const currentCommerce = commerces?.find(c => c.id === commerceId);
+  // Pantallas sin conexión hace más de 10 min (número rojo en "Pantallas").
+  const downCount = useDownScreens(commerceId).length;
   const basePath = `/admin/display/commerce/${commerceId}/workspace`;
 
   // Mobile menu state
@@ -107,6 +111,11 @@ export default function DisplayWorkspaceLayout() {
             >
               <item.icon className={cn("w-5 h-5 shrink-0", isActive ? "text-indigo-500" : "text-muted-foreground")} />
               <span className="truncate">{item.label}</span>
+              {item.id === 'screens' && downCount > 0 && (
+                <span className="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-rose-500 text-white text-[11px] font-bold flex items-center justify-center" title="Pantallas sin conexión">
+                  {downCount}
+                </span>
+              )}
             </Link>
           );
         })}
@@ -214,6 +223,7 @@ export default function DisplayWorkspaceLayout() {
         <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] bg-indigo-600/5 rounded-full mix-blend-screen filter blur-[100px] pointer-events-none" />
         
         <div className="flex-1 overflow-y-auto">
+          <ScreenDownAlert commerceId={commerceId} />
           <Outlet />
         </div>
       </main>

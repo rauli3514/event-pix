@@ -4,5 +4,17 @@
             "source": "/((?!api/|.*\\.[\\w]+$).*)",
             "destination": "/index.html"
         }
+    ],
+    "redirects": [
+        {
+            "source": "/eventpix-tv-v2.apk",
+            "destination": "https://github.com/rauli3514/event-pix/releases/download/tv-latest/eventpix-tv.apk",
+            "permanent": false
+        },
+        {
+            "source": "/eventpix-tv.apk",
+            "destination": "https://github.com/rauli3514/event-pix/releases/download/tv-latest/eventpix-tv.apk",
+            "permanent": false
+        }
     ]
 }
