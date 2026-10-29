@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { CalendarClock, ChevronDown, FolderOpen, ListVideo, MonitorPlay, Plus, RefreshCw, Upload } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -91,7 +91,10 @@ export default function WorkspaceDashboard() {
     const screensWithSchedule = screens.filter(d => d.assignment?.schedule_id).length;
 
     const base = `/admin/display/commerce/${commerceId}/workspace`;
-    const setupPending = !isLoading && (screens.length === 0 || files.length === 0 || campaigns.length === 0);
+    // La guía aparece mientras falta configurar algo, o si se pidió desde el menú (?guia=1).
+    const [searchParams] = useSearchParams();
+    const setupPending = searchParams.get('guia') === '1'
+        || (!isLoading && (screens.length === 0 || files.length === 0 || campaigns.length === 0));
 
     return (
         <div className="p-4 md:p-8 w-full max-w-7xl mx-auto space-y-6">
