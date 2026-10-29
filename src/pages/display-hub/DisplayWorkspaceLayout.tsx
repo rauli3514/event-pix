@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation, useParams, useNavigate } from 'react-router-dom';
-import { 
+import {
   LayoutDashboard,
-  Monitor, 
-  FolderOpen, 
-  ListVideo, 
-  Puzzle, 
-  Calendar, 
+  Monitor,
+  FolderOpen,
+  ListVideo,
+  Puzzle,
+  Calendar,
   ArrowLeft,
   Menu,
   LogOut,
-  PenTool,
   Database,
-  Bluetooth
+  Bluetooth,
+  ChevronDown,
 } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { cn } from '@/lib/utils';
@@ -28,16 +28,45 @@ import { IntelligenceStorageService } from '@/services/intelligence/Intelligence
 import { ScreenDownAlert } from '@/components/display/ScreenDownAlert';
 import { useDownScreens } from '@/hooks/use-down-screens';
 
-const MENU_ITEMS = [
-  { id: 'dashboard', label: 'Inicio', icon: LayoutDashboard, path: 'dashboard' },
-  { id: 'screens', label: 'Pantallas', icon: Monitor, path: 'screens' },
-  { id: 'library', label: 'Medios', icon: FolderOpen, path: 'library' },
-  { id: 'playlists', label: 'Playlists', icon: ListVideo, path: 'playlists' },
-  { id: 'apps', label: 'Aplicaciones', icon: Puzzle, path: 'apps' },
+// Menú en grupos: lo de todos los días arriba y lo que se usa poco dentro de
+// "Más" (cerrado salvo que se esté en una de sus páginas).
+interface MenuItem {
+  id: string;
+  label: string;
+  icon: typeof Monitor;
+  path: string;
+  // Otras páginas que marcan este item como activo.
+  alsoActive?: string[];
+}
+
+const MENU_GROUPS: { title: string; items: MenuItem[] }[] = [
+  {
+    title: 'Día a día',
+    items: [
+      { id: 'dashboard', label: 'Inicio', icon: LayoutDashboard, path: 'dashboard' },
+      { id: 'screens', label: 'Pantallas', icon: Monitor, path: 'screens' },
+      { id: 'schedule', label: 'Programación', icon: Calendar, path: 'schedule' },
+    ],
+  },
+  {
+    title: 'Contenido',
+    items: [
+      { id: 'library', label: 'Medios', icon: FolderOpen, path: 'library' },
+      { id: 'playlists', label: 'Playlists', icon: ListVideo, path: 'playlists' },
+      { id: 'apps', label: 'Apps y plantillas', icon: Puzzle, path: 'apps', alsoActive: ['templates'] },
+    ],
+  },
+];
+
+const MORE_ITEMS: MenuItem[] = [
   { id: 'labels', label: 'Etiquetas', icon: Database, path: 'labels' },
-  { id: 'templates', label: 'Plantillas', icon: PenTool, path: 'templates' },
-  { id: 'schedule', label: 'Programación', icon: Calendar, path: 'schedule' },
   { id: 'ai-knowledge', label: 'Conocimiento IA', icon: Bot, path: 'ai-knowledge' },
+];
+
+// Apps y Plantillas comparten un lugar en el menú: pestañas para pasar de una a otra.
+const APPS_TABS = [
+  { path: 'apps', label: 'Apps' },
+  { path: 'templates', label: 'Plantillas' },
 ];
 
 export default function DisplayWorkspaceLayout() {
@@ -58,6 +87,14 @@ export default function DisplayWorkspaceLayout() {
   const downCount = useDownScreens(commerceId).length;
   const basePath = `/admin/display/commerce/${commerceId}/workspace`;
 
+  const isAt = (path: string) => location.pathname.startsWith(`${basePath}/${path}`);
+  const moreItems = MORE_ITEMS.filter(item => !(item.id === 'ai-knowledge' && isDisplayUser));
+  const [isMoreOpen, setIsMoreOpen] = useState(false);
+  // Siempre abierto si se está en una de sus páginas.
+  const inMore = moreItems.some(item => isAt(item.path));
+  const moreOpen = isMoreOpen || inMore;
+  const appsTab = APPS_TABS.find(tab => isAt(tab.path));
+
   // Mobile menu state
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
@@ -71,7 +108,31 @@ export default function DisplayWorkspaceLayout() {
 
   // checkAndPublish removed as Schedules V2 are evaluated locally by the TvPlayer.
 
-  const SidebarContent = () => (
+  const renderNavLink = (item: MenuItem) => {
+    const isActive = isAt(item.path) || (item.alsoActive || []).some(isAt);
+    return (
+      <Link
+        key={item.id}
+        to={`${basePath}/${item.path}`}
+        className={cn(
+          "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+          isActive
+            ? "bg-indigo-600/10 text-indigo-600 dark:text-indigo-400"
+            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+        )}
+      >
+        <item.icon className={cn("w-5 h-5 shrink-0", isActive ? "text-indigo-600 dark:text-indigo-400" : "text-muted-foreground")} />
+        <span className="truncate">{item.label}</span>
+        {item.id === 'screens' && downCount > 0 && (
+          <span className="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-rose-500 text-white text-[11px] font-bold flex items-center justify-center" title="Pantallas sin conexión">
+            {downCount}
+          </span>
+        )}
+      </Link>
+    );
+  };
+
+  const sidebarContent = (
     <>
       <div className="h-16 flex items-center px-4 border-b border-border shrink-0 transition-colors duration-300">
         <Button variant="ghost" size="sm" onClick={isDisplayUser ? handleLogout : undefined} asChild={!isDisplayUser} className="text-muted-foreground hover:text-foreground hover:bg-muted -ml-2 mr-2 px-2">
@@ -93,77 +154,65 @@ export default function DisplayWorkspaceLayout() {
         </div>
       </div>
 
-      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-        {MENU_ITEMS.filter(item => !(item.id === 'ai-knowledge' && isDisplayUser)).map((item) => {
-          const itemPath = `${basePath}/${item.path}`;
-          const isActive = location.pathname.includes(itemPath);
+      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-5">
+        {MENU_GROUPS.map(group => (
+          <div key={group.title} className="space-y-1">
+            <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">{group.title}</p>
+            {group.items.map(renderNavLink)}
+          </div>
+        ))}
 
-          return (
-            <Link
-              key={item.id}
-              to={itemPath}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                isActive 
-                  ? "bg-indigo-600/10 text-indigo-500" 
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-            >
-              <item.icon className={cn("w-5 h-5 shrink-0", isActive ? "text-indigo-500" : "text-muted-foreground")} />
-              <span className="truncate">{item.label}</span>
-              {item.id === 'screens' && downCount > 0 && (
-                <span className="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-rose-500 text-white text-[11px] font-bold flex items-center justify-center" title="Pantallas sin conexión">
-                  {downCount}
-                </span>
-              )}
-            </Link>
-          );
-        })}
-        <div className="pt-4 mt-4 border-t border-border space-y-1">
+        <div className="space-y-1">
           <button
-            onClick={() => {
-              if (commerceId) {
-                IntelligenceStorageService.setActiveBusinessId(commerceId);
-              }
-              navigate('/admin/intelligence');
-              setIsMobileMenuOpen(false);
-            }}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-gradient-to-r from-violet-600/15 to-indigo-600/15 text-violet-400 hover:from-violet-600/25 hover:to-indigo-600/25 border border-violet-500/30 shadow-sm"
+            onClick={() => setIsMoreOpen(!moreOpen)}
+            className="w-full flex items-center justify-between px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 hover:text-foreground"
+            aria-expanded={moreOpen}
           >
-            <Sparkles className="w-5 h-5 shrink-0 text-violet-400" />
-            <span className="truncate font-semibold">EventPix Intelligence (IA & Reels)</span>
+            Más
+            <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", moreOpen && "rotate-180")} />
           </button>
-          <button
-            onClick={() => {
-              if (commerceId) localStorage.removeItem(`onboarding_dismissed_${commerceId}`);
-              navigate(`/admin/display/commerce/${commerceId}/workspace/dashboard`);
-              setIsMobileMenuOpen(false);
-            }}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-amber-500 hover:bg-amber-500/10"
-          >
-            <Sparkles className="w-5 h-5 shrink-0 text-amber-400" />
-            <span className="truncate">Guía de Inicio (Comience)</span>
-          </button>
-          {/* Bluetooth — solo en app Android nativa (celular) */}
-          {isNativeAndroid && (
-            <button
-              onClick={() => {
-                setIsMobileMenuOpen(false);
-                setTimeout(() => setIsBluetoothOpen(true), 150);
-              }}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              <Bluetooth className="w-5 h-5 shrink-0 text-indigo-400" />
-              <span className="truncate">Configurar TV (Bluetooth)</span>
-            </button>
+          {moreOpen && (
+            <>
+              {moreItems.map(renderNavLink)}
+              <button
+                onClick={() => {
+                  if (commerceId) {
+                    IntelligenceStorageService.setActiveBusinessId(commerceId);
+                  }
+                  navigate('/admin/intelligence');
+                  setIsMobileMenuOpen(false);
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <Sparkles className="w-5 h-5 shrink-0 text-muted-foreground" />
+                <span className="truncate">EventPix Intelligence</span>
+              </button>
+              <button
+                onClick={() => {
+                  if (commerceId) localStorage.removeItem(`onboarding_dismissed_${commerceId}`);
+                  navigate(`${basePath}/dashboard?guia=1`);
+                  setIsMobileMenuOpen(false);
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <Sparkles className="w-5 h-5 shrink-0 text-muted-foreground" />
+                <span className="truncate">Guía para empezar</span>
+              </button>
+              {/* Bluetooth — solo en app Android nativa (celular) */}
+              {isNativeAndroid && (
+                <button
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    setTimeout(() => setIsBluetoothOpen(true), 150);
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-muted-foreground hover:bg-muted hover:text-foreground"
+                >
+                  <Bluetooth className="w-5 h-5 shrink-0 text-muted-foreground" />
+                  <span className="truncate">Configurar TV (Bluetooth)</span>
+                </button>
+              )}
+            </>
           )}
-          <button
-            onClick={() => { setIsAIPanelOpen(true); setIsMobileMenuOpen(false); }}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors bg-gradient-to-r from-indigo-600/10 to-purple-600/10 text-indigo-500 hover:from-indigo-600/20 hover:to-purple-600/20 border border-indigo-500/20"
-          >
-            <Bot className="w-5 h-5 shrink-0 text-indigo-500" />
-            <span className="truncate">Asistente IA</span>
-          </button>
         </div>
       </nav>
       
@@ -207,14 +256,14 @@ export default function DisplayWorkspaceLayout() {
           </SheetTrigger>
           <SheetContent side="left" className="w-[280px] sm:w-[320px] p-0 bg-card border-r-border flex flex-col transition-colors duration-300">
             <SheetTitle className="sr-only">Menú de Navegación</SheetTitle>
-            <SidebarContent />
+            {sidebarContent}
           </SheetContent>
         </Sheet>
       </div>
 
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex w-64 shrink-0 bg-card border-r border-border flex-col h-full z-20 transition-colors duration-300">
-        <SidebarContent />
+        {sidebarContent}
       </aside>
 
       {/* Main Content Area */}
@@ -224,6 +273,24 @@ export default function DisplayWorkspaceLayout() {
         
         <div className="flex-1 overflow-y-auto">
           <ScreenDownAlert commerceId={commerceId} hideBanner={location.pathname.endsWith('/dashboard')} />
+          {appsTab && (
+            <div className="px-4 md:px-8 pt-4 md:pt-6">
+              <div className="inline-flex rounded-lg border border-border bg-card p-1">
+                {APPS_TABS.map(tab => (
+                  <Link
+                    key={tab.path}
+                    to={`${basePath}/${tab.path}`}
+                    className={cn(
+                      "px-4 py-1.5 rounded-md text-sm font-medium transition-colors",
+                      tab === appsTab ? "bg-indigo-600 text-white" : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {tab.label}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
           <Outlet />
         </div>
       </main>

@@ -116,7 +116,7 @@ const App = () => (
 
                 {/* Rutas del Display Workspace */}
                 <Route path="/admin/display/commerce/:commerceId/workspace" element={<DisplayWorkspaceLayout />}>
-                  <Route index element={<Navigate to="screens" replace />} />
+                  <Route index element={<Navigate to="dashboard" replace />} />
                   <Route path="dashboard" element={<WorkspaceDashboard />} />
                   <Route path="screens" element={<DisplayHubList />} />
                   <Route path="library" element={<WorkspaceMedia />} />
