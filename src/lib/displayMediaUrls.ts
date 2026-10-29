@@ -5,6 +5,8 @@
 const MEDIA_ITEM_TYPES = new Set(['image', 'image_ad', 'video', 'video_ad']);
 const IMAGE_URL = /\.(jpe?g|png|gif|webp)($|\?)/i;
 
+// Filas de Supabase sin tipar (items_json es libre).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyRecord = Record<string, any>;
 
 function itemUrls(item: AnyRecord | null | undefined): string[] {
