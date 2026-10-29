@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Plus, MoreVertical, Trash2, Edit2, Send, ListVideo, Image as ImageIcon, Video, Globe, LayoutGrid } from 'lucide-react';
+import { Plus, MoreVertical, Trash2, Edit2, Send, ListVideo } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { SendToScreensModal } from '@/components/display/SendToScreensModal';
+import { ContentThumb } from '@/components/display/ContentThumb';
 
 import { useDisplayCampaigns, useCreateCampaign, useDeleteCampaign, useDisplayDevices } from "@/hooks/use-display-hub";
 import { formatDuration, loopDuration, playlistItems } from '@/lib/playlistItems';
@@ -20,20 +21,7 @@ type Filter = 'all' | 'live' | 'unused';
 type AnyItem = any;
 
 function Thumb({ item }: { item: AnyItem }) {
-    const url = item?.imageUrl || item?.url;
-    const type = item?.type;
-    if ((type === 'image' || type === 'image_ad') && url) {
-        return <img src={url} alt="" loading="lazy" className="w-full h-full object-cover" />;
-    }
-    if ((type === 'video' || type === 'video_ad') && url) {
-        return <video src={`${url}#t=0.5`} className="w-full h-full object-cover" muted playsInline preload="metadata" />;
-    }
-    const Icon = type === 'video' ? Video : type === 'url' || type === 'external_url' || type === 'web' ? Globe : type === 'image' ? ImageIcon : LayoutGrid;
-    return (
-        <div className="w-full h-full flex items-center justify-center bg-muted">
-            <Icon className="w-5 h-5 text-muted-foreground" />
-        </div>
-    );
+    return <ContentThumb item={item} className="w-full h-full" />;
 }
 
 // Playlists: qué pasa cada pantalla. Cada tarjeta muestra el contenido, cuánto

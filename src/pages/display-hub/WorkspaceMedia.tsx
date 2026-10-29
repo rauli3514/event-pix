@@ -10,6 +10,8 @@ import { AddToPlaylistModal } from '@/components/display/AddToPlaylistModal';
 import { useDisplayMedia, useUploadDisplayMedia, useDeleteDisplayMedia, useUpdateDisplayMedia, useUpdateMediaFolder, useDeleteMediaFolder } from '@/hooks/use-display-media';
 import { useDisplayCampaigns } from '@/hooks/use-display-hub';
 import { useVideoUploadCheck } from '@/hooks/use-video-upload-check';
+import { AppCover, WebCover } from '@/components/display/AppCover';
+import { contentKindLabel, isAppItem, isWebItem } from '@/lib/appCovers';
 import { HeavyVideoBadge } from '@/components/display/HeavyVideoBadge';
 import { toast } from 'sonner';
 import { DisplayMedia } from '@/types/display';
@@ -260,7 +262,9 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
         return n === 0 ? 'Sin usar' : n === 1 ? 'En 1 playlist' : `En ${n} playlists`;
     };
 
-    const renderThumb = (file: DisplayMedia, className: string) => {
+    const renderThumb = (file: DisplayMedia, className: string, compact = false) => {
+        if (isAppItem(file)) return <AppCover item={file} className={className} compact={compact} />;
+        if (isWebItem(file)) return <WebCover item={file} className={className} compact={compact} />;
         const FileIcon = getIconForType(file.type);
         if (file.type === 'image' && file.url) return <img src={file.url} alt="" loading="lazy" className={`${className} object-cover`} />;
         if (file.type === 'video' && file.url) return <video src={file.url} className={`${className} object-cover`} muted playsInline preload="metadata" />;
@@ -524,12 +528,12 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                                         </td>
                                         <td className="px-4 py-3">
                                             <button type="button" onClick={() => handleToggleSelect(file.id)} className="flex items-center gap-3 text-left">
-                                                <span className="w-12 h-9 rounded-md overflow-hidden border border-border shrink-0 block">{renderThumb(file, 'w-full h-full')}</span>
+                                                <span className="w-12 h-9 rounded-md overflow-hidden border border-border shrink-0 block">{renderThumb(file, 'w-full h-full', true)}</span>
                                                 <span className="font-medium truncate max-w-xs" title={file.name}>{file.name}</span>
                                                 <HeavyVideoBadge media={file} />
                                             </button>
                                         </td>
-                                        <td className="px-4 py-3 text-muted-foreground">{TYPE_LABEL[file.type] || file.type}</td>
+                                        <td className="px-4 py-3 text-muted-foreground">{(isAppItem(file) && contentKindLabel(file)) || TYPE_LABEL[file.type] || file.type}</td>
                                         <td className={`px-4 py-3 ${usage.get(file.id) ? 'text-foreground' : 'text-muted-foreground'}`}>{usageText(file)}</td>
                                         {search && <td className="px-4 py-3 text-muted-foreground">{file.folder_path === '/' ? 'Sin carpeta' : file.folder_path}</td>}
                                         <td className="px-4 py-3 text-muted-foreground">{formatDate(file.created_at)}</td>
@@ -563,7 +567,7 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                                             {selected && <Check className="w-4 h-4 text-white" strokeWidth={3} />}
                                         </span>
                                         <span className="absolute bottom-2 right-2 text-[11px] font-semibold rounded-md bg-black/70 text-white px-1.5 py-0.5">
-                                            {TYPE_LABEL[file.type] || file.type}
+                                            {(isAppItem(file) && contentKindLabel(file)) || TYPE_LABEL[file.type] || file.type}
                                         </span>
                                         <HeavyVideoBadge media={file} className="absolute bottom-2 left-2" />
                                     </button>
