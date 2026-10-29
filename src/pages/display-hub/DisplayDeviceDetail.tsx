@@ -11,6 +11,7 @@ import { useDisplayDevice, useAssignContentToDevice, useUpdateDisplayDevice, use
 import { useDisplayMedia } from "@/hooks/use-display-media";
 import { sendDeviceCommand, resetDeviceCommandSecret, DeviceCommand } from "@/lib/displayCommands";
 import { fetchPublishedTvVersion, PublishedTvVersion } from "@/lib/tvUpdate";
+import { DeviceDiagnostics } from "@/components/display/DeviceDiagnostics";
 
 const TV_RELEASE_PAGE = 'https://github.com/rauli3514/event-pix/releases/tag/tv-latest';
 
@@ -531,7 +532,7 @@ const DisplayDeviceDetail = () => {
                                     <Activity className="w-5 h-5 text-slate-500 mt-0.5" />
                                     <div>
                                         <p className="text-sm font-medium text-slate-300">Modelo del Equipo</p>
-                                        <p className="text-sm text-slate-500">{deviceData.device_model || 'Desconocido'}</p>
+                                        <p className="text-sm text-slate-500">{deviceData.device_model || deviceData.telemetry?.hardware?.model || 'Desconocido'}</p>
                                     </div>
                                 </div>
                                 <div className="flex items-start gap-3">
@@ -671,6 +672,8 @@ const DisplayDeviceDetail = () => {
                                             </div>
                                         </div>
                                     )}
+
+                                    <DeviceDiagnostics telemetry={deviceData.telemetry} />
                                 </div>
                             </div>
                         )}

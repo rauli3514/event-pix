@@ -414,6 +414,7 @@ class TvBridge(private val activity: MainActivity) {
             "app_version_code": ${getAppVersionCode()},
             "android_version": "$androidVersion (SDK $sdkVersion)",
             "webview": ${JSONObject.quote(CrashReporter.webViewVersion(activity))},
+            "media_cache": ${try { MediaCache.status().toString() } catch (t: Throwable) { "null" }},
             "last_crash": ${CrashReporter.lastReason(activity)?.take(1500)?.let { JSONObject.quote(it) } ?: "null"}
         }
         """.trimIndent()
@@ -530,6 +531,16 @@ class TvBridge(private val activity: MainActivity) {
     @JavascriptInterface
     fun connectToWifi(token: String?, ssid: String, psk: String): Boolean =
         get(token, "connectToWifi", false) { connectToWifi(ssid, psk) }
+
+    // Lista (JSON) de las URLs de videos e imágenes que muestra la pantalla:
+    // se guardan en el equipo para seguir reproduciendo sin internet.
+    @JavascriptInterface
+    fun cacheMedia(token: String?, urlsJson: String?) =
+        call(token, "cacheMedia") { MediaCache.setWanted(MediaCache.parseUrls(urlsJson ?: "[]")) }
+
+    @JavascriptInterface
+    fun getMediaCacheStatus(token: String?): String =
+        get(token, "getMediaCacheStatus", "{}") { MediaCache.status().toString() }
 
     @JavascriptInterface
     fun getTelemetry(token: String?): String = get(token, "getTelemetry", "{}") { getTelemetry() }
