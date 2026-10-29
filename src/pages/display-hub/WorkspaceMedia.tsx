@@ -3,89 +3,147 @@ import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Search, Upload, LayoutGrid, List as ListIcon, Image as ImageIcon, Video, FileAudio, FileText, Globe, Trash2, Folder, Move, MoreVertical, Edit2, Clock, ArrowRightCircle, Play, Calendar } from 'lucide-react';
+import { Search, Upload, LayoutGrid, List as ListIcon, Image as ImageIcon, Video, FileAudio, FileText, Globe, Trash2, Folder, FolderPlus, Move, MoreVertical, Edit2, Play, Calendar, ListPlus, X, ChevronRight, Check } from 'lucide-react';
 import { SendToScreensModal } from '@/components/display/SendToScreensModal';
 import { UploadMediaModal } from '@/components/display/UploadMediaModal';
-import { useDisplayMedia, useUploadDisplayMedia, useDeleteDisplayMedia, useUpdateDisplayMedia } from '@/hooks/use-display-media';
+import { AddToPlaylistModal } from '@/components/display/AddToPlaylistModal';
+import { useDisplayMedia, useUploadDisplayMedia, useDeleteDisplayMedia, useUpdateDisplayMedia, useUpdateMediaFolder, useDeleteMediaFolder } from '@/hooks/use-display-media';
+import { useDisplayCampaigns } from '@/hooks/use-display-hub';
 import { useVideoUploadCheck } from '@/hooks/use-video-upload-check';
 import { HeavyVideoBadge } from '@/components/display/HeavyVideoBadge';
 import { toast } from 'sonner';
 import { DisplayMedia } from '@/types/display';
-import { MediaFolderSidebar } from '@/components/display/MediaFolderSidebar';
 import { MoveMediaModal } from '@/components/display/MoveMediaModal';
 import { AppCatalogModal, AppId } from '@/components/display/apps/AppCatalogModal';
 import { AppEditorModal } from '@/components/display/apps/AppEditorModal';
-import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
+import { itemIsMedia, playlistItems } from '@/lib/playlistItems';
 
 export type CategoryId = 'all' | 'images' | 'videos' | 'audio' | 'docs' | 'web' | 'apps';
 
+const APP_TYPES = ['app', 'widget', 'layout'];
+
+const matchesCategory = (file: DisplayMedia, category: CategoryId) => {
+    switch (category) {
+        case 'all': return true;
+        case 'images': return file.type === 'image';
+        case 'videos': return file.type === 'video';
+        case 'audio': return file.type === 'audio';
+        case 'docs': return file.type === 'docs';
+        case 'web': return file.type === 'web';
+        case 'apps': return APP_TYPES.includes(file.type);
+    }
+};
+
+const TYPE_LABEL: Record<string, string> = {
+    image: 'Imagen', video: 'Video', web: 'Web', app: 'App', widget: 'App', layout: 'App', audio: 'Audio', docs: 'Documento',
+};
+
+const joinPath = (parent: string, name: string) => (parent === '/' ? `/${name}` : `${parent}/${name}`);
+
+// Medios: la biblioteca de fotos, videos, webs y apps del negocio.
+// Una sola fila para buscar y filtrar, las carpetas como fichas (una sola vez)
+// y, al elegir archivos, una barra con lo que se puede hacer con ellos.
 export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: CategoryId }) {
     const { commerceId } = useParams<{ commerceId: string }>();
-    const [viewMode, setViewMode] = useState<'list'|'grid'>('grid');
+    const isAppsPage = initialCategory === 'apps';
+    const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid');
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const [uploadCategory, setUploadCategory] = useState<CategoryId>('all');
     const [isAppCatalogOpen, setIsAppCatalogOpen] = useState(false);
-    const [activeCategory] = useState<CategoryId>(initialCategory);
+    const [activeCategory, setActiveCategory] = useState<CategoryId>(initialCategory);
     const [search, setSearch] = useState('');
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isSendModalOpen, setIsSendModalOpen] = useState(false);
     const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
+    const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState(false);
     const [currentFolder, setCurrentFolder] = useState<string>('/');
-    const [sortMode, setSortMode] = useState<'newest'|'oldest'|'az'|'za'>('newest');
+    const [sortMode, setSortMode] = useState<'newest' | 'oldest' | 'az' | 'za'>('newest');
     const [draggedOverFolder, setDraggedOverFolder] = useState<string | null>(null);
     const [editingApp, setEditingApp] = useState<DisplayMedia | null>(null);
+    const [newFolderName, setNewFolderName] = useState<string | null>(null);
 
     const { data: mediaFiles = [], isLoading } = useDisplayMedia(commerceId);
+    const { data: campaigns = [] } = useDisplayCampaigns(commerceId);
     const { mutateAsync: uploadMedia } = useUploadDisplayMedia();
     // Aviso si un video es pesado para los TV box (4K, H.265, mucho bitrate).
     const { prepare: prepareUploads, dialog: videoCheckDialog } = useVideoUploadCheck();
     const { mutateAsync: deleteMedia } = useDeleteDisplayMedia();
     const { mutateAsync: updateMedia } = useUpdateDisplayMedia();
+    const updateFolder = useUpdateMediaFolder();
+    const deleteFolder = useDeleteMediaFolder();
 
-    const filteredFiles = useMemo(() => {
-        return mediaFiles.filter(file => {
-            // Text Search overrides folder filtering
-            if (search) {
-                if (!file.name.toLowerCase().includes(search.toLowerCase())) return false;
-            } else {
-                // Folder Filter
-                if ((file.folder_path || '/') !== currentFolder) return false;
-            }
-            // Category Filter
-            if (activeCategory === 'all') return true;
-            if (activeCategory === 'images' && file.type === 'image') return true;
-            if (activeCategory === 'videos' && file.type === 'video') return true;
-            if (activeCategory === 'audio' && file.type === 'audio') return true;
-            if (activeCategory === 'docs' && file.type === 'docs') return true;
-            if (activeCategory === 'web' && file.type === 'web') return true;
-            if (activeCategory === 'apps' && (file.type === 'app' || file.type === 'widget' || file.type === 'layout')) return true;
-            return false;
-        }).sort((a, b) => {
-            if (a.type === 'folder' && b.type !== 'folder') return -1;
-            if (a.type !== 'folder' && b.type === 'folder') return 1;
+    const files = useMemo(() => mediaFiles.filter(f => f.type !== 'folder'), [mediaFiles]);
 
+    // Archivos del lugar actual (carpeta o búsqueda), antes de filtrar por tipo:
+    // sirve para los números de cada filtro.
+    const inScope = useMemo(() => files.filter(file => {
+        if (search) return file.name.toLowerCase().includes(search.toLowerCase());
+        // Las apps no se organizan en carpetas: se muestran todas.
+        if (isAppsPage) return true;
+        return (file.folder_path || '/') === currentFolder;
+    }), [files, search, currentFolder, isAppsPage]);
+
+    const filteredFiles = useMemo(() => inScope
+        .filter(file => matchesCategory(file, activeCategory))
+        .sort((a, b) => {
             if (sortMode === 'newest') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
             if (sortMode === 'oldest') return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
             if (sortMode === 'az') return a.name.localeCompare(b.name);
-            if (sortMode === 'za') return b.name.localeCompare(a.name);
-            return 0;
-        });
-    }, [activeCategory, search, mediaFiles, currentFolder, sortMode]);
+            return b.name.localeCompare(a.name);
+        }), [inScope, activeCategory, sortMode]);
+
+    // Carpetas dentro de la actual, con cuántos archivos tienen (contando subcarpetas).
+    const folders = useMemo(() => {
+        if (search || isAppsPage) return [];
+        return mediaFiles
+            .filter(f => f.type === 'folder' && (f.folder_path || '/') === currentFolder)
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map(f => {
+                const path = joinPath(currentFolder, f.name);
+                const count = files.filter(m => m.folder_path === path || (m.folder_path || '').startsWith(`${path}/`)).length;
+                return { media: f, path, count };
+            });
+    }, [mediaFiles, files, currentFolder, search, isAppsPage]);
+
+    // En cuántas playlists está cada archivo ("En 2 playlists" / "Sin usar").
+    const usage = useMemo(() => {
+        const map = new Map<string, number>();
+        const lists = campaigns.map(c => playlistItems(c.items_json));
+        for (const file of files) {
+            map.set(file.id, lists.filter(items => items.some(item => itemIsMedia(item, file))).length);
+        }
+        return map;
+    }, [campaigns, files]);
+
+    const categoryChips: { id: CategoryId; label: string }[] = [
+        { id: 'all', label: 'Todo' },
+        { id: 'images', label: 'Imágenes' },
+        { id: 'videos', label: 'Videos' },
+        { id: 'web', label: 'Webs' },
+        { id: 'apps', label: 'Apps' },
+    ];
+
+    const selectedMedia = mediaFiles.filter(f => selectedIds.includes(f.id));
+
+    const openFolder = (path: string) => {
+        setCurrentFolder(path);
+        setSearch('');
+        setSelectedIds([]);
+    };
 
     const handleUploadFiles = async (fileList: FileList | null) => {
         if (!fileList || !commerceId) return;
-        
-        // Convertir a array inmediatamente para evitar que se pierdan los archivos si el componente se desmonta
-        const files = Array.from(fileList);
-        if (files.length === 0) return;
 
-        const prepared = await prepareUploads(files);
+        // Convertir a array inmediatamente para evitar que se pierdan los archivos si el componente se desmonta
+        const list = Array.from(fileList);
+        if (list.length === 0) return;
+
+        const prepared = await prepareUploads(list);
         if (!prepared) return;
 
         let successCount = 0;
         let failCount = 0;
-        
-        const toastId = toast.loading(`Subiendo ${files.length} archivo(s)...`);
+        const toastId = toast.loading(`Subiendo ${list.length} archivo(s)...`);
 
         for (const { file, metadata } of prepared) {
             try {
@@ -102,7 +160,6 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
         } else {
             toast.success(`Se subieron ${successCount} archivo(s) correctamente.`, { id: toastId });
         }
-        
         setIsUploadModalOpen(false);
     };
 
@@ -119,10 +176,10 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
     };
 
     const handleDelete = async (file: DisplayMedia) => {
-        if (!confirm(`¿Estás seguro de que deseas eliminar "${file.name}"?`)) return;
-        
+        if (!confirm(`¿Seguro que querés eliminar "${file.name}"?`)) return;
         try {
             await deleteMedia(file);
+            setSelectedIds(prev => prev.filter(id => id !== file.id));
             toast.success(`Archivo eliminado: ${file.name}`);
         } catch (error) {
             console.error("Error deleting:", error);
@@ -131,478 +188,429 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
     };
 
     const handleBulkDelete = async () => {
-        if (!confirm(`¿Estás seguro de eliminar los ${selectedIds.length} elementos seleccionados?`)) return;
-        const toDelete = mediaFiles.filter(f => selectedIds.includes(f.id));
-        for (const f of toDelete) {
+        if (!confirm(`¿Seguro que querés eliminar ${selectedIds.length === 1 ? 'el archivo elegido' : `los ${selectedIds.length} archivos elegidos`}?`)) return;
+        for (const f of selectedMedia) {
             try {
                 await deleteMedia(f);
-            } catch (error) {
+            } catch {
                 console.error("Error deleting", f.name);
             }
         }
-        toast.success(`${selectedIds.length} elementos eliminados`);
+        toast.success(`${selectedIds.length} elemento(s) eliminados`);
         setSelectedIds([]);
     };
 
-    const formatDate = (dateString: string) => {
-        const d = new Date(dateString);
-        return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const handleCreateFolder = async () => {
+        const name = (newFolderName || '').trim();
+        setNewFolderName(null);
+        if (!name || !commerceId) return;
+        try {
+            await uploadMedia({ commerceId, webName: name, folderPath: currentFolder, isFolder: true });
+            toast.success('Carpeta creada');
+        } catch {
+            toast.error('No se pudo crear la carpeta');
+        }
     };
+
+    const handleRenameFolder = async (path: string, currentName: string) => {
+        const name = window.prompt('Nuevo nombre de la carpeta', currentName)?.trim();
+        if (!name || name === currentName || !commerceId) return;
+        try {
+            await updateFolder.mutateAsync({ commerceId, oldPath: path, newPath: joinPath(currentFolder, name) });
+            toast.success('Carpeta renombrada');
+        } catch {
+            toast.error('No se pudo renombrar la carpeta');
+        }
+    };
+
+    const handleDeleteFolder = async (path: string, name: string) => {
+        if (!confirm(`¿Eliminar la carpeta "${name}" y TODO lo que tiene adentro?`) || !commerceId) return;
+        try {
+            await deleteFolder.mutateAsync({ commerceId, folderPath: path });
+            toast.success('Carpeta eliminada');
+        } catch {
+            toast.error('No se pudo eliminar la carpeta');
+        }
+    };
+
+    const moveToFolder = async (mediaId: string, path: string) => {
+        try {
+            await updateMedia({ id: mediaId, updates: { folder_path: path } });
+            toast.success('Archivo movido a la carpeta');
+        } catch {
+            toast.error('Error al mover el archivo');
+        }
+    };
+
+    const formatDate = (dateString: string) =>
+        new Date(dateString).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' });
 
     const handleToggleSelect = (id: string) => {
         setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
     };
 
-    const handleSelectAll = () => {
-        if (selectedIds.length === filteredFiles.length) {
-            setSelectedIds([]);
-        } else {
-            setSelectedIds(filteredFiles.map(f => f.id));
-        }
-    };
+    const allSelected = filteredFiles.length > 0 && filteredFiles.every(f => selectedIds.includes(f.id));
+    const handleSelectAll = () => setSelectedIds(allSelected ? [] : filteredFiles.map(f => f.id));
 
     const breadcrumbs = currentFolder === '/' ? [] : currentFolder.split('/').filter(Boolean);
+    const usageText = (file: DisplayMedia) => {
+        const n = usage.get(file.id) || 0;
+        return n === 0 ? 'Sin usar' : n === 1 ? 'En 1 playlist' : `En ${n} playlists`;
+    };
 
-    const navigateToBreadcrumb = (index: number) => {
-        if (index === -1) {
-            setCurrentFolder('/');
-            return;
-        }
-        const newPath = '/' + breadcrumbs.slice(0, index + 1).join('/');
-        setCurrentFolder(newPath);
+    const renderThumb = (file: DisplayMedia, className: string) => {
+        const FileIcon = getIconForType(file.type);
+        if (file.type === 'image' && file.url) return <img src={file.url} alt="" loading="lazy" className={`${className} object-cover`} />;
+        if (file.type === 'video' && file.url) return <video src={file.url} className={`${className} object-cover`} muted playsInline preload="metadata" />;
+        return (
+            <div className={`${className} flex items-center justify-center bg-muted`}>
+                <FileIcon className="w-8 h-8 text-muted-foreground" />
+            </div>
+        );
     };
 
     return (
-        <div className="min-h-full md:h-full flex flex-col bg-background text-foreground transition-colors duration-300">
+        <div className="min-h-full flex flex-col bg-background text-foreground">
             {videoCheckDialog}
-            {/* Descriptive Top Banner */}
-            <div className="p-3 md:p-6 md:px-8 pt-3 md:pt-6 pb-2 shrink-0">
-                <div className="relative overflow-hidden rounded-3xl bg-card border border-border shadow-xl flex items-center min-h-[100px] md:min-h-[140px] px-4 md:px-8 py-4 md:py-6 transition-colors duration-300">
-                    {/* Decorative Background for Banner */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-background/20 to-secondary/10 pointer-events-none">
-                        <div className="absolute right-10 top-1/2 -translate-y-1/2 w-48 h-48 bg-orange-500/10 rounded-full blur-[60px] hidden sm:block"></div>
-                        <div className="absolute right-32 bottom-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-[40px] hidden sm:block"></div>
-                    </div>
-                    
-                    <div className="relative z-10 flex flex-col gap-1 w-full max-w-3xl">
-                        <h1 className="text-2xl md:text-3xl font-extrabold text-foreground flex items-center gap-2 md:gap-3">
-                            {activeCategory !== 'apps' && (
-                                <Sheet>
-                                    <SheetTrigger asChild>
-                                        <Button variant="outline" size="icon" className="md:hidden border-border bg-muted/50 text-muted-foreground hover:text-foreground w-8 h-8 md:w-10 md:h-10 shrink-0">
-                                            <Folder className="w-5 h-5" />
-                                        </Button>
-                                    </SheetTrigger>
-                                    <SheetContent side="left" className="p-0 bg-card border-r-border w-72 flex flex-col transition-colors duration-300">
-                                        <SheetTitle className="sr-only">Carpetas de Medios</SheetTitle>
-                                        <MediaFolderSidebar 
-                                            commerceId={commerceId!}
-                                            mediaFiles={mediaFiles}
-                                            currentFolder={currentFolder}
-                                            onSelectFolder={(path) => {
-                                                setCurrentFolder(path);
-                                                setSearch('');
-                                                setSelectedIds([]);
-                                            }}
-                                        />
-                                    </SheetContent>
-                                </Sheet>
-                            )}
-                            {activeCategory === 'apps' ? 'Aplicaciones' : 'Medios y Archivos'}
-                        </h1>
-                        <p className="text-muted-foreground font-medium max-w-xl text-sm md:text-base">
-                            {activeCategory === 'apps' 
-                                ? 'Creá y administrá aplicaciones y widgets dinámicos para tus pantallas.' 
-                                : 'Gestioná tus imágenes, videos y enlaces, agrupándolos en carpetas para un mayor control al enviarlos.'}
+
+            <div className="px-4 md:px-8 pt-6 pb-10 flex flex-col gap-5">
+                {/* Encabezado */}
+                <header className="flex flex-wrap items-end justify-between gap-4">
+                    <div className="space-y-1">
+                        <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">{isAppsPage ? 'Apps' : 'Medios'}</h1>
+                        <p className="text-sm md:text-base text-muted-foreground max-w-2xl">
+                            {isAppsPage
+                                ? 'Relojes, clima, menús, reseñas y más, para sumar a tus playlists.'
+                                : 'Las fotos, videos y webs que podés mostrar. Elegí varios y sumalos a una playlist.'}
                         </p>
                     </div>
-                </div>
-            </div>
-
-            {/* Action Bar */}
-            <div className="px-3 md:px-8 py-2 md:py-3 flex flex-col sm:flex-row sm:items-center justify-between z-10 gap-3 shrink-0">
-                <div className="flex items-center gap-2">
-                    {/* Placeholder for left-side actions in the future, if needed */}
-                </div>
-                <div className="flex flex-wrap items-center gap-3">
-                    {activeCategory === 'apps' ? (
-                        <Button className="bg-indigo-600 text-white shadow-sm hover:bg-indigo-700 transition-colors" onClick={() => setIsAppCatalogOpen(true)}>
-                            <LayoutGrid className="w-4 h-4 mr-2" />
-                            Crear App
+                    {isAppsPage ? (
+                        <Button className="h-11 px-5 bg-indigo-600 hover:bg-indigo-700 text-white" onClick={() => setIsAppCatalogOpen(true)}>
+                            <LayoutGrid className="w-4 h-4 mr-2" /> Crear app
                         </Button>
                     ) : (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button className="bg-muted text-foreground border border-border shadow-sm hover:bg-accent hover:text-accent-foreground">
-                                    <Upload className="w-4 h-4 mr-2" />
-                                    Subir / Agregar...
+                                <Button className="h-11 px-5 bg-indigo-600 hover:bg-indigo-700 text-white">
+                                    <Upload className="w-4 h-4 mr-2" /> Subir archivos
                                 </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48 bg-card border-border text-foreground z-50">
-                                <DropdownMenuItem onClick={() => { setUploadCategory('all'); setIsUploadModalOpen(true); }} className="hover:bg-accent cursor-pointer focus:bg-accent focus:text-accent-foreground">
-                                    <Upload className="w-4 h-4 mr-2" /> Subir Archivo
+                            <DropdownMenuContent align="end" className="w-56 bg-card border-border text-foreground z-50">
+                                <DropdownMenuItem onClick={() => { setUploadCategory('all'); setIsUploadModalOpen(true); }} className="cursor-pointer">
+                                    <Upload className="w-4 h-4 mr-2" /> Fotos o videos
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setUploadCategory('web'); setIsUploadModalOpen(true); }} className="hover:bg-accent cursor-pointer focus:bg-accent focus:text-accent-foreground">
-                                    <Globe className="w-4 h-4 mr-2 text-blue-400" /> Agregar Enlace Web
+                                <DropdownMenuItem onClick={() => { setUploadCategory('web'); setIsUploadModalOpen(true); }} className="cursor-pointer">
+                                    <Globe className="w-4 h-4 mr-2" /> Una página web
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     )}
-                    <div className="h-8 w-[1px] bg-border mx-1 hidden sm:block"></div>
-                    <Button 
-                        variant="outline"
-                        className="bg-muted text-foreground shadow-sm border-border hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
-                        disabled={selectedIds.length === 0}
-                        onClick={() => setIsMoveModalOpen(true)}
-                    >
-                        <Move className="w-4 h-4 mr-2 text-indigo-500" />
-                        Mover
-                    </Button>
-                    {selectedIds.length > 0 && (
-                        <Button 
-                            variant="outline"
-                            className="bg-destructive/10 text-destructive shadow-sm border-destructive/20 hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
-                            onClick={handleBulkDelete}
-                        >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Eliminar ({selectedIds.length})
-                        </Button>
-                    )}
-                    <Button 
-                        className="bg-orange-500 hover:bg-orange-600 text-white shadow-md disabled:opacity-50"
-                        disabled={selectedIds.length === 0}
-                        onClick={() => setIsSendModalOpen(true)}
-                    >
-                        Enviar a pantallas
-                        <ArrowRightCircle className="w-4 h-4 ml-2" />
-                    </Button>
-                </div>
-            </div>
+                </header>
 
-            <div className="flex flex-1 md:overflow-hidden flex-col md:flex-row min-h-0 border-t border-border mt-2">
-                {/* Desktop Sidebar */}
-                {activeCategory !== 'apps' && (
-                    <div className="hidden md:flex w-64 shrink-0 border-r border-border bg-card flex-col transition-colors duration-300">
-                        {commerceId && (
-                            <MediaFolderSidebar 
-                                commerceId={commerceId}
-                                mediaFiles={mediaFiles}
-                                currentFolder={currentFolder}
-                                onSelectFolder={(path) => {
-                                    setCurrentFolder(path);
-                                    setSearch('');
-                                    setSelectedIds([]);
-                                }}
-                            />
+                {/* Buscar y filtrar: una sola fila */}
+                <div className="flex flex-wrap items-center gap-3">
+                    <div className="relative flex-1 min-w-[220px] max-w-md">
+                        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                            aria-label="Buscar archivos"
+                            placeholder="Buscar por nombre…"
+                            className="h-11 pl-9 bg-card border-border"
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                        />
+                    </div>
+                    {!isAppsPage && (
+                        <div role="group" aria-label="Tipo de archivo" className="flex flex-wrap gap-1.5">
+                            {categoryChips.map(chip => {
+                                const count = inScope.filter(f => matchesCategory(f, chip.id)).length;
+                                const active = activeCategory === chip.id;
+                                return (
+                                    <button
+                                        key={chip.id}
+                                        type="button"
+                                        aria-pressed={active}
+                                        onClick={() => setActiveCategory(chip.id)}
+                                        className={`h-10 px-3.5 rounded-full text-sm border transition-colors ${active
+                                            ? 'border-indigo-500 bg-indigo-500/10 text-foreground font-semibold'
+                                            : 'border-border text-muted-foreground hover:text-foreground hover:border-indigo-500/40'}`}
+                                    >
+                                        {chip.label} · {count}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+                    <div className="flex items-center gap-2 ml-auto">
+                        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <span className="hidden sm:inline">Ordenar</span>
+                            <select
+                                className="h-10 px-3 rounded-md border border-border bg-card text-sm text-foreground outline-none focus:ring-2 focus:ring-indigo-500/50"
+                                value={sortMode}
+                                onChange={e => setSortMode(e.target.value as typeof sortMode)}
+                            >
+                                <option value="newest">Más recientes</option>
+                                <option value="oldest">Más antiguos</option>
+                                <option value="az">Nombre A–Z</option>
+                                <option value="za">Nombre Z–A</option>
+                            </select>
+                        </label>
+                        <div className="flex bg-card p-1 rounded-md border border-border" role="group" aria-label="Vista">
+                            <Button variant="ghost" size="sm" aria-label="Ver como grilla" aria-pressed={viewMode === 'grid'}
+                                className={`h-8 px-2 ${viewMode === 'grid' ? 'bg-muted text-foreground' : 'text-muted-foreground'}`}
+                                onClick={() => setViewMode('grid')}>
+                                <LayoutGrid className="w-4 h-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" aria-label="Ver como lista" aria-pressed={viewMode === 'list'}
+                                className={`h-8 px-2 ${viewMode === 'list' ? 'bg-muted text-foreground' : 'text-muted-foreground'}`}
+                                onClick={() => setViewMode('list')}>
+                                <ListIcon className="w-4 h-4" />
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Dónde estoy */}
+                {!isAppsPage && (
+                    <nav aria-label="Carpeta actual" className="flex flex-wrap items-center gap-1.5 text-sm">
+                        {search ? (
+                            <span className="text-muted-foreground">Resultados para "<span className="text-foreground font-medium">{search}</span>" en todas las carpetas</span>
+                        ) : (
+                            <>
+                                <button type="button" onClick={() => openFolder('/')}
+                                    className={`hover:text-indigo-500 ${breadcrumbs.length === 0 ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
+                                    Todos los archivos
+                                </button>
+                                {breadcrumbs.map((crumb, idx) => (
+                                    <span key={idx} className="flex items-center gap-1.5">
+                                        <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+                                        <button type="button" onClick={() => openFolder('/' + breadcrumbs.slice(0, idx + 1).join('/'))}
+                                            className={`hover:text-indigo-500 ${idx === breadcrumbs.length - 1 ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
+                                            {crumb}
+                                        </button>
+                                    </span>
+                                ))}
+                            </>
                         )}
+                    </nav>
+                )}
+
+                {/* Carpetas: una sola vez, como fichas. Se pueden soltar archivos encima. */}
+                {!isAppsPage && !search && (
+                    <section aria-label="Carpetas" className="flex items-center gap-2 overflow-x-auto pb-1 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap md:overflow-visible">
+                        {folders.map(({ media, path, count }) => (
+                            <div
+                                key={media.id}
+                                onDragOver={e => { e.preventDefault(); setDraggedOverFolder(media.id); }}
+                                onDragLeave={() => setDraggedOverFolder(null)}
+                                onDrop={async e => {
+                                    e.preventDefault();
+                                    setDraggedOverFolder(null);
+                                    const droppedId = e.dataTransfer.getData('mediaId');
+                                    if (droppedId) await moveToFolder(droppedId, path);
+                                }}
+                                className={`group shrink-0 flex items-center rounded-xl border bg-card transition-colors ${draggedOverFolder === media.id ? 'border-indigo-500 bg-indigo-500/10' : 'border-border hover:border-indigo-500/40'}`}
+                            >
+                                <button type="button" onClick={() => openFolder(path)} className="flex items-center gap-2 h-10 pl-3.5 pr-2 text-sm font-medium">
+                                    <Folder className="w-4 h-4 text-indigo-500" />
+                                    {media.name}
+                                    <span className="text-muted-foreground font-normal">{count}</span>
+                                </button>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <button type="button" aria-label={`Opciones de la carpeta ${media.name}`} className="h-10 w-8 flex items-center justify-center text-muted-foreground hover:text-foreground">
+                                            <MoreVertical className="w-4 h-4" />
+                                        </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="bg-card border-border text-foreground">
+                                        <DropdownMenuItem onClick={() => handleRenameFolder(path, media.name)} className="cursor-pointer">
+                                            <Edit2 className="w-4 h-4 mr-2" /> Renombrar
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleDeleteFolder(path, media.name)} className="cursor-pointer text-destructive focus:text-destructive">
+                                            <Trash2 className="w-4 h-4 mr-2" /> Eliminar
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
+                        ))}
+                        {newFolderName === null ? (
+                            <button type="button" onClick={() => setNewFolderName('')}
+                                className="shrink-0 flex items-center gap-2 h-10 px-3.5 rounded-xl border border-dashed border-border text-sm text-muted-foreground hover:text-foreground hover:border-indigo-500/50">
+                                <FolderPlus className="w-4 h-4" /> Nueva carpeta
+                            </button>
+                        ) : (
+                            <form onSubmit={e => { e.preventDefault(); handleCreateFolder(); }} className="shrink-0 flex items-center gap-2">
+                                <Input autoFocus aria-label="Nombre de la carpeta" placeholder="Nombre de la carpeta" value={newFolderName}
+                                    onChange={e => setNewFolderName(e.target.value)}
+                                    onBlur={() => { if (!newFolderName?.trim()) setNewFolderName(null); }}
+                                    onKeyDown={e => { if (e.key === 'Escape') setNewFolderName(null); }}
+                                    className="h-10 w-56 bg-card border-border" />
+                                <Button type="submit" className="h-10 bg-indigo-600 hover:bg-indigo-700 text-white">Crear</Button>
+                            </form>
+                        )}
+                    </section>
+                )}
+
+                {/* Barra al elegir archivos */}
+                {selectedIds.length > 0 && (
+                    <div role="region" aria-label="Archivos elegidos"
+                        className="sticky top-2 z-20 flex flex-wrap items-center gap-2 rounded-xl border border-indigo-500/40 bg-indigo-950/90 text-white backdrop-blur px-4 py-2.5 shadow-lg">
+                        <strong className="text-sm mr-1">{selectedIds.length === 1 ? '1 elegido' : `${selectedIds.length} elegidos`}</strong>
+                        <Button size="sm" className="h-10 bg-indigo-500 hover:bg-indigo-400 text-white" onClick={() => setIsPlaylistModalOpen(true)}>
+                            <ListPlus className="w-4 h-4 mr-2" /> Agregar a una playlist
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-10 bg-transparent border-indigo-400/50 text-white hover:bg-white/10 hover:text-white" onClick={() => setIsSendModalOpen(true)}>
+                            <Play className="w-4 h-4 mr-2" /> Mostrar ya en pantallas
+                        </Button>
+                        {!isAppsPage && (
+                            <Button size="sm" variant="outline" className="h-10 bg-transparent border-indigo-400/50 text-white hover:bg-white/10 hover:text-white" onClick={() => setIsMoveModalOpen(true)}>
+                                <Move className="w-4 h-4 mr-2" /> Mover a carpeta
+                            </Button>
+                        )}
+                        <Button size="sm" variant="outline" className="h-10 bg-transparent border-indigo-400/50 text-rose-300 hover:bg-rose-500/20 hover:text-rose-200" onClick={handleBulkDelete}>
+                            <Trash2 className="w-4 h-4 mr-2" /> Eliminar
+                        </Button>
+                        <div className="ml-auto flex items-center gap-1">
+                            <Button size="sm" variant="ghost" className="h-10 text-white/80 hover:text-white hover:bg-white/10" onClick={handleSelectAll}>
+                                {allSelected ? 'Ninguno' : 'Elegir todos'}
+                            </Button>
+                            <Button size="sm" variant="ghost" aria-label="Cancelar selección" className="h-10 text-white/80 hover:text-white hover:bg-white/10" onClick={() => setSelectedIds([])}>
+                                <X className="w-4 h-4" />
+                            </Button>
+                        </div>
                     </div>
                 )}
 
-                {/* Main Content Area */}
-                <div className="flex-1 flex flex-col bg-background/50 min-h-0">
-                    <div className="p-3 md:p-6 flex-1 flex flex-col md:overflow-hidden min-h-0">
-                        
-                        {/* Filters and Toolbar */}
-                        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-4 shrink-0">
-                            <div className="flex items-center gap-3">
-                                <div className="relative w-full md:w-64">
-                                    <Search className="w-4 h-4 absolute left-3 top-2.5 text-muted-foreground" />
-                                    <Input 
-                                        placeholder="Buscar archivos..."
-                                        className="pl-9 bg-card shadow-sm border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-indigo-500"
-                                        value={search}
-                                        onChange={(e: any) => setSearch(e.target.value)}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="flex items-center gap-3 shrink-0">
-                                <select 
-                                    className="h-9 px-3 rounded-md border border-border bg-card text-sm text-foreground outline-none focus:ring-2 focus:ring-indigo-500/50 shadow-sm"
-                                    value={sortMode}
-                                    onChange={(e) => setSortMode(e.target.value as any)}
-                                >
-                                    <option value="newest">Más reciente</option>
-                                    <option value="oldest">Más antiguo</option>
-                                    <option value="az">A-Z</option>
-                                    <option value="za">Z-A</option>
-                                </select>
-                                <div className="flex bg-muted/50 p-1 rounded-md border border-border shadow-sm">
-                                    <Button 
-                                        variant="ghost" size="sm" 
-                                        className={`h-8 px-2 ${viewMode === 'grid' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
-                                        onClick={() => setViewMode('grid')}
-                                    >
-                                        <LayoutGrid className="w-4 h-4" />
-                                    </Button>
-                                    <Button 
-                                        variant="ghost" size="sm" 
-                                        className={`h-8 px-2 ${viewMode === 'list' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
-                                        onClick={() => setViewMode('list')}
-                                    >
-                                        <ListIcon className="w-4 h-4" />
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Breadcrumbs */}
+                {/* Archivos */}
+                {isLoading ? (
+                    <div className="rounded-xl border border-border bg-card/50 p-12 text-center text-muted-foreground">Cargando archivos…</div>
+                ) : filteredFiles.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-border bg-card/40 p-12 flex flex-col items-center text-center gap-2">
+                        <Folder className="w-12 h-12 text-muted-foreground/60" />
+                        <p className="text-lg font-semibold">{search ? 'No encontramos archivos con ese nombre' : folders.length > 0 ? 'Esta carpeta no tiene archivos sueltos' : 'Todavía no hay nada acá'}</p>
+                        <p className="text-sm text-muted-foreground max-w-md">
+                            {isAppsPage ? 'Creá una app (reloj, clima, menú…) para sumarla a tus playlists.' : 'Subí fotos o videos, o agregá una página web.'}
+                        </p>
                         {!search && (
-                            <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground shrink-0">
-                                <button 
-                                    onClick={() => navigateToBreadcrumb(-1)}
-                                    className="hover:text-indigo-500 transition-colors font-medium"
-                                >
-                                    Raíz
-                                </button>
-                                {breadcrumbs.map((crumb, idx) => (
-                                    <div key={idx} className="flex items-center gap-2">
-                                        <span className="text-border">/</span>
-                                        <button
-                                            onClick={() => navigateToBreadcrumb(idx)}
-                                            className={`hover:text-indigo-500 transition-colors ${idx === breadcrumbs.length - 1 ? 'font-semibold text-foreground' : 'font-medium'}`}
-                                        >
-                                            {crumb}
-                                        </button>
-                                    </div>
-                                ))}
-                                <span className="ml-auto text-xs text-muted-foreground font-medium">
-                                    {isLoading ? 'Cargando...' : `${filteredFiles.length} elemento(s)`}
-                                </span>
-                            </div>
+                            <Button className="mt-4 h-11 bg-indigo-600 hover:bg-indigo-700 text-white"
+                                onClick={() => (isAppsPage ? setIsAppCatalogOpen(true) : setIsUploadModalOpen(true))}>
+                                {isAppsPage ? <><LayoutGrid className="w-4 h-4 mr-2" /> Crear app</> : <><Upload className="w-4 h-4 mr-2" /> Subir archivos</>}
+                            </Button>
                         )}
-                        {search && (
-                            <div className="mb-4 flex items-center justify-between shrink-0">
-                                <h3 className="text-sm font-medium text-foreground">Resultados de búsqueda: "{search}"</h3>
-                                <span className="text-xs text-muted-foreground font-medium">{filteredFiles.length} elemento(s)</span>
-                            </div>
-                        )}
-
-                        {/* Data View */}
-                        <div className="flex-1 md:overflow-y-auto pb-6 pr-2 min-h-0">
-                            {isLoading ? (
-                                <div className="bg-card/50 rounded-xl shadow-sm border border-border p-12 flex flex-col items-center justify-center text-muted-foreground h-full">
-                                    <p className="text-lg font-medium text-muted-foreground">Cargando archivos...</p>
-                                </div>
-                            ) : filteredFiles.length === 0 ? (
-                                <div className="bg-card/50 rounded-xl shadow-sm border border-border p-12 flex flex-col items-center justify-center text-muted-foreground h-full min-h-[300px]">
-                                    <Folder className="w-16 h-16 mb-4 text-muted-foreground/50" />
-                                    <p className="text-lg font-medium text-foreground">No hay archivos</p>
-                                    <p className="text-sm mt-1 text-center max-w-md">Sube archivos, enlaces web o crea carpetas para organizar tu contenido.</p>
-                                    <Button className="mt-6 bg-orange-500 hover:bg-orange-600 text-white" onClick={() => setIsUploadModalOpen(true)}>
-                                        <Upload className="w-4 h-4 mr-2" /> Subir Archivos
-                                    </Button>
-                                </div>
-                            ) : viewMode === 'list' ? (
-                                <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
-                                    <table className="w-full text-left text-sm whitespace-nowrap">
-                                        <thead>
-                                            <tr className="bg-muted/50 border-b border-border">
-                                                <th className="w-10 px-4 py-3">
-                                                    <input 
-                                                        type="checkbox" 
-                                                        className="rounded border-border text-indigo-500 focus:ring-indigo-500/20 bg-background" 
-                                                        checked={selectedIds.length === filteredFiles.length && filteredFiles.length > 0}
-                                                        onChange={handleSelectAll}
-                                                    />
-                                                </th>
-                                                <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nombre</th>
-                                                {search && <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ubicación</th>}
-                                                <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Modificado</th>
-                                                <th className="px-4 py-3 font-medium text-muted-foreground w-16"></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-border/50">
-                                            {filteredFiles.map(file => {
-                                                const FileIcon = getIconForType(file.type);
-                                                const isFolder = file.type === 'folder';
-                                                return (
-                                                <tr key={file.id} className="hover:bg-muted/50 transition-colors group">
-                                                    <td className="px-4 py-3">
-                                                        <input 
-                                                            type="checkbox" 
-                                                            className="rounded border-border text-indigo-500 focus:ring-indigo-500/20 bg-background" 
-                                                            checked={selectedIds.includes(file.id)}
-                                                            onChange={() => handleToggleSelect(file.id)}
-                                                        />
-                                                    </td>
-                                                    <td className="px-4 py-3 cursor-pointer" onClick={() => {
-                                                        if (isFolder) {
-                                                            setCurrentFolder(currentFolder === '/' ? `/${file.name}` : `${currentFolder}/${file.name}`);
-                                                            setSearch('');
-                                                        } else {
-                                                            handleToggleSelect(file.id);
-                                                        }
-                                                    }}>
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-10 h-10 rounded bg-muted border border-border flex items-center justify-center shrink-0 overflow-hidden">
-                                                                {file.type === 'image' && file.url ? (
-                                                                    <img src={file.url} alt={file.name} className="w-full h-full object-cover" />
-                                                                ) : file.type === 'video' && file.url ? (
-                                                                    <video src={file.url} className="w-full h-full object-cover" muted playsInline preload="metadata" />
-                                                                ) : (
-                                                                    <FileIcon className={`w-5 h-5 ${isFolder ? 'text-orange-400' : 'text-muted-foreground'}`} />
-                                                                )}
-                                                            </div>
-                                                            <span className="font-medium text-foreground truncate max-w-sm" title={file.name}>{file.name}</span>
-                                                            <HeavyVideoBadge media={file} />
-                                                        </div>
-                                                    </td>
-                                                    {search && (
-                                                        <td className="px-4 py-4 text-xs text-muted-foreground">
-                                                            {file.folder_path === '/' ? 'Raíz' : file.folder_path}
-                                                        </td>
-                                                    )}
-                                                    <td className="px-4 py-4 text-sm text-muted-foreground">{formatDate(file.created_at)}</td>
-                                                    <td className="px-4 py-4 text-right">
-                                                        <Button variant="ghost" size="icon" className="text-red-400 hover:text-red-300 hover:bg-red-950/50" onClick={(e) => { e.stopPropagation(); handleDelete(file); }}>
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </Button>
-                                                    </td>
-                                                </tr>
-                                            )})}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                                    {filteredFiles.map(file => {
-                                        const FileIcon = getIconForType(file.type);
-                                        const isFolder = file.type === 'folder';
-                                        return (
-                                        <div 
-                                            key={file.id} 
-                                            draggable={!isFolder}
-                                            onDragStart={(e) => {
-                                                if (!isFolder) {
-                                                    e.dataTransfer.setData('mediaId', file.id);
-                                                }
-                                            }}
-                                            onDragOver={(e) => {
-                                                if (isFolder) {
-                                                    e.preventDefault();
-                                                    setDraggedOverFolder(file.id);
-                                                }
-                                            }}
-                                            onDragLeave={() => {
-                                                if (isFolder) setDraggedOverFolder(null);
-                                            }}
-                                            onDrop={async (e) => {
-                                                e.preventDefault();
-                                                setDraggedOverFolder(null);
-                                                if (isFolder) {
-                                                    const droppedId = e.dataTransfer.getData('mediaId');
-                                                    if (droppedId && droppedId !== file.id) {
-                                                        const newPath = currentFolder === '/' ? `/${file.name}` : `${currentFolder}/${file.name}`;
-                                                        try {
-                                                            await updateMedia({ id: droppedId, updates: { folder_path: newPath } });
-                                                            toast.success('Archivo movido a la carpeta');
-                                                        } catch (err) {
-                                                            toast.error('Error al mover el archivo');
-                                                        }
-                                                    }
-                                                }
-                                            }}
-                                            onClick={() => {
-                                                if (isFolder) {
-                                                    setCurrentFolder(currentFolder === '/' ? `/${file.name}` : `${currentFolder}/${file.name}`);
-                                                    setSearch('');
-                                                } else {
-                                                    handleToggleSelect(file.id);
-                                                }
-                                            }}
-                                            className={`bg-card/40 backdrop-blur-sm rounded-2xl shadow-lg border overflow-hidden group transition-all duration-300 cursor-pointer flex flex-col relative transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/10 ${selectedIds.includes(file.id) ? 'border-orange-500 ring-2 ring-orange-500/50 bg-orange-500/5' : 'border-border/60'} ${draggedOverFolder === file.id ? 'border-orange-500 ring-2 ring-orange-500 shadow-md bg-orange-500/10' : 'hover:border-primary/50 hover:bg-muted/60'}`}
-                                        >
-                                            <div className="absolute top-3 left-3 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 focus-within:opacity-100">
-                                                <input 
-                                                    type="checkbox" 
-                                                    className="w-4 h-4 rounded border-border text-primary focus:ring-primary/20 shadow-sm bg-background/80 backdrop-blur-md cursor-pointer transition-colors" 
-                                                    checked={selectedIds.includes(file.id)}
-                                                    onChange={(e) => { e.stopPropagation(); handleToggleSelect(file.id); }}
-                                                />
-                                            </div>
-                                            {/* Si está seleccionado siempre mostramos el checkbox */}
-                                            {selectedIds.includes(file.id) && (
-                                                <div className="absolute top-3 left-3 z-10">
-                                                    <input 
-                                                        type="checkbox" 
-                                                        className="w-4 h-4 rounded border-primary text-primary focus:ring-primary/20 shadow-sm bg-background cursor-pointer" 
-                                                        checked={true}
-                                                        onChange={(e) => { e.stopPropagation(); handleToggleSelect(file.id); }}
-                                                    />
-                                                </div>
-                                            )}
-                                            <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8 bg-background/80 backdrop-blur-md text-foreground hover:bg-muted rounded-full shadow-sm border border-border" onClick={(e) => e.stopPropagation()}>
-                                                            <MoreVertical className="w-4 h-4" />
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" className="w-48 bg-card border-border text-foreground z-50">
-                                                        {file.type === 'app' && (
-                                                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditingApp(file); }} className="hover:bg-accent cursor-pointer focus:bg-accent focus:text-accent-foreground">
-                                                                <Edit2 className="w-4 h-4 mr-2 text-primary" /> Editar App
-                                                            </DropdownMenuItem>
-                                                        )}
-                                                        <DropdownMenuItem onClick={(e) => { 
-                                                            e.stopPropagation(); 
-                                                            setSelectedIds([file.id]);
-                                                            setIsSendModalOpen(true);
-                                                        }} className="hover:bg-accent cursor-pointer focus:bg-accent focus:text-accent-foreground">
-                                                            <Play className="w-4 h-4 mr-2 text-primary" /> Enviar a pantallas
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem onClick={(e) => { 
-                                                            e.stopPropagation(); 
-                                                            setSelectedIds([file.id]);
-                                                            setIsMoveModalOpen(true);
-                                                        }} className="hover:bg-accent cursor-pointer focus:bg-accent focus:text-accent-foreground">
-                                                            <Move className="w-4 h-4 mr-2 text-blue-400" /> Mover
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDelete(file); }} className="hover:bg-destructive/10 cursor-pointer focus:bg-destructive/10 focus:text-destructive text-destructive">
-                                                            <Trash2 className="w-4 h-4 mr-2" /> Eliminar
-                                                        </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </div>
-                                            
-                                            {/* Preview Area */}
-                                            <div className="flex-1 bg-muted/50 relative overflow-hidden flex items-center justify-center p-4">
-                                                {file.type === 'image' && file.url ? (
-                                                    <img src={file.url} alt={file.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                                                ) : file.type === 'video' && file.url ? (
-                                                    <>
-                                                        <video src={file.url} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" muted playsInline preload="metadata" />
-                                                        <HeavyVideoBadge media={file} className="absolute bottom-2 left-2" />
-                                                    </>
-                                                ) : (
-                                                    <div className="w-16 h-16 rounded-2xl bg-card border border-border/50 shadow-inner flex items-center justify-center transform transition-transform group-hover:scale-110 group-hover:-rotate-3">
-                                                        <FileIcon className={`w-8 h-8 ${isFolder ? 'text-primary fill-primary/20' : 'text-muted-foreground'}`} />
-                                                    </div>
-                                                )}
-                                            </div>
-                                            
-                                            {/* Card Details */}
-                                            <div className="p-4 border-t border-border/60 bg-card/40 backdrop-blur-sm flex flex-col justify-center min-h-[4rem] shrink-0">
-                                                <h4 className="font-semibold text-foreground text-sm truncate max-w-full" title={file.name}>{file.name}</h4>
-                                                {search ? (
-                                                    <p className="text-xs font-medium text-primary mt-1 truncate">{file.folder_path === '/' ? 'Raíz' : file.folder_path}</p>
-                                                ) : (
-                                                    <p className="text-xs text-muted-foreground mt-1 truncate flex items-center gap-1.5"><Clock className="w-3 h-3" /> {formatDate(file.created_at).split(',')[0]}</p>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )})}
-                                </div>
-                            )}
-                        </div>
                     </div>
-                </div>
+                ) : viewMode === 'list' ? (
+                    <div className="rounded-xl border border-border bg-card overflow-x-auto">
+                        <table className="w-full text-left text-sm whitespace-nowrap">
+                            <thead>
+                                <tr className="bg-muted/50 border-b border-border">
+                                    <th className="w-10 px-4 py-3">
+                                        <input type="checkbox" aria-label="Elegir todos" className="w-4 h-4 accent-indigo-600" checked={allSelected} onChange={handleSelectAll} />
+                                    </th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nombre</th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Tipo</th>
+                                    <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Uso</th>
+                                    {search && <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Carpeta</th>}
+                                    <th className="px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Subido</th>
+                                    <th className="px-4 py-3 w-12"><span className="sr-only">Acciones</span></th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border/50">
+                                {filteredFiles.map(file => (
+                                    <tr key={file.id} className={`transition-colors ${selectedIds.includes(file.id) ? 'bg-indigo-500/5' : 'hover:bg-muted/40'}`}>
+                                        <td className="px-4 py-3">
+                                            <input type="checkbox" aria-label={`Elegir ${file.name}`} className="w-4 h-4 accent-indigo-600"
+                                                checked={selectedIds.includes(file.id)} onChange={() => handleToggleSelect(file.id)} />
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <button type="button" onClick={() => handleToggleSelect(file.id)} className="flex items-center gap-3 text-left">
+                                                <span className="w-12 h-9 rounded-md overflow-hidden border border-border shrink-0 block">{renderThumb(file, 'w-full h-full')}</span>
+                                                <span className="font-medium truncate max-w-xs" title={file.name}>{file.name}</span>
+                                                <HeavyVideoBadge media={file} />
+                                            </button>
+                                        </td>
+                                        <td className="px-4 py-3 text-muted-foreground">{TYPE_LABEL[file.type] || file.type}</td>
+                                        <td className={`px-4 py-3 ${usage.get(file.id) ? 'text-foreground' : 'text-muted-foreground'}`}>{usageText(file)}</td>
+                                        {search && <td className="px-4 py-3 text-muted-foreground">{file.folder_path === '/' ? 'Sin carpeta' : file.folder_path}</td>}
+                                        <td className="px-4 py-3 text-muted-foreground">{formatDate(file.created_at)}</td>
+                                        <td className="px-4 py-3 text-right">
+                                            <Button variant="ghost" size="icon" aria-label={`Eliminar ${file.name}`} className="text-muted-foreground hover:text-destructive" onClick={() => handleDelete(file)}>
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+                        {filteredFiles.map(file => {
+                            const selected = selectedIds.includes(file.id);
+                            const used = (usage.get(file.id) || 0) > 0;
+                            return (
+                                <div
+                                    key={file.id}
+                                    draggable
+                                    onDragStart={e => e.dataTransfer.setData('mediaId', file.id)}
+                                    className={`group relative rounded-xl overflow-hidden border bg-card flex flex-col transition-all ${selected ? 'border-indigo-500 ring-2 ring-indigo-500/40' : 'border-border hover:border-indigo-500/40'}`}
+                                >
+                                    <button type="button" onClick={() => handleToggleSelect(file.id)} aria-pressed={selected}
+                                        aria-label={`${selected ? 'Quitar' : 'Elegir'} ${file.name}`}
+                                        className="relative aspect-[4/3] bg-muted block w-full">
+                                        {renderThumb(file, 'absolute inset-0 w-full h-full')}
+                                        <span className={`absolute top-2 left-2 w-6 h-6 rounded-md border-2 flex items-center justify-center ${selected ? 'bg-indigo-600 border-indigo-600' : 'bg-black/40 border-white/80'}`}>
+                                            {selected && <Check className="w-4 h-4 text-white" strokeWidth={3} />}
+                                        </span>
+                                        <span className="absolute bottom-2 right-2 text-[11px] font-semibold rounded-md bg-black/70 text-white px-1.5 py-0.5">
+                                            {TYPE_LABEL[file.type] || file.type}
+                                        </span>
+                                        <HeavyVideoBadge media={file} className="absolute bottom-2 left-2" />
+                                    </button>
+                                    <div className="absolute top-2 right-2 md:opacity-0 md:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" aria-label={`Opciones de ${file.name}`} className="h-8 w-8 rounded-full bg-black/60 text-white hover:bg-black/80 hover:text-white">
+                                                    <MoreVertical className="w-4 h-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="w-52 bg-card border-border text-foreground z-50">
+                                                {APP_TYPES.includes(file.type) && (
+                                                    <DropdownMenuItem onClick={() => setEditingApp(file)} className="cursor-pointer">
+                                                        <Edit2 className="w-4 h-4 mr-2" /> Editar app
+                                                    </DropdownMenuItem>
+                                                )}
+                                                <DropdownMenuItem onClick={() => { setSelectedIds([file.id]); setIsPlaylistModalOpen(true); }} className="cursor-pointer">
+                                                    <ListPlus className="w-4 h-4 mr-2" /> Agregar a una playlist
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => { setSelectedIds([file.id]); setIsSendModalOpen(true); }} className="cursor-pointer">
+                                                    <Play className="w-4 h-4 mr-2" /> Mostrar ya en pantallas
+                                                </DropdownMenuItem>
+                                                {!isAppsPage && (
+                                                    <DropdownMenuItem onClick={() => { setSelectedIds([file.id]); setIsMoveModalOpen(true); }} className="cursor-pointer">
+                                                        <Move className="w-4 h-4 mr-2" /> Mover a carpeta
+                                                    </DropdownMenuItem>
+                                                )}
+                                                <DropdownMenuItem onClick={() => handleDelete(file)} className="cursor-pointer text-destructive focus:text-destructive">
+                                                    <Trash2 className="w-4 h-4 mr-2" /> Eliminar
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
+                                    <div className="px-3 py-2.5 flex flex-col gap-0.5 min-w-0">
+                                        <h3 className="text-sm font-semibold truncate" title={file.name}>{file.name}</h3>
+                                        <span className={`text-xs truncate ${used ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+                                            {search ? `${usageText(file)} · ${file.folder_path === '/' ? 'Sin carpeta' : file.folder_path}` : usageText(file)}
+                                        </span>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
 
-            <UploadMediaModal 
-                isOpen={isUploadModalOpen} 
-                onClose={() => setIsUploadModalOpen(false)} 
+            <UploadMediaModal
+                isOpen={isUploadModalOpen}
+                onClose={() => setIsUploadModalOpen(false)}
                 onUpload={handleUploadFiles}
                 onAddWebLink={handleAddWebLink}
                 activeCategory={uploadCategory}
@@ -611,16 +619,25 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                 <MoveMediaModal
                     isOpen={isMoveModalOpen}
                     onClose={() => setIsMoveModalOpen(false)}
-                    selectedAssets={mediaFiles.filter(f => selectedIds.includes(f.id))}
+                    selectedAssets={selectedMedia}
                     allMedia={mediaFiles}
                     commerceId={commerceId}
+                    onSuccess={() => setSelectedIds([])}
+                />
+            )}
+            {commerceId && (
+                <AddToPlaylistModal
+                    isOpen={isPlaylistModalOpen}
+                    onClose={() => setIsPlaylistModalOpen(false)}
+                    commerceId={commerceId}
+                    media={selectedMedia}
                     onSuccess={() => setSelectedIds([])}
                 />
             )}
             <SendToScreensModal
                 isOpen={isSendModalOpen}
                 onClose={() => setIsSendModalOpen(false)}
-                selectedAssets={mediaFiles.filter(f => selectedIds.includes(f.id))}
+                selectedAssets={selectedMedia}
                 commerceId={commerceId || ''}
                 onSuccess={() => setSelectedIds([])}
             />
@@ -655,8 +672,8 @@ export function getIconForType(type: string) {
         case 'audio': return FileAudio;
         case 'docs': return FileText;
         case 'web': return Globe;
-        case 'app': 
-        case 'widget': 
+        case 'app':
+        case 'widget':
         case 'layout': return LayoutGrid;
         case 'schedule': return Calendar;
         default: return FileText;

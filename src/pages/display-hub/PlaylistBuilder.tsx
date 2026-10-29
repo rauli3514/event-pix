@@ -17,39 +17,7 @@ import { useDisplayMedia, useUploadDisplayMedia } from "@/hooks/use-display-medi
 import { DisplayCampaignV2, UniversalElement, DisplayFitMode, DisplayTransition } from '@/types/display';
 import { UploadMediaModal } from '@/components/display/UploadMediaModal';
 import { PlaylistPreviewModal } from '@/components/display/PlaylistPreviewModal';
-
-const migrateToV2 = (data: any): DisplayCampaignV2 => {
-    if (data?.version === '2.0') return data as DisplayCampaignV2;
-
-    const items = Array.isArray(data) ? data : [];
-    const playlist: UniversalElement[] = items.map((item: any) => ({
-        id: item.id || crypto.randomUUID(),
-        type: item.type === 'image_ad' ? 'image' : (item.type === 'video' ? 'video' : 'url'),
-        url: item.imageUrl || item.url,
-        content: item.title || 'Migrado',
-        metadata: item.metadata || {},
-        duration: item.duration || 10,
-        transition: 'fade',
-        fitMode: 'contain',
-    }));
-
-    return {
-        version: '2.0',
-        settings: {
-            orientation: 'landscape',
-            background: { type: 'color', value: '#050505' },
-            shuffle: false,
-            transition: 'fade',
-            defaultDuration: 10
-        },
-        zones: [{
-            id: 'main',
-            name: 'Principal',
-            width: '100%', height: '100%', top: 0, left: 0, zIndex: 1,
-            playlist
-        }]
-    };
-};
+import { mediaToPlaylistItem, toPlaylistV2 } from '@/lib/playlistItems';
 
 export function getIconForType(type: string) {
     switch (type) {
@@ -73,7 +41,7 @@ const PlaylistBuilder = () => {
 
     const playlistRecord = playlists?.find(c => c.id === playlistId);
 
-    const [campaignV2, setCampaignV2] = useState<DisplayCampaignV2>(migrateToV2(null));
+    const [campaignV2, setCampaignV2] = useState<DisplayCampaignV2>(toPlaylistV2(null));
     const [mediaFolder, setMediaFolder] = useState<string>('/');
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
@@ -83,7 +51,7 @@ const PlaylistBuilder = () => {
 
     useEffect(() => {
         if (playlistRecord && playlistRecord.items_json) {
-            setCampaignV2(migrateToV2(playlistRecord.items_json));
+            setCampaignV2(toPlaylistV2(playlistRecord.items_json));
         }
     }, [playlistRecord]);
 
@@ -143,20 +111,11 @@ const PlaylistBuilder = () => {
             return;
         }
 
-        const defaultDuration = campaignV2.settings.defaultDuration || 15;
-        const defaultTransition = campaignV2.settings.transition || 'fade';
-
-        const newItem = {
-            id: crypto.randomUUID(),
-            type: media.type,
-            url: media.url,
-            content: media.name,
-            metadata: media.metadata || {},
-            duration: defaultDuration,
-            transition: defaultTransition,
-            fitMode: 'contain',
-            source_id: media.id
-        } as any;
+        // Las webs se guardan como 'url' (el tipo que entiende el reproductor).
+        const newItem = mediaToPlaylistItem(media, {
+            defaultDuration: campaignV2.settings.defaultDuration || 15,
+            transition: campaignV2.settings.transition || 'fade',
+        });
 
         const updatedZones = [...campaignV2.zones];
         if (!updatedZones[0]) return;

@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { PlaySquare, Plus, Clock, MoreVertical, Trash2, Edit2, FileVideo, ArrowLeft } from 'lucide-react';
+import { Plus, MoreVertical, Trash2, Edit2, Send, ListVideo, Image as ImageIcon, Video, Globe, LayoutGrid } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -8,210 +8,303 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { SendToScreensModal } from '@/components/display/SendToScreensModal';
 
-import { useDisplayCampaigns, useCreateCampaign, useDeleteCampaign } from "@/hooks/use-display-hub";
+import { useDisplayCampaigns, useCreateCampaign, useDeleteCampaign, useDisplayDevices } from "@/hooks/use-display-hub";
+import { playlistItems } from '@/lib/playlistItems';
+import type { DisplayCampaign } from '@/types/display';
 
+type Filter = 'all' | 'live' | 'unused';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyItem = any;
+
+// Duración de una vuelta. Los videos usan su duración real si se conoce (la
+// guarda el análisis al subirlos); si falta alguna, se avisa con "~".
+function loopDuration(items: AnyItem[]): { seconds: number; exact: boolean } {
+    let seconds = 0;
+    let exact = true;
+    for (const item of items) {
+        if (item?.type === 'video' || item?.type === 'video_ad') {
+            const real = Number(item?.metadata?.video?.duration_sec);
+            if (Number.isFinite(real) && real > 0) seconds += real;
+            else { seconds += Number(item?.duration) || 0; exact = false; }
+        } else {
+            seconds += Number(item?.duration) || 10;
+        }
+    }
+    return { seconds, exact };
+}
+
+function formatDuration(seconds: number): string {
+    const s = Math.round(seconds);
+    if (s < 60) return `${s} s`;
+    const m = Math.floor(s / 60);
+    const rest = s % 60;
+    return rest ? `${m} min ${rest} s` : `${m} min`;
+}
+
+function Thumb({ item }: { item: AnyItem }) {
+    const url = item?.imageUrl || item?.url;
+    const type = item?.type;
+    if ((type === 'image' || type === 'image_ad') && url) {
+        return <img src={url} alt="" loading="lazy" className="w-full h-full object-cover" />;
+    }
+    if ((type === 'video' || type === 'video_ad') && url) {
+        return <video src={`${url}#t=0.5`} className="w-full h-full object-cover" muted playsInline preload="metadata" />;
+    }
+    const Icon = type === 'video' ? Video : type === 'url' || type === 'external_url' || type === 'web' ? Globe : type === 'image' ? ImageIcon : LayoutGrid;
+    return (
+        <div className="w-full h-full flex items-center justify-center bg-muted">
+            <Icon className="w-5 h-5 text-muted-foreground" />
+        </div>
+    );
+}
+
+// Playlists: qué pasa cada pantalla. Cada tarjeta muestra el contenido, cuánto
+// dura una vuelta y en qué pantallas se está viendo.
 const DisplayPlaylists = () => {
     const navigate = useNavigate();
     const { commerceId } = useParams<{ commerceId: string }>();
-    
     const effectiveCommerceId = commerceId || 'unknown';
 
-
-    const { data: campaigns, isLoading } = useDisplayCampaigns(effectiveCommerceId);
-    
+    const { data: campaigns = [], isLoading } = useDisplayCampaigns(effectiveCommerceId);
+    const { data: devices = [] } = useDisplayDevices(effectiveCommerceId);
     const createCampaign = useCreateCampaign();
     const deleteCampaign = useDeleteCampaign();
 
-
+    const [filter, setFilter] = useState<Filter>('all');
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [newCampaignData, setNewCampaignData] = useState({ name: '', description: '' });
+    const [sending, setSending] = useState<DisplayCampaign | null>(null);
 
+    // Pantallas que muestran cada playlist (directo o en alguna franja de su programación).
+    const screensByPlaylist = useMemo(() => {
+        const map = new Map<string, string[]>();
+        for (const device of devices as AnyItem[]) {
+            if (device.pairing_status !== 'linked') continue;
+            const a = device.assignment;
+            if (!a) continue;
+            const ids = new Set<string>();
+            if (a.campaign_id) ids.add(a.campaign_id);
+            if (a.schedule?.default_campaign_id) ids.add(a.schedule.default_campaign_id);
+            for (const ev of a.schedule?.events || []) if (ev?.campaign_id) ids.add(ev.campaign_id);
+            for (const id of ids) map.set(id, [...(map.get(id) || []), device.name || `Pantalla ${device.device_id}`]);
+        }
+        return map;
+    }, [devices]);
 
+    const liveCount = campaigns.filter(c => screensByPlaylist.has(c.id)).length;
+    const visible = campaigns.filter(c =>
+        filter === 'all' ? true : filter === 'live' ? screensByPlaylist.has(c.id) : !screensByPlaylist.has(c.id)
+    );
 
     const handleCreateSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        
         if (!newCampaignData.name.trim()) {
-            toast.error('El nombre de la campaña es requerido');
+            toast.error('Poné un nombre para la playlist');
             return;
         }
-
-        createCampaign.mutate({ 
-            commerceId: effectiveCommerceId, 
-            name: newCampaignData.name.trim(), 
-            description: newCampaignData.description 
+        createCampaign.mutate({
+            commerceId: effectiveCommerceId,
+            name: newCampaignData.name.trim(),
+            description: newCampaignData.description
         }, {
             onSuccess: (newCampaign) => {
                 setIsCreateModalOpen(false);
                 setNewCampaignData({ name: '', description: '' });
-                toast.success('Campaña creada');
-                // Redirect to builder
+                toast.success('Playlist creada');
                 navigate(`/admin/display/commerce/${effectiveCommerceId}/playlists/${newCampaign.id}`);
             },
-            onError: () => toast.error('Error al crear campaña')
+            onError: () => toast.error('No se pudo crear la playlist')
         });
     };
 
+    const handleDelete = (campaign: DisplayCampaign) => {
+        const screens = screensByPlaylist.get(campaign.id);
+        const warning = screens?.length ? `\n\nAhora se muestra en: ${screens.join(', ')}.` : '';
+        if (!window.confirm(`¿Eliminar la playlist "${campaign.name}"?${warning}`)) return;
+        deleteCampaign.mutate({ id: campaign.id }, { onSuccess: () => toast.success('Playlist eliminada') });
+    };
 
     if (isLoading) return (
-        <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <div className="min-h-[60vh] flex items-center justify-center bg-background text-foreground">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
         </div>
     );
 
+    const filters: { id: Filter; label: string; count: number }[] = [
+        { id: 'all', label: 'Todas', count: campaigns.length },
+        { id: 'live', label: 'En pantalla', count: liveCount },
+        { id: 'unused', label: 'Sin usar', count: campaigns.length - liveCount },
+    ];
+
     return (
-        <div className="min-h-screen bg-background p-6 md:p-10 relative overflow-hidden text-foreground transition-colors duration-300">
-            {/* Banner Superior */}
-            <div className="max-w-7xl mx-auto">
-                <div className="relative overflow-hidden rounded-3xl bg-card border border-border shadow-xl flex items-center min-h-[140px] px-8 py-6 mb-8 transition-colors duration-300">
-                    <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-background/20 to-secondary/10 pointer-events-none">
-                        <div className="absolute right-10 top-1/2 -translate-y-1/2 w-48 h-48 bg-secondary/10 rounded-full blur-[60px]"></div>
-                        <div className="absolute right-32 bottom-0 w-32 h-32 bg-primary/10 rounded-full blur-[40px]"></div>
-                    </div>
-                    
-                    <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between w-full gap-6">
-                        <div className="flex flex-col gap-1 w-full max-w-2xl">
-                            <h1 className="text-3xl font-extrabold text-foreground flex items-center gap-3">
-                                <PlaySquare className="w-8 h-8 text-primary" />
-                                Tus Playlists
-                            </h1>
-                            <p className="text-muted-foreground font-medium max-w-xl mt-1">
-                                Administrá y organizá el contenido que se reproducirá en tus pantallas.
-                            </p>
-                        </div>
-                        <div className="shrink-0 flex items-center gap-3">
-                            <Button variant="outline" onClick={() => navigate(`/admin/display/commerce/${commerceId}/workspace`)} className="bg-background/50 hover:bg-muted text-foreground border-border rounded-full px-6 py-5 shadow-sm">
-                                <ArrowLeft className="w-4 h-4 mr-2" /> Volver
-                            </Button>
-                            <Button onClick={() => setIsCreateModalOpen(true)} className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-6 py-5 text-sm font-bold shadow-lg shadow-primary/20 transition-all hover:scale-105">
-                                <Plus className="w-4 h-4 mr-2" /> Crear Playlist
-                            </Button>
-                        </div>
-                    </div>
+        <div className="min-h-full bg-background text-foreground px-4 md:px-8 pt-6 pb-10 flex flex-col gap-5">
+            <header className="flex flex-wrap items-end justify-between gap-4">
+                <div className="space-y-1 max-w-2xl">
+                    <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Playlists</h1>
+                    <p className="text-sm md:text-base text-muted-foreground">
+                        Una playlist es lo que pasa una pantalla: tus fotos y videos en orden, una y otra vez.
+                    </p>
                 </div>
+                <Button onClick={() => setIsCreateModalOpen(true)} className="h-11 px-5 bg-indigo-600 hover:bg-indigo-700 text-white">
+                    <Plus className="w-4 h-4 mr-2" /> Nueva playlist
+                </Button>
+            </header>
 
-                {/* Create Playlist Modal */}
-                <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-                    <DialogContent className="bg-card border-border text-foreground">
-                        <DialogHeader>
-                            <DialogTitle>Nueva Playlist</DialogTitle>
-                            <DialogDescription className="text-muted-foreground">
-                                Ingresá un nombre para tu nueva lista de reproducción.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <form onSubmit={handleCreateSubmit} className="space-y-4 py-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="name" className="text-foreground">Nombre de la Playlist *</Label>
-                                <Input 
-                                    id="name" 
-                                    value={newCampaignData.name} 
-                                    onChange={e => setNewCampaignData({ ...newCampaignData, name: e.target.value })} 
-                                    placeholder="Ej: Promociones de Verano"
-                                    className="bg-background border-border text-foreground"
-                                    required
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="desc" className="text-foreground">Descripción (Opcional)</Label>
-                                <Input 
-                                    id="desc" 
-                                    value={newCampaignData.description} 
-                                    onChange={e => setNewCampaignData({ ...newCampaignData, description: e.target.value })} 
-                                    placeholder="Breve descripción del contenido"
-                                    className="bg-background border-border text-foreground"
-                                />
-                            </div>
-                            <Button type="submit" className="w-full bg-primary hover:bg-primary/90 mt-2" disabled={createCampaign.isPending}>
-                                {createCampaign.isPending ? 'Creando...' : 'Comenzar a Diseñar'}
-                            </Button>
-                        </form>
-                    </DialogContent>
-                </Dialog>
+            {campaigns.length > 0 && (
+                <div role="group" aria-label="Filtrar playlists" className="flex flex-wrap gap-1.5">
+                    {filters.map(f => (
+                        <button
+                            key={f.id}
+                            type="button"
+                            aria-pressed={filter === f.id}
+                            onClick={() => setFilter(f.id)}
+                            className={`h-10 px-3.5 rounded-full text-sm border transition-colors ${filter === f.id
+                                ? 'border-indigo-500 bg-indigo-500/10 text-foreground font-semibold'
+                                : 'border-border text-muted-foreground hover:text-foreground hover:border-indigo-500/40'}`}
+                        >
+                            {f.label} · {f.count}
+                        </button>
+                    ))}
+                </div>
+            )}
 
-                {/* Grid of Playlists */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {campaigns?.map(campaign => {
-                        let itemsCount = 0;
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                {visible.map(campaign => {
+                    const items = playlistItems(campaign.items_json);
+                    const { seconds, exact } = loopDuration(items);
+                    const screens = screensByPlaylist.get(campaign.id) || [];
+                    const editUrl = `/admin/display/commerce/${effectiveCommerceId}/playlists/${campaign.id}`;
+                    const preview = items.slice(0, 4);
+                    const more = items.length - preview.length;
 
-                        if (Array.isArray(campaign.items_json)) {
-                            itemsCount = campaign.items_json.length;
-                        } else if (campaign.items_json?.version === '2.0') {
-                            const v2 = campaign.items_json as any;
-                            const playlist = v2.zones?.[0]?.playlist || [];
-                            itemsCount = playlist.length;
-                        }
-                        
-                        return (
-                            <div key={campaign.id} className="group bg-card border border-border rounded-2xl p-6 hover:border-primary/50 transition-all duration-300 flex flex-col shadow-sm hover:shadow-md">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
-                                            <PlaySquare className="w-6 h-6" />
-                                        </div>
-                                        <h3 className="font-bold text-lg text-foreground line-clamp-1">{campaign.name}</h3>
+                    return (
+                        <article key={campaign.id} className="rounded-2xl border border-border bg-card overflow-hidden flex flex-col hover:border-indigo-500/40 transition-colors">
+                            <Link to={editUrl} aria-label={`Editar ${campaign.name}`} className="grid grid-cols-4 gap-0.5 h-24 bg-background">
+                                {preview.map((item, i) => (
+                                    <div key={item?.id || i} className="relative overflow-hidden bg-muted">
+                                        <Thumb item={item} />
+                                        {i === preview.length - 1 && more > 0 && (
+                                            <span className="absolute inset-0 bg-black/55 flex items-center justify-center text-sm font-bold text-white">+{more}</span>
+                                        )}
+                                    </div>
+                                ))}
+                                {Array.from({ length: Math.max(0, 4 - preview.length) }).map((_, i) => (
+                                    <div key={`empty-${i}`} className="bg-muted/60" />
+                                ))}
+                            </Link>
+
+                            <div className="p-4 flex flex-col gap-3 flex-1">
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0">
+                                        <h2 className="text-lg font-bold truncate" title={campaign.name}>{campaign.name}</h2>
+                                        <p className="text-sm text-muted-foreground">
+                                            {items.length === 0
+                                                ? 'Vacía: agregale contenido'
+                                                : `${items.length} ${items.length === 1 ? 'elemento' : 'elementos'} · ${exact ? '' : '~'}${formatDuration(seconds)} por vuelta`}
+                                        </p>
                                     </div>
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground hover:bg-muted -mr-2 -mt-2">
+                                            <Button variant="ghost" size="icon" aria-label={`Opciones de ${campaign.name}`} className="text-muted-foreground hover:text-foreground -mr-2 -mt-1 shrink-0">
                                                 <MoreVertical className="w-5 h-5" />
                                             </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end" className="bg-card border-border text-foreground">
-                                            <DropdownMenuItem asChild className="cursor-pointer hover:bg-accent">
-                                                <Link to={`/admin/display/commerce/${effectiveCommerceId}/playlists/${campaign.id}`}>
-                                                    <Edit2 className="w-4 h-4 mr-2" /> Editar
-                                                </Link>
+                                            <DropdownMenuItem asChild className="cursor-pointer">
+                                                <Link to={editUrl}><Edit2 className="w-4 h-4 mr-2" /> Editar</Link>
                                             </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => {
-                                                if (window.confirm("¿Seguro que deseas eliminar esta playlist?")) {
-                                                    deleteCampaign.mutate({ id: campaign.id }, {
-                                                        onSuccess: () => toast.success("Playlist eliminada")
-                                                    });
-                                                }
-                                            }} className="text-destructive focus:text-destructive cursor-pointer hover:bg-destructive/10">
+                                            <DropdownMenuItem onClick={() => handleDelete(campaign)} className="text-destructive focus:text-destructive cursor-pointer">
                                                 <Trash2 className="w-4 h-4 mr-2" /> Eliminar
                                             </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 </div>
 
-                                <p className="text-sm text-muted-foreground mb-6 line-clamp-2 min-h-[40px]">{campaign.description || 'Sin descripción'}</p>
-                                
-                                <div className="mt-auto pt-4 border-t border-border flex items-center justify-between text-sm text-muted-foreground">
-                                    <div className="flex items-center gap-2">
-                                        <FileVideo className="w-4 h-4" />
-                                        <span>{itemsCount} Elementos</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Clock className="w-4 h-4" />
-                                        <span>{new Date(campaign.created_at).toLocaleDateString()}</span>
-                                    </div>
-                                </div>
-                                
-                                <Button asChild className="w-full mt-4 bg-muted text-foreground hover:bg-primary hover:text-primary-foreground border-0 transition-colors">
-                                    <Link to={`/admin/display/commerce/${effectiveCommerceId}/playlists/${campaign.id}`}>
-                                        Abrir Playlist
-                                    </Link>
-                                </Button>
-                            </div>
-                        )
-                    })}
+                                <p className={`flex items-start gap-2 text-sm ${screens.length ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
+                                    <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${screens.length ? 'bg-emerald-500' : 'bg-muted-foreground/50'}`} />
+                                    {screens.length ? `En pantalla: ${screens.join(', ')}` : 'No está en ninguna pantalla'}
+                                </p>
 
-                    {(!campaigns || campaigns.length === 0) && (
-                        <div className="col-span-full flex flex-col items-center justify-center py-20 bg-muted/30 rounded-2xl border border-dashed border-border">
-                            <PlaySquare className="w-12 h-12 text-muted-foreground mb-4" />
-                            <h3 className="text-xl font-bold text-foreground">No tienes playlists</h3>
-                            <p className="text-muted-foreground mt-2 text-center max-w-sm">
-                                Creá tu primera playlist para empezar a mostrar contenido en tus pantallas.
-                            </p>
-                            <Button onClick={() => setIsCreateModalOpen(true)} className="mt-6">
-                                Crear mi primera Playlist
-                            </Button>
-                        </div>
-                    )}
-                </div>
+                                <div className="flex gap-2 mt-auto pt-1">
+                                    <Button asChild variant="secondary" className="flex-1 h-10">
+                                        <Link to={editUrl}><Edit2 className="w-4 h-4 mr-2" /> Editar</Link>
+                                    </Button>
+                                    <Button variant="outline" className="flex-1 h-10 border-border" disabled={items.length === 0} onClick={() => setSending(campaign)}>
+                                        <Send className="w-4 h-4 mr-2" /> Enviar a pantallas
+                                    </Button>
+                                </div>
+                            </div>
+                        </article>
+                    );
+                })}
+
+                {campaigns.length === 0 && (
+                    <div className="col-span-full flex flex-col items-center justify-center text-center py-16 px-4 rounded-2xl border border-dashed border-border bg-card/40 gap-2">
+                        <ListVideo className="w-12 h-12 text-muted-foreground" />
+                        <h2 className="text-xl font-bold">Todavía no tenés playlists</h2>
+                        <p className="text-muted-foreground max-w-sm">
+                            Creá una, sumale fotos y videos de Medios y elegí en qué pantallas se ve.
+                        </p>
+                        <Button onClick={() => setIsCreateModalOpen(true)} className="mt-4 h-11 bg-indigo-600 hover:bg-indigo-700 text-white">
+                            <Plus className="w-4 h-4 mr-2" /> Crear mi primera playlist
+                        </Button>
+                    </div>
+                )}
+                {campaigns.length > 0 && visible.length === 0 && (
+                    <p className="col-span-full text-muted-foreground py-8 text-center">
+                        {filter === 'live' ? 'Ninguna playlist se está mostrando ahora.' : 'Todas las playlists están en alguna pantalla.'}
+                    </p>
+                )}
             </div>
+
+            <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+                <DialogContent className="bg-card border-border text-foreground">
+                    <DialogHeader>
+                        <DialogTitle>Nueva playlist</DialogTitle>
+                        <DialogDescription className="text-muted-foreground">
+                            Ponele un nombre. En el paso siguiente le sumás el contenido.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleCreateSubmit} className="space-y-4 py-2">
+                        <div className="space-y-2">
+                            <Label htmlFor="name">Nombre</Label>
+                            <Input
+                                id="name"
+                                value={newCampaignData.name}
+                                onChange={e => setNewCampaignData({ ...newCampaignData, name: e.target.value })}
+                                placeholder="Ej.: Promociones de verano"
+                                className="bg-background border-border"
+                                required
+                                autoFocus
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="desc">Descripción (opcional)</Label>
+                            <Input
+                                id="desc"
+                                value={newCampaignData.description}
+                                onChange={e => setNewCampaignData({ ...newCampaignData, description: e.target.value })}
+                                placeholder="Para qué es o dónde se usa"
+                                className="bg-background border-border"
+                            />
+                        </div>
+                        <Button type="submit" className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-white" disabled={createCampaign.isPending}>
+                            {createCampaign.isPending ? 'Creando…' : 'Crear y agregar contenido'}
+                        </Button>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            <SendToScreensModal
+                isOpen={!!sending}
+                onClose={() => setSending(null)}
+                selectedAssets={sending ? [{ id: sending.id, type: 'campaign', name: sending.name }] : []}
+                commerceId={effectiveCommerceId}
+                onSuccess={() => setSending(null)}
+            />
         </div>
     );
 };
