@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Monitor, Save, HardDrive, Clock, Smartphone, Activity, Cpu, PlaySquare, Trash2, AlertTriangle, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Monitor, Save, HardDrive, Clock, Smartphone, Activity, Cpu, PlaySquare, Trash2, AlertTriangle, RotateCcw, Camera } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,8 @@ import { useDisplayMedia } from "@/hooks/use-display-media";
 import { sendDeviceCommand, resetDeviceCommandSecret, DeviceCommand } from "@/lib/displayCommands";
 import { fetchPublishedTvVersion, PublishedTvVersion } from "@/lib/tvUpdate";
 import { DeviceDiagnostics } from "@/components/display/DeviceDiagnostics";
+import { ScreenPhoto } from "@/components/display/ScreenPhoto";
+import { useDeviceScreens } from "@/hooks/use-device-screens";
 
 const TV_RELEASE_PAGE = 'https://github.com/rauli3514/event-pix/releases/tag/tv-latest';
 
@@ -39,6 +41,7 @@ const DisplayDeviceDetail = () => {
     const { id } = useParams<{ id: string }>();
 
     const { data: deviceData, isLoading } = useDisplayDevice(id);
+    const { data: screenShots = {} } = useDeviceScreens(id ? [id] : []);
     const assignContent = useAssignContentToDevice();
     const updateDevice = useUpdateDisplayDevice();
     const deleteAssignment = useDeleteAssignment();
@@ -249,6 +252,31 @@ const DisplayDeviceDetail = () => {
                         
                         {activeTab === 'assignment' && (
                             <>
+                            {/* Foto real de lo que se ve */}
+                        <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl p-6">
+                            <div className="flex items-center gap-2 mb-4">
+                                <Camera className="w-5 h-5 text-indigo-400" />
+                                <h2 className="text-xl font-bold text-white">Lo que se ve ahora</h2>
+                            </div>
+                            <ScreenPhoto
+                                device={deviceData}
+                                screen={screenShots[deviceData.id]}
+                                className="aspect-video rounded-xl"
+                                fallback={
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 px-6 text-center text-sm text-slate-400">
+                                        <Camera className="w-8 h-8 text-slate-600" />
+                                        Todavía no hay foto de esta pantalla. La app del TV manda una cada 5 minutos
+                                        (necesita la versión más nueva de la app).
+                                    </div>
+                                }
+                            />
+                            {screenShots[deviceData.id]?.now_playing?.name && (
+                                <p className="mt-3 text-sm text-slate-400">
+                                    Pasando: <span className="text-white font-medium">{screenShots[deviceData.id]!.now_playing!.name}</span>
+                                </p>
+                            )}
+                        </div>
+
                             {/* Campaign Assignment */}
                         <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl p-6">
                             <div className="flex items-center gap-2 mb-6">

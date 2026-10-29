@@ -9,6 +9,8 @@ import { callTvBridge, hasTvBridgeMethod, onTvBridgeReady } from '@/lib/tvBridge
 import { useLiteMode } from '@/lib/tvPerformance';
 import { useLocalDay } from '@/hooks/use-local-day';
 import { itemsActiveOn } from '@/lib/playlistItems';
+import { setTvDeviceCode } from '@/lib/tvScreenshot';
+import { useScreenReporter } from './useScreenReporter';
 
 // Identidad de Display Digital para las pantallas de espera de la TV. En la app
 // Android el logo sale del APK (WebViewManager intercepta /edm-assets/).
@@ -54,6 +56,9 @@ class WatchdogBoundary extends Component<{children: ReactNode}, {hasError: boole
 // --- Core Player Component ---
 const TvPlayerCore = () => {
     const { deviceCode } = useParams<{ deviceCode: string }>();
+    // Antes de dibujar el contenido: las apps (Etiquetas) lo usan para leer
+    // los precios de este comercio sin sesión.
+    setTvDeviceCode(deviceCode ?? null);
     const [localRotation, setLocalRotation] = useState<number | null>(null);
 
     // 1. Telemetry Engine
@@ -173,6 +178,9 @@ const TvPlayerCore = () => {
         contentKey,
         shuffle
     );
+
+    // Foto de lo que se ve y qué está pasando, para el panel.
+    useScreenReporter(deviceCode, items[currentIndex], status === 'playing' || status === 'offline_playing', lite);
 
     // --- UI Renders ---
     

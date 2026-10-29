@@ -11,6 +11,8 @@ import { describeAlertSchedule, formatDownFor } from '@/lib/screenAlerts';
 import { useAlertSettings } from '@/hooks/use-alert-settings';
 import { AlertSettingsModal } from '@/components/display/AlertSettingsModal';
 import { ContentThumb } from '@/components/display/ContentThumb';
+import { ScreenPhoto } from '@/components/display/ScreenPhoto';
+import { useDeviceScreens } from '@/hooks/use-device-screens';
 import { ChangeScreenContentModal } from '@/components/display/ChangeScreenContentModal';
 import { OnboardingWizardWidget } from '@/components/display/OnboardingWizardWidget';
 
@@ -89,6 +91,15 @@ export default function WorkspaceDashboard() {
     const images = files.filter(m => m.type === 'image' || m.type === 'image_ad').length;
     const videos = files.filter(m => m.type === 'video' || m.type === 'video_ad').length;
     const others = files.length - images - videos;
+
+    // Foto real de cada pantalla y qué estaba pasando según la propia TV
+    // (si reportó hace menos de 15 minutos).
+    const { data: screenShots = {} } = useDeviceScreens(screens.map(d => d.id));
+    const nowName = (d: AnyDevice): string | null => {
+        const shot = screenShots[d.id];
+        if (!shot?.now_playing?.name) return null;
+        return nowMs - new Date(shot.captured_at).getTime() < 15 * 60 * 1000 ? shot.now_playing.name : null;
+    };
 
     const contents = new Map(screens.map(d => [d.id, describeContent(d, now)]));
     const playlistsOnAir = new Set([...contents.values()].map(c => c.campaignNowId).filter(Boolean)).size;
@@ -250,12 +261,15 @@ export default function WorkspaceDashboard() {
                             const isOnline = d.derived_status === 'online';
                             return (
                                 <article key={d.id} className="bg-card border border-border rounded-2xl overflow-hidden flex flex-col">
-                                    <Link to={`/admin/display/${d.id}`} className="relative block aspect-video bg-zinc-900 overflow-hidden group" title="Ver detalles de la pantalla">
-                                        {content.cover ? (
+                                    <ScreenPhoto
+                                        device={d}
+                                        screen={screenShots[d.id]}
+                                        className="aspect-video group"
+                                        fallback={content.cover ? (
                                             <ContentThumb
                                                 large
                                                 item={content.cover}
-                                                className={`w-full h-full ${isOnline ? '' : 'grayscale opacity-60'} group-hover:scale-[1.02] transition-transform`}
+                                                className={`absolute inset-0 w-full h-full ${isOnline ? '' : 'grayscale opacity-60'} group-hover:scale-[1.02] transition-transform`}
                                                 iconClassName="w-8 h-8"
                                             />
                                         ) : (
@@ -263,15 +277,17 @@ export default function WorkspaceDashboard() {
                                                 <MonitorPlay className="w-10 h-10" />
                                             </span>
                                         )}
-                                        <span className="absolute top-2 right-2 rounded-md bg-black/60 px-2 py-0.5 text-xs font-medium text-white">
+                                    >
+                                        <Link to={`/admin/display/${d.id}`} className="absolute inset-0" title="Ver detalles de la pantalla" aria-label={`Ver detalles de ${screenName(d)}`} />
+                                        <span className="absolute top-2 right-2 rounded-md bg-black/60 px-2 py-0.5 text-xs font-medium text-white pointer-events-none">
                                             {isPortrait(d) ? 'Vertical' : 'Horizontal'}
                                         </span>
-                                        {content.title && (
-                                            <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-3 pt-6 pb-2 text-sm font-medium text-white truncate">
-                                                {isOnline ? 'Ahora' : 'Último'}: {content.title}
+                                        {(nowName(d) || content.title) && (
+                                            <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent pl-3 pr-28 pt-6 pb-2 text-sm font-medium text-white truncate pointer-events-none">
+                                                {isOnline ? 'Ahora' : 'Último'}: {nowName(d) || content.title}
                                             </span>
                                         )}
-                                    </Link>
+                                    </ScreenPhoto>
                                     <div className="p-4 flex-1 flex flex-col gap-3">
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-2">
