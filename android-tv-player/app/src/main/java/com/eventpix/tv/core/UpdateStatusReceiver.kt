@@ -31,7 +31,15 @@ class UpdateStatusReceiver : BroadcastReceiver() {
             // (MY_PACKAGE_REPLACED) vuelve a abrir la app.
             PackageInstaller.STATUS_SUCCESS -> Log.i("UpdateStatusReceiver", "Actualización instalada")
             else -> {
-                val message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: "Instalación cancelada o fallida ($status)"
+                val detail = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)
+                val message = when (status) {
+                    PackageInstaller.STATUS_FAILURE_CONFLICT ->
+                        "La versión nueva tiene otra firma: hay que desinstalar la app e instalarla a mano una vez"
+                    PackageInstaller.STATUS_FAILURE_ABORTED -> "Instalación cancelada"
+                    PackageInstaller.STATUS_FAILURE_STORAGE -> "No hay lugar para instalar la actualización"
+                    PackageInstaller.STATUS_FAILURE_BLOCKED -> "Android bloqueó la instalación (revisá 'instalar apps desconocidas')"
+                    else -> detail ?: "Instalación fallida ($status)"
+                }
                 Log.w("UpdateStatusReceiver", "Actualización no instalada: $message")
                 MainActivity.emitToWebFromAnywhere(
                     "tvupdate",

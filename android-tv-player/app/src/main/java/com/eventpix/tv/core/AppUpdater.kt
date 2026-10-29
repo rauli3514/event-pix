@@ -114,6 +114,13 @@ class AppUpdater(
                     ?: throw IllegalStateException("El archivo descargado no es un APK válido")
                 if (archive.packageName != context.packageName) throw IllegalStateException("El APK es de otra app")
                 if (versionCodeOf(archive) <= current.getLong("code")) throw IllegalStateException("El APK no es más nuevo")
+                // Android rechaza la actualización si el APK está firmado con otra
+                // clave: se avisa con un mensaje claro en vez de un error genérico.
+                if (!sameSigner(apk)) {
+                    throw IllegalStateException(
+                        "La versión nueva tiene otra firma: hay que desinstalar la app e instalarla a mano una vez"
+                    )
+                }
 
                 emit("installing", JSONObject().put("current", current).put("latest", latest))
                 install(apk)
@@ -123,6 +130,24 @@ class AppUpdater(
             } finally {
                 busy = false
             }
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun signaturesOf(info: PackageInfo?): Set<String> =
+        info?.signatures?.map { it.toCharsString() }?.toSet() ?: emptySet()
+
+    // ¿El APK descargado está firmado igual que la app instalada? Si no se
+    // puede saber (algún Android no lee firmas de archivos), se deja intentar.
+    @Suppress("DEPRECATION")
+    private fun sameSigner(apk: File): Boolean {
+        return try {
+            val pm = context.packageManager
+            val installed = signaturesOf(pm.getPackageInfo(context.packageName, android.content.pm.PackageManager.GET_SIGNATURES))
+            val downloaded = signaturesOf(pm.getPackageArchiveInfo(apk.path, android.content.pm.PackageManager.GET_SIGNATURES))
+            installed.isEmpty() || downloaded.isEmpty() || installed == downloaded
+        } catch (e: Exception) {
+            true
         }
     }
 
