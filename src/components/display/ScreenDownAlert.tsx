@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { useDownScreens } from '@/hooks/use-down-screens';
+import { useDownScreensState } from '@/hooks/use-down-screens';
 import { downScreensKey, formatDownFor } from '@/lib/screenAlerts';
 
 const HIDDEN_KEY = 'display_down_alert_hidden';
@@ -18,15 +18,17 @@ interface Props {
 // Cartel arriba del panel con las pantallas caídas, aviso emergente cuando se
 // cae una mientras el panel está abierto y contador en el título de la pestaña.
 export function ScreenDownAlert({ commerceId, showCommerce, className = 'mx-4 mt-4 md:mx-8' }: Props) {
-    const down = useDownScreens(commerceId);
+    const { screens: down, loaded } = useDownScreensState(commerceId);
     const key = downScreensKey(down);
     const [hiddenKey, setHiddenKey] = useState(() => {
         try { return sessionStorage.getItem(HIDDEN_KEY) || ''; } catch { return ''; }
     });
 
-    // Aviso emergente solo para las que se caen con el panel abierto (no al entrar).
+    // Aviso emergente solo para las que se caen con el panel abierto: la primera
+    // lista que llega (las que ya estaban caídas al entrar) es la base.
     const knownRef = useRef<Set<string> | null>(null);
     useEffect(() => {
+        if (!loaded) return;
         const ids = new Set(down.map(s => s.id));
         if (knownRef.current) {
             for (const screen of down) {
@@ -39,7 +41,7 @@ export function ScreenDownAlert({ commerceId, showCommerce, className = 'mx-4 mt
             }
         }
         knownRef.current = ids;
-    }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [key, loaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // "(2) Título": se ve aunque la pestaña esté en segundo plano.
     useEffect(() => {
