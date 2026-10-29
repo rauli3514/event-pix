@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -21,6 +21,8 @@ export interface DynamicMenuConfig {
     labels: DynamicLabel[];
     // Planilla de Google con los precios (columna A nombre, B precio).
     sheetUrl?: string;
+    // Formato del diseño: horizontal (16:9, por defecto) o vertical (9:16).
+    orientation?: 'landscape' | 'portrait';
 }
 
 const FONTS = [
@@ -193,6 +195,27 @@ export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Part
         <div className="flex flex-col gap-6 h-full pb-10">
             {/* Editor Panel */}
             <div className="flex flex-col gap-4 h-full overflow-y-auto pr-2">
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                    <h3 className="font-semibold text-white mb-1">Formato de la pantalla</h3>
+                    <p className="text-xs text-slate-400 mb-3">Elegí cómo está la TV donde se va a ver. Así el diseño ocupa toda la pantalla.</p>
+                    <div className="grid grid-cols-2 gap-2">
+                        {([['landscape', 'Horizontal', 'w-10 h-6'], ['portrait', 'Vertical', 'w-6 h-10']] as const).map(([value, text, shape]) => {
+                            const active = (config.orientation || 'landscape') === value;
+                            return (
+                                <button
+                                    key={value}
+                                    type="button"
+                                    onClick={() => onChange({ ...config, orientation: value })}
+                                    className={cn("flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm font-medium", active ? "border-emerald-500 bg-emerald-500/10 text-white" : "border-slate-700 text-slate-400 hover:text-white")}
+                                >
+                                    <span className={cn("rounded-sm border-2 border-current shrink-0", shape)} />
+                                    {text}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
                 <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
                     <h3 className="font-semibold text-white mb-4">Fondo del Menú</h3>
                     {config.backgroundMediaUrl ? (
@@ -415,6 +438,27 @@ export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Part
 export const DynamicMenuPreview = ({ config, onChange, isEditing = false, commerceId }: { config: Partial<DynamicMenuConfig>, onChange?: (c: Partial<DynamicMenuConfig>) => void, isEditing?: boolean, commerceId?: string }) => {
     const labels = config.labels || [];
     const containerRef = useRef<HTMLDivElement>(null);
+    // El diseño tiene un formato fijo (16:9 o 9:16) y se agranda lo más posible
+    // dentro de la pantalla sin recortarse; el espacio que sobra se rellena con
+    // el mismo fondo oscurecido.
+    const outerRef = useRef<HTMLDivElement>(null);
+    const [outer, setOuter] = useState({ width: 0, height: 0 });
+    useEffect(() => {
+        const el = outerRef.current;
+        if (!el) return;
+        const observer = new ResizeObserver(entries => {
+            const rect = entries[0].contentRect;
+            setOuter({ width: rect.width, height: rect.height });
+        });
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, []);
+    const ratio = config.orientation === 'portrait' ? 9 / 16 : 16 / 9;
+    const stageWidth = Math.min(outer.width, outer.height * ratio);
+    const stageHeight = stageWidth / ratio;
+    // Tamaño de letra: % del ancho del diseño (igual que antes con cqw, pero
+    // calculado acá para que ande también en TVs con navegadores viejos).
+    const fontPx = (size: number) => `${(size * stageWidth) / 100}px`;
     const params = useParams<{ commerceId: string }>();
     const effectiveCommerceId = commerceId || params.commerceId || '';
     // Precios en vivo: planilla de Google conectada o página Etiquetas (por nombre).
@@ -441,16 +485,14 @@ export const DynamicMenuPreview = ({ config, onChange, isEditing = false, commer
     };
 
     return (
-        <div className="w-full h-full bg-black flex items-center justify-center overflow-hidden">
+        <div ref={outerRef} className="relative w-full h-full bg-black flex items-center justify-center overflow-hidden">
+            {config.backgroundMediaUrl && config.backgroundMediaType !== 'video' && (
+                <img src={config.backgroundMediaUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30" />
+            )}
             <div 
                 ref={containerRef} 
                 className="relative bg-black overflow-hidden flex-shrink-0" 
-                style={{ 
-                    aspectRatio: '16/9',
-                    width: '100%',
-                    maxHeight: '100%',
-                    containerType: 'inline-size'
-                }}
+                style={{ width: stageWidth || '100%', height: stageHeight || '100%' }}
             >
                 {config.backgroundMediaUrl && (
                     config.backgroundMediaType === 'video' ? (
@@ -525,7 +567,7 @@ export const DynamicMenuPreview = ({ config, onChange, isEditing = false, commer
                                         transform: 'translate(-50%, -50%)',
                                         color: label.color,
                                         fontFamily: label.fontFamily,
-                                        fontSize: `${label.fontSize}cqw`,
+                                        fontSize: fontPx(label.fontSize),
                                         fontWeight: label.fontWeight,
                                         fontStyle: label.fontStyle,
                                         textShadow: '0px 4px 15px rgba(0,0,0,0.9), 0px 0px 8px rgba(0,0,0,0.8)',
@@ -586,7 +628,7 @@ export const DynamicMenuPreview = ({ config, onChange, isEditing = false, commer
                                 transform: 'translate(-50%, -50%)',
                                 color: label.color,
                                 fontFamily: label.fontFamily,
-                                fontSize: `${label.fontSize}cqw`,
+                                fontSize: fontPx(label.fontSize),
                                 fontWeight: label.fontWeight,
                                 fontStyle: label.fontStyle,
                                 textShadow: '0px 2px 10px rgba(0,0,0,0.8)'
