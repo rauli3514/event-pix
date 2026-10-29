@@ -4,6 +4,16 @@ import { Settings, RefreshCw, Unlink, Trash2, X, Info, Power, Monitor, Clock, Sh
 
 import { callTvBridge, exitAndroidApp, getTvAppVersion, hasTvBridgeMethod, onTvBridgeReady, openHomeSettings, openWifiSettings } from '@/lib/tvBridge';
 import { checkTvUpdate, startTvUpdate, supportsTvUpdate, TvUpdateStatus, useTvUpdateStatus } from '@/lib/tvUpdate';
+import { LiteSetting, setLiteSetting, useLiteMode } from '@/lib/tvPerformance';
+
+// Texto de la opción "Modo liviano": qué está elegido y si está activo ahora.
+function liteLabel(setting: LiteSetting, lite: boolean, memoryMb: number | null): string {
+    if (setting === 'on') return 'Modo liviano: ON';
+    if (setting === 'off') return 'Modo liviano: OFF';
+    const ram = memoryMb ? `, ${Math.round(memoryMb)} MB de RAM` : '';
+    return `Modo liviano: AUTO (${lite ? 'activo' : 'inactivo'}${ram})`;
+}
+const NEXT_LITE: Record<LiteSetting, LiteSetting> = { auto: 'on', on: 'off', off: 'auto' };
 
 // Texto y acción de la opción "Actualizar app" según el estado que informa la app.
 function updateMenuItem(status: TvUpdateStatus): { label: string; action: () => void } {
@@ -44,6 +54,7 @@ export const TvSettingsMenu = ({ deviceCode, onRefresh }: TvSettingsMenuProps) =
     // null = esta app no maneja el permiso (navegador, kiosco o Android viejo).
     const [canAutoStart, setCanAutoStart] = useState<boolean | null>(null);
     const updateStatus = useTvUpdateStatus();
+    const liteMode = useLiteMode();
     const [canUpdate, setCanUpdate] = useState(false);
 
     const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -127,6 +138,14 @@ export const TvSettingsMenu = ({ deviceCode, onRefresh }: TvSettingsMenuProps) =
             }
         },
         {
+            // Equipos con poca memoria: menos contenido cargado a la vez y
+            // transiciones simples (ver tvPerformance.ts).
+            id: 'lite_mode',
+            label: liteLabel(liteMode.setting, liteMode.lite, liteMode.memoryMb),
+            icon: <Zap className={`w-5 h-5 ${liteMode.lite ? 'text-emerald-400' : ''}`} />,
+            action: () => setLiteSetting(NEXT_LITE[liteMode.setting])
+        },
+        {
             id: 'keepawake',
             label: `Mantener Despierto: ${keepAwake ? 'ON' : 'OFF'}`,
             icon: <Zap className="w-5 h-5" />,
@@ -185,7 +204,7 @@ export const TvSettingsMenu = ({ deviceCode, onRefresh }: TvSettingsMenuProps) =
             label: 'Información del Sistema',
             icon: <Info className="w-5 h-5" />,
             action: () => {
-                alert(`Device ID: ${deviceCode}\nApp TV: ${getTvAppVersion() ?? 'no disponible'}\nResolución: ${window.innerWidth}x${window.innerHeight}`);
+                alert(`Device ID: ${deviceCode}\nApp TV: ${getTvAppVersion() ?? 'no disponible'}\nResolución: ${window.innerWidth}x${window.innerHeight}\nModo liviano: ${liteMode.lite ? 'activo' : 'inactivo'}${liteMode.memoryMb ? ` (RAM ${Math.round(liteMode.memoryMb)} MB)` : ''}`);
             }
         },
         {

@@ -6,6 +6,7 @@ import { useSyncEngine } from './useSyncEngine';
 import { MediaRenderer } from './MediaRenderer';
 import { usePlaylistRotation } from '@/hooks/use-playlist-rotation';
 import { callTvBridge, hasTvBridgeMethod, onTvBridgeReady } from '@/lib/tvBridge';
+import { useLiteMode } from '@/lib/tvPerformance';
 
 // Identidad de Display Digital para las pantallas de espera de la TV. En la app
 // Android el logo sale del APK (WebViewManager intercepta /edm-assets/).
@@ -69,6 +70,9 @@ const TvPlayerCore = () => {
         contentKey,
         shuffle
     } = useSyncEngine(deviceCode, sendHeartbeat);
+
+    // Modo liviano en equipos con poca memoria (ver tvPerformance.ts).
+    const { lite } = useLiteMode();
 
     // 3. System Events (Rotation, Online status & Secret Exit)
     useEffect(() => {
@@ -286,6 +290,7 @@ const TvPlayerCore = () => {
                 onVideoEnded={onVideoEnded}
                 onVideoError={onVideoError}
                 onVideoDuration={onVideoDuration}
+                lite={lite}
             />
             <TvSettingsMenu deviceCode={deviceCode!} onRefresh={() => fetchCampaign()} />
         </div>

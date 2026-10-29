@@ -1,6 +1,7 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
 import { PlayerRenderer } from '@/components/display/PlayerRenderer';
 import { CampaignItem } from '@/types/display';
+import { isCheapItem } from '@/lib/tvPerformance';
 
 interface Props {
     items: CampaignItem[];
@@ -12,6 +13,8 @@ interface Props {
     onVideoEnded: (index: number) => boolean;
     onVideoError: (index: number) => void;
     onVideoDuration: (index: number, seconds: number) => void;
+    // Modo liviano (equipos con poca memoria, ver tvPerformance.ts).
+    lite?: boolean;
 }
 
 interface State {
@@ -42,7 +45,7 @@ export class MediaErrorBoundary extends Component<{children: ReactNode, onError:
     }
 }
 
-export function MediaRenderer({ items, currentIndex, prevIndex: prevProp, nextIndex: nextProp, deviceCommerceId, onVideoEnded, onVideoError, onVideoDuration }: Props) {
+export function MediaRenderer({ items, currentIndex, prevIndex: prevProp, nextIndex: nextProp, deviceCommerceId, onVideoEnded, onVideoError, onVideoDuration, lite }: Props) {
     if (!items || items.length === 0) return null;
 
     const prevIndex = prevProp ?? (items.length > 1 ? (currentIndex - 1 + items.length) % items.length : -1);
@@ -59,6 +62,12 @@ export function MediaRenderer({ items, currentIndex, prevIndex: prevProp, nextIn
                 if (!isActive && !isPrev && !isNext && items.length > 3) {
                     return null;
                 }
+                // Modo liviano: fuera de pantalla solo quedan imágenes y textos. Un
+                // video, una web o una app montados de fondo ocupan memoria y CPU
+                // (decodificador, JavaScript corriendo) aunque no se vean.
+                if (lite && !isActive && (!(isPrev || isNext) || !isCheapItem(item.type as string))) {
+                    return null;
+                }
 
                 return (
                     <MediaErrorBoundary 
@@ -71,6 +80,7 @@ export function MediaRenderer({ items, currentIndex, prevIndex: prevProp, nextIn
                             item={item} 
                             isActive={isActive} 
                             isPrev={isPrev}
+                            lite={lite}
                             commerceId={deviceCommerceId}
                             nativeLoop={items.length === 1 && (item as any).loop !== false}
                             onVideoEnded={() => onVideoEnded(index)}
