@@ -22,7 +22,26 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Firma de los APK publicados. Tiene que ser SIEMPRE la misma: Android solo
+    // deja actualizar una app con un APK firmado con la misma clave. El
+    // workflow "APK de la TV" pasa la clave con -PtvKeystore=<archivo> (antes se
+    // usaba la clave de depuración automática, que cambiaba en cada compilación).
+    val tvKeystore = (project.findProperty("tvKeystore") as String?)?.let { file(it) }
+    signingConfigs {
+        if (tvKeystore != null) {
+            create("tv") {
+                storeFile = tvKeystore
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            if (tvKeystore != null) signingConfig = signingConfigs.getByName("tv")
+        }
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

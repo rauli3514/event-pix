@@ -29,7 +29,11 @@ function updateMenuItem(status: TvUpdateStatus): { label: string; action: () => 
         case 'up_to_date':
             return { label: `App al día${current}`, action: checkTvUpdate };
         case 'error':
-            return { label: 'Actualización: error, reintentar', action: checkTvUpdate };
+            // El motivo (ej. "otra firma: hay que reinstalar a mano") ayuda más que "error".
+            return {
+                label: `Actualización: ${status.message ? status.message.slice(0, 90) : 'error'} · reintentar`,
+                action: checkTvUpdate
+            };
         default:
             return { label: 'Buscando actualización…', action: checkTvUpdate };
     }

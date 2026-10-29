@@ -59,18 +59,32 @@ jobs:
           path: tv-debug.keystore
           key: tv-debug-keystore-v1
 
-      # Siempre la misma firma: cada APK se instala encima del anterior sin
-      # perder el código de la pantalla ni sus ajustes.
-      - name: Crear la firma si no existe
+      # Siempre la misma firma: Android solo deja actualizar la app con un APK
+      # firmado con la misma clave (si cambia, cada TV hay que reinstalarla a mano).
+      # La clave sale del secreto TV_KEYSTORE_B64 si existe; si no, de la caché.
+      # Su huella (pública) está anotada en android-tv-player/signing-cert-sha256.txt:
+      # si no coincide, no se publica nada.
+      - name: Preparar la firma
+        env:
+          TV_KEYSTORE_B64: ${{ secrets.TV_KEYSTORE_B64 }}
         run: |
-          if [ ! -f tv-debug.keystore ]; then
+          if [ -n "$TV_KEYSTORE_B64" ]; then
+            echo "$TV_KEYSTORE_B64" | base64 -d > tv-debug.keystore
+          elif [ ! -f tv-debug.keystore ]; then
             echo "::warning::No había firma en caché: se crea una nueva. Las TVs con un APK firmado con otra clave necesitan reinstalarlo a mano una vez."
             keytool -genkeypair -keystore tv-debug.keystore -storepass android \
               -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
               -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
-          mkdir -p ~/.android
-          cp tv-debug.keystore ~/.android/debug.keystore
+          KEY_SHA=$(keytool -list -v -keystore tv-debug.keystore -storepass android -alias androiddebugkey \
+            | grep -m1 'SHA256:' | awk '{print $2}')
+          echo "Huella de la firma: $KEY_SHA"
+          echo "KEY_SHA=$KEY_SHA" >> "$GITHUB_ENV"
+          EXPECTED=$(tr -d '[:space:]' < android-tv-player/signing-cert-sha256.txt 2>/dev/null || true)
+          if [ -n "$EXPECTED" ] && [ "$EXPECTED" != "$KEY_SHA" ]; then
+            echo "::error::La firma no es la anotada en signing-cert-sha256.txt ($EXPECTED). Las TVs no podrían actualizarse: no se publica."
+            exit 1
+          fi
 
       - name: Compilar el APK
         working-directory: android-tv-player
@@ -78,10 +92,20 @@ jobs:
           chmod +x gradlew
           # lintDebug: funciones de Android que no existen en equipos viejos (NewApi).
           # testDebugUnitTest: pruebas de la app (por ejemplo, rangos de video de MediaCache).
-          ./gradlew lintDebug testDebugUnitTest assembleDebug --no-daemon --stacktrace -PtvBuildNumber=${{ github.run_number }}
+          ./gradlew lintDebug testDebugUnitTest assembleDebug --no-daemon --stacktrace \
+            -PtvBuildNumber=${{ github.run_number }} -PtvKeystore="$GITHUB_WORKSPACE/tv-debug.keystore"
           cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/eventpix-tv.apk"
           echo "VERSION_CODE=$((100 + ${{ github.run_number }}))" >> "$GITHUB_ENV"
           echo "VERSION_NAME=2.3.${{ github.run_number }}" >> "$GITHUB_ENV"
+
+      - name: Verificar que el APK quedó firmado con esa clave
+        run: |
+          APK_SHA=$(keytool -printcert -jarfile eventpix-tv.apk | grep -m1 'SHA256:' | awk '{print $2}')
+          echo "Huella del APK: $APK_SHA"
+          if [ "$APK_SHA" != "$KEY_SHA" ]; then
+            echo "::error::El APK está firmado con otra clave ($APK_SHA, se esperaba $KEY_SHA)."
+            exit 1
+          fi
 
       - name: Reporte de lint
         if: failure()
@@ -111,6 +135,7 @@ jobs:
             "sha256": "$SHA256",
             "size": $SIZE,
             "commit": "${GITHUB_SHA::7}",
+            "signer": "$KEY_SHA",
             "publishedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           }
           EOF
