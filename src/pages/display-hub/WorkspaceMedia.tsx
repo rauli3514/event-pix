@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -47,7 +47,9 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
     const { commerceId } = useParams<{ commerceId: string }>();
     const isAppsPage = initialCategory === 'apps';
     const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid');
-    const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+    // ?subir=1 (botón "Subir contenido" de Inicio) abre directo la subida.
+    const [searchParams] = useSearchParams();
+    const [isUploadModalOpen, setIsUploadModalOpen] = useState(() => searchParams.get('subir') === '1');
     const [uploadCategory, setUploadCategory] = useState<CategoryId>('all');
     const [isAppCatalogOpen, setIsAppCatalogOpen] = useState(false);
     const [activeCategory, setActiveCategory] = useState<CategoryId>(initialCategory);

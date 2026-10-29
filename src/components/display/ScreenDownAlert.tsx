@@ -13,11 +13,13 @@ interface Props {
     // Mostrar el nombre del negocio (vista de todos los negocios).
     showCommerce?: boolean;
     className?: string;
+    // Sin cartel (la página ya muestra las caídas); siguen el aviso emergente y el título.
+    hideBanner?: boolean;
 }
 
 // Cartel arriba del panel con las pantallas caídas, aviso emergente cuando se
 // cae una mientras el panel está abierto y contador en el título de la pestaña.
-export function ScreenDownAlert({ commerceId, showCommerce, className = 'mx-4 mt-4 md:mx-8' }: Props) {
+export function ScreenDownAlert({ commerceId, showCommerce, className = 'mx-4 mt-4 md:mx-8', hideBanner }: Props) {
     const { screens: down, loaded } = useDownScreensState(commerceId);
     const key = downScreensKey(down);
     const [hiddenKey, setHiddenKey] = useState(() => {
@@ -50,7 +52,7 @@ export function ScreenDownAlert({ commerceId, showCommerce, className = 'mx-4 mt
         return () => { document.title = document.title.replace(/^\(\d+\) /, ''); };
     }, [down.length]);
 
-    if (down.length === 0 || key === hiddenKey) return null;
+    if (hideBanner || down.length === 0 || key === hiddenKey) return null;
 
     const hide = () => {
         setHiddenKey(key);

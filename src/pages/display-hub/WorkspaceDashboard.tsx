@@ -1,238 +1,286 @@
-import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useCommerces, useDisplayDevices, useDisplayCampaigns, useDisplaySchedules } from '@/hooks/use-display-hub';
-import { useDisplayMedia } from '@/hooks/use-display-media';
-import { Monitor, ListVideo, Rocket, ChevronRight, CheckCircle2, CloudOff, CalendarClock, HardDrive, MonitorPlay, Smartphone } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
-import { Button } from '@/components/ui/button';
+import { useMemo, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { CalendarClock, ChevronDown, FolderOpen, ListVideo, MonitorPlay, Plus, RefreshCw, Upload } from 'lucide-react';
 
+import { Button } from '@/components/ui/button';
+import { useDisplayCampaigns, useDisplayDevices, useDisplaySchedules } from '@/hooks/use-display-hub';
+import { useDisplayMedia } from '@/hooks/use-display-media';
+import { assignmentContentNow } from '@/lib/displaySchedule';
+import { playlistItems } from '@/lib/playlistItems';
+import { formatDownFor } from '@/lib/screenAlerts';
+import { ContentThumb } from '@/components/display/ContentThumb';
+import { ChangeScreenContentModal } from '@/components/display/ChangeScreenContentModal';
 import { OnboardingWizardWidget } from '@/components/display/OnboardingWizardWidget';
 
-export default function WorkspaceDashboard() {
-    const { commerceId } = useParams();
-    const navigate = useNavigate();
-    const [greeting, setGreeting] = useState('Administrador');
-    
-    useEffect(() => {
-        supabase.auth.getUser().then(({ data: { user } }) => {
-            if (user?.user_metadata?.full_name) {
-                setGreeting(user.user_metadata.full_name.split(' ')[0]);
-            }
-        });
-    }, []);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyDevice = any;
 
-    const { data: commerces } = useCommerces();
-    const { data: devices = [] } = useDisplayDevices(commerceId);
+const MAX_DOWN_LISTED = 4;
+
+const screenName = (d: AnyDevice) => d.name || `Pantalla ${d.device_id}`;
+const isPortrait = (d: AnyDevice) => d.orientation === 'portrait' || d.orientation === '90' || d.orientation === '270';
+
+// "sin señal hace 2 h" / "nunca se conectó"
+function downText(d: AnyDevice, now: number): string {
+    if (!d.last_seen) return 'nunca se conectó';
+    return `sin señal ${formatDownFor(Math.max(0, now - new Date(d.last_seen).getTime()))}`;
+}
+
+// Lo que pasa una pantalla, listo para mostrar.
+function describeContent(d: AnyDevice, now: Date) {
+    const { campaign, media, schedule } = assignmentContentNow(d.assignment, now);
+    const items = campaign ? playlistItems(campaign.items_json) : media ? [media] : [];
+    const title = campaign?.name || media?.name || null;
+    let detail = 'Sin contenido asignado';
+    if (schedule) detail = `Programación: ${schedule.name || 'sin nombre'}`;
+    else if (campaign) detail = `Playlist: ${campaign.name}`;
+    else if (media) detail = `Archivo: ${media.name}`;
+    return { title, detail, cover: items[0] || null, campaignId: d.assignment?.campaign_id || null, scheduleId: d.assignment?.schedule_id || null, campaignNowId: campaign?.id || null };
+}
+
+function WhatToDo({ device }: { device: AnyDevice }) {
+    return (
+        <ol className="mt-2 space-y-1 text-sm text-foreground/80 list-decimal pl-5">
+            <li>Fijate que el equipo esté prendido y la TV en la entrada HDMI correcta.</li>
+            <li>Revisá que tenga internet (el Wi-Fi del local o el cable).</li>
+            <li>Desenchufalo 10 segundos y volvé a enchufarlo.</li>
+            <li>
+                Si sigue igual,{' '}
+                <Link to={`/admin/display/${device.id}`} className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline">mirá los detalles del equipo</Link>.
+            </li>
+        </ol>
+    );
+}
+
+// Inicio: cómo están las pantallas ahora y qué pasa cada una.
+export default function WorkspaceDashboard() {
+    const { commerceId = '' } = useParams<{ commerceId: string }>();
+    const { data: devices = [], isLoading } = useDisplayDevices(commerceId);
     const { data: campaigns = [] } = useDisplayCampaigns(commerceId);
     const { data: media = [] } = useDisplayMedia(commerceId);
     const { data: schedules = [] } = useDisplaySchedules(commerceId);
-    
-    const commerce = commerces?.find(c => c.id === commerceId);
-    
-    const onlineDevices = devices.filter(d => (d as any).derived_status === 'online').length;
-    const offlineDevices = devices.filter(d => (d as any).derived_status === 'offline').length;
-    
-    const imageMediaCount = media.filter(m => m.type === 'image' || m.type === 'image_ad').length;
-    const videoMediaCount = media.filter(m => m.type === 'video' || m.type === 'video_ad').length;
 
-    const activeSchedulesCount = schedules.length;
+    const [openHelp, setOpenHelp] = useState<string | null>(null);
+    const [changing, setChanging] = useState<AnyDevice | null>(null);
+    const [showAllDown, setShowAllDown] = useState(false);
 
-    const recentCampaigns = [...campaigns].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 3);
-    const upcomingSchedules = [...schedules].sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()).slice(0, 3);
+    const now = new Date();
+    const nowMs = now.getTime();
+
+    const screens = useMemo(() => (devices as AnyDevice[])
+        .filter(d => d.pairing_status === 'linked')
+        .sort((a, b) => {
+            const onlineA = a.derived_status === 'online' ? 0 : 1;
+            const onlineB = b.derived_status === 'online' ? 0 : 1;
+            return onlineA - onlineB || screenName(a).localeCompare(screenName(b));
+        }), [devices]);
+    const waiting = (devices as AnyDevice[]).filter(d => d.pairing_status === 'pending').length;
+    const online = screens.filter(d => d.derived_status === 'online');
+    const down = screens
+        .filter(d => d.derived_status !== 'online')
+        .sort((a, b) => (b.last_seen || '').localeCompare(a.last_seen || ''));
+    const downListed = showAllDown ? down : down.slice(0, MAX_DOWN_LISTED);
+
+    const files = media.filter(m => m.type !== 'folder');
+    const images = files.filter(m => m.type === 'image' || m.type === 'image_ad').length;
+    const videos = files.filter(m => m.type === 'video' || m.type === 'video_ad').length;
+    const others = files.length - images - videos;
+
+    const contents = new Map(screens.map(d => [d.id, describeContent(d, now)]));
+    const playlistsOnAir = new Set([...contents.values()].map(c => c.campaignNowId).filter(Boolean)).size;
+    const screensWithSchedule = screens.filter(d => d.assignment?.schedule_id).length;
+
+    const base = `/admin/display/commerce/${commerceId}/workspace`;
+    const setupPending = !isLoading && (screens.length === 0 || files.length === 0 || campaigns.length === 0);
 
     return (
-        <div className="p-6 md:p-10 space-y-8 animate-in fade-in duration-500 w-full max-w-7xl mx-auto">
-            {/* Top Banner (Hero) */}
-            <div className="relative overflow-hidden rounded-3xl bg-black border border-border shadow-2xl min-h-[160px] md:min-h-[240px] flex items-center">
-                <div 
-                    className="absolute inset-0 bg-contain md:bg-cover sm:bg-[length:auto_100%] bg-right bg-no-repeat pointer-events-none opacity-80 sm:opacity-100"
-                    style={{ backgroundImage: 'url("/banner-dashboard.PNG")' }}
-                >
-                    <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent"></div>
+        <div className="p-4 md:p-8 w-full max-w-7xl mx-auto space-y-6">
+            {/* Encabezado */}
+            <div className="flex flex-wrap items-end justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Inicio</h1>
+                    <p className="text-muted-foreground mt-1">Así están tus pantallas ahora.</p>
                 </div>
-                
-                <div className="relative z-10 p-6 md:p-12 lg:p-16 flex flex-col items-start w-full">
-                    <h1 className="text-2xl md:text-4xl font-extrabold text-white mb-2 tracking-tight">
-                        ¡Hola, {greeting}!
-                    </h1>
-                    <p className="text-gray-300 text-sm md:text-base mb-4 md:mb-6 max-w-md">
-                        {commerce?.name || 'Administrador'}
-                    </p>
-                    <Button 
-                        onClick={() => navigate(`/admin/display/commerce/${commerceId}/workspace/playlists`)}
-                        className="bg-white hover:bg-gray-200 text-black rounded-full px-4 md:px-5 py-4 md:py-5 text-xs md:text-base font-bold shadow-lg shadow-white/10 transition-all hover:scale-105"
-                    >
-                        Crear Contenido <Rocket className="w-4 h-4 md:w-5 md:h-5 ml-2 text-indigo-600" />
+                <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" asChild className="h-11 px-4">
+                        <Link to={`${base}/library?subir=1`}><Upload className="w-4 h-4 mr-2" /> Subir contenido</Link>
+                    </Button>
+                    <Button asChild className="h-11 px-4 bg-indigo-600 hover:bg-indigo-700 text-white">
+                        <Link to={`${base}/playlists?nueva=1`}><Plus className="w-4 h-4 mr-2" /> Nueva playlist</Link>
                     </Button>
                 </div>
             </div>
 
-            {/* Quick Stats Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-card border border-border rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
-                    <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-muted-foreground text-sm font-medium">Equipos</h3>
-                        <div className="p-2 bg-blue-500/10 rounded-lg"><Monitor className="w-4 h-4 text-blue-500" /></div>
-                    </div>
-                    <p className="text-2xl font-bold text-foreground mb-1">{devices.length}</p>
-                    <div className="flex items-center text-xs gap-2">
-                        <span className="text-emerald-500 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> {onlineDevices} online</span>
-                        <span className="text-rose-500 flex items-center gap-1"><CloudOff className="w-3 h-3" /> {offlineDevices} offline</span>
-                    </div>
-                </div>
-                <div className="bg-card border border-border rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
-                    <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-muted-foreground text-sm font-medium">Contenido</h3>
-                        <div className="p-2 bg-purple-500/10 rounded-lg"><HardDrive className="w-4 h-4 text-purple-500" /></div>
-                    </div>
-                    <p className="text-2xl font-bold text-foreground mb-1">{media.length}</p>
-                    <div className="flex items-center text-xs text-muted-foreground gap-2">
-                        <span>{imageMediaCount} img</span>
-                        <span>&bull;</span>
-                        <span>{videoMediaCount} vid</span>
-                    </div>
-                </div>
-                <div className="bg-card border border-border rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
-                    <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-muted-foreground text-sm font-medium">Playlists</h3>
-                        <div className="p-2 bg-fuchsia-500/10 rounded-lg"><ListVideo className="w-4 h-4 text-fuchsia-500" /></div>
-                    </div>
-                    <p className="text-2xl font-bold text-foreground mb-1">{campaigns.length}</p>
-                    <p className="text-xs text-muted-foreground">Listas listas para emitir</p>
-                </div>
-                <div className="bg-card border border-border rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
-                    <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-muted-foreground text-sm font-medium">Programaciones</h3>
-                        <div className="p-2 bg-amber-500/10 rounded-lg"><CalendarClock className="w-4 h-4 text-amber-500" /></div>
-                    </div>
-                    <p className="text-2xl font-bold text-foreground mb-1">{activeSchedulesCount}</p>
-                    <p className="text-xs text-muted-foreground">Schedules configurados</p>
-                </div>
-            </div>
+            {/* Estado + resumen */}
+            <div className="flex flex-wrap gap-5">
+                <section className="flex-[2_1_420px] bg-card border border-border rounded-2xl p-5 md:p-6 space-y-4">
+                    {isLoading ? (
+                        <p className="text-muted-foreground">Cargando pantallas…</p>
+                    ) : screens.length === 0 ? (
+                        <div>
+                            <p className="text-xl font-semibold">Todavía no tenés pantallas vinculadas</p>
+                            <p className="text-muted-foreground mt-1">Prendé el equipo, anotá el código que aparece en la TV y vinculalo desde{' '}
+                                <Link to={`${base}/screens`} className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline">Pantallas</Link>.
+                            </p>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                                <span className="text-4xl font-extrabold tracking-tight">{online.length} de {screens.length}</span>
+                                <span className="text-lg text-muted-foreground">{screens.length === 1 ? 'pantalla funcionando' : 'pantallas funcionando'}</span>
+                            </div>
+                            <div className="flex gap-1 h-2.5" aria-hidden>
+                                {screens.map((d, i) => (
+                                    <span
+                                        key={d.id}
+                                        className={`flex-1 ${d.derived_status === 'online' ? 'bg-emerald-500' : 'bg-amber-500'} ${i === 0 ? 'rounded-l-full' : ''} ${i === screens.length - 1 ? 'rounded-r-full' : ''}`}
+                                    />
+                                ))}
+                            </div>
+                            {down.length === 0 ? (
+                                <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">Todas andan bien.</p>
+                            ) : (
+                                <ul className="space-y-2">
+                                    {downListed.map(d => (
+                                        <li key={d.id} className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2.5">
+                                            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm">
+                                                <span className="font-semibold">{screenName(d)}</span>
+                                                <span className="text-amber-700 dark:text-amber-300">{downText(d, nowMs)}</span>
+                                                <button
+                                                    onClick={() => setOpenHelp(openHelp === d.id ? null : d.id)}
+                                                    className="ml-auto flex items-center gap-1 font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+                                                    aria-expanded={openHelp === d.id}
+                                                >
+                                                    Qué hacer <ChevronDown className={`w-3.5 h-3.5 transition-transform ${openHelp === d.id ? 'rotate-180' : ''}`} />
+                                                </button>
+                                            </div>
+                                            {openHelp === d.id && <WhatToDo device={d} />}
+                                        </li>
+                                    ))}
+                                    {down.length > MAX_DOWN_LISTED && (
+                                        <li>
+                                            <button onClick={() => setShowAllDown(!showAllDown)} className="text-sm text-muted-foreground hover:text-foreground">
+                                                {showAllDown ? 'Ver menos' : `Ver las otras ${down.length - MAX_DOWN_LISTED}`}
+                                            </button>
+                                        </li>
+                                    )}
+                                </ul>
+                            )}
+                            {waiting > 0 && (
+                                <p className="text-sm text-muted-foreground">
+                                    {waiting === 1 ? '1 equipo espera que lo vincules' : `${waiting} equipos esperan que los vincules`} en{' '}
+                                    <Link to={`${base}/screens`} className="text-indigo-600 dark:text-indigo-400 hover:underline">Pantallas</Link>.
+                                </p>
+                            )}
+                        </>
+                    )}
+                </section>
 
-            {/* Main Content Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                
-                {/* Left Column: Equipos (Spans 2 columns on lg) */}
-                <div className="lg:col-span-2 space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-lg font-semibold text-foreground">Estado de Equipos</h2>
-                        <Link to={`/admin/display/commerce/${commerceId}/workspace/screens`} className="text-sm text-primary hover:underline flex items-center">
-                            Ver todos <ChevronRight className="w-4 h-4 ml-1" />
+                <div className="flex-[1_1_260px] flex flex-col gap-3">
+                    <Link to={`${base}/library`} className="flex-1 flex items-center gap-3.5 bg-card border border-border rounded-2xl px-4 py-4 hover:border-indigo-500/50 transition-colors">
+                        <span className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center shrink-0"><FolderOpen className="w-5 h-5 text-indigo-600 dark:text-indigo-400" /></span>
+                        <span className="min-w-0">
+                            <span className="block font-semibold">{files.length} {files.length === 1 ? 'archivo' : 'archivos'}</span>
+                            <span className="block text-sm text-muted-foreground truncate">{images} imágenes · {videos} videos · {others} apps y webs</span>
+                        </span>
+                    </Link>
+                    <Link to={`${base}/playlists`} className="flex-1 flex items-center gap-3.5 bg-card border border-border rounded-2xl px-4 py-4 hover:border-indigo-500/50 transition-colors">
+                        <span className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center shrink-0"><ListVideo className="w-5 h-5 text-indigo-600 dark:text-indigo-400" /></span>
+                        <span className="min-w-0">
+                            <span className="block font-semibold">{campaigns.length} {campaigns.length === 1 ? 'playlist' : 'playlists'}</span>
+                            <span className="block text-sm text-muted-foreground truncate">
+                                {playlistsOnAir === 0 ? 'Ninguna se está mostrando' : playlistsOnAir === 1 ? '1 se está mostrando ahora' : `${playlistsOnAir} se están mostrando ahora`}
+                            </span>
+                        </span>
+                    </Link>
+                    {schedules.length === 0 ? (
+                        <Link to={`${base}/schedule`} className="flex-1 flex items-center gap-3.5 bg-card border border-dashed border-border rounded-2xl px-4 py-4 hover:border-indigo-500/50 transition-colors">
+                            <span className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center shrink-0"><CalendarClock className="w-5 h-5 text-indigo-600 dark:text-indigo-400" /></span>
+                            <span className="min-w-0">
+                                <span className="block font-semibold">Sin programación</span>
+                                <span className="block text-sm text-indigo-600 dark:text-indigo-400">Mostrá algo distinto de mañana y de tarde →</span>
+                            </span>
                         </Link>
-                    </div>
-                    
-                    <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
-                        {devices.length === 0 ? (
-                            <div className="p-10 text-center flex flex-col items-center justify-center">
-                                <MonitorPlay className="w-12 h-12 text-muted-foreground mb-4 opacity-50" />
-                                <p className="text-muted-foreground text-sm">No tienes equipos registrados.</p>
-                            </div>
-                        ) : (
-                            <div className="divide-y divide-border">
-                                {devices.slice(0, 5).map(device => {
-                                    const isOnline = (device as any).derived_status === 'online';
-                                    const isVertical = device.orientation === 'portrait' || device.orientation === '90' || device.orientation === '270';
-                                    return (
-                                        <div key={device.id} className="p-4 flex items-center justify-between hover:bg-muted/50 transition-colors group">
-                                            <div className="flex items-center gap-4">
-                                                <div className="relative shrink-0">
-                                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isOnline ? 'bg-emerald-500/10' : 'bg-rose-500/10'}`}>
-                                                        {isVertical ? (
-                                                            <Smartphone className={`w-5 h-5 ${isOnline ? 'text-emerald-500' : 'text-rose-500'}`} />
-                                                        ) : (
-                                                            <MonitorPlay className={`w-5 h-5 ${isOnline ? 'text-emerald-500' : 'text-rose-500'}`} />
-                                                        )}
-                                                    </div>
-                                                    <span className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-card ${isOnline ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
-                                                </div>
-                                                <div>
-                                                    <h4 className="font-medium text-sm text-foreground line-clamp-1">{device.name || 'Dispositivo sin nombre'}</h4>
-                                                    <div className="flex items-center text-xs text-muted-foreground mt-0.5 gap-2">
-                                                        <span>{isVertical ? 'Vertical' : 'Horizontal'}</span>
-                                                        <span>&bull;</span>
-                                                        <span>{device.last_seen ? new Date(device.last_seen).toLocaleDateString() : 'Nunca visto'}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <Link 
-                                                to={`/admin/display/commerce/${commerceId}/workspace/screens`}
-                                                className="px-3 py-1.5 text-xs font-medium rounded-full bg-secondary text-secondary-foreground opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap ml-4"
-                                            >
-                                                Gestionar
-                                            </Link>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Right Column: Onboarding, Playlists & Schedules */}
-                <div className="space-y-8">
-                    {/* Guía Inicial / Onboarding Wizard */}
-                    <OnboardingWizardWidget className="w-full max-w-none shadow-md" />
-
-                    {/* Recent Playlists */}
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-lg font-semibold text-foreground">Playlists Recientes</h2>
-                            <Link to={`/admin/display/commerce/${commerceId}/workspace/playlists`} className="text-sm text-primary hover:underline flex items-center">
-                                Ver todas <ChevronRight className="w-4 h-4 ml-1" />
-                            </Link>
-                        </div>
-                        <div className="bg-card border border-border rounded-2xl shadow-sm p-2 space-y-2">
-                            {recentCampaigns.length === 0 ? (
-                                <div className="p-6 text-center">
-                                    <p className="text-xs text-muted-foreground">Sin playlists aún.</p>
-                                </div>
-                            ) : (
-                                recentCampaigns.map(playlist => (
-                                    <Link key={playlist.id} to={`/admin/display/commerce/${commerceId}/playlists/${playlist.id}`} className="flex items-center justify-between p-3 rounded-xl hover:bg-muted transition-colors">
-                                        <div className="flex items-center gap-3 overflow-hidden">
-                                            <div className="w-8 h-8 rounded-lg bg-fuchsia-500/10 flex items-center justify-center shrink-0">
-                                                <ListVideo className="w-4 h-4 text-fuchsia-500" />
-                                            </div>
-                                            <span className="font-medium text-sm text-foreground truncate">{playlist.name}</span>
-                                        </div>
-                                        <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-                                    </Link>
-                                ))
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Upcoming Schedules */}
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-lg font-semibold text-foreground">Próximos Eventos</h2>
-                            <Link to={`/admin/display/commerce/${commerceId}/workspace/schedules`} className="text-sm text-primary hover:underline flex items-center">
-                                Ver panel <ChevronRight className="w-4 h-4 ml-1" />
-                            </Link>
-                        </div>
-                        <div className="bg-card border border-border rounded-2xl shadow-sm p-2 space-y-2">
-                            {upcomingSchedules.length === 0 ? (
-                                <div className="p-6 text-center">
-                                    <p className="text-xs text-muted-foreground">No hay eventos programados.</p>
-                                </div>
-                            ) : (
-                                upcomingSchedules.map(schedule => (
-                                    <div key={schedule.id} className="flex items-center justify-between p-3 rounded-xl border border-border/50 bg-muted/30">
-                                        <div className="flex flex-col overflow-hidden">
-                                            <span className="font-medium text-sm text-foreground truncate">{(schedule as any).name || 'Programación'}</span>
-                                            <span className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                                                <CalendarClock className="w-3 h-3 shrink-0" /> 
-                                                <span className="truncate">{new Date(schedule.scheduled_at).toLocaleDateString()}</span>
-                                            </span>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    </div>
+                    ) : (
+                        <Link to={`${base}/schedule`} className="flex-1 flex items-center gap-3.5 bg-card border border-border rounded-2xl px-4 py-4 hover:border-indigo-500/50 transition-colors">
+                            <span className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center shrink-0"><CalendarClock className="w-5 h-5 text-indigo-600 dark:text-indigo-400" /></span>
+                            <span className="min-w-0">
+                                <span className="block font-semibold">{schedules.length} {schedules.length === 1 ? 'programación' : 'programaciones'}</span>
+                                <span className="block text-sm text-muted-foreground truncate">
+                                    {screensWithSchedule === 0 ? 'Ninguna pantalla la usa' : screensWithSchedule === 1 ? 'La usa 1 pantalla' : `Las usan ${screensWithSchedule} pantallas`}
+                                </span>
+                            </span>
+                        </Link>
+                    )}
                 </div>
             </div>
+
+            {setupPending && <OnboardingWizardWidget className="w-full max-w-none" />}
+
+            {/* Pantallas */}
+            {screens.length > 0 && (
+                <section className="space-y-4">
+                    <div className="flex items-center justify-between gap-3">
+                        <h2 className="text-xl font-bold">Tus pantallas</h2>
+                        <Link to={`${base}/screens`} className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline">Ver todas</Link>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                        {screens.map(d => {
+                            const content = contents.get(d.id)!;
+                            const isOnline = d.derived_status === 'online';
+                            return (
+                                <article key={d.id} className="bg-card border border-border rounded-2xl overflow-hidden flex flex-col">
+                                    <Link to={`/admin/display/${d.id}`} className="relative block aspect-video bg-zinc-900 overflow-hidden group" title="Ver detalles de la pantalla">
+                                        {content.cover ? (
+                                            <ContentThumb
+                                                item={content.cover}
+                                                className={`w-full h-full ${isOnline ? '' : 'grayscale opacity-60'} group-hover:scale-[1.02] transition-transform`}
+                                                iconClassName="w-8 h-8"
+                                            />
+                                        ) : (
+                                            <span className="absolute inset-0 flex items-center justify-center text-zinc-500">
+                                                <MonitorPlay className="w-10 h-10" />
+                                            </span>
+                                        )}
+                                        <span className="absolute top-2 right-2 rounded-md bg-black/60 px-2 py-0.5 text-xs font-medium text-white">
+                                            {isPortrait(d) ? 'Vertical' : 'Horizontal'}
+                                        </span>
+                                        {content.title && (
+                                            <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-3 pt-6 pb-2 text-sm font-medium text-white truncate">
+                                                {isOnline ? 'Ahora' : 'Último'}: {content.title}
+                                            </span>
+                                        )}
+                                    </Link>
+                                    <div className="p-4 flex-1 flex flex-col gap-3">
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isOnline ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                                                <h3 className="font-semibold truncate">{screenName(d)}</h3>
+                                            </div>
+                                            <p className={`text-sm mt-0.5 ${isOnline ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-300'}`}>
+                                                {isOnline ? 'En línea' : downText(d, nowMs).replace(/^./, c => c.toUpperCase())}
+                                            </p>
+                                            <p className="text-sm text-muted-foreground truncate mt-1">{content.detail}</p>
+                                        </div>
+                                        <Button variant="outline" className="mt-auto w-full" onClick={() => setChanging(d)}>
+                                            <RefreshCw className="w-4 h-4 mr-2" /> Cambiar contenido
+                                        </Button>
+                                    </div>
+                                </article>
+                            );
+                        })}
+                    </div>
+                </section>
+            )}
+
+            <ChangeScreenContentModal
+                isOpen={!!changing}
+                onClose={() => setChanging(null)}
+                commerceId={commerceId}
+                device={changing ? { id: changing.id, name: screenName(changing) } : null}
+                currentCampaignId={changing ? contents.get(changing.id)?.campaignId : null}
+                currentScheduleId={changing ? contents.get(changing.id)?.scheduleId : null}
+            />
         </div>
     );
 }
