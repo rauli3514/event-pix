@@ -3,8 +3,9 @@ import { supabase } from '@/lib/supabase';
 import { DisplayMedia } from '@/types/display';
 
 
-export const useDisplayMedia = (commerceId?: string) => {
+export const useDisplayMedia = (commerceId?: string, options?: { staleTime?: number }) => {
     return useQuery({
+        ...(options?.staleTime !== undefined ? { staleTime: options.staleTime } : {}),
         queryKey: ['display_media', commerceId],
         queryFn: async () => {
             if (!commerceId) return [];

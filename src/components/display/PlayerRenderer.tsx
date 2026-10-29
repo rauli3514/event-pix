@@ -23,11 +23,18 @@ interface PlayerRendererProps {
     onVideoEnded?: () => boolean;
     onVideoError?: () => void;
     onVideoDuration?: (seconds: number) => void;
+    // Modo liviano (equipos con poca memoria): siempre fundido corto.
+    lite?: boolean;
 }
 
-export const PlayerRenderer = ({ item, isActive, isPrev, commerceId, defaultTransition, nativeLoop, onVideoEnded, onVideoError, onVideoDuration }: PlayerRendererProps) => {
-    // Attempt to fetch live media to keep apps synchronized with recent edits without reloading the playlist
-    const { data: mediaList = [] } = useDisplayMedia(commerceId || '');
+const APP_TYPES = ['app', 'widget', 'layout'];
+
+export const PlayerRenderer = ({ item, isActive, isPrev, commerceId, defaultTransition, nativeLoop, onVideoEnded, onVideoError, onVideoDuration, lite }: PlayerRendererProps) => {
+    // Las apps toman su configuración en vivo de la biblioteca (así se ven los
+    // cambios sin recargar la playlist). Solo las apps la necesitan: antes cada
+    // imagen o video que entraba en pantalla volvía a pedir la lista entera.
+    const isApp = APP_TYPES.includes(item.type);
+    const { data: mediaList = [] } = useDisplayMedia(isApp ? commerceId || '' : '', { staleTime: 60_000 });
 
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -61,8 +68,11 @@ export const PlayerRenderer = ({ item, isActive, isPrev, commerceId, defaultTran
 
     // Implementamos transiciones CSS fluidas (Fade, Slide, Zoom, etc.) aceleradas por hardware GPU (Chromium TV / Android WebView)
     const getTransitionStyle = (): React.CSSProperties => {
-        const transitionType = item.transition || defaultTransition || 'fade';
-        const duration = '0.9s';
+        const requested = item.transition || defaultTransition || 'fade';
+        // Desenfoque, 3D y zoom sobre video a pantalla completa son caros para
+        // la GPU de un TV box chico: en modo liviano, fundido corto.
+        const transitionType = lite && requested !== 'none' ? 'fade' : requested;
+        const duration = lite ? '0.4s' : '0.9s';
         const easing = 'cubic-bezier(0.25, 1, 0.5, 1)';
 
         const base: React.CSSProperties = {
