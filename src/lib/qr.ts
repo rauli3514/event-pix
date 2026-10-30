@@ -37,12 +37,28 @@ const withHttps = (url: string) => {
     return /^[a-z][a-z0-9+.-]*:/i.test(u) ? u : `https://${u}`;
 };
 
-// Número para wa.me: solo dígitos, con código de país. Un celular argentino
-// escrito sin código (10 dígitos, ej. 3411234567) se completa con 549.
+// Número para wa.me: solo dígitos, con código de país. Los celulares
+// argentinos se completan:
+//   3411234567     (10 dígitos)          -> 5493411234567
+//   93411234567    (con el 9 adelante)   -> 5493411234567
+//   543411234567   (54 sin el 9)         -> 5493411234567
+//   0341 15 1234567 (con 0 y 15)         -> 5493411234567
 export function whatsappNumber(phone: string): string {
     let digits = phone.replace(/\D/g, '');
     if (digits.startsWith('00')) digits = digits.slice(2);
-    if (digits.length === 10) digits = `549${digits}`;
+    // Formato local con 0 y 15: 0 + característica (2 a 4) + 15 + número, 13 dígitos en total.
+    if (digits.length === 13 && digits.startsWith('0')) {
+        for (const area of [2, 3, 4]) {
+            if (digits.slice(1 + area, 3 + area) === '15') {
+                digits = digits.slice(1, 1 + area) + digits.slice(3 + area);
+                break;
+            }
+        }
+    }
+    if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1);
+    if (digits.length === 10) return `549${digits}`;
+    if (digits.length === 11 && digits.startsWith('9')) return `54${digits}`;
+    if (digits.length === 12 && digits.startsWith('54')) return `549${digits.slice(2)}`;
     return digits;
 }
 

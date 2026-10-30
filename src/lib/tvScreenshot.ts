@@ -1,4 +1,5 @@
 import { callTvBridge, hasTvBridgeMethod } from '@/lib/tvBridge';
+import { canCaptureScreen } from '@/lib/videoSource';
 
 // Código de la pantalla que está corriendo el reproductor (lo fija la TV al
 // arrancar). Fuera de la TV es null.
@@ -12,7 +13,8 @@ export const SCREENSHOT_REQUEST_EVENT = 'tv-screenshot-request';
 // Foto de lo que se ve (JPEG en base64) usando la app Android. null si la app
 // es vieja o no se pudo.
 export function captureTvScreen(maxWidth = 640, timeoutMs = 8000): Promise<string | null> {
-    if (!hasTvBridgeMethod('requestScreenshot')) return Promise.resolve(null);
+    // En Android 7 no se saca (ver canCaptureScreen): se informa igual qué está pasando.
+    if (!hasTvBridgeMethod('requestScreenshot') || !canCaptureScreen()) return Promise.resolve(null);
     const id = Math.random().toString(36).slice(2);
     return new Promise(resolve => {
         const finish = (image: string | null) => {

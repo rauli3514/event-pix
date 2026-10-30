@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { initialVideoUrl, isNetworkVideoUrl, networkVideoUrl, rememberNetworkVideo } from '@/lib/videoSource';
 import { useDisplayMedia } from '@/hooks/use-display-media';
 import { WeatherPreview } from './apps/weather/WeatherApp';
 import { SplitScreenPreview } from './apps/split-screen/SplitScreenApp';
@@ -39,6 +40,37 @@ export const PlayerRenderer = ({ item, isActive, isPrev, commerceId, defaultTran
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
 
+    // Videos: de dónde se cargan (caché del equipo o internet, ver videoSource.ts).
+    const isVideo = item.type === 'video' || item.type === 'video_ad';
+    const [videoSrc, setVideoSrc] = useState<string>(() => (isVideo ? initialVideoUrl(item.url || '') : ''));
+    const [videoSrcFor, setVideoSrcFor] = useState<string | undefined>(item.url);
+    if (isVideo && item.url !== videoSrcFor) {
+        setVideoSrcFor(item.url);
+        setVideoSrc(initialVideoUrl(item.url || ''));
+    }
+    const startedRef = useRef(false);
+    const isActiveRef = useRef(isActive);
+    const videoSrcRef = useRef(videoSrc);
+    const onVideoErrorRef = useRef(onVideoError);
+    useEffect(() => {
+        isActiveRef.current = isActive;
+        videoSrcRef.current = videoSrc;
+        onVideoErrorRef.current = onVideoError;
+    });
+    // Un video que falla o no arranca: primero se reintenta por internet; si
+    // ya venía de internet, se avisa para pasar al siguiente.
+    const failVideo = () => {
+        const url = item.url as string | undefined;
+        if (url && !isNetworkVideoUrl(videoSrcRef.current)) {
+            rememberNetworkVideo(url);
+            const next = networkVideoUrl(url);
+            videoSrcRef.current = next;
+            setVideoSrc(next);
+            return;
+        }
+        if (isActiveRef.current) onVideoErrorRef.current?.();
+    };
+
     // Si es un iframe, forzar una recarga suave cuando se vuelve activo (opcional, depende de si queremos resetear el estado de la web externa)
     useEffect(() => {
         if (isActive && item.type === 'external_url' && iframeRef.current) {
@@ -54,9 +86,10 @@ export const PlayerRenderer = ({ item, isActive, isPrev, commerceId, defaultTran
                 const video = videoRef.current;
                 // Si falló o ya cargó mientras se precargaba, avisar ahora que es el activo.
                 if (video.error) {
-                    onVideoError?.();
+                    failVideo();
                     return;
                 }
+                startedRef.current = false;
                 if (Number.isFinite(video.duration)) onVideoDuration?.(video.duration);
                 video.currentTime = 0;
                 video.play().catch(() => {});
@@ -65,6 +98,21 @@ export const PlayerRenderer = ({ item, isActive, isPrev, commerceId, defaultTran
             }
         }
     }, [isActive, item.type]);
+
+    // Si el video no arranca en unos segundos (el equipo no lo puede leer de
+    // la caché, o se trabó), se reintenta por internet o se saltea.
+    useEffect(() => {
+        if (!isVideo || !isActive) return;
+        const video = videoRef.current;
+        if (video && videoSrc && video.paused) {
+            video.play().catch(() => {});
+        }
+        const timer = setTimeout(() => {
+            if (!startedRef.current) failVideo();
+        }, isNetworkVideoUrl(videoSrc) ? 15000 : 8000);
+        return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isActive, videoSrc, isVideo]);
 
     // Implementamos transiciones CSS fluidas (Fade, Slide, Zoom, etc.) aceleradas por hardware GPU (Chromium TV / Android WebView)
     const getTransitionStyle = (): React.CSSProperties => {
@@ -372,7 +420,7 @@ export const PlayerRenderer = ({ item, isActive, isPrev, commerceId, defaultTran
                     {item.url ? (
                         <video 
                             ref={videoRef}
-                            src={item.url} 
+                            src={videoSrc || item.url}
                             style={{ width: '100%', height: '100%', objectFit: objectFitValue, pointerEvents: 'none' }}
                             muted={item.mute !== false}
                             loop={!!nativeLoop}
@@ -383,7 +431,8 @@ export const PlayerRenderer = ({ item, isActive, isPrev, commerceId, defaultTran
                             poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
                             className="[&::-webkit-media-controls-play-button]:hidden [&::-webkit-media-controls-start-playback-button]:hidden [&::-webkit-media-controls]:hidden"
                             onLoadedMetadata={(e) => onVideoDuration?.((e.target as HTMLVideoElement).duration)}
-                            onError={() => { if (isActive) onVideoError?.(); }}
+                            onError={() => failVideo()}
+                            onPlaying={() => { startedRef.current = true; }}
                             onEnded={(e) => {
                                 const handled = onVideoEnded ? onVideoEnded() : item.loop === false;
                                 if (!handled) {
