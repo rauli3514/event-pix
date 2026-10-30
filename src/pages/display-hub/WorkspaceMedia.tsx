@@ -3,7 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Search, Upload, LayoutGrid, List as ListIcon, Image as ImageIcon, Video, FileAudio, FileText, Globe, Trash2, Folder, FolderPlus, Move, MoreVertical, Edit2, Play, Calendar, ListPlus, X, ChevronRight, Check } from 'lucide-react';
+import { Search, Upload, LayoutGrid, List as ListIcon, Image as ImageIcon, Video, FileAudio, FileText, Globe, Trash2, Folder, FolderPlus, Move, MoreVertical, Edit2, Play, Calendar, ListPlus, X, ChevronRight, Check, Sparkles } from 'lucide-react';
 import { SendToScreensModal } from '@/components/display/SendToScreensModal';
 import { UploadMediaModal } from '@/components/display/UploadMediaModal';
 import { AddToPlaylistModal } from '@/components/display/AddToPlaylistModal';
@@ -18,6 +18,8 @@ import { DisplayMedia } from '@/types/display';
 import { MoveMediaModal } from '@/components/display/MoveMediaModal';
 import { AppCatalogModal, AppId } from '@/components/display/apps/AppCatalogModal';
 import { AppEditorModal } from '@/components/display/apps/AppEditorModal';
+import { PlacaMakerModal } from '@/components/display/PlacaMakerModal';
+import { PLACA_TEMPLATE_IDS as PLACA_IDS, placaFromMetadata, type PlacaTemplateId } from '@/lib/placas';
 import { itemIsMedia, playlistItems } from '@/lib/playlistItems';
 
 export type CategoryId = 'all' | 'images' | 'videos' | 'audio' | 'docs' | 'web' | 'apps';
@@ -65,6 +67,10 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
     const [draggedOverFolder, setDraggedOverFolder] = useState<string | null>(null);
     const [editingApp, setEditingApp] = useState<DisplayMedia | null>(null);
     const [newFolderName, setNewFolderName] = useState<string | null>(null);
+    // Crear placa: ?placa=1 (o ?placa=<diseño>) la abre directo (desde Plantillas o Inicio).
+    const [placaOpen, setPlacaOpen] = useState(() => !!searchParams.get('placa'));
+    const [placaTemplate] = useState(() => (searchParams.get('placa') || '') as PlacaTemplateId);
+    const [editingPlaca, setEditingPlaca] = useState<DisplayMedia | null>(null);
 
     const { data: mediaFiles = [], isLoading } = useDisplayMedia(commerceId);
     const { data: campaigns = [] } = useDisplayCampaigns(commerceId);
@@ -295,6 +301,10 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                             <LayoutGrid className="w-4 h-4 mr-2" /> Crear app
                         </Button>
                     ) : (
+                        <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" className="h-11 px-5" onClick={() => { setEditingPlaca(null); setPlacaOpen(true); }}>
+                            <Sparkles className="w-4 h-4 mr-2 text-indigo-500" /> Crear placa
+                        </Button>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button className="h-11 px-5 bg-indigo-600 hover:bg-indigo-700 text-white">
@@ -310,6 +320,7 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
+                        </div>
                     )}
                 </header>
 
@@ -584,6 +595,11 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                                                         <Edit2 className="w-4 h-4 mr-2" /> Editar app
                                                     </DropdownMenuItem>
                                                 )}
+                                                {placaFromMetadata(file.metadata) && (
+                                                    <DropdownMenuItem onClick={() => { setEditingPlaca(file); setPlacaOpen(true); }} className="cursor-pointer">
+                                                        <Edit2 className="w-4 h-4 mr-2" /> Editar placa
+                                                    </DropdownMenuItem>
+                                                )}
                                                 <DropdownMenuItem onClick={() => { setSelectedIds([file.id]); setIsPlaylistModalOpen(true); }} className="cursor-pointer">
                                                     <ListPlus className="w-4 h-4 mr-2" /> Agregar a una playlist
                                                 </DropdownMenuItem>
@@ -614,6 +630,16 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                 )}
             </div>
 
+            {commerceId && (
+                <PlacaMakerModal
+                    isOpen={placaOpen}
+                    onClose={() => { setPlacaOpen(false); setEditingPlaca(null); }}
+                    commerceId={commerceId}
+                    editing={editingPlaca}
+                    initialTemplate={PLACA_IDS.includes(placaTemplate) ? placaTemplate : undefined}
+                    onSaved={saved => { if (!editingPlaca) setCurrentFolder(saved.folder_path || '/'); }}
+                />
+            )}
             <UploadMediaModal
                 isOpen={isUploadModalOpen}
                 onClose={() => setIsUploadModalOpen(false)}

@@ -27,7 +27,7 @@ export const useUploadDisplayMedia = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ commerceId, file, webUrl, webName, folderPath = '/', isFolder = false, type: overrideType, metadata }: { commerceId: string; file?: File; webUrl?: string; webName?: string; folderPath?: string; isFolder?: boolean; type?: string; metadata?: any }) => {
+        mutationFn: async ({ commerceId, file, webUrl, webName, displayName, folderPath = '/', isFolder = false, type: overrideType, metadata }: { commerceId: string; file?: File; webUrl?: string; webName?: string; displayName?: string; folderPath?: string; isFolder?: boolean; type?: string; metadata?: any }) => {
             let type = overrideType || 'docs';
             let publicUrl = '';
             let storagePath = overrideType === 'app' ? `app://${webName?.replace(/[^a-z0-9]/gi, '_').toLowerCase()}` : 'web_link';
@@ -45,7 +45,7 @@ export const useUploadDisplayMedia = () => {
                 const fileExt = file.name.split('.').pop();
                 const uniqueFilename = `${crypto.randomUUID()}.${fileExt}`;
                 storagePath = `${commerceId}/${uniqueFilename}`;
-                name = file.name;
+                name = displayName || file.name;
                 size = file.size;
 
                 const { error: uploadError } = await supabase.storage
@@ -141,6 +141,46 @@ export const useUpdateDisplayMedia = () => {
                 .single();
 
             if (error) throw error;
+            return data as DisplayMedia;
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ['display_media', data.commerce_id] });
+        }
+    });
+};
+
+// Cambia la imagen de un archivo de Medios por otra (por ejemplo, al editar una
+// placa). El archivo anterior queda en el almacenamiento: alguna pantalla sin
+// internet todavía puede estar usándolo.
+export const useReplaceMediaFile = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ media, file, name, metadata }: { media: DisplayMedia; file: File; name?: string; metadata?: Record<string, unknown> }) => {
+            const ext = file.name.split('.').pop() || 'jpg';
+            const storagePath = `${media.commerce_id}/${crypto.randomUUID()}.${ext}`;
+            const { error: uploadError } = await supabase.storage
+                .from('display-media')
+                .upload(storagePath, file, { cacheControl: '3600', upsert: false });
+            if (uploadError) throw uploadError;
+            const { data: urlData } = supabase.storage.from('display-media').getPublicUrl(storagePath);
+
+            const { data, error } = await supabase
+                .from('display_media')
+                .update({
+                    url: urlData.publicUrl,
+                    storage_path: storagePath,
+                    size_bytes: file.size,
+                    ...(name ? { name } : {}),
+                    ...(metadata ? { metadata } : {}),
+                })
+                .eq('id', media.id)
+                .select()
+                .single();
+            if (error) {
+                await supabase.storage.from('display-media').remove([storagePath]);
+                throw error;
+            }
             return data as DisplayMedia;
         },
         onSuccess: (data) => {

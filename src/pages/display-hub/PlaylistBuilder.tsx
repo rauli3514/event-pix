@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
     ArrowDown, ArrowLeft, ArrowUp, Check, ChevronDown, GripVertical,
-    Maximize2, MonitorPlay, Plus, Search, Send, Upload, X,
+    Maximize2, MonitorPlay, Plus, Search, Send, Sparkles, Upload, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -23,6 +23,7 @@ import type { DisplayCampaignV2, DisplayFitMode, DisplayMedia, DisplayTransition
 import { UploadMediaModal } from '@/components/display/UploadMediaModal';
 import { PlaylistPreviewModal } from '@/components/display/PlaylistPreviewModal';
 import { PlaylistMiniPreview } from '@/components/display/PlaylistMiniPreview';
+import { PlacaMakerModal } from '@/components/display/PlacaMakerModal';
 import { HeavyVideoBadge } from '@/components/display/HeavyVideoBadge';
 import { ContentThumb } from '@/components/display/ContentThumb';
 import { appKindOf } from '@/lib/appCovers';
@@ -142,6 +143,7 @@ const PlaylistBuilder = () => {
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [pickedScreens, setPickedScreens] = useState<string[]>([]);
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+    const [isPlacaOpen, setIsPlacaOpen] = useState(false);
     const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
     const [sending, setSending] = useState(false);
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -475,9 +477,12 @@ const PlaylistBuilder = () => {
                             );
                         })}
                     </div>
-                    <div className="p-3 border-t border-border">
-                        <button onClick={() => setIsUploadModalOpen(true)} className="w-full flex items-center justify-center gap-2 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline py-1">
-                            <Upload className="w-4 h-4" /> Subir un archivo nuevo
+                    <div className="p-3 border-t border-border flex items-center justify-center gap-x-5 gap-y-1 flex-wrap">
+                        <button onClick={() => setIsUploadModalOpen(true)} className="flex items-center justify-center gap-2 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline py-1">
+                            <Upload className="w-4 h-4" /> Subir un archivo
+                        </button>
+                        <button onClick={() => setIsPlacaOpen(true)} className="flex items-center justify-center gap-2 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline py-1">
+                            <Sparkles className="w-4 h-4" /> Crear una placa
                         </button>
                     </div>
                 </section>
@@ -804,6 +809,16 @@ const PlaylistBuilder = () => {
                 onAddWebLink={handleAddWebLink}
             />
             {videoCheckDialog}
+            {commerceId && (
+                <PlacaMakerModal
+                    isOpen={isPlacaOpen}
+                    onClose={() => setIsPlacaOpen(false)}
+                    commerceId={commerceId}
+                    initialOrientation={settings.orientation === 'portrait' ? 'portrait' : 'landscape'}
+                    saveLabel="Guardar y agregar"
+                    onSaved={media => addMedia([media])}
+                />
+            )}
 
             <PlaylistPreviewModal
                 isOpen={isPreviewModalOpen}
