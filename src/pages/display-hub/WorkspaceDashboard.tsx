@@ -270,7 +270,7 @@ export default function WorkspaceDashboard() {
                         </span>
                     </Link>
                     {schedules.length === 0 ? (
-                        <Link to={`${base}/schedule`} className="flex-1 flex items-center gap-3.5 bg-card border border-dashed border-border rounded-2xl px-4 py-4 hover:border-indigo-500/50 transition-colors">
+                        <Link to={`${base}/schedule?nueva=1`} className="flex-1 flex items-center gap-3.5 bg-card border border-dashed border-border rounded-2xl px-4 py-4 hover:border-indigo-500/50 transition-colors">
                             <span className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center shrink-0"><CalendarClock className="w-5 h-5 text-indigo-600 dark:text-indigo-400" /></span>
                             <span className="min-w-0">
                                 <span className="block font-semibold">Sin programación</span>
