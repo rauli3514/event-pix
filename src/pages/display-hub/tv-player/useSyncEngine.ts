@@ -6,6 +6,7 @@ import { findActiveScheduleEvent, pickActiveAssignment } from '@/lib/displaySche
 import { getOrCreateCommandSecret, openSignedCommand, registerCommandSecret } from '@/lib/displayCommands';
 import { callTvBridge, hasTvBridgeMethod } from '@/lib/tvBridge';
 import { SCREENSHOT_REQUEST_EVENT } from '@/lib/tvScreenshot';
+import { ALERT_REFRESH_EVENT } from '@/lib/urgentAlerts';
 import { collectAssignmentMediaUrls, mediaItemUrls, orderMediaUrls } from '@/lib/displayMediaUrls';
 
 type PlayerStatus = 'loading' | 'playing' | 'offline_playing' | 'no_content' | 'error';
@@ -324,6 +325,11 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
                 // Pedido de foto de la pantalla (solo lee lo que se ve): también sin firma.
                 if (raw?.action === 'screenshot') {
                     window.dispatchEvent(new Event(SCREENSHOT_REQUEST_EVENT));
+                    return;
+                }
+                // Aviso urgente nuevo o quitado: la TV vuelve a consultarlo al servidor.
+                if (raw?.action === 'alert') {
+                    window.dispatchEvent(new Event(ALERT_REFRESH_EVENT));
                     return;
                 }
 

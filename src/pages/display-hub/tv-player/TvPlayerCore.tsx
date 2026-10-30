@@ -11,6 +11,8 @@ import { useLocalDay } from '@/hooks/use-local-day';
 import { itemsActiveOn } from '@/lib/playlistItems';
 import { setTvDeviceCode } from '@/lib/tvScreenshot';
 import { useScreenReporter } from './useScreenReporter';
+import { useUrgentAlert } from './useUrgentAlert';
+import { UrgentAlertOverlay } from '@/components/display/UrgentAlertOverlay';
 
 // Identidad de Display Digital para las pantallas de espera de la TV. En la app
 // Android el logo sale del APK (WebViewManager intercepta /edm-assets/).
@@ -179,6 +181,9 @@ const TvPlayerCore = () => {
         shuffle
     );
 
+    // Aviso urgente del panel ("Hoy cerramos a las 18 h"), encima de todo.
+    const urgentAlert = useUrgentAlert(deviceCode);
+
     // Foto de lo que se ve y qué está pasando, para el panel.
     useScreenReporter(deviceCode, items[currentIndex], status === 'playing' || status === 'offline_playing', lite);
 
@@ -274,6 +279,7 @@ const TvPlayerCore = () => {
                     <span className="text-orange-400 font-medium whitespace-nowrap">app.event-pix.com.ar</span>
                 </p>
                 <p className="absolute bottom-[5vh] text-[1vw] text-slate-600 font-mono tracking-widest">CÓDIGO {deviceCode}</p>
+                {urgentAlert && <div style={{ ...containerStyle, backgroundColor: 'transparent' }}><UrgentAlertOverlay alert={urgentAlert} /></div>}
                 <TvSettingsMenu deviceCode={deviceCode!} onRefresh={() => fetchCampaign()} />
             </div>
         );
@@ -300,6 +306,7 @@ const TvPlayerCore = () => {
         return (
             <div className="fixed inset-0 w-full h-full flex items-center justify-center" style={BRAND_BACKGROUND}>
                 <img src={BRAND_LOGO} alt="Display Digital" className="w-[18vw] max-w-[360px] opacity-80" style={BRAND_LOGO_STYLE} />
+                {urgentAlert && <div style={{ ...containerStyle, backgroundColor: 'transparent' }}><UrgentAlertOverlay alert={urgentAlert} /></div>}
                 <TvSettingsMenu deviceCode={deviceCode!} onRefresh={() => fetchCampaign()} />
             </div>
         );
@@ -318,6 +325,7 @@ const TvPlayerCore = () => {
                 onVideoDuration={onVideoDuration}
                 lite={lite}
             />
+            {urgentAlert && <UrgentAlertOverlay alert={urgentAlert} />}
             <TvSettingsMenu deviceCode={deviceCode!} onRefresh={() => fetchCampaign()} />
         </div>
     );
