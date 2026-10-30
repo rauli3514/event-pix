@@ -7,6 +7,7 @@ import { getOrCreateCommandSecret, openSignedCommand, registerCommandSecret } fr
 import { callTvBridge, hasTvBridgeMethod } from '@/lib/tvBridge';
 import { SCREENSHOT_REQUEST_EVENT } from '@/lib/tvScreenshot';
 import { ALERT_REFRESH_EVENT } from '@/lib/urgentAlerts';
+import { SCREEN_QR_REFRESH_EVENT } from '@/lib/qr';
 import { collectAssignmentMediaUrls, mediaItemUrls, orderMediaUrls } from '@/lib/displayMediaUrls';
 
 type PlayerStatus = 'loading' | 'playing' | 'offline_playing' | 'no_content' | 'error';
@@ -330,6 +331,11 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
                 // Aviso urgente nuevo o quitado: la TV vuelve a consultarlo al servidor.
                 if (raw?.action === 'alert') {
                     window.dispatchEvent(new Event(ALERT_REFRESH_EVENT));
+                    return;
+                }
+                // QR fijo cambiado en el panel: lo vuelve a leer.
+                if (raw?.action === 'qr') {
+                    window.dispatchEvent(new Event(SCREEN_QR_REFRESH_EVENT));
                     return;
                 }
 

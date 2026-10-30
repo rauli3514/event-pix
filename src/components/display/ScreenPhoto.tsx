@@ -15,11 +15,26 @@ interface Props {
     // Lo que va encima de la foto (link, etiquetas…).
     children?: ReactNode;
     className?: string;
+    // Orientación de la pantalla: en las verticales la TV saca la foto
+    // "acostada" (como sale por el cable) y acá se endereza.
+    orientation?: string | null;
+    // Cuándo se le cambió el contenido: una foto anterior ya no sirve.
+    contentSince?: string | null;
+}
+
+// Cuánto girar la foto para verla como la ve la gente. La TV rota el
+// contenido N grados para una pantalla parada; la foto se gira al revés.
+function uprightRotation(orientation?: string | null): number {
+    const o = String(orientation ?? '');
+    if (o === 'portrait' || o === '90') return -90;
+    if (o === '270') return 90;
+    if (o === '180') return 180;
+    return 0;
 }
 
 // Foto real de lo que se ve en la TV (la manda la app cada 5 minutos), con la
 // hora y un botón para pedir una nueva.
-export function ScreenPhoto({ device, screen, fallback, children, className = '' }: Props) {
+export function ScreenPhoto({ device, screen, fallback, children, className = '', orientation, contentSince }: Props) {
     const request = useRequestScreenshot();
     const online = device.derived_status === 'online';
     const src = screenImageSrc(screen);
@@ -30,7 +45,14 @@ export function ScreenPhoto({ device, screen, fallback, children, className = ''
         return () => clearInterval(timer);
     }, []);
     const ageMs = screen?.image_at ? Math.max(0, now - new Date(screen.image_at).getTime()) : Infinity;
-    const showPhoto = !!src && ageMs < MAX_PHOTO_AGE_MS;
+    const photoAt = screen?.image_at ? new Date(screen.image_at).getTime() : 0;
+    const outdated = !!contentSince && photoAt < new Date(contentSince).getTime();
+    const showPhoto = !!src && ageMs < MAX_PHOTO_AGE_MS && !outdated;
+    // Solo se gira si la foto vino "acostada" (más ancha que alta): las
+    // versiones de la app que ya la mandan derecha quedan como están.
+    const [sideways, setSideways] = useState(false);
+    const rotation = uprightRotation(orientation);
+    const turn = rotation === 180 || (rotation !== 0 && sideways);
 
     const refresh = async () => {
         try {
@@ -43,9 +65,21 @@ export function ScreenPhoto({ device, screen, fallback, children, className = ''
     };
 
     return (
-        <div className={`relative overflow-hidden bg-zinc-900 ${className}`}>
+        <div className={`relative overflow-hidden bg-zinc-900 ${className}`} style={{ containerType: 'size' }}>
             {showPhoto
-                ? <img src={src!} alt="Lo que se ve ahora en la pantalla" className={`absolute inset-0 w-full h-full object-contain ${online ? '' : 'grayscale opacity-60'}`} />
+                ? (
+                    <img
+                        src={src!}
+                        alt="Lo que se ve ahora en la pantalla"
+                        onLoad={e => setSideways(e.currentTarget.naturalWidth > e.currentTarget.naturalHeight)}
+                        className={`absolute object-contain ${online ? '' : 'grayscale opacity-60'} ${turn ? '' : 'inset-0 w-full h-full'}`}
+                        style={turn ? (rotation === 180
+                            ? { inset: 0, width: '100%', height: '100%', transform: 'rotate(180deg)' }
+                            // Girada 90°: el ancho de la imagen pasa a ser el alto del recuadro.
+                            : { left: '50%', top: '50%', width: '100cqh', height: '100cqw', transform: `translate(-50%, -50%) rotate(${rotation}deg)` })
+                            : undefined}
+                    />
+                )
                 : fallback}
             {children}
             {showPhoto && (

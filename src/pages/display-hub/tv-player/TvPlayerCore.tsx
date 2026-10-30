@@ -14,6 +14,8 @@ import { setTvDeviceCode } from '@/lib/tvScreenshot';
 import { useScreenReporter } from './useScreenReporter';
 import { useUrgentAlert } from './useUrgentAlert';
 import { UrgentAlertOverlay } from '@/components/display/UrgentAlertOverlay';
+import { ScreenQrOverlay } from '@/components/display/ScreenQrOverlay';
+import { useScreenQr } from './useScreenQr';
 
 // Identidad de Display Digital para las pantallas de espera de la TV. En la app
 // Android el logo sale del APK (WebViewManager intercepta /edm-assets/).
@@ -189,6 +191,11 @@ const TvPlayerCore = () => {
 
     // Aviso urgente del panel ("Hoy cerramos a las 18 h"), encima de todo.
     const urgentAlert = useUrgentAlert(deviceCode);
+    // QR fijo de la pantalla (el menú, el WhatsApp…). Un aviso a pantalla completa lo tapa.
+    const screenQr = useScreenQr(deviceCode);
+    const qrOverlay = screenQr && urgentAlert?.layout !== 'full'
+        ? <ScreenQrOverlay qr={screenQr} bannerBelow={urgentAlert?.layout === 'banner'} />
+        : null;
 
     // Foto de lo que se ve y qué está pasando, para el panel.
     useScreenReporter(deviceCode, items[currentIndex], status === 'playing' || status === 'offline_playing', lite);
@@ -312,6 +319,7 @@ const TvPlayerCore = () => {
         return (
             <div className="fixed inset-0 w-full h-full flex items-center justify-center" style={BRAND_BACKGROUND}>
                 <img src={BRAND_LOGO} alt="Display Digital" className="w-[18vw] max-w-[360px] opacity-80" style={BRAND_LOGO_STYLE} />
+                {qrOverlay && <div style={{ ...containerStyle, backgroundColor: 'transparent' }}>{qrOverlay}</div>}
                 {urgentAlert && <div style={{ ...containerStyle, backgroundColor: 'transparent' }}><UrgentAlertOverlay alert={urgentAlert} /></div>}
                 <TvSettingsMenu deviceCode={deviceCode!} onRefresh={() => fetchCampaign()} />
             </div>
@@ -331,6 +339,7 @@ const TvPlayerCore = () => {
                 onVideoDuration={onVideoDuration}
                 lite={lite}
             />
+            {qrOverlay}
             {urgentAlert && <UrgentAlertOverlay alert={urgentAlert} />}
             <TvSettingsMenu deviceCode={deviceCode!} onRefresh={() => fetchCampaign()} />
         </div>

@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Monitor, Save, HardDrive, Clock, Smartphone, Activity, Cpu, PlaySquare, Trash2, AlertTriangle, RotateCcw, Camera } from 'lucide-react';
+import { ArrowLeft, Monitor, Save, HardDrive, Clock, Smartphone, Activity, Cpu, PlaySquare, Trash2, AlertTriangle, RotateCcw, Camera, QrCode } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useDisplayDevice, useAssignContentToDevice, useUpdateDisplayDevice, useDisplayCampaigns, useDeleteAssignment } from "@/hooks/use-display-hub";
+import { useDisplayDevice, useDisplayDevices, useAssignContentToDevice, useUpdateDisplayDevice, useDisplayCampaigns, useDeleteAssignment } from "@/hooks/use-display-hub";
+import { ScreenQrModal } from '@/components/display/ScreenQrModal';
+import { QR_CORNERS, QR_KINDS, parseScreenQr } from '@/lib/qr';
 import { useDisplayMedia } from "@/hooks/use-display-media";
 import { sendDeviceCommand, resetDeviceCommandSecret, DeviceCommand } from "@/lib/displayCommands";
 import { fetchPublishedTvVersion, PublishedTvVersion } from "@/lib/tvUpdate";
@@ -49,6 +51,8 @@ const DisplayDeviceDetail = () => {
     const commerceId = deviceData?.commerce_id || undefined;
     const { data: campaigns, isLoading: isLoadingCampaigns } = useDisplayCampaigns(commerceId);
     const { data: mediaFiles, isLoading: isLoadingMedia } = useDisplayMedia(commerceId);
+    const { data: commerceDevices = [] } = useDisplayDevices(commerceId);
+    const [qrOpen, setQrOpen] = useState(false);
 
     const [activeTab, setActiveTab] = useState<'assignment' | 'setup'>('assignment');
     
@@ -261,6 +265,8 @@ const DisplayDeviceDetail = () => {
                             <ScreenPhoto
                                 device={deviceData}
                                 screen={screenShots[deviceData.id]}
+                                orientation={deviceData.orientation}
+                                contentSince={deviceData.assignment?.created_at}
                                 className="aspect-video rounded-xl"
                                 fallback={
                                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 px-6 text-center text-sm text-slate-400">
@@ -276,6 +282,38 @@ const DisplayDeviceDetail = () => {
                                 </p>
                             )}
                         </div>
+
+                        {/* QR fijo en pantalla */}
+                        {(() => {
+                            const qr = parseScreenQr((deviceData as { qr_overlay?: unknown }).qr_overlay);
+                            return (
+                                <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl p-6 flex flex-wrap items-center gap-4">
+                                    <QrCode className="w-8 h-8 text-indigo-400 shrink-0" />
+                                    <div className="flex-1 min-w-[200px]">
+                                        <h2 className="text-lg font-bold text-white">QR fijo en pantalla</h2>
+                                        <p className="text-sm text-slate-400">
+                                            {qr
+                                                ? <>{QR_KINDS[qr.spec.kind]?.label || 'QR'} · {QR_CORNERS[qr.corner].toLowerCase()}{qr.caption ? ` · "${qr.caption}"` : ''}</>
+                                                : 'Un código en una esquina, siempre visible: el menú, tu web o el WhatsApp.'}
+                                        </p>
+                                    </div>
+                                    <Button onClick={() => setQrOpen(true)} variant={qr ? 'outline' : 'default'} className={qr ? 'border-slate-700 text-white hover:bg-slate-800' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}>
+                                        {qr ? 'Cambiar' : 'Poner un QR'}
+                                    </Button>
+                                </div>
+                            );
+                        })()}
+                        {commerceId && (
+                            <ScreenQrModal
+                                isOpen={qrOpen}
+                                onClose={() => setQrOpen(false)}
+                                commerceId={commerceId}
+                                screen={{ ...deviceData, name: deviceData.name || `Pantalla ${deviceData.device_id}` }}
+                                others={(commerceDevices as { id: string; device_id: string; name: string | null; pairing_status?: string; orientation?: string; qr_overlay?: unknown }[])
+                                    .filter(d => d.id !== deviceData.id && d.pairing_status === 'linked')
+                                    .map(d => ({ ...d, name: d.name || `Pantalla ${d.device_id}` }))}
+                            />
+                        )}
 
                             {/* Campaign Assignment */}
                         <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl p-6">

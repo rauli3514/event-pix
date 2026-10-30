@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { Bell, BellOff, CalendarClock, Megaphone, ChevronDown, FolderOpen, ListVideo, MonitorPlay, Plus, RefreshCw, Upload } from 'lucide-react';
+import { Bell, BellOff, CalendarClock, Megaphone, ChevronDown, FolderOpen, ListVideo, MonitorPlay, Plus, QrCode, RefreshCw, Upload } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { useDisplayCampaigns, useDisplayDevices, useDisplaySchedules } from '@/hooks/use-display-hub';
@@ -18,6 +18,8 @@ import { ContentThumb } from '@/components/display/ContentThumb';
 import { ScreenPhoto } from '@/components/display/ScreenPhoto';
 import { useDeviceScreens } from '@/hooks/use-device-screens';
 import { ChangeScreenContentModal } from '@/components/display/ChangeScreenContentModal';
+import { ScreenQrModal } from '@/components/display/ScreenQrModal';
+import { parseScreenQr } from '@/lib/qr';
 import { OnboardingWizardWidget } from '@/components/display/OnboardingWizardWidget';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -72,6 +74,7 @@ export default function WorkspaceDashboard() {
 
     const [openHelp, setOpenHelp] = useState<string | null>(null);
     const [changing, setChanging] = useState<AnyDevice | null>(null);
+    const [qrFor, setQrFor] = useState<AnyDevice | null>(null);
     const [showAllDown, setShowAllDown] = useState(false);
     const { data: alertSettings } = useAlertSettings(commerceId);
     const [alertsOpen, setAlertsOpen] = useState(false);
@@ -306,6 +309,8 @@ export default function WorkspaceDashboard() {
                                     <ScreenPhoto
                                         device={d}
                                         screen={screenShots[d.id]}
+                                        orientation={d.orientation}
+                                        contentSince={d.assignment?.created_at}
                                         className="aspect-video group"
                                         fallback={content.cover ? (
                                             <ContentThumb
@@ -341,9 +346,20 @@ export default function WorkspaceDashboard() {
                                             </p>
                                             <p className="text-sm text-muted-foreground truncate mt-1">{content.detail}</p>
                                         </div>
-                                        <Button variant="outline" className="mt-auto w-full" onClick={() => setChanging(d)}>
-                                            <RefreshCw className="w-4 h-4 mr-2" /> Cambiar contenido
-                                        </Button>
+                                        <div className="mt-auto flex gap-2">
+                                            <Button variant="outline" className="flex-1" onClick={() => setChanging(d)}>
+                                                <RefreshCw className="w-4 h-4 mr-2" /> Cambiar contenido
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => setQrFor(d)}
+                                                title={parseScreenQr(d.qr_overlay) ? 'Cambiar el QR fijo' : 'Poner un QR fijo en la pantalla'}
+                                                aria-label="QR fijo en la pantalla"
+                                                className={parseScreenQr(d.qr_overlay) ? 'border-indigo-500/60 text-indigo-600 dark:text-indigo-400' : ''}
+                                            >
+                                                <QrCode className="w-4 h-4" />{parseScreenQr(d.qr_overlay) && <span className="ml-1.5">QR</span>}
+                                            </Button>
+                                        </div>
                                     </div>
                                 </article>
                             );
@@ -365,6 +381,15 @@ export default function WorkspaceDashboard() {
                 <AlertSettingsModal isOpen onClose={() => setAlertsOpen(false)} commerceId={commerceId} settings={alertSettings} />
             )}
 
+            {commerceId && (
+                <ScreenQrModal
+                    isOpen={!!qrFor}
+                    onClose={() => setQrFor(null)}
+                    commerceId={commerceId}
+                    screen={qrFor ? { ...qrFor, name: screenName(qrFor) } : null}
+                    others={screens.filter(s => s.id !== qrFor?.id).map(s => ({ ...s, name: screenName(s) }))}
+                />
+            )}
             <ChangeScreenContentModal
                 isOpen={!!changing}
                 onClose={() => setChanging(null)}
