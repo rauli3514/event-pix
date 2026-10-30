@@ -34,3 +34,23 @@ No hace falta correr nada en Supabase ni actualizar la app de la TV.
 
 Botón **Mandar a pantallas** en la lista o en la programación. La lista muestra en
 qué pantallas está cada una y qué pasa ahora.
+
+## Fechas especiales
+
+Para feriados, fiestas o eventos puntuales, sin tocar la semana tipo.
+
+- En la programación → **Fechas especiales** → **Agregar fecha**.
+- Elegís un nombre (Feriado, Navidad…), la fecha (o "varios días seguidos"),
+  el horario (todo el día o uno puntual, puede cruzar la medianoche) y qué se muestra.
+- En su horario **le gana a la semana tipo**; fuera de ese horario todo sigue igual.
+  Ej.: 24/12 de 18 a 24 h la playlist de Navidad; el feriado, todo el día, una
+  placa de "Cerrado por feriado".
+- Los días de esta semana con fecha especial se marcan con ★ en el calendario,
+  y "Ahora pasa" avisa si hoy es una.
+- Las fechas que ya pasaron se pueden borrar de una vez.
+
+### Paso único en Supabase
+
+En el SQL Editor corré `supabase/migrations/20261102000000_display_schedule_special_dates.sql`
+(se puede correr más de una vez). Sin ese paso, la semana tipo sigue funcionando igual y
+el panel avisa al querer guardar una fecha especial.

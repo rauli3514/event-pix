@@ -1,23 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, ArrowLeft, CalendarClock, MonitorUp, MoreVertical, Pencil, Plus, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CalendarClock, CalendarHeart, MonitorUp, MoreVertical, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useDeleteSchedule, useDisplayDevices, useDisplaySchedules } from '@/hooks/use-display-hub';
-import { useDeleteScheduleEvent, useSaveScheduleEvent, useUpdateScheduleInfo } from '@/hooks/use-schedule-editor';
+import { MissingSpecialDatesError, useDeleteScheduleEvent, useSaveScheduleEvent, useUpdateScheduleInfo } from '@/hooks/use-schedule-editor';
 import { useNowMinute } from '@/hooks/use-now-minute';
 import { SendToScreensModal } from '@/components/display/SendToScreensModal';
 import { ScheduleCalendar } from '@/components/display/schedule/ScheduleCalendar';
 import { FranjaDialog, type FranjaValue } from '@/components/display/schedule/FranjaDialog';
 import { NewScheduleDialog } from '@/components/display/schedule/NewScheduleDialog';
+import { SpecialDateDialog, type SpecialValue } from '@/components/display/schedule/SpecialDateDialog';
 import { ContentPicker, type PickedContent } from '@/components/display/schedule/ContentPicker';
-import { findActiveScheduleEvent } from '@/lib/displaySchedule';
+import { findActiveScheduleEvent, scheduleDayKey, specialCoversDay } from '@/lib/displaySchedule';
 import { describeDays } from '@/lib/itemRules';
 import {
     DAY_LETTER, DAY_LONG, EVENT_COLORS, MINUTES_PER_DAY, WEEK,
-    colorMap, conflicts, eventAssetKey, eventName, eventRange, formatMinutes, segmentsForDay, toStoredTime, winnersByDay,
+    colorMap, conflicts, describeRange, eventAssetKey, eventName, eventRange, formatMinutes, formatSpecialDates, pastSpecials, segmentsForDay,
+    specialsThisWeek, toStoredTime, upcomingSpecials, weeklyEvents, winnersByDay,
     type ScheduleEvent,
 } from '@/lib/scheduleView';
 
@@ -142,8 +144,10 @@ function ScheduleList({ schedules, loading, screensOf, onOpen, onNew, commerceId
                 <div className="grid gap-4 md:grid-cols-2">
                     {schedules.map(s => {
                         const screens = screensOf(s.id);
-                        const events: ScheduleEvent[] = s.events || [];
-                        const active = findActiveScheduleEvent(events, now);
+                        const allEvents: ScheduleEvent[] = s.events || [];
+                        const events = weeklyEvents(allEvents);
+                        const nextSpecial = upcomingSpecials(allEvents, now)[0];
+                        const active = findActiveScheduleEvent(allEvents, now);
                         const showing = active ? eventName(active) : (defaultOf(s)?.name || 'pantalla negra');
                         return (
                             <article key={s.id} className="rounded-2xl border border-border bg-card overflow-hidden flex flex-col hover:border-indigo-500/40 transition-colors">
@@ -157,6 +161,12 @@ function ScheduleList({ schedules, loading, screensOf, onOpen, onNew, commerceId
                                         </div>
                                     </div>
                                     <WeekStrip events={events} />
+                                    {nextSpecial && (
+                                        <p className="mt-2 text-sm flex items-center gap-1.5 text-rose-700 dark:text-rose-300">
+                                            <CalendarHeart className="w-4 h-4 shrink-0" />
+                                            <span className="truncate">Próxima fecha especial: {nextSpecial.label || eventName(nextSpecial)} · {formatSpecialDates(nextSpecial)}</span>
+                                        </p>
+                                    )}
                                     <p className="mt-3 text-sm">
                                         <span className="text-muted-foreground">Ahora pasa: </span>
                                         <span className="font-medium">{showing}</span>
@@ -226,7 +236,9 @@ function WeekStrip({ events }: { events: ScheduleEvent[] }) {
 // Una programación: calendario y edición
 
 function ScheduleDetail({ schedule, commerceId, screens, onBack }: { schedule: ScheduleRow; commerceId: string; screens: DeviceRow[]; onBack: () => void }) {
-    const events: ScheduleEvent[] = useMemo(() => schedule.events || [], [schedule.events]);
+    const allEvents: ScheduleEvent[] = useMemo(() => schedule.events || [], [schedule.events]);
+    // El calendario muestra la semana tipo; las fechas especiales van aparte.
+    const events = useMemo(() => weeklyEvents(allEvents), [allEvents]);
     const saveEvent = useSaveScheduleEvent(commerceId);
     const deleteEvent = useDeleteScheduleEvent(commerceId);
     const updateInfo = useUpdateScheduleInfo(commerceId);
@@ -234,6 +246,7 @@ function ScheduleDetail({ schedule, commerceId, screens, onBack }: { schedule: S
     const now = useNowMinute();
     const [day, setDay] = useState(() => now.getDay());
     const [editing, setEditing] = useState<FranjaValue | null>(null);
+    const [special, setSpecial] = useState<SpecialValue | null>(null);
     const [sending, setSending] = useState(false);
     const [name, setName] = useState<string>(schedule.name);
     const [nameFocused, setNameFocused] = useState(false);
@@ -324,7 +337,71 @@ function ScheduleDetail({ schedule, commerceId, screens, onBack }: { schedule: S
         });
     };
 
-    const active = findActiveScheduleEvent(events, now);
+    const active = findActiveScheduleEvent(allEvents, now);
+    const todayKey = scheduleDayKey(now);
+    const todaySpecial = allEvents.find(e => specialCoversDay(e, todayKey));
+    const upcoming = upcomingSpecials(allEvents, now);
+    const past = pastSpecials(allEvents, now);
+    const weekSpecials = specialsThisWeek(allEvents, now);
+
+    const contentOf = (ev: ScheduleEvent): PickedContent | null => ev.campaign ? { kind: 'campaign', id: ev.campaign.id, name: ev.campaign.name }
+        : ev.media ? { kind: 'media', id: ev.media.id, name: ev.media.name, type: ev.media.type } : null;
+
+    const openSpecial = (ev?: ScheduleEvent) => {
+        if (ev) {
+            const r = eventRange(ev);
+            setSpecial({ id: ev.id, label: ev.label || '', dateFrom: ev.date_from!, dateTo: ev.date_to || null, start: r?.start ?? 0, end: r?.end ?? MINUTES_PER_DAY, content: contentOf(ev) });
+        } else {
+            setSpecial({ label: '', dateFrom: todayKey, dateTo: null, start: 0, end: MINUTES_PER_DAY, content: null });
+        }
+    };
+
+    const saveSpecial = async (v: SpecialValue) => {
+        try {
+            await saveEvent.mutateAsync({
+                scheduleId: schedule.id,
+                event: {
+                    id: v.id,
+                    campaign_id: v.content?.kind === 'campaign' ? v.content.id : null,
+                    media_id: v.content?.kind === 'media' ? v.content.id : null,
+                    campaign: v.content?.kind === 'campaign' ? { id: v.content.id, name: v.content.name } : null,
+                    media: v.content?.kind === 'media' ? { id: v.content.id, name: v.content.name, type: v.content.type } : null,
+                    start_time: toStoredTime(v.start),
+                    end_time: toStoredTime(v.end),
+                    days_of_week: [],
+                    date_from: v.dateFrom,
+                    date_to: v.dateTo,
+                    label: v.label || null,
+                },
+            });
+            setSpecial(null);
+            toast.success('Fecha especial guardada');
+        } catch (err) {
+            toast.error(err instanceof MissingSpecialDatesError
+                ? 'Falta un paso en el servidor: hay que correr el SQL de fechas especiales (docs/programacion.md).'
+                : 'No se pudo guardar. Revisá la conexión y probá de nuevo.');
+        }
+    };
+
+    const deleteSpecial = async () => {
+        if (!special?.id) return;
+        try {
+            await deleteEvent.mutateAsync({ scheduleId: schedule.id, eventId: special.id });
+            setSpecial(null);
+            toast.success('Fecha especial quitada');
+        } catch {
+            toast.error('No se pudo quitar. Probá de nuevo.');
+        }
+    };
+
+    const clearPast = async () => {
+        try {
+            for (const ev of past) await deleteEvent.mutateAsync({ scheduleId: schedule.id, eventId: ev.id });
+            toast.success('Listo');
+        } catch {
+            toast.error('No se pudieron borrar todas. Probá de nuevo.');
+        }
+    };
 
     return (
         <div className="flex flex-col min-h-0 h-full gap-4">
@@ -359,10 +436,43 @@ function ScheduleDetail({ schedule, commerceId, screens, onBack }: { schedule: S
                 </div>
                 <div className="rounded-xl border border-border bg-card p-3 text-sm space-y-1">
                     <p><span className="text-muted-foreground">Ahora pasa:</span> <span className="font-medium">{active ? eventName(active) : (base?.name || 'pantalla negra')}</span></p>
+                    {todaySpecial && <p className="text-rose-700 dark:text-rose-300">Hoy es fecha especial: {todaySpecial.label || eventName(todaySpecial)} ({describeRange(todaySpecial)})</p>}
                     <p className={screens.length ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}>
                         {screens.length ? `En pantalla: ${screens.map(screenName).join(', ')}` : 'Todavía no está en ninguna pantalla. Tocá "Mandar a pantallas".'}
                     </p>
                 </div>
+            </div>
+
+            <div className="rounded-xl border border-border bg-card p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-medium flex items-center gap-1.5"><CalendarHeart className="w-4 h-4 text-rose-500" /> Fechas especiales <span className="font-normal text-muted-foreground">(feriados, Navidad, eventos: le ganan a la semana)</span></p>
+                    <Button size="sm" variant="outline" onClick={() => openSpecial()}><Plus className="w-4 h-4 mr-1.5" /> Agregar fecha</Button>
+                </div>
+                {upcoming.length > 0 ? (
+                    <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                        {upcoming.map(ev => (
+                            <li key={ev.id}>
+                                <button type="button" onClick={() => openSpecial(ev)} className="w-full text-left rounded-lg border border-border px-3 py-2 hover:border-rose-400/60 hover:bg-muted/50">
+                                    <span className="block text-sm font-semibold">
+                                        {formatSpecialDates(ev)}{ev.label ? ` · ${ev.label}` : ''}
+                                        {specialCoversDay(ev, todayKey) && <span className="ml-1.5 rounded-full bg-rose-600 px-1.5 py-0.5 text-[10px] font-bold text-white align-middle">HOY</span>}
+                                    </span>
+                                    <span className="block text-xs text-muted-foreground truncate">
+                                        {eventRange(ev)?.start === 0 && eventRange(ev)?.end === MINUTES_PER_DAY ? 'Todo el día' : describeRange(ev)} · {eventName(ev)}
+                                    </span>
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                ) : (
+                    <p className="mt-1 text-xs text-muted-foreground">No hay ninguna cargada. Ejemplo: el 24/12 de 18 a 24 h, la playlist de Navidad.</p>
+                )}
+                {past.length > 0 && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                        {past.length === 1 ? '1 fecha ya pasó' : `${past.length} fechas ya pasaron`} ·{' '}
+                        <button type="button" onClick={clearPast} disabled={deleteEvent.isPending} className="text-indigo-600 dark:text-indigo-400 hover:underline">Borrarlas</button>
+                    </p>
+                )}
             </div>
 
             {legend.length > 0 && (
@@ -414,11 +524,22 @@ function ScheduleDetail({ schedule, commerceId, screens, onBack }: { schedule: S
                     events={events}
                     defaultName={base?.name || null}
                     days={narrow ? [day] : WEEK}
+                    specialByDay={weekSpecials}
                     onCreate={(d, start, end) => setEditing({ content: null, days: [d], start, end })}
                     onEdit={ev => { if (!ev.id.startsWith('tmp-')) setEditing(fromEvent(ev)); }}
                     onChangeTime={handleChangeTime}
                 />
             </div>
+
+            <SpecialDateDialog
+                isOpen={!!special}
+                onClose={() => setSpecial(null)}
+                commerceId={commerceId}
+                initial={special || { label: '', dateFrom: todayKey, dateTo: null, start: 0, end: MINUTES_PER_DAY, content: null }}
+                onSave={saveSpecial}
+                onDelete={special?.id ? deleteSpecial : undefined}
+                saving={saveEvent.isPending || deleteEvent.isPending}
+            />
 
             <FranjaDialog
                 isOpen={!!editing}

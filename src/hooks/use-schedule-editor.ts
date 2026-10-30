@@ -11,6 +11,9 @@ type ScheduleRow = any;
 
 const key = (commerceId: string) => ['display_schedules', commerceId];
 
+// Falta correr el SQL de fechas especiales (20261102).
+export class MissingSpecialDatesError extends Error {}
+
 export interface EventDraft {
     id?: string;
     campaign_id: string | null;
@@ -18,6 +21,10 @@ export interface EventDraft {
     start_time: string;
     end_time: string;
     days_of_week: number[];
+    // Fecha especial (solo si es una): AAAA-MM-DD y un nombre.
+    date_from?: string | null;
+    date_to?: string | null;
+    label?: string | null;
     // Para mostrarlo mientras se guarda.
     campaign?: ScheduleEvent['campaign'];
     media?: ScheduleEvent['media'];
@@ -52,12 +59,18 @@ export const useSaveScheduleEvent = (commerceId: string) => {
                 start_time: event.start_time,
                 end_time: event.end_time,
                 days_of_week: event.days_of_week,
+                // Las columnas de fechas solo se mandan para las fechas especiales:
+                // así la semana tipo se sigue guardando aunque falte el SQL.
+                ...(event.date_from !== undefined ? { date_from: event.date_from, date_to: event.date_to ?? null, label: event.label ?? null } : {}),
             };
             const query = event.id
                 ? supabase.from('display_schedule_events').update(row).eq('id', event.id)
                 : supabase.from('display_schedule_events').insert({ ...row, schedule_id: scheduleId });
             const { error } = await query;
-            if (error) throw error;
+            if (error) {
+                if (/date_from|date_to|label/.test(error.message || '')) throw new MissingSpecialDatesError(error.message);
+                throw error;
+            }
         },
         onMutate: ({ scheduleId, event }) => apply(scheduleId, s => {
             const events = [...(s.events || [])];
