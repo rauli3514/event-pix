@@ -1,4 +1,6 @@
 import { useState, useMemo } from 'react';
+import { useParams } from 'react-router-dom';
+import { PlacaTemplatesStrip } from '@/components/display/PlacaTemplatesStrip';
 import { useTemplateCategories, useTemplates } from '@/hooks/use-display-templates';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,6 +9,7 @@ import { Search, Eye, PenTool, LayoutTemplate, MonitorSmartphone, Monitor, Layer
 import { cn } from '@/lib/utils';
 
 export default function WorkspaceTemplates() {
+    const { commerceId } = useParams<{ commerceId: string }>();
     const { data: categories = [], isLoading: loadingCats } = useTemplateCategories();
     // Cargamos todas las plantillas desde el inicio
     const { data: allTemplates = [], isLoading: loadingTemps } = useTemplates();
@@ -104,11 +107,15 @@ export default function WorkspaceTemplates() {
 
             {/* Grid de Plantillas */}
             <div className="flex-1 overflow-y-auto p-6 bg-background/50">
+                {commerceId && <PlacaTemplatesStrip commerceId={commerceId} />}
+                {!loadingTemps && allTemplates.length > 0 && (
+                    <h2 className="text-lg font-bold mb-4">Plantillas para editar en Canva</h2>
+                )}
                 {loadingTemps ? (
                     <div className="flex items-center justify-center h-40">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00C4CC]"></div>
                     </div>
-                ) : filteredTemplates.length === 0 ? (
+                ) : allTemplates.length === 0 ? null : filteredTemplates.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-center p-8 border border-dashed border-border rounded-3xl bg-card/30 max-w-lg mx-auto">
                         <LayoutTemplate className="w-16 h-16 text-muted-foreground/30 mb-4" />
                         <h3 className="text-xl font-bold text-foreground">No hay plantillas</h3>
