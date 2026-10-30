@@ -13,7 +13,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAssignContentToDevice, useDisplayCampaigns, useDisplayDevices, useUpdateCampaign } from '@/hooks/use-display-hub';
 import { useDisplayMedia, useUploadDisplayMedia } from '@/hooks/use-display-media';
 import { useVideoUploadCheck } from '@/hooks/use-video-upload-check';
-import { useLocalDay } from '@/hooks/use-local-day';
+import { useNowMinute } from '@/hooks/use-now-minute';
+import { useWeatherNow } from '@/hooks/use-weather-now';
+import { ItemRulesEditor } from '@/components/display/ItemRulesEditor';
+import {
+    WEATHER_RULES, describeSchedule, itemHasRules, itemHasSchedule, itemNowStatus, itemWeatherRule, readLastPlace, weatherPlacesOf,
+} from '@/lib/itemRules';
 import type { DisplayCampaignV2, DisplayFitMode, DisplayMedia, DisplayTransition, UniversalElement } from '@/types/display';
 import { UploadMediaModal } from '@/components/display/UploadMediaModal';
 import { PlaylistPreviewModal } from '@/components/display/PlaylistPreviewModal';
@@ -23,7 +28,7 @@ import { ContentThumb } from '@/components/display/ContentThumb';
 import { appKindOf } from '@/lib/appCovers';
 import {
     DEFAULT_ITEM_DURATION, dayKeyPlus, formatClock, formatDayShort, formatDuration, isVideoItem, itemDateStatus,
-    itemSeconds, itemsActiveOn, loopDuration,
+    itemSeconds, loopDuration, localDayKey,
     mediaToPlaylistItem, toPlaylistV2, videoSeconds,
 } from '@/lib/playlistItems';
 
@@ -74,6 +79,18 @@ function Thumb({ item, className = 'w-14 h-9' }: { item: AnyItem; className?: st
         <div className={`${className} shrink-0 rounded-md overflow-hidden bg-muted border border-border`}>
             <ContentThumb item={item} className="w-full h-full pointer-events-none" iconClassName="w-4 h-4" />
         </div>
+    );
+}
+
+// Regla de un elemento ("Lun a Vie · 7 a 11 h", "Si llueve"); apagada si ahora no toca.
+function RuleBadge({ children, off, tone, note }: { children: React.ReactNode; off: boolean; tone: 'violet' | 'sky'; note?: string }) {
+    const color = off
+        ? 'bg-muted text-muted-foreground'
+        : tone === 'violet' ? 'bg-violet-500/15 text-violet-700 dark:text-violet-300' : 'bg-sky-500/15 text-sky-700 dark:text-sky-300';
+    return (
+        <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${color}`}>
+            {children}{off && <span className="font-normal"> · {note || 'ahora no'}</span>}
+        </span>
     );
 }
 
@@ -254,11 +271,19 @@ const PlaylistBuilder = () => {
         setDragOverIndex(null);
     };
 
-    // Lo que se ve hoy (sin lo vencido ni lo que todavía no empieza).
-    const today = useLocalDay();
-    const activeItems = itemsActiveOn(items, today);
-    const offDate = items.length - activeItems.length;
+    // Lo que se ve ahora: sin lo vencido ni lo que todavía no empieza, y
+    // respetando los días, horarios y clima de cada elemento.
+    const now = useNowMinute();
+    const today = localDayKey(now);
+    const weatherPlaces = weatherPlacesOf(items);
+    const { weatherOf } = useWeatherNow(weatherPlaces);
+    const nowStatus = (item: AnyItem) => itemNowStatus(item, now, weatherOf);
+    const activeItems = items.filter(item => nowStatus(item) === 'active');
+    const offDate = items.filter(item => itemDateStatus(item, today) !== 'active').length;
+    const offRules = items.length - activeItems.length - offDate;
+    const withRules = items.some(itemHasRules);
     const loop = loopDuration(activeItems);
+    const defaultPlace = weatherPlaces[0] || readLastPlace();
 
     // ---- Paso 3: pantallas ----
     const screens = (devices as AnyItem[]).filter(d => d.pairing_status === 'linked');
@@ -465,8 +490,9 @@ const PlaylistBuilder = () => {
                             {items.length === 0
                                 ? 'Todavía no hay nada en la playlist.'
                                 : <>
-                                    {items.length} {items.length === 1 ? 'elemento' : 'elementos'} · una vuelta dura <strong className="text-foreground">{loop.exact ? '' : '~'}{formatDuration(loop.seconds)}</strong> · se repite sin parar
+                                    {items.length} {items.length === 1 ? 'elemento' : 'elementos'} · una vuelta dura{withRules ? ' ahora' : ''} <strong className="text-foreground">{loop.exact ? '' : '~'}{formatDuration(loop.seconds)}</strong> · se repite sin parar
                                     {offDate > 0 && <span className="text-amber-600 dark:text-amber-400"> · {offDate === 1 ? '1 está fuera de fecha y hoy no se ve' : `${offDate} están fuera de fecha y hoy no se ven`}</span>}
+                                    {offRules > 0 && <span className="text-violet-600 dark:text-violet-400"> · {offRules === 1 ? '1 no se ve ahora por su horario o el clima' : `${offRules} no se ven ahora por su horario o el clima`}</span>}
                                 </>}
                         </p>
                         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
@@ -518,6 +544,9 @@ const PlaylistBuilder = () => {
                                         const repeats = video && real && (Number(item.duration) || 0) > real;
                                         const expanded = expandedId === item.id;
                                         const dateStatus = itemDateStatus(item, today);
+                                        const status = nowStatus(item);
+                                        const scheduleText = itemHasSchedule(item) ? describeSchedule(item) : '';
+                                        const weatherRule = itemWeatherRule(item);
                                         const isDragOver = dragOverIndex === index && draggedIndex !== index;
                                         return (
                                             <li
@@ -541,11 +570,23 @@ const PlaylistBuilder = () => {
                                                     <Thumb item={item} className="w-12 h-8 sm:w-16 sm:h-10" />
                                                     <div className="flex-1 min-w-0">
                                                         <p className="flex items-center gap-2 min-w-0">
-                                                            <span className={`text-sm font-medium truncate ${dateStatus === 'active' ? '' : 'text-muted-foreground'}`}>{item.content || 'Sin nombre'}</span>
+                                                            <span className={`text-sm font-medium truncate ${status === 'active' ? '' : 'text-muted-foreground'}`}>{item.content || 'Sin nombre'}</span>
                                                             {dateStatus === 'expired' && <span className="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold bg-rose-500/15 text-rose-600 dark:text-rose-400">Vencido</span>}
                                                             {dateStatus === 'upcoming' && <span className="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold bg-sky-500/15 text-sky-700 dark:text-sky-300">Empieza el {formatDayShort(item.validFrom)}</span>}
                                                             {dateStatus === 'active' && item.validUntil && <span className="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-300">Hasta el {formatDayShort(item.validUntil)}</span>}
                                                         </p>
+                                                        {dateStatus === 'active' && (scheduleText || weatherRule) && (
+                                                            <p className="flex flex-wrap items-center gap-1 mt-0.5">
+                                                                {scheduleText && (
+                                                                    <RuleBadge off={status === 'off_schedule'} tone="violet">{scheduleText}</RuleBadge>
+                                                                )}
+                                                                {weatherRule && (
+                                                                    <RuleBadge off={status === 'off_weather' || status === 'no_weather'} tone="sky" note={status === 'no_weather' ? 'sin datos del clima' : undefined}>
+                                                                        {WEATHER_RULES[weatherRule.when].badge}
+                                                                    </RuleBadge>
+                                                                )}
+                                                            </p>
+                                                        )}
                                                         <button onClick={() => setExpandedId(expanded ? null : item.id)} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
                                                             <span className="hidden sm:inline">{itemKind ? kindText(item) : 'Contenido'} · más opciones</span>
                                                             <span className="sm:hidden">Opciones</span>
@@ -643,6 +684,12 @@ const PlaylistBuilder = () => {
                                                             </div>
                                                             <p className="text-xs text-muted-foreground">Fuera de estas fechas no se muestra: no hace falta acordarse de sacarlo.</p>
                                                         </div>
+                                                        <ItemRulesEditor
+                                                            item={item}
+                                                            onChange={patch => updateItem(item.id, patch as Partial<UniversalElement>)}
+                                                            defaultPlace={defaultPlace}
+                                                            weatherOf={weatherOf}
+                                                        />
                                                         {video && (
                                                             <div className="space-y-1.5 sm:col-span-2">
                                                                 <p className="text-xs font-medium text-muted-foreground">Si el video es corto, repetirlo hasta cumplir</p>
