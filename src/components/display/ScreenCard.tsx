@@ -25,10 +25,18 @@ interface Props {
     onEdit: () => void;
     onMove: () => void;
     onDelete: () => void;
+    // Arrastrar la tarjeta (para soltarla en otra zona).
+    draggable?: boolean;
+    dragging?: boolean;
+    onDragStart?: () => void;
+    onDragEnd?: () => void;
+    // Recibir otra tarjeta arrastrada (para cambiar el orden).
+    dropProps?: Pick<React.HTMLAttributes<HTMLElement>, 'onDragOver' | 'onDragLeave' | 'onDrop'>;
+    dropHighlight?: boolean;
 }
 
 // Una pantalla: foto real (o lo que tiene asignado), estado y acciones.
-export function ScreenCard({ device: d, content, shot, nowPlaying, zoneName, now, onChangeContent, onQr, onPreview, onEdit, onMove, onDelete }: Props) {
+export function ScreenCard({ device: d, content, shot, nowPlaying, zoneName, now, onChangeContent, onQr, onPreview, onEdit, onMove, onDelete, draggable, dragging, onDragStart, onDragEnd, dropProps, dropHighlight }: Props) {
     const online = d.derived_status === 'online';
     const qr = parseScreenQr(d.qr_overlay);
     const meta = [
@@ -38,7 +46,17 @@ export function ScreenCard({ device: d, content, shot, nowPlaying, zoneName, now
     ].filter(Boolean).join(' · ');
 
     return (
-        <article className={`group/card relative bg-card border rounded-2xl overflow-hidden flex flex-col transition-colors hover:border-indigo-500/40 ${online ? 'border-border' : 'border-amber-500/30'}`}>
+        <article
+            draggable={draggable}
+            onDragStart={e => {
+                e.dataTransfer.setData('text/plain', d.id);
+                e.dataTransfer.effectAllowed = 'move';
+                onDragStart?.();
+            }}
+            onDragEnd={onDragEnd}
+            {...dropProps}
+            className={`group/card relative bg-card border rounded-2xl overflow-hidden flex flex-col transition-all hover:border-indigo-500/40 ${online ? 'border-border' : 'border-amber-500/30'} ${draggable ? 'cursor-grab active:cursor-grabbing' : ''} ${dragging ? 'opacity-40 scale-[0.98]' : ''} ${dropHighlight ? 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-background' : ''}`}
+        >
             {/* Línea de estado arriba */}
             <span className={`absolute inset-x-0 top-0 h-0.5 z-10 ${online ? 'bg-emerald-500' : 'bg-amber-500'}`} aria-hidden />
             <ScreenPhoto
@@ -60,7 +78,7 @@ export function ScreenCard({ device: d, content, shot, nowPlaying, zoneName, now
                     </span>
                 )}
             >
-                <Link to={`/admin/display/${d.id}`} className="absolute inset-0" title="Ver detalles de la pantalla" aria-label={`Ver detalles de ${screenName(d)}`} />
+                <button type="button" onClick={onChangeContent} className="absolute inset-0 cursor-pointer" title="Cambiar el contenido de esta pantalla" aria-label={`Cambiar el contenido de ${screenName(d)}`} />
                 <span className="absolute top-2 right-2 flex gap-1 pointer-events-none">
                     {qr && (
                         <span className="rounded-md bg-white/90 px-1.5 py-0.5 text-[11px] font-bold text-black flex items-center gap-1"><QrCode className="w-3 h-3" /> QR</span>

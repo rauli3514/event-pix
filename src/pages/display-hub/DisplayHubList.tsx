@@ -56,6 +56,18 @@ const DisplayHubList = () => {
     const [changing, setChanging] = useState<AnyDevice>(null);
     const [qrFor, setQrFor] = useState<AnyDevice>(null);
     const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+    // Arrastrar una pantalla a otra zona.
+    const [draggingId, setDraggingId] = useState<string | null>(null);
+    const [dropKey, setDropKey] = useState<string | null>(null);
+    const [dropCardId, setDropCardId] = useState<string | null>(null);
+    // Orden propio de las tarjetas: el guardado en la base (sort_order) o, si
+    // todavía no se corrió el SQL, el de este navegador. Mientras se guarda, el nuevo.
+    const orderKey = `screens_order:${commerceId}`;
+    const [localOrder, setLocalOrder] = useState<Record<string, number>>(() => {
+        try { return JSON.parse(localStorage.getItem(`screens_order:${commerceId}`) || '{}'); } catch { return {}; }
+    });
+    const [pendingOrder, setPendingOrder] = useState<Record<string, number>>({});
+    const [pendingZone, setPendingZone] = useState<Record<string, string>>({});
     const [search, setSearch] = useState('');
     const [selectedGroupId, setSelectedGroupId] = useState<string | 'all' | 'unassigned'>('all');
     
@@ -152,6 +164,9 @@ const DisplayHubList = () => {
         return out;
     };
 
+    const zoneOf = (d: AnyDevice): string => pendingZone[d.id] ?? (d.group_id || '');
+    const orderOf = (d: AnyDevice): number | null => pendingOrder[d.id] ?? d.sort_order ?? localOrder[d.id] ?? null;
+
     const filteredLinkedDevices = linkedDevices.filter(device => {
         // Status filter
         const matchesStatus = filter === 'all' 
@@ -191,17 +206,108 @@ const DisplayHubList = () => {
     const sections = useMemo(() => {
         const map = new Map<string, AnyDevice[]>();
         for (const d of filteredLinkedDevices) {
-            const key = d.group_id || '';
+            const key = zoneOf(d);
             if (!map.has(key)) map.set(key, []);
             map.get(key)!.push(d);
         }
+        // El orden propio primero; las que no tienen, después (en línea primero).
         const sortDevices = (list: AnyDevice[]) => list.sort((a, b) =>
-            (a.derived_status === 'online' ? 0 : 1) - (b.derived_status === 'online' ? 0 : 1) || screenName(a).localeCompare(screenName(b)));
+            (orderOf(a) ?? 1e9) - (orderOf(b) ?? 1e9)
+            || (a.derived_status === 'online' ? 0 : 1) - (b.derived_status === 'online' ? 0 : 1)
+            || screenName(a).localeCompare(screenName(b)));
         return [...map.entries()]
             .map(([key, list]) => ({ key, name: key ? zonePath(key) || 'Zona' : 'Sin zona', devices: sortDevices(list) }))
             .sort((a, b) => (a.key ? 0 : 1) - (b.key ? 0 : 1) || a.name.localeCompare(b.name));
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [filteredLinkedDevices.map(d => d.id + d.derived_status + d.group_id).join(), linkGroups]);
+    }, [filteredLinkedDevices.map(d => d.id + d.derived_status + d.group_id + d.sort_order).join(), linkGroups, pendingOrder, pendingZone, localOrder]);
+
+    // Zona destino: id de la zona, o '' para "sin zona".
+    const moveToZone = (deviceId: string, zoneId: string) => {
+        const device = linkedDevices.find(d => d.id === deviceId);
+        setDraggingId(null);
+        setDropKey(null);
+        if (!device || (device.group_id || '') === zoneId) return;
+        updateDevice.mutate({ id: deviceId, updates: { group_id: zoneId || null } }, {
+            onSuccess: () => toast.success(`${screenName(device)} → ${zoneId ? zonePath(zoneId) : 'sin zona'}`),
+            onError: () => toast.error('No se pudo cambiar de zona. Probá de nuevo.'),
+        });
+    };
+    // Soltar una tarjeta sobre otra: queda justo antes, en la zona de esa tarjeta.
+    const reorder = async (dragId: string, targetId: string) => {
+        setDraggingId(null);
+        setDropKey(null);
+        setDropCardId(null);
+        if (dragId === targetId) return;
+        const dragged = linkedDevices.find(d => d.id === dragId);
+        const target = linkedDevices.find(d => d.id === targetId);
+        if (!dragged || !target) return;
+        const zone = zoneOf(target);
+        const section = sections.find(sec => sec.key === zone);
+        if (!section) return;
+        const list = section.devices.filter(d => d.id !== dragId);
+        list.splice(list.findIndex(d => d.id === targetId), 0, dragged);
+        const order: Record<string, number> = {};
+        list.forEach((d, i) => { order[d.id] = (i + 1) * 10; });
+        const zoneChanged = zoneOf(dragged) !== zone;
+        setPendingOrder(prev => ({ ...prev, ...order }));
+        if (zoneChanged) setPendingZone(prev => ({ ...prev, [dragId]: zone }));
+
+        const results = await Promise.all(list.map(d => supabase
+            .from('display_devices')
+            .update({ sort_order: order[d.id], ...(d.id === dragId && zoneChanged ? { group_id: zone || null } : {}) })
+            .eq('id', d.id)));
+        const failed = results.find(r => r.error);
+        if (failed?.error && /sort_order/.test(failed.error.message || '')) {
+            // Falta el SQL: el orden queda en este navegador (y la zona, en la base).
+            if (zoneChanged) await supabase.from('display_devices').update({ group_id: zone || null }).eq('id', dragId);
+            const next = { ...localOrder, ...order };
+            setLocalOrder(next);
+            try { localStorage.setItem(orderKey, JSON.stringify(next)); } catch { /* sin espacio */ }
+            toast.info('Orden guardado en esta computadora. Para verlo igual en todos lados, corré el SQL del orden (docs/pantallas.md).');
+        } else if (failed?.error) {
+            toast.error('No se pudo guardar el orden. Probá de nuevo.');
+            setPendingOrder(prev => { const n = { ...prev }; list.forEach(d => delete n[d.id]); return n; });
+            setPendingZone(prev => { const n = { ...prev }; delete n[dragId]; return n; });
+            return;
+        } else if (zoneChanged) {
+            toast.success(`${screenName(dragged)} → ${zone ? zonePath(zone) : 'sin zona'}`);
+        }
+        await queryClient.invalidateQueries({ queryKey: ['display_devices'] });
+        setPendingOrder(prev => { const n = { ...prev }; list.forEach(d => delete n[d.id]); return n; });
+        setPendingZone(prev => { const n = { ...prev }; delete n[dragId]; return n; });
+    };
+
+    const cardDropProps = (targetId: string) => ({
+        onDragOver: (e: React.DragEvent) => {
+            if (!draggingId || draggingId === targetId) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            if (dropCardId !== targetId) setDropCardId(targetId);
+        },
+        onDragLeave: () => setDropCardId(prev => (prev === targetId ? null : prev)),
+        onDrop: (e: React.DragEvent) => {
+            e.preventDefault();
+            const id = e.dataTransfer.getData('text/plain') || draggingId;
+            if (id) reorder(id, targetId);
+        },
+    });
+
+    // Props para que algo reciba una pantalla arrastrada.
+    const dropProps = (zoneId: string) => ({
+        onDragOver: (e: React.DragEvent) => {
+            if (!draggingId) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            if (dropKey !== zoneId) setDropKey(zoneId);
+        },
+        onDragLeave: () => setDropKey(prev => (prev === zoneId ? null : prev)),
+        onDrop: (e: React.DragEvent) => {
+            e.preventDefault();
+            const id = e.dataTransfer.getData('text/plain') || draggingId;
+            if (id) moveToZone(id, zoneId);
+        },
+    });
+    const dropRing = (zoneId: string) => (draggingId && dropKey === zoneId ? ' ring-2 ring-indigo-500 ring-offset-2 ring-offset-background' : '');
 
     const openLinkWithCode = (code: string) => {
         setLinkData(prev => ({ ...prev, device_code: code }));
@@ -272,13 +378,13 @@ const DisplayHubList = () => {
                     {groupsList.map(g => {
                         const count = linkedDevices.filter(d => d.group_id && zoneAndChildren(g.id).has(d.group_id)).length;
                         return (
-                            <button key={g.id} type="button" onClick={() => setSelectedGroupId(g.id)} className={zoneChip(selectedGroupId === g.id)}>
+                            <button key={g.id} type="button" onClick={() => setSelectedGroupId(g.id)} className={zoneChip(selectedGroupId === g.id) + dropRing(g.id)} {...dropProps(g.id)}>
                                 {zonePath(g.id)} <span className="tabular-nums opacity-70">{count}</span>
                             </button>
                         );
                     })}
-                    {groupsList.length > 0 && unassignedCount > 0 && (
-                        <button type="button" onClick={() => setSelectedGroupId('unassigned')} className={zoneChip(selectedGroupId === 'unassigned')}>
+                    {groupsList.length > 0 && (unassignedCount > 0 || !!draggingId) && (
+                        <button type="button" onClick={() => setSelectedGroupId('unassigned')} className={zoneChip(selectedGroupId === 'unassigned') + dropRing('')} {...dropProps('')}>
                             Sin zona <span className="tabular-nums opacity-70">{unassignedCount}</span>
                         </button>
                     )}
@@ -286,6 +392,12 @@ const DisplayHubList = () => {
                         <Settings2 className="w-4 h-4" /> {groupsList.length ? 'Organizar zonas' : 'Crear zonas'}
                     </button>
                 </div>
+
+                {draggingId && (
+                    <p className="-mt-3 text-sm text-indigo-600 dark:text-indigo-400">
+                        Soltala sobre otra pantalla para ponerla en ese lugar{groupsList.length > 0 ? ', o sobre una zona para moverla' : ''}.
+                    </p>
+                )}
 
                 {/* TVs prendidas esperando que las vinculen */}
                 {pendingDevices.length > 0 && (
@@ -321,8 +433,9 @@ const DisplayHubList = () => {
                                 <button
                                     type="button"
                                     onClick={() => setCollapsed(prev => ({ ...prev, [section.key]: !isCollapsed }))}
-                                    className="flex items-center gap-2 text-left"
+                                    className={`flex items-center gap-2 text-left rounded-lg pr-2${dropRing(section.key)}`}
                                     aria-expanded={!isCollapsed}
+                                    {...dropProps(section.key)}
                                 >
                                     <span className={`w-1 h-5 rounded-full ${section.key ? 'bg-indigo-500' : 'bg-muted-foreground/40'}`} aria-hidden />
                                     <span className="text-lg font-bold">{section.name}</span>
@@ -350,6 +463,12 @@ const DisplayHubList = () => {
                                             onEdit={() => { setSelectedDevice(d); setEditModalOpen(true); }}
                                             onMove={() => { setMoveDeviceTarget(d); setMoveDeviceModalOpen(true); }}
                                             onDelete={() => handleDeleteDevice(d.id)}
+                                            draggable
+                                            dragging={draggingId === d.id}
+                                            onDragStart={() => setDraggingId(d.id)}
+                                            onDragEnd={() => { setDraggingId(null); setDropKey(null); setDropCardId(null); }}
+                                            dropProps={cardDropProps(d.id)}
+                                            dropHighlight={dropCardId === d.id && draggingId !== d.id}
                                         />
                                     ))}
                                 </div>
