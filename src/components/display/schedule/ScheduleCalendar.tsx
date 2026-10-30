@@ -19,6 +19,8 @@ interface Props {
     onEdit: (event: ScheduleEvent) => void;
     // Mover o estirar una franja: nuevo horario para todos sus días.
     onChangeTime: (event: ScheduleEvent, start: number, end: number) => void;
+    // Días de esta semana con fecha especial (se marcan en el encabezado).
+    specialByDay?: Record<number, string>;
 }
 
 type Drag =
@@ -29,7 +31,7 @@ const snap = (m: number) => Math.round(m / SNAP) * SNAP;
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 // Calendario semanal de una programación.
-export function ScheduleCalendar({ events, defaultName, days = WEEK, onCreate, onEdit, onChangeTime }: Props) {
+export function ScheduleCalendar({ events, defaultName, days = WEEK, onCreate, onEdit, onChangeTime, specialByDay = {} }: Props) {
     const now = useNowMinute();
     const today = now.getDay();
     const nowMin = now.getHours() * 60 + now.getMinutes();
@@ -145,6 +147,11 @@ export function ScheduleCalendar({ events, defaultName, days = WEEK, onCreate, o
                         <span className="hidden md:inline">{DAY_LONG[d]}</span>
                         <span className="md:hidden">{days.length > 1 ? DAY_SHORT[d] : DAY_LONG[d]}</span>
                         {d === today && <span className="ml-1.5 rounded-full bg-indigo-600 px-1.5 py-0.5 text-[10px] font-bold text-white align-middle">HOY</span>}
+                        {specialByDay[d] && (
+                            <span title={`Esta semana: ${specialByDay[d]} (fecha especial)`} className="block text-[10px] font-semibold text-rose-600 dark:text-rose-400 truncate px-1">
+                                ★ {specialByDay[d]}
+                            </span>
+                        )}
                     </div>
                 ))}
             </div>

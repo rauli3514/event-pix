@@ -1,4 +1,4 @@
-import { findActiveScheduleEvent, getEventWindow } from '@/lib/displaySchedule';
+import { findActiveScheduleEvent, getEventWindow, scheduleDayKey, specialCoversDay } from '@/lib/displaySchedule';
 
 // Cómo se ve una programación semanal en el calendario: los bloques de cada
 // día, qué se ve en cada momento (la misma regla que la TV), los huecos con
@@ -13,6 +13,10 @@ export interface ScheduleEvent {
     media_id?: string | null;
     campaign?: { id: string; name: string } | null;
     media?: { id: string; name: string; type?: string; url?: string } | null;
+    // Fecha especial (feriado, Navidad): vale solo esos días y le gana a la semana.
+    date_from?: string | null;
+    date_to?: string | null;
+    label?: string | null;
 }
 
 export const MINUTES_PER_DAY = 24 * 60;
@@ -193,4 +197,56 @@ export function firstVisibleHour(events: ScheduleEvent[]): number {
     const starts = events.map(e => eventRange(e)).filter(Boolean).map(r => r!.start);
     if (starts.length === 0) return 7;
     return Math.max(0, Math.floor(Math.min(...starts) / 60) - 1);
+}
+
+// ---- Fechas especiales ----
+
+export const isSpecial = (ev: ScheduleEvent) => !!ev.date_from;
+export const weeklyEvents = (events: ScheduleEvent[]) => events.filter(e => !isSpecial(e));
+export const specialEvents = (events: ScheduleEvent[]) => events.filter(isSpecial);
+
+const fromKey = (key: string) => {
+    const [y, m, d] = key.split('-').map(Number);
+    return new Date(y, m - 1, d);
+};
+
+// "mié 24/12" o "2/1 al 15/1"
+export function formatSpecialDates(ev: Pick<ScheduleEvent, 'date_from' | 'date_to'>): string {
+    if (!ev.date_from) return '';
+    const short = (key: string) => {
+        const d = fromKey(key);
+        return `${d.getDate()}/${d.getMonth() + 1}`;
+    };
+    if (ev.date_to && ev.date_to !== ev.date_from) return `${short(ev.date_from)} al ${short(ev.date_to)}`;
+    const d = fromKey(ev.date_from);
+    const weekday = d.toLocaleDateString('es-AR', { weekday: 'short' }).replace('.', '');
+    return `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)} ${short(ev.date_from)}`;
+}
+
+// Las que todavía no pasaron (incluye las de hoy), de la más cercana a la más lejana.
+export function upcomingSpecials(events: ScheduleEvent[], now: Date = new Date()): ScheduleEvent[] {
+    const today = scheduleDayKey(now);
+    return specialEvents(events)
+        .filter(e => (e.date_to || e.date_from)! >= today)
+        .sort((a, b) => a.date_from!.localeCompare(b.date_from!) || a.start_time.localeCompare(b.start_time));
+}
+
+export function pastSpecials(events: ScheduleEvent[], now: Date = new Date()): ScheduleEvent[] {
+    const today = scheduleDayKey(now);
+    return specialEvents(events).filter(e => (e.date_to || e.date_from)! < today);
+}
+
+// Fechas especiales de esta semana (lunes a domingo), por día: { 3: 'Navidad' }.
+export function specialsThisWeek(events: ScheduleEvent[], now: Date = new Date()): Record<number, string> {
+    const out: Record<number, string> = {};
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+    for (let i = 0; i < 7; i++) {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        const key = scheduleDayKey(d);
+        const hit = specialEvents(events).find(e => specialCoversDay(e, key));
+        if (hit) out[d.getDay()] = hit.label || 'Fecha especial';
+    }
+    return out;
 }

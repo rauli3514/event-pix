@@ -37,16 +37,44 @@ export function getEventWindow(ev: { start_time?: string | null; end_time?: stri
     return { start, end, crossesMidnight: end < start };
 }
 
-export function isScheduleEventActive(
-    ev: { start_time?: string | null; end_time?: string | null; days_of_week?: number[] | null },
-    now: Date
-): boolean {
-    const win = getEventWindow(ev);
-    const days = ev.days_of_week || [];
-    if (!win || days.length === 0) return false;
+type ScheduleEventLike = {
+    start_time?: string | null;
+    end_time?: string | null;
+    days_of_week?: number[] | null;
+    // Fechas especiales: la franja vale solo esos días (AAAA-MM-DD, inclusive).
+    date_from?: string | null;
+    date_to?: string | null;
+};
 
-    const today = now.getDay();
+const pad2 = (n: number) => String(n).padStart(2, '0');
+// "AAAA-MM-DD" en la hora del equipo.
+export const scheduleDayKey = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
+export const isSpecialDateEvent = (ev: ScheduleEventLike) => !!ev.date_from;
+
+// ¿La fecha especial cubre ese día?
+export function specialCoversDay(ev: ScheduleEventLike, dayKey: string): boolean {
+    if (!ev.date_from) return false;
+    return dayKey >= ev.date_from && dayKey <= (ev.date_to || ev.date_from);
+}
+
+export function isScheduleEventActive(ev: ScheduleEventLike, now: Date): boolean {
+    const win = getEventWindow(ev);
+    if (!win) return false;
     const minutes = now.getHours() * 60 + now.getMinutes();
+
+    if (ev.date_from) {
+        const today = scheduleDayKey(now);
+        if (!win.crossesMidnight) return specialCoversDay(ev, today) && minutes >= win.start && minutes < win.end;
+        const prev = new Date(now);
+        prev.setDate(prev.getDate() - 1);
+        return (specialCoversDay(ev, today) && minutes >= win.start)
+            || (specialCoversDay(ev, scheduleDayKey(prev)) && minutes < win.end);
+    }
+
+    const days = ev.days_of_week || [];
+    if (days.length === 0) return false;
+    const today = now.getDay();
 
     if (!win.crossesMidnight) {
         return days.includes(today) && minutes >= win.start && minutes < win.end;
@@ -57,17 +85,20 @@ export function isScheduleEventActive(
 }
 
 // Evento que corresponde ahora, o null si toca el contenido predeterminado.
-// Si dos eventos se superponen, gana el que empieza más tarde (el más específico).
-export function findActiveScheduleEvent<T extends { start_time?: string | null; end_time?: string | null; days_of_week?: number[] | null }>(
+// Una fecha especial (feriado, Navidad) le gana a la semana tipo. Si dos se
+// superponen, gana la que empieza más tarde (la más específica).
+export function findActiveScheduleEvent<T extends ScheduleEventLike>(
     events: T[] | null | undefined,
     now: Date
 ): T | null {
     const active = (events || []).filter(ev => isScheduleEventActive(ev, now));
     if (active.length === 0) return null;
+    const specials = active.filter(isSpecialDateEvent);
+    const pool = specials.length ? specials : active;
     const minutes = now.getHours() * 60 + now.getMinutes();
     // Minutos transcurridos desde que empezó cada evento (contemplando la medianoche).
     const elapsed = (ev: T) => (minutes - (getEventWindow(ev)?.start ?? 0) + MINUTES_PER_DAY) % MINUTES_PER_DAY;
-    return active.reduce((best, ev) => (elapsed(ev) < elapsed(best) ? ev : best));
+    return pool.reduce((best, ev) => (elapsed(ev) < elapsed(best) ? ev : best));
 }
 
 interface AssignmentLike {
