@@ -1,3 +1,5 @@
+import { drawQrCode, type QrData } from '@/lib/qr';
+
 // "Crear placa": diseños listos para promos, precios y avisos. Se dibujan en
 // un canvas y se guardan como imagen JPG en Medios (la TV la muestra como
 // cualquier foto). Los datos de la placa quedan en metadata.placa para poder
@@ -28,6 +30,7 @@ export interface PlacaData {
     palette: PaletteId;
     fields: PlacaFields;
     photo: PlacaPhoto | null;
+    qr?: QrData | null;      // código QR con su leyenda (opcional)
 }
 
 // ---- Colores ----
@@ -129,6 +132,7 @@ export function placaFromMetadata(metadata: unknown): PlacaData | null {
         palette: PALETTES[p.palette] ? p.palette : PLACA_TEMPLATES[p.template].palette,
         fields: { ...EMPTY_FIELDS, ...(p.fields || {}) },
         photo: p.photo?.url ? { url: p.photo.url, name: p.photo.name } : null,
+        qr: p.qr?.value && p.qr.spec ? { spec: p.qr.spec, value: p.qr.value, caption: p.qr.caption || '' } : null,
     };
 }
 
@@ -343,6 +347,30 @@ function footerText(ctx: Ctx, text: string, x: number, y: number, maxW: number, 
     drawLines(ctx, f, x, y - f.height, color, align);
 }
 
+// Tarjeta blanca con el QR y su leyenda: siempre negro sobre blanco, que es
+// lo que mejor leen los celulares.
+function qrCardSize(qr: QrData, size: number, u: number) {
+    const pc = 22 * u;
+    return { w: size + pc * 2, h: size + pc * 2 + (qr.caption ? 78 * u : 0), pc };
+}
+
+function qrCard(ctx: Ctx, qr: QrData, x: number, y: number, size: number, u: number) {
+    const { w, h, pc } = qrCardSize(qr, size, u);
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.28)';
+    ctx.shadowBlur = 30 * u;
+    ctx.shadowOffsetY = 8 * u;
+    ctx.fillStyle = '#ffffff';
+    roundRect(ctx, x, y, w, h, 26 * u);
+    ctx.fill();
+    ctx.restore();
+    drawQrCode(ctx, qr.value, x + pc, y + pc, size);
+    if (qr.caption) {
+        const t = fitText(ctx, qr.caption, { maxWidth: w - pc * 1.4, maxHeight: 70 * u, maxSize: 30 * u, minSize: 18 * u, weight: 700, maxLines: 2, lineHeight: 1.12 });
+        drawLines(ctx, t, x + w / 2, y + pc + size + 4 * u + (70 * u - t.height) / 2, '#111111', 'center');
+    }
+}
+
 // Dibuja la placa completa en un canvas del tamaño de placaSize().
 export function drawPlaca(ctx: Ctx, data: PlacaData, photo: HTMLImageElement | null) {
     const { width: W, height: H } = placaSize(data.orientation);
@@ -352,6 +380,33 @@ export function drawPlaca(ctx: Ctx, data: PlacaData, photo: HTMLImageElement | n
     const u = Math.min(W, H) / 1080; // unidad: 1 en 1080p
     const pad = 90 * u;
     const img = PLACA_TEMPLATES[data.template].usesPhoto ? photo : null;
+    // QR: en los diseños centrados va a la derecha (horizontal) o abajo
+    // (vertical); en los demás, en una esquina libre.
+    const q = data.qr?.value ? data.qr : null;
+    const qrSize = (v ? 250 : 220) * u;
+    const qc = q ? qrCardSize(q, qrSize, u) : { w: 0, h: 0 };
+    const qrGap = q ? 36 * u : 0;
+    const qrBesides = qc.w + qrGap; // ancho que ocupa al lado de algo
+
+    // Zona para el contenido de los diseños centrados, según dónde va el QR.
+    //   bottom: hasta dónde puede llegar el contenido (para centrarlo en alto).
+    //   drawQr(footerTop): dibuja el QR (abajo, encima del pie, o a la derecha).
+    const centeredArea = (side = pad) => {
+        if (!q) return { cx: W / 2, maxW: W - side * 2, bottom: H, qrBelow: false, drawQr: () => {} };
+        if (!v) {
+            const right = W - side - qrBesides - 40 * u;
+            return {
+                cx: (side + right) / 2, maxW: right - side, bottom: H, qrBelow: false,
+                drawQr: () => qrCard(ctx, q, W - side - qc.w, (H - qc.h) / 2, qrSize, u),
+            };
+        }
+        const footerReserve = data.fields.footer ? 62 * u : 0;
+        const cardTop = H - pad * 0.9 - footerReserve - qc.h;
+        return {
+            cx: W / 2, maxW: W - side * 2, bottom: cardTop - qrGap, qrBelow: true,
+            drawQr: () => qrCard(ctx, q, (W - qc.w) / 2, cardTop, qrSize, u),
+        };
+    };
 
     ctx.save();
     ctx.clearRect(0, 0, W, H);
@@ -388,16 +443,23 @@ export function drawPlaca(ctx: Ctx, data: PlacaData, photo: HTMLImageElement | n
             const footerH = f.footer ? 60 * u : 0;
             const priceH = f.price ? (img ? 210 : 260) * u + (f.oldPrice ? 70 * u : 0) : 0;
             const textH = f.text ? 140 * u : 0;
-            const title = fitText(ctx, f.title, { maxWidth: panel.w, maxHeight: Math.max(120 * u, panel.y + panel.h - y - priceH - textH - footerH - 40 * u), maxSize: (img ? 110 : 140) * u, minSize: 44 * u, weight: 900, maxLines: 4, lineHeight: 1.05 });
+            // El QR abajo a la derecha del panel: el título termina antes y el
+            // texto, el precio y el pie le dejan lugar.
+            const qrTop = panel.y + panel.h - qc.h;
+            let titleMaxH = Math.max(120 * u, panel.y + panel.h - y - priceH - textH - footerH - 40 * u);
+            if (q) titleMaxH = Math.max(120 * u, Math.min(titleMaxH, qrTop - y - textH - 30 * u));
+            const narrow = panel.w - qrBesides;
+            const title = fitText(ctx, f.title, { maxWidth: panel.w, maxHeight: titleMaxH, maxSize: (img ? 110 : 140) * u, minSize: 44 * u, weight: 900, maxLines: 4, lineHeight: 1.05 });
             drawLines(ctx, title, panel.x, y, p.text);
             y += title.height + 24 * u;
             if (f.text) {
-                const t = fitText(ctx, f.text, { maxWidth: panel.w, maxHeight: 120 * u, maxSize: 50 * u, minSize: 28 * u, weight: 500, maxLines: 2, lineHeight: 1.2 });
+                const t = fitText(ctx, f.text, { maxWidth: q ? narrow : panel.w, maxHeight: 120 * u, maxSize: 50 * u, minSize: 28 * u, weight: 500, maxLines: 2, lineHeight: 1.2 });
                 drawLines(ctx, t, panel.x, y, p.soft);
                 y += t.height + 36 * u;
             }
-            if (f.price) priceBlock(ctx, f.price, f.oldPrice, panel.x, y, panel.w, (img ? 150 : 190) * u, p);
-            footerText(ctx, f.footer, panel.x, panel.y + panel.h, panel.w, 40 * u, p.soft);
+            if (f.price) priceBlock(ctx, f.price, f.oldPrice, panel.x, y, q ? narrow : panel.w, (img ? 150 : 190) * u, p);
+            footerText(ctx, f.footer, panel.x, panel.y + panel.h, q ? narrow : panel.w, 40 * u, p.soft);
+            if (q) qrCard(ctx, q, panel.x + panel.w - qc.w, qrTop, qrSize, u);
             break;
         }
         case 'precio': {
@@ -445,6 +507,7 @@ export function drawPlaca(ctx: Ctx, data: PlacaData, photo: HTMLImageElement | n
                 priceBlock(ctx, f.price, '', W - pad - pw, H - pad - footerH - priceSize * 1.35, pw, priceSize, p);
             }
             footerText(ctx, f.footer, pad, H - pad * 0.7, W - pad * 2, 40 * u, softColor);
+            if (q) qrCard(ctx, q, W - pad - qc.w, pad, qrSize, u);
             break;
         }
         case 'combo': {
@@ -472,19 +535,24 @@ export function drawPlaca(ctx: Ctx, data: PlacaData, photo: HTMLImageElement | n
             const priceH = f.price ? 230 * u : 0;
             if (lines.length) {
                 const avail = col.y + col.h - y - priceH - footerH - 20 * u;
-                const size = Math.max(30 * u, Math.min(62 * u, avail / (lines.length * 1.45)));
-                ctx.font = `600 ${size}px ${TITLE_FONT}`;
+                const maxSize = Math.max(30 * u, Math.min(62 * u, avail / (lines.length * 1.45)));
+                const lineW = col.w - maxSize - (q ? qrBesides : 0);
+                // Todos los renglones del mismo tamaño: el del más largo.
+                const size = Math.min(...lines.map(line =>
+                    fitText(ctx, line, { maxWidth: lineW, maxHeight: maxSize * 1.2, maxSize, minSize: maxSize * 0.6, weight: 600, maxLines: 1 }).size));
                 lines.forEach((line, i) => {
                     const ly = y + i * size * 1.45;
                     ctx.fillStyle = p.accent;
                     ctx.beginPath(); ctx.arc(col.x + size * 0.3, ly + size * 0.55, size * 0.2, 0, Math.PI * 2); ctx.fill();
-                    const t = fitText(ctx, line, { maxWidth: col.w - size, maxHeight: size * 1.2, maxSize: size, minSize: size * 0.6, weight: 600, maxLines: 1 });
+                    const t = fitText(ctx, line, { maxWidth: lineW, maxHeight: size * 1.2, maxSize: size, minSize: size, weight: 600, maxLines: 1 });
                     drawLines(ctx, t, col.x + size * 0.85, ly, p.text);
                 });
                 y += lines.length * size * 1.45 + 30 * u;
             }
-            if (f.price) priceBlock(ctx, f.price, '', col.x, Math.min(y, col.y + col.h - priceH - footerH), col.w, 160 * u, p);
-            footerText(ctx, f.footer, col.x, col.y + col.h, col.w, 40 * u, p.soft);
+            if (f.price) priceBlock(ctx, f.price, '', col.x, Math.min(y, col.y + col.h - priceH - footerH), col.w - (q ? qrBesides : 0), 160 * u, p);
+            footerText(ctx, f.footer, col.x, col.y + col.h, col.w - (q ? qrBesides : 0), 40 * u, p.soft);
+            // El QR al lado del precio, abajo a la derecha de la columna.
+            if (q) qrCard(ctx, q, col.x + col.w - qc.w, Math.max(col.y + title.height + 36 * u, col.y + col.h - qc.h), qrSize, u);
             break;
         }
         case 'descuento': {
@@ -495,13 +563,14 @@ export function drawPlaca(ctx: Ctx, data: PlacaData, photo: HTMLImageElement | n
                 ctx.fillRect(0, 0, W, H);
                 ctx.globalAlpha = 1;
             } else decor(ctx, p, W, H);
-            const cx = W / 2;
-            const big = fitText(ctx, f.badge || '%', { maxWidth: W - pad * 2, maxHeight: (v ? 560 : 440) * u, maxSize: (v ? 330 : 400) * u, minSize: 80 * u, family: DISPLAY_FONT, weight: 400, maxLines: 2, lineHeight: 1, uppercase: true });
-            const title = f.title ? fitText(ctx, f.title, { maxWidth: W - pad * 2, maxHeight: 240 * u, maxSize: 100 * u, minSize: 44 * u, weight: 900, maxLines: 2, lineHeight: 1.05 }) : null;
-            const text = f.text ? fitText(ctx, f.text, { maxWidth: W - pad * 2, maxHeight: 110 * u, maxSize: 54 * u, minSize: 28 * u, weight: 500, maxLines: 2, lineHeight: 1.2 }) : null;
+            const area = centeredArea();
+            const cx = area.cx;
+            const big = fitText(ctx, f.badge || '%', { maxWidth: area.maxW, maxHeight: (v ? 560 : 440) * u, maxSize: (v ? 330 : 400) * u, minSize: 80 * u, family: DISPLAY_FONT, weight: 400, maxLines: 2, lineHeight: 1, uppercase: true });
+            const title = f.title ? fitText(ctx, f.title, { maxWidth: area.maxW, maxHeight: 240 * u, maxSize: 100 * u, minSize: 44 * u, weight: 900, maxLines: 2, lineHeight: 1.05 }) : null;
+            const text = f.text ? fitText(ctx, f.text, { maxWidth: area.maxW, maxHeight: 110 * u, maxSize: 54 * u, minSize: 28 * u, weight: 500, maxLines: 2, lineHeight: 1.2 }) : null;
             const gap = 34 * u;
             const total = big.height + (title ? title.height + gap : 0) + (text ? text.height + gap : 0);
-            let y = (H - total) / 2 - (f.footer ? 30 * u : 0);
+            let y = (area.bottom - total) / 2 - (f.footer && !area.qrBelow ? 30 * u : 0);
             ctx.save();
             ctx.shadowColor = 'rgba(0,0,0,0.25)';
             ctx.shadowBlur = 30 * u;
@@ -510,7 +579,8 @@ export function drawPlaca(ctx: Ctx, data: PlacaData, photo: HTMLImageElement | n
             y += big.height + gap;
             if (title) { drawLines(ctx, title, cx, y, p.text, 'center'); y += title.height + gap; }
             if (text) drawLines(ctx, text, cx, y, p.soft, 'center');
-            footerText(ctx, f.footer, cx, H - pad * 0.8, W - pad * 2, 42 * u, p.soft, 'center');
+            footerText(ctx, f.footer, cx, H - pad * 0.8, area.maxW, 42 * u, p.soft, 'center');
+            area.drawQr();
             break;
         }
         case 'aviso': {
@@ -519,31 +589,34 @@ export function drawPlaca(ctx: Ctx, data: PlacaData, photo: HTMLImageElement | n
             ctx.lineWidth = 10 * u;
             roundRect(ctx, pad * 0.5, pad * 0.5, W - pad, H - pad, 40 * u);
             ctx.stroke();
-            const cx = W / 2;
-            const maxW = W - pad * 3;
-            const title = fitText(ctx, f.title, { maxWidth: maxW, maxHeight: (v ? 800 : 480) * u, maxSize: (v ? 130 : 140) * u, minSize: 50 * u, weight: 900, maxLines: v ? 6 : 4, lineHeight: 1.08 });
+            const area = centeredArea(pad * 1.5);
+            const cx = area.cx;
+            const maxW = area.maxW;
+            const title = fitText(ctx, f.title, { maxWidth: maxW, maxHeight: Math.min((v ? 800 : 480) * u, area.bottom - pad * 2), maxSize: (v ? 130 : 140) * u, minSize: 50 * u, weight: 900, maxLines: v ? 6 : 4, lineHeight: 1.08 });
             const text = f.text ? fitText(ctx, f.text, { maxWidth: maxW, maxHeight: 200 * u, maxSize: 60 * u, minSize: 30 * u, weight: 500, maxLines: 3, lineHeight: 1.25 }) : null;
             const badgeH = f.badge ? 38 * u * 1.8 + 50 * u : 0;
             const gap = 44 * u;
             const total = badgeH + title.height + (text ? gap + text.height : 0);
-            let y = (H - total) / 2;
+            let y = (area.bottom - total) / 2;
             if (f.badge) { pill(ctx, f.badge, cx, y, 38 * u, p.accent, p.onAccent, 'center'); y += badgeH; }
             drawLines(ctx, title, cx, y, p.text, 'center');
             y += title.height + gap;
             if (text) drawLines(ctx, text, cx, y, p.soft, 'center');
             footerText(ctx, f.footer, cx, H - pad * 1.1, maxW, 40 * u, p.soft, 'center');
+            area.drawQr();
             break;
         }
         case 'bienvenida': {
             decor(ctx, p, W, H);
-            const cx = W / 2;
-            const maxW = W - pad * 3;
-            const logoH = img ? (v ? 620 : 420) * u : 0;
+            const area = centeredArea(pad * 1.5);
+            const cx = area.cx;
+            const maxW = area.maxW;
+            const logoH = img ? (v ? (q ? 480 : 620) : (q ? 360 : 420)) * u : 0;
             const title = fitText(ctx, f.title, { maxWidth: maxW, maxHeight: 300 * u, maxSize: 150 * u, minSize: 50 * u, weight: 900, maxLines: 2, lineHeight: 1.05 });
             const text = f.text ? fitText(ctx, f.text, { maxWidth: maxW, maxHeight: 150 * u, maxSize: 56 * u, minSize: 28 * u, weight: 500, maxLines: 2, lineHeight: 1.2 }) : null;
             const gap = 50 * u;
             const total = (img ? logoH + gap : 0) + title.height + (text ? gap * 0.6 + text.height : 0);
-            let y = (H - total) / 2;
+            let y = (area.bottom - total) / 2;
             if (img) {
                 drawContain(ctx, img, { x: cx - maxW / 2, y, w: maxW, h: logoH });
                 y += logoH + gap;
@@ -552,6 +625,7 @@ export function drawPlaca(ctx: Ctx, data: PlacaData, photo: HTMLImageElement | n
             y += title.height + gap * 0.6;
             if (text) drawLines(ctx, text, cx, y, p.soft, 'center');
             footerText(ctx, f.footer, cx, H - pad * 0.8, maxW, 40 * u, p.soft, 'center');
+            area.drawQr();
             break;
         }
     }

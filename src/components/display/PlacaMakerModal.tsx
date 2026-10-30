@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ImageOff, ImagePlus, Loader2, Monitor, MonitorSmartphone, Sparkles, Upload } from 'lucide-react';
+import { ImageOff, ImagePlus, Loader2, Monitor, MonitorSmartphone, QrCode, Sparkles, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useDisplayMedia, useReplaceMediaFile, useUploadDisplayMedia } from '@/hooks/use-display-media';
 import { useDisplayCampaigns, useUpdateCampaign } from '@/hooks/use-display-hub';
 import type { DisplayMedia } from '@/types/display';
+import { QrEditor } from '@/components/display/QrEditor';
+import { QR_KINDS, qrData, type QrSpec } from '@/lib/qr';
 import {
     FIELD_LABELS, PALETTES, PLACA_TEMPLATES, PLACA_TEMPLATE_IDS,
     defaultPlaca, drawPlaca, loadPlacaFonts, loadPlacaImage, placaFromMetadata, placaName, placaSize,
@@ -54,6 +56,16 @@ function PlacaMaker({ onClose, commerceId, editing, initialTemplate, initialOrie
     const [fontsReady, setFontsReady] = useState(false);
     const [saving, setSaving] = useState(false);
     const fileRef = useRef<HTMLInputElement>(null);
+    // Código QR: el borrador se guarda aunque lo apaguen, por si lo vuelven a prender.
+    const [qrOn, setQrOn] = useState(() => !!data.qr);
+    const [qrSpec, setQrSpec] = useState<QrSpec>(() => data.qr?.spec || { kind: 'web' });
+    const [qrCaption, setQrCaption] = useState(() => data.qr?.caption ?? QR_KINDS.web.caption);
+    const updateQr = (on: boolean, spec: QrSpec, caption: string) => {
+        setQrOn(on);
+        setQrSpec(spec);
+        setQrCaption(caption);
+        setData(prev => ({ ...prev, qr: on ? qrData(spec, caption) : null }));
+    };
 
     const { data: media = [] } = useDisplayMedia(commerceId);
     const { data: campaigns = [] } = useDisplayCampaigns(commerceId);
@@ -144,6 +156,10 @@ function PlacaMaker({ onClose, commerceId, editing, initialTemplate, initialOrie
     const handleSave = async () => {
         if (!data.fields.title.trim() && !data.fields.badge.trim()) {
             toast.error('Escribí al menos el título');
+            return;
+        }
+        if (qrOn && !data.qr) {
+            toast.error('Completá los datos del QR o destildá "Con QR"');
             return;
         }
         setSaving(true);
@@ -294,6 +310,21 @@ function PlacaMaker({ onClose, commerceId, editing, initialTemplate, initialOrie
                             )}
                         </div>
                     )}
+
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-medium flex items-center gap-1.5"><QrCode className="w-4 h-4" /> Código QR</p>
+                            <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                <input type="checkbox" checked={qrOn} onChange={e => updateQr(e.target.checked, qrSpec, qrCaption)} className="w-4 h-4 accent-indigo-600" />
+                                {qrOn ? 'Con QR' : 'Agregar'}
+                            </label>
+                        </div>
+                        {qrOn ? (
+                            <QrEditor spec={qrSpec} caption={qrCaption} commerceId={commerceId} onChange={(spec, caption) => updateQr(true, spec, caption)} />
+                        ) : (
+                            <p className="text-xs text-muted-foreground">Para que escaneen el menú, tu web, WhatsApp o Instagram.</p>
+                        )}
+                    </div>
 
                     <div className="space-y-2">
                         <p className="text-sm font-medium">Colores</p>
