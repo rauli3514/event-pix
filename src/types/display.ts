@@ -28,6 +28,7 @@ export interface DisplayDevice {
     orientation: string;
     pairing_status: 'pending' | 'linked';
     settings: any | null; // For Setup Screens (timezone, cache, reload commands)
+    sort_order?: number | null; // Orden en el panel (Pantallas)
     last_seen: string | null;
     created_at: string;
     updated_at: string;

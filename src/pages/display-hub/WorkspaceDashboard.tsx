@@ -300,7 +300,7 @@ export default function WorkspaceDashboard() {
                                             </span>
                                         )}
                                     >
-                                        <Link to={`/admin/display/${d.id}`} className="absolute inset-0" title="Ver detalles de la pantalla" aria-label={`Ver detalles de ${screenName(d)}`} />
+                                        <button type="button" onClick={() => setChanging(d)} className="absolute inset-0 cursor-pointer" title="Cambiar el contenido de esta pantalla" aria-label={`Cambiar el contenido de ${screenName(d)}`} />
                                         <span className="absolute top-2 right-2 rounded-md bg-black/60 px-2 py-0.5 text-xs font-medium text-white pointer-events-none">
                                             {isPortrait(d) ? 'Vertical' : 'Horizontal'}
                                         </span>
