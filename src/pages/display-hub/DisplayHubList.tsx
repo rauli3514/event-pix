@@ -1,19 +1,24 @@
 import { useState } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Monitor, Plus, Hash, Eye, ChevronDown, MoreVertical, Edit2, Info, Move, Trash2, Play, Bluetooth } from 'lucide-react';
+import { useParams, useSearchParams } from 'react-router-dom';
+import { Monitor, Plus, Hash, Eye, ChevronDown, Play, Bluetooth, Search, Settings2, Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { EditScreenModal } from "@/components/display/EditScreenModal";
 import { ZoneManagerSidebar } from "@/components/display/ZoneManagerSidebar";
 import { MoveDeviceModal } from "@/components/display/MoveDeviceModal";
 import { BluetoothProvisioningModal } from "@/components/display/BluetoothProvisioningModal";
-import { Layers } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
+import { ScreenCard } from '@/components/display/ScreenCard';
+import { ChangeScreenContentModal } from '@/components/display/ChangeScreenContentModal';
+import { ScreenQrModal } from '@/components/display/ScreenQrModal';
+import { useDeviceScreens } from '@/hooks/use-device-screens';
+import { describeContent, screenName } from '@/lib/screenStatus';
+import { formatDownFor } from '@/lib/screenAlerts';
+import { useNowMinute } from '@/hooks/use-now-minute';
 
 import { toast } from 'sonner';
 
@@ -22,9 +27,12 @@ import { supabase } from '@/lib/supabase';
 import { useQueryClient } from '@tanstack/react-query';
 import { DisplayDevice } from '@/types/display';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyDevice = any;
+
+// Pantallas: todas las TVs del comercio, por zona, con su foto real y qué pasan.
 const DisplayHubList = () => {
     const { commerceId } = useParams<{ commerceId: string }>();
-    const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     
     const urlCode = searchParams.get('code') || searchParams.get('bt')?.replace('EventPix-TV-', '');
@@ -44,6 +52,10 @@ const DisplayHubList = () => {
     
     // States for filtering & sidebar
     const [filter, setFilter] = useState<'all' | 'online' | 'offline'>('all');
+    const [zonesOpen, setZonesOpen] = useState(false);
+    const [changing, setChanging] = useState<AnyDevice>(null);
+    const [qrFor, setQrFor] = useState<AnyDevice>(null);
+    const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
     const [search, setSearch] = useState('');
     const [selectedGroupId, setSelectedGroupId] = useState<string | 'all' | 'unassigned'>('all');
     
@@ -68,7 +80,8 @@ const DisplayHubList = () => {
     const [moveDeviceModalOpen, setMoveDeviceModalOpen] = useState(false);
     const [moveDeviceTarget, setMoveDeviceTarget] = useState<DisplayDevice | null>(null);
 
-    const linkedDevices = devices?.filter(d => d.derived_status !== 'pending') || [];
+    const linkedDevices = devices?.filter(d => d.pairing_status === 'linked') || [];
+    const pendingDevices = devices?.filter(d => d.pairing_status === 'pending') || [];
     
     const unassignedCount = linkedDevices.filter(d => !d.group_id).length;
 
@@ -76,7 +89,7 @@ const DisplayHubList = () => {
         e.preventDefault();
         
         if (!linkData.device_code.trim()) {
-            toast.error('Debes ingresar el código de la TV');
+            toast.error('Escribí el código que muestra la TV');
             return;
         }
 
@@ -96,7 +109,7 @@ const DisplayHubList = () => {
             onSuccess: () => {
                 setIsLinkModalOpen(false);
                 setLinkData({ device_code: '', name: '', description: '', group_id: 'none', orientation: 'landscape' });
-                toast.success('¡Pantalla vinculada exitosamente!');
+                toast.success('Pantalla vinculada');
             },
             onError: (error: any) => {
                 toast.error(error.message || 'Error al vincular pantalla');
@@ -105,14 +118,38 @@ const DisplayHubList = () => {
     };
 
     const handleDeleteDevice = async (deviceId: string) => {
-        if (!confirm('¿Estás seguro de que deseas eliminar esta pantalla?')) return;
+        if (!confirm('¿Eliminar esta pantalla? Deja de mostrar contenido hasta que la vuelvas a vincular.')) return;
         const { error } = await supabase.from('display_devices').delete().eq('id', deviceId);
         if (error) {
-            toast.error('Error al eliminar pantalla');
+            toast.error('No se pudo eliminar. Probá de nuevo.');
         } else {
             toast.success('Pantalla eliminada');
             queryClient.invalidateQueries({ queryKey: ["display_devices"] });
         }
+    };
+
+    // Zonas: nombre completo ("Local centro / Barra") y sus subzonas.
+    const groupsList = linkGroups || [];
+    const zonePath = (id: string | null | undefined): string => {
+        const parts: string[] = [];
+        let g = groupsList.find(x => x.id === id);
+        let guard = 0;
+        while (g && guard++ < 10) {
+            parts.unshift(g.name);
+            g = groupsList.find(x => x.id === g!.parent_id);
+        }
+        return parts.join(' / ');
+    };
+    const zoneAndChildren = (id: string): Set<string> => {
+        const out = new Set([id]);
+        let added = true;
+        while (added) {
+            added = false;
+            for (const g of groupsList) {
+                if (g.parent_id && out.has(g.parent_id) && !out.has(g.id)) { out.add(g.id); added = true; }
+            }
+        }
+        return out;
     };
 
     const filteredLinkedDevices = linkedDevices.filter(device => {
@@ -127,7 +164,7 @@ const DisplayHubList = () => {
         else if (selectedGroupId !== 'all') {
             // Include devices in this group OR sub-groups. For simplicity, just exact match or build tree logic.
             // A more advanced version would check if device.group_id is a descendant.
-            matchesGroup = device.group_id === selectedGroupId;
+            matchesGroup = !!device.group_id && zoneAndChildren(selectedGroupId).has(device.group_id);
         }
         
         // Search filter
@@ -139,211 +176,243 @@ const DisplayHubList = () => {
     });
 
 
+    const now = useNowMinute();
+    const nowMs = now.getTime();
+    const { data: screenShots = {} } = useDeviceScreens(linkedDevices.map(d => d.id));
+    const nowPlaying = (d: AnyDevice): string | null => {
+        const shot = screenShots[d.id];
+        if (!shot?.now_playing?.name) return null;
+        return nowMs - new Date(shot.captured_at).getTime() < 15 * 60 * 1000 ? shot.now_playing.name : null;
+    };
+    const onlineCount = linkedDevices.filter(d => d.derived_status === 'online').length;
+    const offlineCount = linkedDevices.length - onlineCount;
+
+    // Agrupadas por zona (las sin zona al final), en línea primero.
+    const sections = useMemo(() => {
+        const map = new Map<string, AnyDevice[]>();
+        for (const d of filteredLinkedDevices) {
+            const key = d.group_id || '';
+            if (!map.has(key)) map.set(key, []);
+            map.get(key)!.push(d);
+        }
+        const sortDevices = (list: AnyDevice[]) => list.sort((a, b) =>
+            (a.derived_status === 'online' ? 0 : 1) - (b.derived_status === 'online' ? 0 : 1) || screenName(a).localeCompare(screenName(b)));
+        return [...map.entries()]
+            .map(([key, list]) => ({ key, name: key ? zonePath(key) || 'Zona' : 'Sin zona', devices: sortDevices(list) }))
+            .sort((a, b) => (a.key ? 0 : 1) - (b.key ? 0 : 1) || a.name.localeCompare(b.name));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filteredLinkedDevices.map(d => d.id + d.derived_status + d.group_id).join(), linkGroups]);
+
+    const openLinkWithCode = (code: string) => {
+        setLinkData(prev => ({ ...prev, device_code: code }));
+        setIsLinkModalOpen(true);
+    };
+
     if (isLoading) return (
         <div className="h-full flex items-center justify-center bg-background text-foreground">
             <div className="flex flex-col items-center gap-4">
-                <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-                <p className="text-muted-foreground animate-pulse">Cargando pantallas...</p>
+                <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                <p className="text-muted-foreground">Cargando pantallas…</p>
             </div>
         </div>
     );
 
+    const zoneChip = (active: boolean) =>
+        `shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${active
+            ? 'border-indigo-600 bg-indigo-600 text-white'
+            : 'border-border bg-card text-muted-foreground hover:text-foreground hover:border-indigo-500/50'}`;
+    const statusChip = (active: boolean, tone: 'emerald' | 'amber' | 'slate') => {
+        const on = tone === 'emerald' ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+            : tone === 'amber' ? 'border-amber-500/60 bg-amber-500/10 text-amber-800 dark:text-amber-300'
+            : 'border-indigo-600 bg-indigo-600/10 text-indigo-700 dark:text-indigo-300';
+        return `inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${active ? on : 'border-border bg-card text-muted-foreground hover:text-foreground'}`;
+    };
+
     return (
-        <div className="flex h-full w-full min-h-0 overflow-hidden bg-background text-foreground flex-col transition-colors duration-300">
-            {/* Descriptive Top Banner */}
-            <div className="p-4 sm:p-6 md:px-8 pt-4 sm:pt-6 pb-2 shrink-0">
-                <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-card border border-border shadow-xl flex items-center px-4 py-4 sm:px-8 sm:py-6 transition-colors duration-300">
-                    {/* Decorative Background for Banner */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-background/20 to-secondary/10 pointer-events-none">
-                        <div className="absolute right-10 top-1/2 -translate-y-1/2 w-48 h-48 bg-emerald-500/10 rounded-full blur-[60px]"></div>
-                        <div className="absolute right-32 bottom-0 w-32 h-32 bg-sky-500/10 rounded-full blur-[40px]"></div>
+        <div className="h-full w-full overflow-y-auto bg-background text-foreground">
+            <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
+                {/* Encabezado */}
+                <header className="flex flex-wrap items-end justify-between gap-4">
+                    <div className="space-y-1">
+                        <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Pantallas</h1>
+                        <p className="text-sm md:text-base text-muted-foreground max-w-2xl">
+                            Tus TVs, con lo que están pasando ahora. Ordenalas por zona (salón, vidriera, barra) para encontrarlas rápido.
+                        </p>
                     </div>
-                    
-                    <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between w-full gap-4 sm:gap-6">
-                        <div className="flex flex-col gap-1 w-full max-w-2xl">
-                            <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground flex items-center gap-3">
-                                <Sheet>
-                                    <SheetTrigger asChild>
-                                        <Button variant="outline" size="icon" className="lg:hidden border-border bg-muted/50 text-muted-foreground w-9 h-9 shrink-0 hover:text-foreground">
-                                            <Layers className="w-4 h-4" />
-                                        </Button>
-                                    </SheetTrigger>
-                                    <SheetContent side="left" className="p-0 bg-card border-r-border w-72 flex flex-col transition-colors duration-300">
-                                        <SheetTitle className="sr-only">Zonas y Pantallas</SheetTitle>
-                                        <ZoneManagerSidebar 
-                                            commerceId={effectiveCommerceId}
-                                            groups={linkGroups || []}
-                                            selectedGroupId={selectedGroupId}
-                                            onSelectGroup={setSelectedGroupId}
-                                            unassignedCount={unassignedCount}
-                                            totalCount={linkedDevices.length}
-                                        />
-                                    </SheetContent>
-                                </Sheet>
-                                Tus Pantallas
-                            </h1>
-                            <p className="text-muted-foreground font-medium max-w-xl mt-1">
-                                Administrá los dispositivos y el contenido que reproducen, agrupándolos en zonas para un mayor control.
-                            </p>
-                        </div>
-                        
-                        <div className="shrink-0 flex flex-wrap items-center gap-2 sm:gap-3">
-                            <Button variant="outline" className="border-border text-foreground hover:bg-muted rounded-full px-4 py-2 sm:px-5 sm:py-5 text-xs sm:text-sm font-bold shadow-sm transition-all" onClick={() => setIsBluetoothModalOpen(true)}>
-                                <Bluetooth className="w-4 h-4 mr-1.5 sm:mr-2 text-blue-500" /> Configurar por Bluetooth
-                            </Button>
-                            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-4 py-2 sm:px-6 sm:py-5 text-xs sm:text-sm font-bold shadow-lg shadow-primary/10 transition-all hover:scale-105" onClick={() => setIsLinkModalOpen(true)}>
-                                <Plus className="w-4 h-4 mr-1.5 sm:mr-2" /> Agregar Pantalla
-                            </Button>
-                        </div>
+                    <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" className="h-11 px-4" onClick={() => setIsBluetoothModalOpen(true)}>
+                            <Bluetooth className="w-4 h-4 mr-2 text-blue-500" /> Configurar por Bluetooth
+                        </Button>
+                        <Button className="h-11 px-5 bg-indigo-600 hover:bg-indigo-700 text-white" onClick={() => setIsLinkModalOpen(true)}>
+                            <Plus className="w-4 h-4 mr-2" /> Agregar pantalla
+                        </Button>
                     </div>
-                </div>
-            </div>
+                </header>
 
-            {/* Main Content Area: Sidebar + Grid */}
-            <div className="flex-1 flex overflow-hidden">
-                {/* Sidebar de Zonas (Desktop > 1024px) */}
-                <div className="hidden lg:block shrink-0 h-full">
-                    <ZoneManagerSidebar 
-                        commerceId={effectiveCommerceId}
-                        groups={linkGroups || []}
-                        selectedGroupId={selectedGroupId}
-                        onSelectGroup={setSelectedGroupId}
-                        unassignedCount={unassignedCount}
-                        totalCount={linkedDevices.length}
-                    />
-                </div>
-
-                {/* Contenido Principal */}
-                <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:px-8 bg-background min-w-0">
-                    {/* Filters & Search */}
-                    <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-                    <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-                        <div className="flex bg-muted border border-border rounded-lg p-1 w-full sm:w-auto">
-                            <button onClick={() => setFilter('all')} className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filter === 'all' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Todas</button>
-                            <button onClick={() => setFilter('online')} className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filter === 'online' ? 'bg-emerald-500/10 text-emerald-600' : 'text-muted-foreground hover:text-emerald-500'}`}>Online</button>
-                            <button onClick={() => setFilter('offline')} className={`flex-1 sm:flex-none px-4 py-1.5 rounded-md text-sm font-medium transition-all ${filter === 'offline' ? 'bg-destructive/10 text-destructive' : 'text-muted-foreground hover:text-destructive'}`}>Offline</button>
-                        </div>
-                    </div>
-                    
-                    <div className="w-full sm:w-72">
-                        <Input 
-                            placeholder="Buscar pantalla..." 
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="bg-card border-border text-foreground w-full h-10 shadow-sm"
-                        />
+                {/* Estado + búsqueda */}
+                <div className="flex flex-wrap items-center gap-2">
+                    <button type="button" onClick={() => setFilter('all')} className={statusChip(filter === 'all', 'slate')}>
+                        <Monitor className="w-4 h-4" /> Todas <span className="tabular-nums opacity-80">{linkedDevices.length}</span>
+                    </button>
+                    <button type="button" onClick={() => setFilter(filter === 'online' ? 'all' : 'online')} className={statusChip(filter === 'online', 'emerald')}>
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" /> En línea <span className="tabular-nums opacity-80">{onlineCount}</span>
+                    </button>
+                    <button type="button" onClick={() => setFilter(filter === 'offline' ? 'all' : 'offline')} className={statusChip(filter === 'offline', 'amber')}>
+                        <span className="w-2 h-2 rounded-full bg-amber-500" /> Sin señal <span className="tabular-nums opacity-80">{offlineCount}</span>
+                    </button>
+                    <div className="relative ml-auto w-full sm:w-64">
+                        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                        <Input placeholder="Buscar por nombre o código" value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-10 bg-card border-border" />
                     </div>
                 </div>
 
-                {/* Lista de Pantallas */}
-                <div className="mt-8 space-y-8">
-                    {Object.entries(
-                        filteredLinkedDevices.reduce((acc, device) => {
-                            const groupName = device.group?.name || 'Sin Zona Asignada';
-                            if (!acc[groupName]) acc[groupName] = [];
-                            acc[groupName].push(device);
-                            return acc;
-                        }, {} as Record<string, typeof filteredLinkedDevices>)
-                    ).map(([groupName, groupDevices]) => (
-                        <div key={groupName} className="space-y-3">
-                            <div className="flex items-center gap-2 text-foreground font-semibold px-2">
-                                <ChevronDown className="w-4 h-4" />
-                                {groupName} <span className="text-muted-foreground font-normal text-sm ml-1">({groupDevices.length})</span>
-                            </div>
-                            
-                            <div className="bg-card border border-border rounded-xl overflow-hidden divide-y divide-border shadow-sm">
-                                {groupDevices.map(device => {
-                                    const isOnline = device.derived_status === 'online';
-                                    return (
-                                        <div key={device.id} className="flex flex-col md:flex-row items-start md:items-center justify-between p-3 sm:p-4 hover:bg-muted/50 transition-colors group gap-3 md:gap-4 min-w-0 w-full">
-                                            {/* Izquierda: Checkbox, Estado y Nombre */}
-                                            <div className="flex flex-wrap items-center gap-2 sm:gap-4 min-w-0 flex-1">
-                                                <input type="checkbox" className="w-4.5 h-4.5 rounded border-border bg-background text-emerald-500 focus:ring-emerald-500/20 shrink-0" />
-                                                
-                                                <div className={`px-2 py-0.5 rounded-full text-[11px] font-bold flex items-center gap-1.5 shrink-0 ${isOnline ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' : 'bg-muted text-muted-foreground border border-border'}`}>
-                                                    {isOnline && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
-                                                    {isOnline ? 'En línea' : 'Desconectado'}
-                                                </div>
-                                                
-                                                <div className="min-w-0 flex-1">
-                                                    <h4 className="font-semibold text-foreground cursor-pointer hover:text-primary transition-colors truncate" onClick={() => { setSelectedDevice(device); setEditModalOpen(true); }}>
-                                                        {device.name}
-                                                    </h4>
-                                                    <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1 truncate">
-                                                        Recurso: <span className="text-muted-foreground font-medium truncate">
-                                                            {device.assignment?.schedule?.name || device.assignment?.media?.name || device.assignment?.campaign?.name || 'Sin asignar'}
-                                                        </span>
-                                                        <ChevronDown className="w-3 h-3 shrink-0" />
-                                                    </p>
-                                                </div>
-                                            </div>
-
-                                            {/* Derecha: Botones de Acción */}
-                                            <div className="flex items-center gap-2 opacity-100 sm:opacity-70 group-hover:opacity-100 transition-opacity w-full md:w-auto justify-start md:justify-end flex-wrap pt-2 md:pt-0 border-t md:border-t-0 border-border/50">
-                                                <Button 
-                                                    variant="outline" 
-                                                    size="sm" 
-                                                    className="h-8 bg-background border-border text-muted-foreground hover:text-foreground hover:bg-muted"
-                                                    onClick={() => { setPreviewDevice(device); setPreviewModalOpen(true); }}
-                                                >
-                                                    <Eye className="w-3.5 h-3.5 mr-1.5" /> Avance
-                                                </Button>
-                                                <Button 
-                                                    variant="outline" 
-                                                    size="sm" 
-                                                    className="h-8 bg-background border-border text-muted-foreground hover:text-foreground hover:bg-muted"
-                                                    onClick={() => { setSelectedDevice(device); setEditModalOpen(true); }}
-                                                >
-                                                    <Edit2 className="w-3.5 h-3.5 mr-1.5" /> Editar
-                                                </Button>
-                                                
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                                                            <MoreVertical className="w-4 h-4" />
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" className="w-56 bg-card text-foreground border border-border shadow-xl rounded-xl">
-                                                        <DropdownMenuItem className="cursor-pointer py-2 focus:bg-accent focus:text-accent-foreground" onClick={() => { setSelectedDevice(device); setEditModalOpen(true); }}>
-                                                            <Info className="w-4 h-4 mr-2 text-muted-foreground" /> Ver información del dispositivo
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem className="cursor-pointer py-2 focus:bg-accent focus:text-accent-foreground" onClick={() => navigate(`/admin/display/${device.id}`)}>
-                                                            <Monitor className="w-4 h-4 mr-2 text-muted-foreground" /> Rendimiento y Diagnóstico
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuSeparator className="bg-border" />
-                                                        <DropdownMenuItem className="cursor-pointer py-2 focus:bg-accent focus:text-accent-foreground" onClick={() => { setMoveDeviceTarget(device); setMoveDeviceModalOpen(true); }}>
-                                                            <Move className="w-4 h-4 mr-2 text-muted-foreground" /> Mover
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuSeparator className="bg-border" />
-                                                        <DropdownMenuItem className="cursor-pointer py-2 text-destructive focus:bg-destructive/10 focus:text-destructive" onClick={() => handleDeleteDevice(device.id)}>
-                                                            <Trash2 className="w-4 h-4 mr-2" /> Eliminar
-                                                        </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    ))}
-                    
-                    {filteredLinkedDevices.length === 0 && (
-                        <div className="py-12 text-center border-2 border-dashed border-border rounded-2xl bg-card/50">
-                            <Monitor className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                            <h3 className="text-lg font-bold text-foreground">No se encontraron pantallas</h3>
-                            <p className="text-muted-foreground text-sm mt-2">Prueba cambiando los filtros o agrega una nueva pantalla.</p>
-                        </div>
+                {/* Zonas */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                    <button type="button" onClick={() => setSelectedGroupId('all')} className={zoneChip(selectedGroupId === 'all')}>Todas las zonas</button>
+                    {groupsList.map(g => {
+                        const count = linkedDevices.filter(d => d.group_id && zoneAndChildren(g.id).has(d.group_id)).length;
+                        return (
+                            <button key={g.id} type="button" onClick={() => setSelectedGroupId(g.id)} className={zoneChip(selectedGroupId === g.id)}>
+                                {zonePath(g.id)} <span className="tabular-nums opacity-70">{count}</span>
+                            </button>
+                        );
+                    })}
+                    {groupsList.length > 0 && unassignedCount > 0 && (
+                        <button type="button" onClick={() => setSelectedGroupId('unassigned')} className={zoneChip(selectedGroupId === 'unassigned')}>
+                            Sin zona <span className="tabular-nums opacity-70">{unassignedCount}</span>
+                        </button>
                     )}
+                    <button type="button" onClick={() => setZonesOpen(true)} className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-dashed border-border px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:border-indigo-500/50">
+                        <Settings2 className="w-4 h-4" /> {groupsList.length ? 'Organizar zonas' : 'Crear zonas'}
+                    </button>
                 </div>
+
+                {/* TVs prendidas esperando que las vinculen */}
+                {pendingDevices.length > 0 && (
+                    <section className="rounded-2xl border border-dashed border-indigo-500/50 bg-indigo-500/5 p-4">
+                        <p className="text-sm font-semibold flex items-center gap-2">
+                            <span className="relative flex w-2.5 h-2.5"><span className="absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-60 animate-ping" /><span className="relative inline-flex w-2.5 h-2.5 rounded-full bg-indigo-500" /></span>
+                            {pendingDevices.length === 1 ? '1 TV espera que la vincules' : `${pendingDevices.length} TVs esperan que las vincules`}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">Están prendidas con la app abierta. Fijate que el código coincida con el que muestra la pantalla.</p>
+                        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                            {pendingDevices.map(d => (
+                                <div key={d.id} className="flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-2.5">
+                                    <span className="font-mono text-lg font-bold tracking-widest">{d.device_id}</span>
+                                    <span className="text-xs text-muted-foreground flex-1 min-w-0 truncate">
+                                        {d.last_seen ? `vista ${formatDownFor(Math.max(0, nowMs - new Date(d.last_seen).getTime()))}` : 'recién prendida'}
+                                    </span>
+                                    <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white" onClick={() => openLinkWithCode(d.device_id)}>
+                                        <Link2 className="w-4 h-4 mr-1.5" /> Vincular
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                )}
+
+                {/* Pantallas por zona */}
+                {sections.map(section => {
+                    const isCollapsed = !!collapsed[section.key];
+                    const showHeader = sections.length > 1 || !!section.key;
+                    return (
+                        <section key={section.key || 'none'} className="space-y-3">
+                            {showHeader && (
+                                <button
+                                    type="button"
+                                    onClick={() => setCollapsed(prev => ({ ...prev, [section.key]: !isCollapsed }))}
+                                    className="flex items-center gap-2 text-left"
+                                    aria-expanded={!isCollapsed}
+                                >
+                                    <span className={`w-1 h-5 rounded-full ${section.key ? 'bg-indigo-500' : 'bg-muted-foreground/40'}`} aria-hidden />
+                                    <span className="text-lg font-bold">{section.name}</span>
+                                    <span className="text-sm text-muted-foreground">
+                                        {section.devices.length} {section.devices.length === 1 ? 'pantalla' : 'pantallas'}
+                                        {section.devices.some(d => d.derived_status !== 'online') && ` · ${section.devices.filter(d => d.derived_status !== 'online').length} sin señal`}
+                                    </span>
+                                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
+                                </button>
+                            )}
+                            {!isCollapsed && (
+                                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                                    {section.devices.map(d => (
+                                        <ScreenCard
+                                            key={d.id}
+                                            device={d}
+                                            content={describeContent(d, now)}
+                                            shot={screenShots[d.id]}
+                                            nowPlaying={nowPlaying(d)}
+                                            zoneName={selectedGroupId === 'all' && sections.length > 1 ? null : (d.group_id ? zonePath(d.group_id) : null)}
+                                            now={nowMs}
+                                            onChangeContent={() => setChanging(d)}
+                                            onQr={() => setQrFor(d)}
+                                            onPreview={() => { setPreviewDevice(d); setPreviewModalOpen(true); }}
+                                            onEdit={() => { setSelectedDevice(d); setEditModalOpen(true); }}
+                                            onMove={() => { setMoveDeviceTarget(d); setMoveDeviceModalOpen(true); }}
+                                            onDelete={() => handleDeleteDevice(d.id)}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </section>
+                    );
+                })}
+
+                {filteredLinkedDevices.length === 0 && (
+                    <div className="rounded-2xl border-2 border-dashed border-border bg-card/40 p-10 md:p-14 flex flex-col items-center text-center gap-2">
+                        <Monitor className="w-12 h-12 text-muted-foreground/60" />
+                        {linkedDevices.length === 0 ? (
+                            <>
+                                <p className="text-lg font-semibold">Todavía no hay pantallas</p>
+                                <p className="text-sm text-muted-foreground max-w-md">Abrí la app de EventPix en la TV: te va a mostrar un código. Tocá "Agregar pantalla" y escribilo.</p>
+                                <Button className="mt-4 h-11 bg-indigo-600 hover:bg-indigo-700 text-white" onClick={() => setIsLinkModalOpen(true)}><Plus className="w-4 h-4 mr-2" /> Agregar pantalla</Button>
+                            </>
+                        ) : (
+                            <>
+                                <p className="text-lg font-semibold">No hay pantallas con ese filtro</p>
+                                <button type="button" onClick={() => { setFilter('all'); setSearch(''); setSelectedGroupId('all'); }} className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">Ver todas</button>
+                            </>
+                        )}
+                    </div>
+                )}
+
+                <Sheet open={zonesOpen} onOpenChange={setZonesOpen}>
+                    <SheetContent side="left" className="p-0 bg-card border-r-border w-72 flex flex-col">
+                        <SheetTitle className="sr-only">Zonas</SheetTitle>
+                        <ZoneManagerSidebar
+                            commerceId={effectiveCommerceId}
+                            groups={groupsList}
+                            selectedGroupId={selectedGroupId}
+                            onSelectGroup={id => { setSelectedGroupId(id); setZonesOpen(false); }}
+                            unassignedCount={unassignedCount}
+                            totalCount={linkedDevices.length}
+                        />
+                    </SheetContent>
+                </Sheet>
+
+                <ChangeScreenContentModal
+                    isOpen={!!changing}
+                    onClose={() => setChanging(null)}
+                    commerceId={effectiveCommerceId}
+                    device={changing ? { id: changing.id, name: screenName(changing) } : null}
+                    currentCampaignId={changing?.assignment?.campaign_id || null}
+                    currentScheduleId={changing?.assignment?.schedule_id || null}
+                />
+                <ScreenQrModal
+                    isOpen={!!qrFor}
+                    onClose={() => setQrFor(null)}
+                    commerceId={effectiveCommerceId}
+                    screen={qrFor ? { ...qrFor, name: screenName(qrFor) } : null}
+                    others={linkedDevices.filter(s => s.id !== qrFor?.id).map(s => ({ ...s, name: screenName(s) }))}
+                />
 
                 {/* Modal de Vinculación */}
                 <Dialog open={isLinkModalOpen} onOpenChange={setIsLinkModalOpen}>
                     <DialogContent className="sm:max-w-[700px] bg-card border-border text-foreground p-0 overflow-hidden flex flex-col max-h-[100dvh] sm:max-h-[90vh]">
                         <div className="p-4 sm:p-6 border-b border-border bg-muted/30 shrink-0">
-                            <DialogTitle className="text-xl">Vincular Nueva Pantalla</DialogTitle>
+                            <DialogTitle className="text-xl">Vincular una pantalla</DialogTitle>
                             <DialogDescription className="text-muted-foreground mt-1">
-                                Abre la aplicación de EventPix en la TV para obtener el código.
+                                Abrí la app de EventPix en la TV: el código aparece en la pantalla.
                             </DialogDescription>
                         </div>
                         <div className="overflow-y-auto flex-1">
@@ -351,7 +420,7 @@ const DisplayHubList = () => {
                                 {/* Left Side: Basic Info */}
                                 <div className="flex-1 p-4 sm:p-6 space-y-5 border-b md:border-b-0 md:border-r border-border">
                                     <div className="space-y-2">
-                                        <Label htmlFor="code" className="text-foreground font-bold">1. Código de Vinculación *</Label>
+                                        <Label htmlFor="code" className="text-foreground font-bold">1. Código que muestra la TV</Label>
                                         <div className="relative">
                                             <Hash className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
                                             <Input
@@ -359,14 +428,14 @@ const DisplayHubList = () => {
                                                 value={linkData.device_code}
                                                 onChange={(e) => setLinkData({ ...linkData, device_code: e.target.value.toUpperCase() })}
                                                 placeholder="Ej: MX9-K7P2A"
-                                                className="pl-9 bg-background border-primary/50 text-foreground font-mono uppercase tracking-widest text-lg h-11 focus-visible:ring-primary"
+                                                className="pl-9 bg-background border-indigo-500/50 text-foreground font-mono uppercase tracking-widest text-lg h-11 focus-visible:ring-indigo-500"
                                                 required
                                             />
                                         </div>
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="name" className="text-foreground font-bold">2. Nombre *</Label>
+                                        <Label htmlFor="name" className="text-foreground font-bold">2. Nombre</Label>
                                         <Input
                                             id="name"
                                             value={linkData.name}
@@ -378,13 +447,13 @@ const DisplayHubList = () => {
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="group" className="text-foreground font-bold">3. Ubicación / Grupo</Label>
+                                        <Label htmlFor="group" className="text-foreground font-bold">3. Zona</Label>
                                         <Select value={linkData.group_id} onValueChange={(val) => setLinkData({ ...linkData, group_id: val })}>
                                             <SelectTrigger className="w-full bg-background border-border text-foreground h-11 focus:ring-primary">
-                                                <SelectValue placeholder="Ninguna zona..." />
+                                                <SelectValue placeholder="Sin zona" />
                                             </SelectTrigger>
                                             <SelectContent className="bg-card border-border text-foreground">
-                                                <SelectItem value="none">Sin Grupo</SelectItem>
+                                                <SelectItem value="none">Sin zona</SelectItem>
                                                 {linkGroups?.map(g => (
                                                     <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
                                                 ))}
@@ -395,14 +464,14 @@ const DisplayHubList = () => {
 
                                 {/* Right Side: Orientation */}
                                 <div className="flex-1 p-4 sm:p-6 bg-background">
-                                    <Label className="text-foreground font-bold mb-4 block">4. Orientación Inicial</Label>
+                                    <Label className="text-foreground font-bold mb-4 block">4. Cómo está la TV</Label>
                                     <div className="grid grid-cols-2 gap-4">
                                         {/* Horizontal */}
                                         <button 
                                             type="button"
                                             onClick={() => setLinkData({ ...linkData, orientation: 'landscape' })}
                                             className={`flex flex-col items-center justify-center p-6 rounded-xl border-2 transition-all ${
-                                                linkData.orientation === 'landscape' ? 'border-primary bg-primary/10 text-primary shadow-sm' : 'border-border bg-card text-muted-foreground hover:border-primary/50 hover:bg-muted'
+                                                linkData.orientation === 'landscape' ? 'border-indigo-600 bg-indigo-600/10 text-indigo-700 dark:text-indigo-300 shadow-sm' : 'border-border bg-card text-muted-foreground hover:border-indigo-500/50 hover:bg-muted'
                                             }`}
                                         >
                                             <div className="w-16 h-10 border-2 border-current rounded flex items-center justify-center mb-3">
@@ -417,7 +486,7 @@ const DisplayHubList = () => {
                                             type="button"
                                             onClick={() => setLinkData({ ...linkData, orientation: 'portrait' })}
                                             className={`flex flex-col items-center justify-center p-6 rounded-xl border-2 transition-all ${
-                                                linkData.orientation === 'portrait' ? 'border-primary bg-primary/10 text-primary shadow-sm' : 'border-border bg-card text-muted-foreground hover:border-primary/50 hover:bg-muted'
+                                                linkData.orientation === 'portrait' ? 'border-indigo-600 bg-indigo-600/10 text-indigo-700 dark:text-indigo-300 shadow-sm' : 'border-border bg-card text-muted-foreground hover:border-indigo-500/50 hover:bg-muted'
                                             }`}
                                         >
                                             <div className="w-10 h-16 border-2 border-current rounded flex items-center justify-center mb-3">
@@ -428,15 +497,15 @@ const DisplayHubList = () => {
                                         </button>
                                     </div>
                                     <p className="text-xs text-muted-foreground mt-4 text-center">
-                                        Podrás cambiarla luego desde los ajustes de la pantalla.
+                                        Se puede cambiar después desde los ajustes de la pantalla.
                                     </p>
                                 </div>
                             </form>
                         </div>
                         <div className="p-4 border-t border-border flex justify-end gap-3 bg-muted/20 shrink-0">
                             <Button type="button" variant="ghost" onClick={() => setIsLinkModalOpen(false)}>Cancelar</Button>
-                            <Button type="submit" form="link-device-form" className="bg-primary hover:bg-primary/90 min-w-[140px] h-10" disabled={linkDevice.isPending}>
-                                {linkDevice.isPending ? 'Vinculando...' : 'Vincular Pantalla'}
+                            <Button type="submit" form="link-device-form" className="bg-indigo-600 hover:bg-indigo-700 text-white min-w-[140px] h-10" disabled={linkDevice.isPending}>
+                                {linkDevice.isPending ? 'Vinculando…' : 'Vincular pantalla'}
                             </Button>
                         </div>
                     </DialogContent>
@@ -489,7 +558,7 @@ const DisplayHubList = () => {
                         <DialogHeader className="px-6 py-4 border-b border-border bg-muted flex flex-row items-center justify-between shrink-0">
                             <DialogTitle className="text-xl font-semibold flex items-center gap-2">
                                 <Eye className="w-5 h-5 text-primary" />
-                                Vista Previa: {previewDevice?.name}
+                                Cómo se ve: {previewDevice?.name}
                             </DialogTitle>
                         </DialogHeader>
                         <div className="flex-1 bg-black flex items-center justify-center relative overflow-hidden">
@@ -531,7 +600,6 @@ const DisplayHubList = () => {
                 />
             </div>
         </div>
-    </div>
     );
 };
 

@@ -5,10 +5,8 @@ import { Bell, BellOff, CalendarClock, Megaphone, ChevronDown, FolderOpen, ListV
 import { Button } from '@/components/ui/button';
 import { useDisplayCampaigns, useDisplayDevices, useDisplaySchedules } from '@/hooks/use-display-hub';
 import { useDisplayMedia } from '@/hooks/use-display-media';
-import { assignmentContentNow } from '@/lib/displaySchedule';
-import { itemsActiveOn, localDayKey, playlistItems } from '@/lib/playlistItems';
-import { itemsActiveNow } from '@/lib/itemRules';
-import { describeAlertSchedule, formatDownFor } from '@/lib/screenAlerts';
+import { describeAlertSchedule } from '@/lib/screenAlerts';
+import { describeContent, downText, isPortrait, screenName } from '@/lib/screenStatus';
 import { useAlertSettings } from '@/hooks/use-alert-settings';
 import { AlertSettingsModal } from '@/components/display/AlertSettingsModal';
 import { UrgentAlertModal } from '@/components/display/UrgentAlertModal';
@@ -26,29 +24,6 @@ import { OnboardingWizardWidget } from '@/components/display/OnboardingWizardWid
 type AnyDevice = any;
 
 const MAX_DOWN_LISTED = 4;
-
-const screenName = (d: AnyDevice) => d.name || `Pantalla ${d.device_id}`;
-const isPortrait = (d: AnyDevice) => d.orientation === 'portrait' || d.orientation === '90' || d.orientation === '270';
-
-// "sin señal hace 2 h" / "nunca se conectó"
-function downText(d: AnyDevice, now: number): string {
-    if (!d.last_seen) return 'nunca se conectó';
-    return `sin señal ${formatDownFor(Math.max(0, now - new Date(d.last_seen).getTime()))}`;
-}
-
-// Lo que pasa una pantalla, listo para mostrar.
-function describeContent(d: AnyDevice, now: Date) {
-    const { campaign, media, schedule } = assignmentContentNow(d.assignment, now);
-    const inDate = campaign ? itemsActiveOn(playlistItems(campaign.items_json), localDayKey(now)) : media ? [media] : [];
-    // Lo que toca a esta hora (sin mirar el clima); si nada, lo primero en fecha.
-    const items = campaign ? [...itemsActiveNow(inDate, now), ...inDate] : inDate;
-    const title = campaign?.name || media?.name || null;
-    let detail = 'Sin contenido asignado';
-    if (schedule) detail = `Programación: ${schedule.name || 'sin nombre'}`;
-    else if (campaign) detail = `Playlist: ${campaign.name}`;
-    else if (media) detail = `Archivo: ${media.name}`;
-    return { title, detail, cover: items[0] || null, campaignId: d.assignment?.campaign_id || null, scheduleId: d.assignment?.schedule_id || null, campaignNowId: campaign?.id || null };
-}
 
 function WhatToDo({ device }: { device: AnyDevice }) {
     return (
