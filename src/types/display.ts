@@ -99,6 +99,13 @@ export interface UniversalElement {
     metadata?: any;            // Para configuración de Apps y Widgets
     validFrom?: string;        // "AAAA-MM-DD": se muestra desde ese día (inclusive)
     validUntil?: string;       // "AAAA-MM-DD": se deja de mostrar después de ese día
+    showDays?: number[];       // Días de la semana (0 = domingo); vacío = todos
+    showFrom?: string;         // "HH:MM": se muestra desde esa hora
+    showTo?: string;           // "HH:MM": hasta esa hora (no incluida; puede cruzar la medianoche)
+    weather?: {                // Solo con este clima en esa ciudad (ver lib/itemRules.ts)
+        when: 'rain' | 'cold' | 'heat';
+        place: { name: string; lat: number; lon: number };
+    };
     
     // Configuraciones específicas
     mute?: boolean;            // Para video

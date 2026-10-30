@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { useDisplayCampaigns, useDisplayDevices, useDisplaySchedules } from '@/hooks/use-display-hub';
 import { useDisplayMedia } from '@/hooks/use-display-media';
 import { assignmentContentNow } from '@/lib/displaySchedule';
-import { itemsActiveOn, playlistItems } from '@/lib/playlistItems';
+import { itemsActiveOn, localDayKey, playlistItems } from '@/lib/playlistItems';
+import { itemsActiveNow } from '@/lib/itemRules';
 import { describeAlertSchedule, formatDownFor } from '@/lib/screenAlerts';
 import { useAlertSettings } from '@/hooks/use-alert-settings';
 import { AlertSettingsModal } from '@/components/display/AlertSettingsModal';
@@ -36,7 +37,9 @@ function downText(d: AnyDevice, now: number): string {
 // Lo que pasa una pantalla, listo para mostrar.
 function describeContent(d: AnyDevice, now: Date) {
     const { campaign, media, schedule } = assignmentContentNow(d.assignment, now);
-    const items = campaign ? itemsActiveOn(playlistItems(campaign.items_json)) : media ? [media] : [];
+    const inDate = campaign ? itemsActiveOn(playlistItems(campaign.items_json), localDayKey(now)) : media ? [media] : [];
+    // Lo que toca a esta hora (sin mirar el clima); si nada, lo primero en fecha.
+    const items = campaign ? [...itemsActiveNow(inDate, now), ...inDate] : inDate;
     const title = campaign?.name || media?.name || null;
     let detail = 'Sin contenido asignado';
     if (schedule) detail = `Programación: ${schedule.name || 'sin nombre'}`;

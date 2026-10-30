@@ -7,8 +7,9 @@ import { MediaRenderer } from './MediaRenderer';
 import { usePlaylistRotation } from '@/hooks/use-playlist-rotation';
 import { callTvBridge, hasTvBridgeMethod, onTvBridgeReady } from '@/lib/tvBridge';
 import { useLiteMode } from '@/lib/tvPerformance';
-import { useLocalDay } from '@/hooks/use-local-day';
-import { itemsActiveOn } from '@/lib/playlistItems';
+import { useNowMinute } from '@/hooks/use-now-minute';
+import { useWeatherNow } from '@/hooks/use-weather-now';
+import { itemsActiveNow, weatherPlacesOf } from '@/lib/itemRules';
 import { setTvDeviceCode } from '@/lib/tvScreenshot';
 import { useScreenReporter } from './useScreenReporter';
 import { useUrgentAlert } from './useUrgentAlert';
@@ -80,11 +81,16 @@ const TvPlayerCore = () => {
         shuffle
     } = useSyncEngine(deviceCode, sendHeartbeat);
 
-    // Solo lo que está en fecha hoy (los vencidos y los que todavía no
-    // empiezan se saltean); se vuelve a calcular a la medianoche.
-    const today = useLocalDay();
-    const items = useMemo(() => itemsActiveOn(allItems, today), [allItems, today]);
-    const nothingToday = allItems.length > 0 && items.length === 0;
+    // Solo lo que toca ahora: en fecha, en su día y horario, y con el clima
+    // que pide ("si llueve", "si hace calor"). Se revisa cada minuto; la lista
+    // cambia solo cuando entra o sale algún elemento, así no se corta la rotación.
+    const now = useNowMinute();
+    const weatherPlaces = useMemo(() => weatherPlacesOf(allItems), [allItems]);
+    const { weatherOf } = useWeatherNow(weatherPlaces);
+    const activeSignature = itemsActiveNow<{ id?: string }>(allItems, now, weatherOf).map(item => item.id).join('|');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const items = useMemo(() => itemsActiveNow(allItems, now, weatherOf), [allItems, activeSignature]);
+    const nothingNow = allItems.length > 0 && items.length === 0;
 
     // Modo liviano en equipos con poca memoria (ver tvPerformance.ts).
     const { lite } = useLiteMode();
@@ -301,7 +307,7 @@ const TvPlayerCore = () => {
         );
     }
 
-    if (nothingToday && (status === 'playing' || status === 'offline_playing')) {
+    if (nothingNow && (status === 'playing' || status === 'offline_playing')) {
         // Todo lo de la playlist está fuera de fecha: solo el logo.
         return (
             <div className="fixed inset-0 w-full h-full flex items-center justify-center" style={BRAND_BACKGROUND}>

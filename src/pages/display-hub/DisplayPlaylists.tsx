@@ -13,6 +13,7 @@ import { ContentThumb } from '@/components/display/ContentThumb';
 
 import { useDisplayCampaigns, useCreateCampaign, useDeleteCampaign, useDisplayDevices } from "@/hooks/use-display-hub";
 import { formatDuration, itemsActiveOn, loopDuration, playlistItems } from '@/lib/playlistItems';
+import { itemHasRules } from '@/lib/itemRules';
 import type { DisplayCampaign } from '@/types/display';
 
 type Filter = 'all' | 'live' | 'unused';
@@ -140,6 +141,7 @@ const DisplayPlaylists = () => {
                 {visible.map(campaign => {
                     const items = playlistItems(campaign.items_json);
                     const offDate = items.length - itemsActiveOn(items).length;
+                    const withRules = itemsActiveOn(items).filter(itemHasRules).length;
                     const { seconds, exact } = loopDuration(itemsActiveOn(items));
                     const screens = screensByPlaylist.get(campaign.id) || [];
                     const editUrl = `/admin/display/commerce/${effectiveCommerceId}/playlists/${campaign.id}`;
@@ -174,6 +176,11 @@ const DisplayPlaylists = () => {
                                         {offDate > 0 && (
                                             <p className="text-xs text-amber-600 dark:text-amber-400">
                                                 {offDate === 1 ? '1 fuera de fecha (hoy no se ve)' : `${offDate} fuera de fecha (hoy no se ven)`}
+                                            </p>
+                                        )}
+                                        {withRules > 0 && (
+                                            <p className="text-xs text-violet-600 dark:text-violet-400">
+                                                {withRules === 1 ? '1 con horario o clima' : `${withRules} con horario o clima`}
                                             </p>
                                         )}
                                     </div>
