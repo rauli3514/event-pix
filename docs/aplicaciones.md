@@ -39,5 +39,11 @@ Reloj y Fecha, Código QR, Reseñas y YouTube.
 - **Reseñas**: las reseñas de ejemplo se ven solo en el editor; en la TV, sin reseñas
   cargadas, se muestra solo el título.
 - **Reloj / Clima**: fecha como "Martes, 3 de noviembre".
+- **En vertical** (por ejemplo, el exhibidor de mostrador):
+  - el Clima tiene diseño propio: ciudad, fecha y hora arriba; ícono y temperatura grandes;
+    sensación, humedad y viento; pronóstico de 5 días en lista con chance de lluvia. Todo
+    se mide en proporción a la pantalla;
+  - el Reloj digital apila horas y minutos en dos renglones grandes, con los segundos y la
+    fecha ("Martes" / "3 de noviembre") abajo.
 - **Pantalla Dividida**: un solo video por zona (el fondo borroso era un segundo video y los
   TV box tienen pocos decodificadores).
