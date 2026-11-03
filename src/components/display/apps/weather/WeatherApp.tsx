@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -356,6 +356,23 @@ export const WeatherPreview = ({ config }: { config: Partial<WeatherConfig> }) =
 const localDay = (time: string) => new Date(`${String(time).slice(0, 10)}T12:00:00`);
 const capFirst = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
+// Mide el recuadro disponible y le pasa el tamaño al contenido.
+function Measure({ children }: { children: (size: { width: number; height: number }) => ReactNode }) {
+    const ref = useRef<HTMLDivElement>(null);
+    const [size, setSize] = useState({ width: 0, height: 0 });
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        const observer = new ResizeObserver(entries => {
+            const rect = entries[0].contentRect;
+            setSize({ width: rect.width, height: rect.height });
+        });
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, []);
+    return <div ref={ref} className="absolute inset-0 z-10">{size.width > 0 && size.height > 0 && children(size)}</div>;
+}
+
 // La hora que se muestra avanza sola (antes quedaba la del momento de cargar).
 function useNow(intervalMs: number) {
     const [now, setNow] = useState(() => new Date());
@@ -613,6 +630,65 @@ const WeatherCard = ({ data, unitStr, mode, theme, customBgImage }: { data: any,
         );
     };
 
+    // Pantalla vertical (por ejemplo, el exhibidor de mostrador): diseño propio que
+    // ocupa todo el alto. Todo se mide en "u" (1 % del ancho, o menos si la pantalla
+    // es más baja) para que entre igual en cualquier tamaño.
+    const renderPortraitLayout = (W: number, H: number) => {
+        const u = Math.min(W, H / 1.9) / 100;
+        const px = (n: number) => `${n * u}px`;
+        const codes = data.daily.weather_code || data.daily.weathercode || [];
+        const rainProb = data.daily.precipitation_probability_max || [];
+        return (
+            <div className="w-full h-full flex flex-col" style={{ padding: px(6), gap: px(3) }}>
+                <div className="flex items-start justify-between drop-shadow-md" style={{ gap: px(3) }}>
+                    <div className="min-w-0">
+                        <div className="flex items-center font-semibold" style={{ fontSize: px(7), gap: px(1.5) }}>
+                            <MapPin style={{ width: px(6), height: px(6) }} className="shrink-0" />
+                            <span className="truncate">{data.location.name.split(',')[0]}</span>
+                        </div>
+                        <div className="opacity-90" style={{ fontSize: px(4.6), marginTop: px(1) }}>{dateString}</div>
+                    </div>
+                    <div className="font-medium tabular-nums shrink-0" style={{ fontSize: px(7) }}>{timeString}</div>
+                </div>
+
+                <div className="flex-1 min-h-0 flex flex-col items-center justify-center text-center">
+                    <Icon className="drop-shadow-2xl" style={{ width: px(34), height: px(34) }} />
+                    <div className="font-light tracking-tighter leading-none drop-shadow-2xl" style={{ fontSize: px(30), marginTop: px(2) }}>
+                        {temp}<span className="align-top font-normal opacity-80" style={{ fontSize: px(10) }}>{unitStr}</span>
+                    </div>
+                    <div className="font-medium drop-shadow-md first-letter:uppercase" style={{ fontSize: px(6), marginTop: px(2) }}>{desc}</div>
+                </div>
+
+                <div className={cn("flex justify-around items-center rounded-3xl font-medium", cardStyle)} style={{ padding: `${px(2.5)} ${px(3)}`, fontSize: px(4.2) }}>
+                    <span>Sensación <b>{feelsLike}°</b></span>
+                    <span className="flex items-center" style={{ gap: px(1) }}><Droplets style={{ width: px(4.5), height: px(4.5) }} />{humidity}%</span>
+                    <span className="flex items-center" style={{ gap: px(1) }}><Wind style={{ width: px(4.5), height: px(4.5) }} />{Math.round(windSpeed)} km/h</span>
+                </div>
+
+                <div className={cn("rounded-3xl flex flex-col", cardStyle)} style={{ padding: `${px(2)} ${px(4)}` }}>
+                    {data.daily.time.slice(1, 6).map((time: string, i: number) => {
+                        const idx = i + 1;
+                        const DIcon = getWeatherIcon(codes[idx], true);
+                        const dayName = capFirst(localDay(time).toLocaleDateString('es-AR', { weekday: 'long' }));
+                        return (
+                            <div key={time} className="flex items-center border-b last:border-0" style={{ height: px(9.5), gap: px(3), borderColor: 'rgba(128,128,128,0.25)' }}>
+                                <span className="font-medium flex-1 min-w-0 truncate" style={{ fontSize: px(5) }}>{dayName}</span>
+                                <DIcon style={{ width: px(6.5), height: px(6.5) }} className="shrink-0" />
+                                <span className="opacity-70 tabular-nums text-right" style={{ fontSize: px(3.8), width: px(11) }}>
+                                    {rainProb[idx] > 0 ? `${rainProb[idx]}%` : ''}
+                                </span>
+                                <span className="tabular-nums text-right" style={{ fontSize: px(5), width: px(22) }}>
+                                    <b>{Math.round(data.daily.temperature_2m_max[idx])}°</b>
+                                    <span className="opacity-60"> {Math.round(data.daily.temperature_2m_min[idx])}°</span>
+                                </span>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div className={cn("w-full h-full flex flex-col relative overflow-hidden", bgStyle)}>
             {bgImage && (
@@ -625,9 +701,13 @@ const WeatherCard = ({ data, unitStr, mode, theme, customBgImage }: { data: any,
             {/* Se dibuja a un tamaño mínimo y se achica para que entre entero en su
                 recuadro (por ejemplo, tres ciudades una al lado de la otra en la TV). */}
             {mode === 'main' && (
-                <FitBox minSize={w => (w >= 1024 ? { width: 1024, height: 900 } : { width: 400, height: 620 })}>
-                    {({ width }) => renderMainLayout(width)}
-                </FitBox>
+                <Measure>
+                    {({ width, height }) => height > width * 1.25 && width >= 260 ? renderPortraitLayout(width, height) : (
+                        <FitBox minSize={w => (w >= 1024 ? { width: 1024, height: 900 } : { width: 400, height: 620 })}>
+                            {({ width }) => renderMainLayout(width)}
+                        </FitBox>
+                    )}
+                </Measure>
             )}
 
             {mode === 'micro' && (

@@ -140,6 +140,11 @@ export const ClockPreview = ({ config, containerWidth: extContainerWidth }: { co
     const dateFontSize = Math.max(12, Math.min(height * 0.15, width * 0.05, 40));
     
     const isTinyHeight = height < 150;
+    // Pantalla vertical: la hora va en dos renglones (horas arriba, minutos abajo)
+    // para aprovechar el alto; en un renglón quedaba chica, limitada por el ancho.
+    const isPortrait = height > width * 1.3 && width >= 180;
+    const stackedFontSize = Math.min(width * 0.62, height * 0.3);
+    const portraitDateSize = Math.max(14, Math.min(width * 0.075, 60));
     
     // Digital formatting
     const hours = format24h ? time.getHours().toString().padStart(2, '0') : (time.getHours() % 12 || 12).toString();
@@ -169,7 +174,19 @@ export const ClockPreview = ({ config, containerWidth: extContainerWidth }: { co
 
             <div className="relative z-10 flex flex-col items-center justify-center w-full h-full gap-2 lg:gap-4">
                 
-                {type === 'digital' ? (
+                {type === 'digital' && isPortrait ? (
+                    <div className={cn("flex flex-col items-center justify-center font-bold tabular-nums tracking-tighter", theme === 'neon' ? 'font-mono' : 'font-sans')}
+                        style={{ lineHeight: 0.92 }}>
+                        <span style={{ fontSize: `${stackedFontSize}px` }}>{hours.padStart(2, '0')}</span>
+                        <span style={{ fontSize: `${stackedFontSize}px`, opacity: 0.85 }}>{minutes}</span>
+                        <span
+                            className={cn("font-medium tracking-normal mt-[0.35em]", theme === 'neon' ? 'text-cyan-600' : 'text-slate-400')}
+                            style={{ fontSize: `${stackedFontSize * 0.2}px` }}
+                        >
+                            {seconds}{!format24h && ` ${ampm}`}
+                        </span>
+                    </div>
+                ) : type === 'digital' ? (
                     <div className="flex flex-col items-center justify-center">
                         <div className={cn(
                             "font-bold tabular-nums tracking-tighter leading-none flex items-baseline gap-1 lg:gap-2",
@@ -263,13 +280,17 @@ export const ClockPreview = ({ config, containerWidth: extContainerWidth }: { co
 
                 {showDate && (
                     <div className={cn(
-                        "font-medium transition-all",
+                        "font-medium transition-all text-center",
+                        isPortrait && "mt-[0.6em] leading-tight",
                         theme === 'glass' ? 'text-white/80' : 
                         theme === 'neon' ? 'text-cyan-600' : 'opacity-70'
                     )}
-                    style={{ fontSize: `${dateFontSize}px` }}
+                    style={{ fontSize: `${isPortrait ? portraitDateSize : dateFontSize}px` }}
                     >
-                        {dateStr}
+                        {isPortrait ? (
+                            // En vertical, el día arriba y la fecha abajo.
+                            <>{dateStr.split(', ')[0]}<br />{dateStr.split(', ').slice(1).join(', ')}</>
+                        ) : dateStr}
                     </div>
                 )}
             </div>
