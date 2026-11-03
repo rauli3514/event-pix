@@ -1,7 +1,7 @@
-import { Component, ErrorInfo, ReactNode } from 'react';
 import { PlayerRenderer } from '@/components/display/PlayerRenderer';
 import { CampaignItem } from '@/types/display';
 import { isCheapItem } from '@/lib/tvPerformance';
+import { RetryBoundary } from '@/components/display/apps/RetryBoundary';
 
 interface Props {
     items: CampaignItem[];
@@ -15,34 +15,6 @@ interface Props {
     onVideoDuration: (index: number, seconds: number) => void;
     // Modo liviano (equipos con poca memoria, ver tvPerformance.ts).
     lite?: boolean;
-}
-
-interface State {
-    hasError: boolean;
-}
-
-export class MediaErrorBoundary extends Component<{children: ReactNode, onError: () => void}, State> {
-    public state: State = {
-        hasError: false
-    };
-
-    public static getDerivedStateFromError(_: Error): State {
-        return { hasError: true };
-    }
-
-    public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-        console.error("MediaRenderer Error:", error, errorInfo);
-        this.props.onError();
-    }
-
-    public render() {
-        if (this.state.hasError) {
-            // If the current media crashes, we just render an empty black screen
-            // so the rotation logic can move on to the next item seamlessly.
-            return <div className="w-full h-full bg-black"></div>;
-        }
-        return this.props.children;
-    }
 }
 
 export function MediaRenderer({ items, currentIndex, prevIndex: prevProp, nextIndex: nextProp, deviceCommerceId, onVideoEnded, onVideoError, onVideoDuration, lite }: Props) {
@@ -70,12 +42,9 @@ export function MediaRenderer({ items, currentIndex, prevIndex: prevProp, nextIn
                 }
 
                 return (
-                    <MediaErrorBoundary 
-                        key={`${item.id}-${index}`}
-                        onError={() => {
-                            console.log(`Error in item ${item.id}. Watchdog will skip.`);
-                        }}
-                    >
+                    // Si el item falla queda en negro (la rotación sigue) y a los 30 s se
+                    // vuelve a intentar: antes quedaba negro hasta reiniciar la TV.
+                    <RetryBoundary key={`${item.id}-${index}`}>
                         <PlayerRenderer 
                             item={item} 
                             isActive={isActive} 
@@ -87,7 +56,7 @@ export function MediaRenderer({ items, currentIndex, prevIndex: prevProp, nextIn
                             onVideoError={() => onVideoError(index)}
                             onVideoDuration={(seconds) => onVideoDuration(index, seconds)}
                         />
-                    </MediaErrorBoundary>
+                    </RetryBoundary>
                 );
             })}
         </div>

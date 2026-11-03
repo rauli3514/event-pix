@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DollarSign, RefreshCw, ArrowRightLeft } from 'lucide-react';
@@ -61,11 +61,11 @@ export const DolarPreview = ({ config, containerWidth: extContainerWidth, mode =
     const [quotes, setQuotes] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
-    const containerRef = useRef<HTMLDivElement>(null);
+    const [containerEl, setContainerEl] = useState<HTMLDivElement | null>(null);
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
     useEffect(() => {
-        if (!containerRef.current) return;
+        if (!containerEl) return;
         const observer = new ResizeObserver(entries => {
             for (let entry of entries) {
                 setDimensions({
@@ -74,34 +74,61 @@ export const DolarPreview = ({ config, containerWidth: extContainerWidth, mode =
                 });
             }
         });
-        observer.observe(containerRef.current);
+        observer.observe(containerEl);
         return () => observer.disconnect();
-    }, []);
+    }, [containerEl]);
 
     useEffect(() => {
+        const CACHE = 'dolar_cache';
+        let cancelled = false;
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        // Última cotización guardada: si arranca sin internet muestra esa (hasta 24 h).
+        try {
+            const cached = JSON.parse(localStorage.getItem(CACHE) || 'null');
+            if (cached && Date.now() - cached.at < 24 * 3600_000 && Array.isArray(cached.quotes) && cached.quotes.length) {
+                setQuotes(cached.quotes);
+                setLastUpdate(new Date(cached.at));
+                setLoading(false);
+            }
+        } catch {
+            // sin caché
+        }
+
         const fetchDolar = async () => {
+            let ok = false;
             try {
                 const res = await fetch('https://dolarapi.com/v1/dolares');
                 const data = await res.json();
+                // Una respuesta de error no es una lista: antes rompía la app (pantalla negra).
+                if (!res.ok || !Array.isArray(data) || data.length === 0) throw new Error(`HTTP ${res.status}`);
+                if (cancelled) return;
                 setQuotes(data);
                 setLastUpdate(new Date());
+                ok = true;
+                try { localStorage.setItem(CACHE, JSON.stringify({ at: Date.now(), quotes: data })); } catch { /* sin espacio */ }
             } catch (error) {
                 console.error("Dolar API Error", error);
             } finally {
-                setLoading(false);
+                if (!cancelled) {
+                    setLoading(false);
+                    // Cada 5 min; si falló, se reintenta al minuto.
+                    timer = setTimeout(fetchDolar, ok ? 5 * 60_000 : 60_000);
+                }
             }
         };
 
         fetchDolar();
-        const interval = setInterval(fetchDolar, 5 * 60 * 1000);
-        return () => clearInterval(interval);
+        return () => {
+            cancelled = true;
+            if (timer) clearTimeout(timer);
+        };
     }, []);
 
-    if (loading || quotes.length === 0) {
+    if (quotes.length === 0) {
         return (
-            <div ref={containerRef} className="w-full h-full flex flex-col items-center justify-center text-slate-500 bg-slate-950">
+            <div ref={setContainerEl} className="w-full h-full flex flex-col items-center justify-center text-slate-500 bg-slate-950">
                 <RefreshCw className="w-12 h-12 mb-4 opacity-50 animate-spin" />
-                <p>Cargando cotizaciones...</p>
+                <p>{loading ? 'Cargando cotizaciones...' : 'Sin conexión con el servicio de cotizaciones'}</p>
             </div>
         );
     }
@@ -115,7 +142,8 @@ export const DolarPreview = ({ config, containerWidth: extContainerWidth, mode =
     
     // Determine layout type based on size or mode
     const isTicker = dimensions.height > 0 && dimensions.height < 150;
-    const isColumn = mode === 'column' || (dimensions.width > 0 && dimensions.width < 400 && dimensions.height >= 150);
+    const isPortrait = dimensions.width > 0 && dimensions.height > dimensions.width * 1.2;
+    const isColumn = mode === 'column' || (dimensions.width > 0 && dimensions.height >= 150 && (dimensions.width < 400 || isPortrait));
 
     const displayQuotes = quotes.filter(q => ['blue', 'oficial', 'tarjeta', 'cripto', 'bolsa'].includes(q.casa));
     const tickerQuotes = type !== 'all' ? [quotes.find(q => q.casa === type) || quotes[0]] : displayQuotes;
@@ -147,7 +175,7 @@ export const DolarPreview = ({ config, containerWidth: extContainerWidth, mode =
 
     if (isTicker) {
         return (
-            <div ref={containerRef} className={cn("w-full h-full flex items-center overflow-hidden whitespace-nowrap transition-colors duration-500 relative", bgStyle)}>
+            <div ref={setContainerEl} className={cn("w-full h-full flex items-center overflow-hidden whitespace-nowrap transition-colors duration-500 relative", bgStyle)}>
                 {bgImage && (
                     <div className="absolute inset-0 bg-cover bg-center transition-opacity duration-1000 z-0 opacity-50" style={{ backgroundImage: `url(${bgImage})` }} />
                 )}
@@ -183,7 +211,7 @@ export const DolarPreview = ({ config, containerWidth: extContainerWidth, mode =
         if (type !== 'all') {
             const quote = quotes.find(q => q.casa === type) || quotes[0];
             return (
-                <div ref={containerRef} className={cn("w-full h-full p-6 flex flex-col items-center justify-center relative transition-colors duration-500 overflow-hidden", bgStyle)}>
+                <div ref={setContainerEl} className={cn("w-full h-full p-6 flex flex-col items-center justify-center relative transition-colors duration-500 overflow-hidden", bgStyle)}>
                     {bgImage && (
                         <div className="absolute inset-0 bg-cover bg-center transition-opacity duration-1000 z-0 opacity-80" style={{ backgroundImage: `url(${bgImage})` }} />
                     )}
@@ -214,19 +242,22 @@ export const DolarPreview = ({ config, containerWidth: extContainerWidth, mode =
         }
 
         return (
-            <div ref={containerRef} className={cn("w-full h-full p-6 flex flex-col relative transition-colors duration-500 overflow-y-auto scrollbar-hide", bgStyle)}>
+            <div ref={setContainerEl} className={cn("w-full h-full p-6 flex flex-col relative transition-colors duration-500 overflow-hidden", bgStyle)}>
                 {bgImage && (
                     <div className="absolute inset-0 bg-cover bg-center transition-opacity duration-1000 z-0 opacity-80" style={{ backgroundImage: `url(${bgImage})` }} />
                 )}
-                <div className="relative z-10 flex flex-col h-full">
-                    <div className="flex items-center gap-2 mb-6 opacity-90 pb-3 drop-shadow-md">
+                <div className="relative z-10 flex flex-col h-full min-h-0">
+                    <div className="flex items-center gap-2 mb-4 opacity-90 pb-2 drop-shadow-md">
                         <DollarSign className={`w-6 h-6 ${accentClass}`} />
                         <h2 className="text-2xl font-light tracking-wider">Mercado</h2>
                     </div>
 
-                    <div className="flex flex-col gap-4 flex-1">
-                        {displayQuotes.map(quote => (
-                            <div key={quote.casa} className={cn("p-4 rounded-2xl flex flex-col gap-3 transition-transform hover:scale-[1.02]", cardStyle)}>
+                    {/* Las tarjetas se reparten el alto: en la TV no se puede deslizar. */}
+                    <div className="flex flex-col gap-3 flex-1 min-h-0">
+                        {/* Solo las que entran (cada tarjeta necesita ~70 px): en una zona
+                            chica se encimaban. Primero oficial y blue. */}
+                        {displayQuotes.slice(0, Math.max(1, Math.floor((dimensions.height - 50) / 70))).map(quote => (
+                            <div key={quote.casa} className={cn("px-4 py-2 rounded-2xl flex flex-col justify-center gap-1 flex-1 min-h-0 max-h-40", cardStyle)}>
                                 <h3 className="text-lg font-medium opacity-90 drop-shadow-md">{quote.nombre}</h3>
                                 <div className="flex justify-between items-center">
                                     <div>
@@ -252,7 +283,7 @@ export const DolarPreview = ({ config, containerWidth: extContainerWidth, mode =
         const quote = quotes.find(q => q.casa === type) || quotes[0];
         
         return (
-            <div ref={containerRef} className={cn("w-full h-full flex flex-col relative transition-colors duration-500 overflow-hidden", bgStyle)}>
+            <div ref={setContainerEl} className={cn("w-full h-full flex flex-col relative transition-colors duration-500 overflow-hidden", bgStyle)}>
                 {bgImage && (
                     <div className="absolute inset-0 bg-cover bg-center transition-opacity duration-1000 z-0 opacity-90" style={{ backgroundImage: `url(${bgImage})` }} />
                 )}
@@ -301,7 +332,7 @@ export const DolarPreview = ({ config, containerWidth: extContainerWidth, mode =
 
     // MAIN VIEW: Multiple quotes (Resumen)
     return (
-        <div ref={containerRef} className={cn("w-full h-full flex flex-col relative transition-colors duration-500 overflow-y-auto scrollbar-hide", bgStyle)}>
+        <div ref={setContainerEl} className={cn("w-full h-full flex flex-col relative transition-colors duration-500 overflow-y-auto scrollbar-hide", bgStyle)}>
             {bgImage && (
                 <div className="absolute inset-0 bg-cover bg-center transition-opacity duration-1000 z-0 opacity-90" style={{ backgroundImage: `url(${bgImage})` }} />
             )}

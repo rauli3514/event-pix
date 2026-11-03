@@ -151,8 +151,13 @@ export const TickerPreview = ({ config }: { config: Partial<TickerConfig>, conta
             return;
         }
 
+        let cancelled = false;
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        let gotNews = false;
+
         const fetchRSS = async () => {
-            setLoading(true);
+            if (!gotNews) setLoading(true);
+            let ok = false;
             try {
                 const rssUrl = config.rssUrl || PREDEFINED_RSS[0].url;
                 
@@ -163,38 +168,35 @@ export const TickerPreview = ({ config }: { config: Partial<TickerConfig>, conta
                 
                 if (error || !data || !data.xml) throw new Error('Failed to fetch RSS via Edge Function');
                 
-                const text = data.xml;
                 const parser = new DOMParser();
-                const xmlDoc = parser.parseFromString(text, "text/xml");
-                
-                // Find all <item> tags
-                const items = Array.from(xmlDoc.querySelectorAll("item"));
-                
-                if (items.length > 0) {
-                    const titles = items
-                        .slice(0, 12) // limit to 12
-                        .map(item => item.querySelector("title")?.textContent || '')
-                        .filter(title => title.trim().length > 0);
-                        
-                    if (titles.length > 0) {
-                        setNewsItems(titles);
-                    } else {
-                        setNewsItems(['No se encontraron noticias válidas.']);
-                    }
-                } else {
-                    setNewsItems(['El formato RSS no es válido.']);
-                }
+                const xmlDoc = parser.parseFromString(data.xml, "text/xml");
+                const titles = Array.from(xmlDoc.querySelectorAll("item"))
+                    .slice(0, 12)
+                    .map(item => item.querySelector("title")?.textContent || '')
+                    .filter(title => title.trim().length > 0);
+                if (titles.length === 0) throw new Error('RSS sin noticias');
+                if (cancelled) return;
+                setNewsItems(titles);
+                gotNews = true;
+                ok = true;
             } catch (error) {
                 console.error("RSS Fetch Error", error);
-                setNewsItems(['Error de conexión al cargar noticias.']);
+                // Si ya había noticias, siguen las anteriores (no aparece un error en la TV).
+                if (!gotNews && !cancelled) setNewsItems(['Noticias no disponibles por el momento']);
             } finally {
-                setLoading(false);
+                if (!cancelled) {
+                    setLoading(false);
+                    // Cada 30 min; si falló, se reintenta a los 3 min.
+                    timer = setTimeout(fetchRSS, ok ? 30 * 60_000 : 3 * 60_000);
+                }
             }
         };
 
         fetchRSS();
-        const interval = setInterval(fetchRSS, 30 * 60 * 1000); // refresh every 30 mins
-        return () => clearInterval(interval);
+        return () => {
+            cancelled = true;
+            if (timer) clearTimeout(timer);
+        };
     }, [sourceType, config.rssUrl, config.customText]);
 
     const speed = config.speed || 'normal';

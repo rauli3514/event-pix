@@ -147,8 +147,10 @@ export const ClockPreview = ({ config, containerWidth: extContainerWidth }: { co
     const seconds = time.getSeconds().toString().padStart(2, '0');
     const ampm = time.getHours() >= 12 ? 'PM' : 'AM';
 
-    const formatter = new Intl.DateTimeFormat('es', { weekday: 'long', day: 'numeric', month: 'long' });
-    const dateStr = formatter.format(time);
+    const formatter = new Intl.DateTimeFormat('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+    // "Martes, 3 de noviembre": solo la primera letra en mayúscula.
+    const rawDate = formatter.format(time);
+    const dateStr = rawDate.charAt(0).toUpperCase() + rawDate.slice(1);
 
     // Analog calculations
     const secDegrees = ((time.getSeconds() / 60) * 360) + 90;
@@ -261,7 +263,7 @@ export const ClockPreview = ({ config, containerWidth: extContainerWidth }: { co
 
                 {showDate && (
                     <div className={cn(
-                        "font-medium capitalize transition-all",
+                        "font-medium transition-all",
                         theme === 'glass' ? 'text-white/80' : 
                         theme === 'neon' ? 'text-cyan-600' : 'opacity-70'
                     )}

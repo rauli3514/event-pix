@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Cloud, CloudRain, CloudLightning, Sun, Search, MapPin, X, Wind, Droplets, Moon } from 'lucide-react';
+import { Cloud, CloudRain, CloudLightning, CloudFog, CloudSnow, CloudDrizzle, Sun, Search, MapPin, X, Wind, Droplets, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { FitBox } from '../FitBox';
@@ -194,7 +194,7 @@ export const WeatherForm = ({ config, onChange }: WeatherFormProps) => {
 
 export const WeatherPreview = ({ config }: { config: Partial<WeatherConfig> }) => {
     const [weatherDataList, setWeatherDataList] = useState<any[]>([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const containerRef = useRef<HTMLDivElement>(null);
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
@@ -211,29 +211,59 @@ export const WeatherPreview = ({ config }: { config: Partial<WeatherConfig> }) =
         return () => observer.disconnect();
     }, []);
 
+    const locationsKey = JSON.stringify(locations);
     useEffect(() => {
         if (locations.length === 0) return;
+        const unitParam = config.unit === 'fahrenheit' ? '&temperature_unit=fahrenheit' : '';
+        const cacheKey = `weather_cache:${locationsKey}${unitParam}`;
+        let cancelled = false;
+        let timer: ReturnType<typeof setTimeout> | null = null;
+
+        // Lo último que se trajo queda guardado: si la TV arranca sin internet
+        // muestra eso (hasta 12 h) en vez de "Cargando clima..." para siempre.
+        try {
+            const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
+            if (cached && Date.now() - cached.at < 12 * 3600_000 && Array.isArray(cached.list) && cached.list.length) {
+                setWeatherDataList(cached.list);
+            }
+        } catch {
+            // sin caché
+        }
 
         const fetchAll = async () => {
             setLoading(true);
+            let ok = false;
             try {
-                const unitParam = config.unit === 'fahrenheit' ? '&temperature_unit=fahrenheit' : '';
-                const promises = locations.map(loc => 
-                    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_probability_max&timezone=auto${unitParam}`)
-                    .then(res => res.json())
-                    .then(data => ({ ...data, location: loc }))
-                );
-                const results = await Promise.all(promises);
+                const results = await Promise.all(locations.map(async loc => {
+                    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_probability_max&timezone=auto${unitParam}`);
+                    const data = await res.json();
+                    // Una respuesta de error (por ejemplo "demasiadas consultas") no trae
+                    // los datos: antes rompía la app y la pantalla quedaba en negro.
+                    if (!res.ok || !data?.current || !Array.isArray(data?.daily?.time)) throw new Error(data?.reason || `HTTP ${res.status}`);
+                    return { ...data, location: loc };
+                }));
+                if (cancelled) return;
                 setWeatherDataList(results);
+                ok = true;
+                try { localStorage.setItem(cacheKey, JSON.stringify({ at: Date.now(), list: results })); } catch { /* sin espacio */ }
             } catch (error) {
                 console.error("Weather error", error);
             } finally {
-                setLoading(false);
+                if (!cancelled) {
+                    setLoading(false);
+                    // Se actualiza cada 30 min; si falló, se reintenta a los 2 min.
+                    timer = setTimeout(fetchAll, ok ? 30 * 60_000 : 2 * 60_000);
+                }
             }
         };
 
         fetchAll();
-    }, [JSON.stringify(locations), config.unit]);
+        return () => {
+            cancelled = true;
+            if (timer) clearTimeout(timer);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [locationsKey, config.unit]);
 
     const renderContent = () => {
         if (locations.length === 0) {
@@ -245,10 +275,10 @@ export const WeatherPreview = ({ config }: { config: Partial<WeatherConfig> }) =
             );
         }
 
-        if (loading || weatherDataList.length === 0) {
+        if (weatherDataList.length === 0) {
             return (
                 <div className="w-full h-full flex items-center justify-center text-slate-500 bg-slate-950">
-                    <span className="animate-pulse">Cargando clima...</span>
+                    <span className="animate-pulse">{loading ? 'Cargando clima...' : 'Sin conexión con el servicio del clima'}</span>
                 </div>
             );
         }
@@ -321,6 +351,21 @@ export const WeatherPreview = ({ config }: { config: Partial<WeatherConfig> }) =
 
 // --- SUBCOMPONENTS ---
 
+// "2026-11-04" es un día del calendario: con new Date() se toma como medianoche
+// en hora universal y en Argentina caía el día anterior (pronóstico corrido).
+const localDay = (time: string) => new Date(`${String(time).slice(0, 10)}T12:00:00`);
+const capFirst = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+// La hora que se muestra avanza sola (antes quedaba la del momento de cargar).
+function useNow(intervalMs: number) {
+    const [now, setNow] = useState(() => new Date());
+    useEffect(() => {
+        const timer = setInterval(() => setNow(new Date()), intervalMs);
+        return () => clearInterval(timer);
+    }, [intervalMs]);
+    return now;
+}
+
 const TickerItem = ({ data, unitStr }: { data: any, unitStr: string }) => {
     const { code, temp, isDay } = parseWeatherData(data);
     const Icon = getWeatherIcon(code, isDay);
@@ -357,12 +402,12 @@ const getBackgroundImage = (code: number, isDay: boolean) => {
         if (code <= 3) return 'https://images.unsplash.com/photo-1503330936140-b3a87ed1b1eb?auto=format&fit=crop&w=1920&q=80'; // clear night
         return 'https://images.unsplash.com/photo-1485249245068-d8dc50b77cc7?auto=format&fit=crop&w=1920&q=80'; // cloudy night
     }
-    if (code === 0) return 'https://images.unsplash.com/photo-1514454529242-9e4677563e7b?auto=format&fit=crop&w=1920&q=80'; // clear day
-    if (code >= 1 && code <= 3) return 'https://images.unsplash.com/photo-1469365556835-3da3db4c253b?auto=format&fit=crop&w=1920&q=80'; // cloudy day
-    if (code >= 51 && code <= 67) return 'https://images.unsplash.com/photo-1515694346937-94d85e41e6f0?auto=format&fit=crop&w=1920&q=80'; // rain
-    if (code >= 71 && code <= 82) return 'https://images.unsplash.com/photo-1478265409131-1f65c88f965c?auto=format&fit=crop&w=1920&q=80'; // snow
-    if (code >= 95) return 'https://images.unsplash.com/photo-1429552077091-836152271555?auto=format&fit=crop&w=1920&q=80'; // storm
-    return 'https://images.unsplash.com/photo-1514454529242-9e4677563e7b?auto=format&fit=crop&w=1920&q=80';
+    const kind = weatherKind(code);
+    if (kind === 'clear') return 'https://images.unsplash.com/photo-1514454529242-9e4677563e7b?auto=format&fit=crop&w=1920&q=80'; // clear day
+    if (kind === 'drizzle' || kind === 'rain') return 'https://images.unsplash.com/photo-1515694346937-94d85e41e6f0?auto=format&fit=crop&w=1920&q=80'; // rain
+    if (kind === 'snow') return 'https://images.unsplash.com/photo-1478265409131-1f65c88f965c?auto=format&fit=crop&w=1920&q=80'; // snow
+    if (kind === 'storm') return 'https://images.unsplash.com/photo-1429552077091-836152271555?auto=format&fit=crop&w=1920&q=80'; // storm
+    return 'https://images.unsplash.com/photo-1469365556835-3da3db4c253b?auto=format&fit=crop&w=1920&q=80'; // cloudy / fog
 };
 
 const WeatherCard = ({ data, unitStr, mode, theme, customBgImage }: { data: any, unitStr: string, mode: 'micro' | 'square' | 'column' | 'main', theme: string, containerWidth?: number, customBgImage?: string }) => {
@@ -400,8 +445,12 @@ const WeatherCard = ({ data, unitStr, mode, theme, customBgImage }: { data: any,
         cardStyle = 'bg-black/60 backdrop-blur-md border border-white/10 shadow-xl';
     }
 
-    const timeString = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-    const dateString = new Date().toLocaleDateString('es-ES', { weekday: 'long', month: 'long', day: 'numeric' });
+    const now = useNow(30_000);
+    const timeString = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+    // "Martes, 3 de noviembre" (solo la primera letra en mayúscula)
+    const dateString = capFirst(now.toLocaleDateString('es-AR', { weekday: 'long', month: 'long', day: 'numeric' }));
+    const weekdayName = capFirst(now.toLocaleDateString('es-AR', { weekday: 'long' }));
+    const dayMonth = now.toLocaleDateString('es-AR', { day: 'numeric', month: 'long' });
 
     // Diseño grande desde 1024 px de ancho (se decide con el ancho virtual del FitBox).
     const renderMainLayout = (layoutWidth: number) => {
@@ -418,7 +467,7 @@ const WeatherCard = ({ data, unitStr, mode, theme, customBgImage }: { data: any,
                     <div className="flex justify-between items-start relative z-10">
                         <div>
                             <h1 className={cn("font-bold tracking-tight mb-2", isLg ? "text-6xl" : "text-4xl")}>{data.location.name.split(',')[0]}</h1>
-                            <p className={cn("opacity-90 capitalize", isLg ? "text-3xl" : "text-xl")}>{dateString}</p>
+                            <p className={cn("opacity-90", isLg ? "text-3xl" : "text-xl")}>{dateString}</p>
                         </div>
                         <div className={cn("font-medium", isLg ? "text-5xl" : "text-3xl")}>{timeString}</div>
                     </div>
@@ -429,7 +478,7 @@ const WeatherCard = ({ data, unitStr, mode, theme, customBgImage }: { data: any,
                             <div className={cn("font-bold tracking-tighter leading-none", isLg ? "text-[14rem]" : "text-[8rem]")}>
                                 {temp}<span className={cn("align-top opacity-70", isLg ? "text-7xl" : "text-5xl")}>{unitStr}</span>
                             </div>
-                            <div className={cn("font-medium opacity-100 capitalize mt-2", isLg ? "text-5xl" : "text-3xl")}>{desc}</div>
+                            <div className={cn("font-medium opacity-100 first-letter:uppercase mt-2", isLg ? "text-5xl" : "text-3xl")}>{desc}</div>
                         </div>
                     </div>
 
@@ -441,7 +490,7 @@ const WeatherCard = ({ data, unitStr, mode, theme, customBgImage }: { data: any,
                         </div>
                         {data.daily.time.slice(1, isLg ? 5 : 4).map((time: string, idx: number) => {
                             const max = Math.round(data.daily.temperature_2m_max[idx + 1]);
-                            const dayName = new Date(time).toLocaleDateString('es-ES', { weekday: 'short' });
+                            const dayName = localDay(time).toLocaleDateString('es-AR', { weekday: 'short' }).replace('.', '');
                             return (
                                 <div key={time} className={cn("flex flex-col items-center", isLg ? "px-8 border-l border-white/20" : "px-3")}>
                                     <span className={cn("font-bold uppercase mb-2", isLg ? "text-2xl" : "text-lg")}>{dayName}</span>
@@ -462,9 +511,9 @@ const WeatherCard = ({ data, unitStr, mode, theme, customBgImage }: { data: any,
                             <div className={cn("flex items-center font-medium drop-shadow-md", isLg ? "text-3xl gap-3" : "text-2xl gap-2")}>
                                 <MapPin className={isLg ? "w-8 h-8" : "w-6 h-6"} /> {data.location.name.split(',')[0]}
                             </div>
-                            <div className={cn("font-light tracking-tight drop-shadow-lg leading-tight capitalize", isLg ? "text-7xl" : "text-4xl")}>
-                                {dateString.split(',')[0]}<br/>
-                                <span className="font-bold">{dateString.split(' ')[1]} {dateString.split(' ')[2]}</span>
+                            <div className={cn("font-light tracking-tight drop-shadow-lg leading-tight", isLg ? "text-7xl" : "text-4xl")}>
+                                {weekdayName}<br/>
+                                <span className="font-bold">{dayMonth}</span>
                             </div>
                         </div>
                         <div className={isLg ? "mt-0" : "mt-4"}>
@@ -480,7 +529,7 @@ const WeatherCard = ({ data, unitStr, mode, theme, customBgImage }: { data: any,
                             <div className={cn("flex-1 rounded-3xl flex flex-col justify-between", cardStyle, isLg ? "p-6" : "p-4")}>
                                 <div className={cn("font-medium", isLg ? "text-xl" : "text-sm")}>Sensación</div>
                                 <div className={cn("font-bold", isLg ? "text-5xl" : "text-2xl")}>{feelsLike}°</div>
-                                <div className={cn("opacity-80 capitalize truncate", isLg ? "text-xl" : "text-sm")}>{desc}</div>
+                                <div className={cn("opacity-80 first-letter:uppercase truncate", isLg ? "text-xl" : "text-sm")}>{desc}</div>
                             </div>
                             <div className={cn("rounded-3xl flex flex-col items-center justify-center", cardStyle, isLg ? "w-48 p-6" : "w-28 p-4")}>
                                 <Icon className={cn("drop-shadow-lg", isLg ? "w-24 h-24" : "w-12 h-12")} />
@@ -506,7 +555,7 @@ const WeatherCard = ({ data, unitStr, mode, theme, customBgImage }: { data: any,
                         <div className={cn("flex gap-4", isLg ? "h-40" : "h-24")}>
                             {data.daily.time.slice(1, isLg ? 6 : 5).map((time: string, idx: number) => {
                                 const max = Math.round(data.daily.temperature_2m_max[idx + 1]);
-                                const dayName = new Date(time).toLocaleDateString('es-ES', { weekday: 'short' });
+                                const dayName = localDay(time).toLocaleDateString('es-AR', { weekday: 'short' }).replace('.', '');
                                 const DIcon = getWeatherIcon((data.daily.weather_code || data.daily.weathercode)[idx+1], true);
                                 return (
                                     <div key={time} className={cn("flex-1 rounded-3xl flex flex-col items-center justify-between", cardStyle, isLg ? "p-4" : "p-2")}>
@@ -548,7 +597,7 @@ const WeatherCard = ({ data, unitStr, mode, theme, customBgImage }: { data: any,
                         {data.daily.time.slice(0, 6).map((time: string, idx: number) => {
                             const max = Math.round(data.daily.temperature_2m_max[idx]);
                             const min = Math.round(data.daily.temperature_2m_min[idx]);
-                            const dayName = idx === 0 ? 'Hoy' : new Date(time).toLocaleDateString('es-ES', { weekday: 'short' });
+                            const dayName = idx === 0 ? 'Hoy' : localDay(time).toLocaleDateString('es-AR', { weekday: 'short' }).replace('.', '');
                             const DIcon = getWeatherIcon((data.daily.weather_code || data.daily.weathercode)[idx], true);
                             return (
                                 <div key={time} className={cn("flex-1 flex flex-col items-center", isLg ? "gap-4" : "gap-2")}>
@@ -594,7 +643,7 @@ const WeatherCard = ({ data, unitStr, mode, theme, customBgImage }: { data: any,
                     <div className="flex-1 flex flex-col items-center justify-center">
                         <Icon className="w-16 h-16 drop-shadow-md mb-2" />
                         <div className="text-5xl font-bold drop-shadow-md">{temp}°</div>
-                        <div className="text-sm opacity-90 mt-1 capitalize drop-shadow-md">{desc}</div>
+                        <div className="text-sm opacity-90 mt-1 first-letter:uppercase drop-shadow-md">{desc}</div>
                     </div>
                 </div>
             )}
@@ -613,14 +662,14 @@ const WeatherCard = ({ data, unitStr, mode, theme, customBgImage }: { data: any,
                         <div className="text-6xl font-bold tracking-tighter drop-shadow-xl">
                             {temp}<span className="text-2xl align-top opacity-80">{unitStr}</span>
                         </div>
-                        <div className="text-base opacity-90 font-medium capitalize drop-shadow-md">{desc}</div>
+                        <div className="text-base opacity-90 font-medium first-letter:uppercase drop-shadow-md">{desc}</div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 mt-auto">
                         {data.daily.time.slice(1, 5).map((time: string, idx: number) => {
                             const max = Math.round(data.daily.temperature_2m_max[idx + 1]);
                             const min = Math.round(data.daily.temperature_2m_min[idx + 1]);
-                            const dayName = new Date(time).toLocaleDateString('es-ES', { weekday: 'short' });
+                            const dayName = localDay(time).toLocaleDateString('es-AR', { weekday: 'short' }).replace('.', '');
                             const DIcon = getWeatherIcon((data.daily.weather_code || data.daily.weathercode)[idx+1], true);
                             return (
                                 <div key={time} className={cn("p-3 rounded-xl flex flex-col items-center", cardStyle)}>
@@ -637,20 +686,46 @@ const WeatherCard = ({ data, unitStr, mode, theme, customBgImage }: { data: any,
     );
 };
 
+// Códigos del servicio (WMO): 0 despejado, 1-3 nubes, 45-48 niebla, 51-57 llovizna,
+// 61-67 lluvia, 71-77 nieve, 80-82 chaparrones, 85-86 nevadas, 95-99 tormenta.
+// Antes los chaparrones (80-82) caían en "Nieve".
+type WeatherKind = 'clear' | 'cloudy' | 'fog' | 'drizzle' | 'rain' | 'snow' | 'storm';
+const weatherKind = (code: number): WeatherKind => {
+    if (code === 0) return 'clear';
+    if (code <= 3) return 'cloudy';
+    if (code === 45 || code === 48) return 'fog';
+    if (code >= 51 && code <= 57) return 'drizzle';
+    if ((code >= 61 && code <= 67) || (code >= 80 && code <= 82)) return 'rain';
+    if ((code >= 71 && code <= 77) || code === 85 || code === 86) return 'snow';
+    if (code >= 95) return 'storm';
+    return 'cloudy';
+};
+
 const getWeatherIcon = (code: number, isDay: boolean) => {
-    if (code === 0) return isDay ? Sun : Moon;
-    if (code >= 1 && code <= 3) return Cloud;
-    if (code >= 51 && code <= 67) return CloudRain;
-    if (code >= 71 && code <= 82) return CloudRain;
-    if (code >= 95) return CloudLightning;
-    return Sun;
+    switch (weatherKind(code)) {
+        case 'clear': return isDay ? Sun : Moon;
+        case 'fog': return CloudFog;
+        case 'drizzle': return CloudDrizzle;
+        case 'rain': return CloudRain;
+        case 'snow': return CloudSnow;
+        case 'storm': return CloudLightning;
+        default: return Cloud;
+    }
 };
 
 const getWeatherDesc = (code: number) => {
     if (code === 0) return 'Despejado';
-    if (code >= 1 && code <= 3) return 'Parcialmente Nublado';
-    if (code >= 51 && code <= 67) return 'Lluvia';
-    if (code >= 71 && code <= 82) return 'Nieve';
-    if (code >= 95) return 'Tormenta';
-    return 'Despejado';
+    if (code === 1) return 'Mayormente despejado';
+    if (code === 2) return 'Parcialmente nublado';
+    if (code === 3) return 'Nublado';
+    if (code >= 80 && code <= 82) return 'Chaparrones';
+    if (code === 85 || code === 86) return 'Nevadas';
+    switch (weatherKind(code)) {
+        case 'fog': return 'Niebla';
+        case 'drizzle': return 'Llovizna';
+        case 'rain': return 'Lluvia';
+        case 'snow': return 'Nieve';
+        case 'storm': return 'Tormenta';
+        default: return 'Nublado';
+    }
 };
