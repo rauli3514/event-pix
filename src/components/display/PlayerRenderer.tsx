@@ -10,6 +10,7 @@ import { QRPreview } from './apps/qr/QRApp';
 import { ReviewsPreview } from './apps/reviews/ReviewsApp';
 import { DynamicMenuPreview } from './apps/dynamic-menu/DynamicMenuApp';
 import { YoutubePreview } from './apps/youtube/YoutubeApp';
+import { isYoutubeUrl } from '@/lib/youtube';
 
 interface PlayerRendererProps {
     item: any; // Using any to support both CampaignItem (V1) and UniversalElement (V2)
@@ -363,6 +364,16 @@ export const PlayerRenderer = ({ item, isActive, isPrev, commerceId, defaultTran
                             style={{ width: '100%', height: '100%', objectFit: objectFitValue }}
                             loading="lazy"
                         />
+                    </div>
+                );
+            }
+
+            // YouTube no deja abrir su página dentro de la pantalla (queda en negro):
+            // los links de YouTube van con su reproductor embebido.
+            if (isYoutubeUrl(item.url)) {
+                return (
+                    <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: '#000', ...displayStyle }}>
+                        <YoutubePreview config={{ url: item.url, isMuted: item.metadata?.isMuted ?? true }} />
                     </div>
                 );
             }

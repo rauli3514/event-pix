@@ -155,7 +155,7 @@ export const ReviewsForm = ({ config, onChange }: ReviewsFormProps) => {
     );
 };
 
-export const ReviewsPreview = ({ config, containerWidth: extContainerWidth }: { config: Partial<ReviewsConfig>, containerWidth?: number, mode?: 'main' | 'column' | 'square' }) => {
+export const ReviewsPreview = ({ config, containerWidth: extContainerWidth, samples = false }: { config: Partial<ReviewsConfig>, containerWidth?: number, mode?: 'main' | 'column' | 'square', samples?: boolean }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const containerRef = useRef<HTMLDivElement>(null);
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
@@ -164,8 +164,9 @@ export const ReviewsPreview = ({ config, containerWidth: extContainerWidth }: { 
     const speed = config.speed || 'normal';
     const title = config.title || 'Nuestros clientes dicen...';
     
-    // Default reviews if empty to show something in preview
-    const reviews = config.reviews && config.reviews.length > 0 ? config.reviews : [
+    // Reseñas de ejemplo solo en el editor (samples): en la TV los clientes verían
+    // opiniones inventadas.
+    const reviews = config.reviews && config.reviews.length > 0 ? config.reviews : !samples ? [] : [
         { id: '1', author: 'María López', text: 'El mejor lugar al que he ido. La atención es impecable y los detalles marcan la diferencia.', rating: 5 },
         { id: '2', author: 'Juan Carlos', text: 'Muy buena experiencia, 100% recomendado.', rating: 5 },
         { id: '3', author: 'Ana Martínez', text: 'Hermoso ambiente y excelente servicio. Sin dudas volveremos muy pronto.', rating: 4 }
@@ -224,9 +225,16 @@ export const ReviewsPreview = ({ config, containerWidth: extContainerWidth }: { 
     const isSmall = minDimension > 0 && minDimension < 400;
     const isMedium = minDimension >= 400 && minDimension < 700;
 
-    const currentReview = reviews[currentIndex];
+    const currentReview = reviews.length ? reviews[currentIndex % reviews.length] : undefined;
 
-    if (!currentReview) return null;
+    // Sin reseñas cargadas: solo el título (antes la pantalla quedaba negra).
+    if (!currentReview) {
+        return (
+            <div ref={containerRef} className={cn("w-full h-full flex items-center justify-center p-8 text-center", getThemeStyles())}>
+                <h2 className="font-bold tracking-tight" style={{ fontSize: isSmall ? '1.5rem' : isMedium ? '2rem' : '3.5rem' }}>{title}</h2>
+            </div>
+        );
+    }
 
     return (
         <div ref={containerRef} className={cn("w-full h-full flex flex-col items-center justify-center p-8 transition-all overflow-hidden relative", getThemeStyles())}>
@@ -255,7 +263,7 @@ export const ReviewsPreview = ({ config, containerWidth: extContainerWidth }: { 
                 <div className="relative w-full flex items-center justify-center h-full max-h-[60%]">
                     {/* Render all reviews but visually hide non-current for a smooth fade effect */}
                     {reviews.map((review, idx) => {
-                        const isActive = idx === currentIndex;
+                        const isActive = idx === currentIndex % reviews.length;
                         return (
                             <div 
                                 key={review.id}
@@ -302,7 +310,7 @@ export const ReviewsPreview = ({ config, containerWidth: extContainerWidth }: { 
                                         theme === 'google' ? 'bg-blue-100 text-blue-600' : 'bg-slate-200/20 text-current'
                                     )}
                                     style={{ width: isSmall ? 40 : 64, height: isSmall ? 40 : 64, fontSize: isSmall ? '1.2rem' : '1.8rem' }}>
-                                        {review.author.charAt(0)}
+                                        {(review.author || '?').charAt(0)}
                                     </div>
                                     <div className="text-left">
                                         <div className="font-bold" style={{ fontSize: isSmall ? '1rem' : '1.5rem' }}>

@@ -67,7 +67,7 @@ export const AppEditorModal = ({ isOpen, onClose, onBack, appId, commerceId, cur
             case 'ticker': return <TickerPreview config={appConfig} />;
             case 'clock': return <ClockPreview config={appConfig} />;
             case 'qr': return <QRPreview config={appConfig} />;
-            case 'reviews': return <ReviewsPreview config={appConfig} />;
+            case 'reviews': return <ReviewsPreview config={appConfig} samples />;
             case 'dynamic-menu': return <DynamicMenuPreview config={appConfig} onChange={setAppConfig} isEditing={true} commerceId={commerceId} />;
             case 'youtube': return <YoutubePreview config={appConfig} />;
             default: return <div className="text-slate-500 flex items-center justify-center h-full">App preview not implemented yet.</div>;

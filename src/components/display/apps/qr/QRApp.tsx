@@ -101,6 +101,15 @@ export const QRForm = ({ config, onChange }: QRFormProps) => {
     );
 };
 
+// ¿El color es oscuro? (para que el código contraste sobre blanco)
+function isDarkColor(color?: string): boolean {
+    const m = /^#?([0-9a-f]{6})$/i.exec(color || '');
+    if (!m) return false;
+    const n = parseInt(m[1], 16);
+    const lum = (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+    return lum < 0.55;
+}
+
 export const QRPreview = ({ config, containerWidth: extContainerWidth }: { config: Partial<QRConfig>, containerWidth?: number, mode?: 'main' | 'column' | 'square' }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
@@ -130,8 +139,11 @@ export const QRPreview = ({ config, containerWidth: extContainerWidth }: { confi
     const title = config.title || 'Escanea aquí';
     const subtitle = config.subtitle || '';
     const value = config.value || 'https://eventpix.com';
-    const qrColor = config.qrColor || (theme === 'light' || theme === 'corporate' ? '#000000' : '#ffffff');
-    const qrBgColor = config.qrBgColor || 'transparent';
+    // El código va siempre oscuro sobre blanco: claro sobre oscuro (como venía en
+    // los temas oscuros) muchos celulares no lo leen. Se respeta el color elegido
+    // si es oscuro.
+    const qrColor = isDarkColor(config.qrColor) ? config.qrColor! : '#000000';
+    const qrBgColor = '#ffffff';
 
     // Theme Styles
     const getThemeStyles = () => {
@@ -151,7 +163,9 @@ export const QRPreview = ({ config, containerWidth: extContainerWidth }: { confi
     const isSmall = minDimension > 0 && minDimension < 350;
     const isMedium = minDimension >= 350 && minDimension < 700;
 
-    const qrSize = isSmall ? 150 : isMedium ? 250 : 400;
+    // Lo más grande que entre (se escanea desde más lejos), dejando lugar al título.
+    const textSpace = (isSmall ? 70 : isMedium ? 130 : 220) + (subtitle ? (isSmall ? 20 : 40) : 0);
+    const qrSize = Math.max(90, Math.round(Math.min(width * 0.6, (height - textSpace) * 0.62)));
 
     return (
         <div ref={containerRef} className={cn("w-full h-full flex flex-col items-center justify-center p-8 transition-all overflow-hidden relative", getThemeStyles())}>
@@ -189,10 +203,11 @@ export const QRPreview = ({ config, containerWidth: extContainerWidth }: { confi
                 </div>
 
                 <div className={cn(
-                    "relative flex items-center justify-center transition-all",
-                    theme === 'glass' ? 'p-4 lg:p-8 bg-white/10 backdrop-blur-md rounded-3xl border border-white/20 shadow-[0_0_50px_rgba(255,255,255,0.1)]' :
-                    theme === 'dark' ? 'p-4 lg:p-8 bg-slate-800 rounded-3xl border border-slate-700' :
-                    theme === 'light' || theme === 'corporate' ? 'p-4 lg:p-8 bg-white rounded-3xl shadow-xl border border-slate-100' : ''
+                    "relative flex items-center justify-center transition-all bg-white rounded-3xl",
+                    isSmall ? 'p-3' : 'p-5',
+                    theme === 'glass' ? 'shadow-[0_0_50px_rgba(255,255,255,0.15)]' :
+                    theme === 'dark' ? 'border border-slate-700' :
+                    'shadow-xl border border-slate-100'
                 )}>
                     <QRCodeSVG 
                         value={value} 

@@ -14,6 +14,9 @@ import { ClockPreview } from '../clock/ClockApp';
 import { QRPreview } from '../qr/QRApp';
 import { ReviewsPreview } from '../reviews/ReviewsApp';
 import { DynamicMenuPreview } from '../dynamic-menu/DynamicMenuApp';
+import { YoutubePreview } from '../youtube/YoutubeApp';
+import { RetryBoundary } from '../RetryBoundary';
+import { isYoutubeUrl } from '@/lib/youtube';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -527,9 +530,14 @@ export const SplitScreenPreview = ({ config, onChange, commerceId }: { config: P
                             }}
                         >
                             {zone.playlistObj ? (
-                                <NestedPlaylistRunner playlist={zone.playlistObj} commerceId={commerceId} />
+                                <RetryBoundary key={`p-${zone.playlistObj.id}`}>
+                                    <NestedPlaylistRunner playlist={zone.playlistObj} commerceId={commerceId} editing={!!onChange} />
+                                </RetryBoundary>
                             ) : zone.mediaObj ? (
-                                <ZoneRenderer media={zone.mediaObj} commerceId={commerceId} />
+                                // Cada zona por separado: si una falla, las demás siguen.
+                                <RetryBoundary key={`m-${zone.mediaObj.id}`}>
+                                    <ZoneRenderer media={zone.mediaObj} commerceId={commerceId} editing={!!onChange} />
+                                </RetryBoundary>
                             ) : (
                                 <div className="text-white/80 text-center flex flex-col items-center p-4 pointer-events-none select-none">
                                     <LayoutTemplate className="w-8 h-8 mb-2 opacity-50" />
@@ -587,7 +595,7 @@ export const SplitScreenPreview = ({ config, onChange, commerceId }: { config: P
     );
 };
 
-const NestedPlaylistRunner = ({ playlist, commerceId }: { playlist: any, commerceId?: string }) => {
+const NestedPlaylistRunner = ({ playlist, commerceId, editing }: { playlist: any, commerceId?: string, editing?: boolean }) => {
     const items = Array.isArray(playlist.items_json) ? playlist.items_json : (playlist.items_json?.zones?.[0]?.playlist || []);
     const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -618,10 +626,10 @@ const NestedPlaylistRunner = ({ playlist, commerceId }: { playlist: any, commerc
         size_bytes: 0
     };
 
-    return <ZoneRenderer media={fakeMedia} commerceId={commerceId} />;
+    return <ZoneRenderer key={`${currentIndex}-${currentItem.id}`} media={fakeMedia} commerceId={commerceId} editing={editing} />;
 };
 
-const ZoneRenderer = ({ media, commerceId }: { media: DisplayMedia, commerceId?: string }) => {
+const ZoneRenderer = ({ media, commerceId, editing }: { media: DisplayMedia, commerceId?: string, editing?: boolean }) => {
     if (media.type === 'image') {
         return (
             <div className="relative w-full h-full flex items-center justify-center pointer-events-none">
@@ -635,9 +643,10 @@ const ZoneRenderer = ({ media, commerceId }: { media: DisplayMedia, commerceId?:
     }
     if (media.type === 'video') {
         return (
+            // Un solo video por zona: el fondo borroso era un segundo video y los
+            // TV box tienen pocos decodificadores (con varias zonas quedaban en negro).
             <div className="relative w-full h-full flex items-center justify-center bg-black pointer-events-none">
-                <video src={media.url} className="absolute inset-0 w-full h-full object-cover opacity-40 blur-xl scale-110" autoPlay loop muted playsInline />
-                <video src={media.url} className="relative w-full h-full object-contain z-10" autoPlay loop muted playsInline />
+                <video src={media.url} className="relative w-full h-full object-contain" autoPlay loop muted playsInline />
             </div>
         );
     }
@@ -658,14 +667,22 @@ const ZoneRenderer = ({ media, commerceId }: { media: DisplayMedia, commerceId?:
             return <QRPreview config={media.metadata.config || {}} />;
         }
         if (media.metadata?.appId === 'reviews') {
-            return <ReviewsPreview config={media.metadata.config || {}} />;
+            return <ReviewsPreview config={media.metadata.config || {}} samples={editing} />;
         }
         if (media.metadata?.appId === 'dynamic-menu') {
             return <DynamicMenuPreview config={media.metadata.config || {}} commerceId={commerceId} />;
         }
+        if (media.metadata?.appId === 'youtube') {
+            return <YoutubePreview config={media.metadata.config || {}} />;
+        }
         return <div className="text-white w-full h-full flex items-center justify-center pointer-events-none">App: {media.metadata?.appId}</div>;
     }
-    if (media.type === 'web') {
+    // Un link de YouTube no se puede abrir como página dentro de la zona (queda
+    // en negro): se muestra con el reproductor de YouTube.
+    if ((media.type === 'web' || media.type === 'url') && isYoutubeUrl(media.url)) {
+        return <YoutubePreview config={{ url: media.url }} />;
+    }
+    if (media.type === 'web' || media.type === 'url') {
         return (
             <div className="relative w-full h-full bg-white pointer-events-none">
                 <iframe src={media.url} className="w-full h-full border-none" title={media.name || "Web Content"} />
