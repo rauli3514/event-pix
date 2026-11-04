@@ -50,6 +50,30 @@
 
 <body style="background-color: #000; color: #fff;">
   <div id="root"></div>
+  <script>
+    // TV (rutas /tv...): si la página no llega a dibujarse, recargar.
+    // Pasa cuando la TV arranca sin internet y usa una copia vieja de la página
+    // que pide archivos de una versión anterior que ya no existen: quedaba en
+    // negro para siempre. Se recarga pidiendo la versión nueva (con ?_r=...
+    // para no usar la copia guardada) y se reintenta cada 30 s hasta que ande.
+    (function () {
+      if (!/^\/tv/.test(location.pathname)) return;
+      var KEY = 'tv_boot_reload_at';
+      function check() {
+        var root = document.getElementById('root');
+        if (root && root.children.length > 0) {
+          try { sessionStorage.removeItem(KEY); } catch (e) {}
+          return;
+        }
+        var last = 0;
+        try { last = +(sessionStorage.getItem(KEY) || 0); } catch (e) {}
+        if (Date.now() - last < 30000) { setTimeout(check, 10000); return; }
+        try { sessionStorage.setItem(KEY, String(Date.now())); } catch (e) {}
+        location.replace(location.pathname + '?_r=' + Date.now() + location.hash);
+      }
+      setTimeout(check, 20000);
+    })();
+  </script>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 

@@ -47,3 +47,11 @@ Reloj y Fecha, Código QR, Reseñas y YouTube.
     fecha ("Martes" / "3 de noviembre") abajo.
 - **Pantalla Dividida**: un solo video por zona (el fondo borroso era un segundo video y los
   TV box tienen pocos decodificadores).
+
+## La TV nunca queda en negro al arrancar
+
+Si la TV arranca sin internet, el navegador interno usa la copia guardada de la página. Si
+esa copia es de una versión anterior (después de una publicación), pide archivos que ya no
+existen y la página no se dibuja: quedaba en negro. Un vigilante en `index.html` (solo en
+las rutas `/tv…`) revisa a los 20 s si la página se dibujó; si no, recarga pidiendo la
+versión nueva (`?_r=…`) y vuelve a intentar cada 30 s hasta que ande.
