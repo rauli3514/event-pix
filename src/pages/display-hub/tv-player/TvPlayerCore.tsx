@@ -80,7 +80,8 @@ const TvPlayerCore = () => {
         preloadProgress,
         fetchCampaign,
         contentKey,
-        shuffle
+        shuffle,
+        hasAssignment
     } = useSyncEngine(deviceCode, sendHeartbeat);
 
     // Solo lo que toca ahora: en fecha, en su día y horario, y con el clima
@@ -278,6 +279,18 @@ const TvPlayerCore = () => {
         );
     }
 
+    // Tiene algo asignado pero ahora no toca nada (fuera del horario de la
+    // programación, playlist vacía): pantalla en negro, sin carteles. Siguen
+    // funcionando las alertas urgentes y el menú del control remoto.
+    if (status === 'no_content' && hasAssignment) {
+        return (
+            <div className="fixed inset-0 w-full h-full bg-black">
+                {urgentAlert && <div style={{ ...containerStyle, backgroundColor: 'transparent' }}><UrgentAlertOverlay alert={urgentAlert} /></div>}
+                <TvSettingsMenu deviceCode={deviceCode!} onRefresh={() => fetchCampaign()} />
+            </div>
+        );
+    }
+
     if (status === 'no_content') {
         return (
             <div className="fixed inset-0 w-full h-full flex flex-col items-center justify-center font-sans text-center" style={BRAND_BACKGROUND}>
@@ -315,11 +328,10 @@ const TvPlayerCore = () => {
     }
 
     if (nothingNow && (status === 'playing' || status === 'offline_playing')) {
-        // Todo lo de la playlist está fuera de fecha: solo el logo.
+        // Nada de la playlist toca ahora (fuera de fecha, día u horario): en negro,
+        // igual que sin programación para este momento.
         return (
-            <div className="fixed inset-0 w-full h-full flex items-center justify-center" style={BRAND_BACKGROUND}>
-                <img src={BRAND_LOGO} alt="Display Digital" className="w-[18vw] max-w-[360px] opacity-80" style={BRAND_LOGO_STYLE} />
-                {qrOverlay && <div style={{ ...containerStyle, backgroundColor: 'transparent' }}>{qrOverlay}</div>}
+            <div className="fixed inset-0 w-full h-full bg-black">
                 {urgentAlert && <div style={{ ...containerStyle, backgroundColor: 'transparent' }}><UrgentAlertOverlay alert={urgentAlert} /></div>}
                 <TvSettingsMenu deviceCode={deviceCode!} onRefresh={() => fetchCampaign()} />
             </div>

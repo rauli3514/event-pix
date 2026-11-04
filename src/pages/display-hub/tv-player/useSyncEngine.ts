@@ -54,6 +54,10 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
     const [deviceCommerceId, setDeviceCommerceId] = useState<string>('');
     const [deviceUuid, setDeviceUuid] = useState<string>('');
     const [deviceGroupId, setDeviceGroupId] = useState<string>('');
+    // La pantalla tiene algo asignado (aunque ahora no toque mostrar nada, por ejemplo
+    // fuera del horario de la programación). Sin asignación se muestra el cartel de
+    // "Pantalla vinculada"; con asignación y nada para ahora, la pantalla queda en negro.
+    const [hasAssignment, setHasAssignment] = useState(false);
 
     const { preloadAssets, preloadProgress } = useCacheManager();
 
@@ -141,6 +145,7 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
         }
 
         if (compiledItems.length === 0) {
+            setHasAssignment(!!assignment);
             setStatus('no_content');
             return;
         }
@@ -204,6 +209,7 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
             if (device.commerce_id) setDeviceCommerceId(device.commerce_id);
 
             if (device.pairing_status !== 'linked') {
+                setHasAssignment(false);
                 setStatus('no_content');
                 return;
             }
@@ -505,6 +511,7 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
         preloadProgress,
         fetchCampaign,
         contentKey,
-        shuffle
+        shuffle,
+        hasAssignment
     };
 }
