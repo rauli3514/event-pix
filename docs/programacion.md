@@ -54,3 +54,11 @@ Para feriados, fiestas o eventos puntuales, sin tocar la semana tipo.
 En el SQL Editor corré `supabase/migrations/20261102000000_display_schedule_special_dates.sql`
 (se puede correr más de una vez). Sin ese paso, la semana tipo sigue funcionando igual y
 el panel avisa al querer guardar una fecha especial.
+
+## Cuando no toca nada
+
+Si la pantalla tiene programación (o una playlist) pero en ese momento no toca nada
+(fuera de horario y sin contenido "de siempre", o todo fuera de fecha), la TV queda en
+negro, sin carteles. Las alertas urgentes y el menú del control siguen andando. El cartel
+"Pantalla vinculada · Todavía no tiene contenido asignado" aparece solo si la pantalla no
+tiene nada asignado (recién instalada).
