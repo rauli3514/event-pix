@@ -75,17 +75,39 @@ En mesada de piedra o vidrio: doble faz VHB 3M bajo el piso, o tarugos de 5 mm.
 
 | Qué | Detalle |
 |---|---|
-| Fuente switching 5 V 5 A | Ficha 5,5 × 2,1 mm |
+| **Fuente switching 5 V 3 A** | Ficha 5,5 × 2,1 mm. **Probada** en el primer exhibidor (ver abajo). Con 2 A no alcanza: se reinicia. |
 | Jack hembra de chasis 5,5 × 2,1 | Con rosca de 8 mm (DC-099); el agujero de atrás es de 8 mm |
 | Módulo USB-A hembra + cable USB-A → USB-C de 20–30 cm | Para el monitor. No conectar 5 V directo a un USB-C: muchos monitores no prenden sin la resistencia que traen esos cables. |
-| Ficha DC para el Tanix | La de su fuente original, cortada (confirmar que sea de 5 V) |
-| Empalmes Wago 221 (2 de 3 vías), cable 20–22 AWG, termocontraíble | |
-| Multímetro | Verificar 5 V y polaridad antes de conectar |
+| Ficha DC para el Tanix | La de su fuente original, cortada (confirmar que sea de 5 V). **Que quede firme**: un falso contacto en la ficha da los mismos apagones que una fuente floja. |
+| Empalmes Wago 221 (2 de 3 vías), cable **20 AWG o más grueso**, corto, termocontraíble | |
+| Multímetro | Verificar 5 V y polaridad antes de conectar, y medir con todo andando |
 
 ```
-Fuente 5V 5A ──> jack (atrás) ──> Wago (+/–) ──┬──> ficha DC ──> Tanix
+Fuente 5V 3A ──> jack (atrás) ──> Wago (+/–) ──┬──> ficha DC ──> Tanix
                                               └──> módulo USB-A ──> cable USB-A→C ──> plaquita del monitor
 ```
+
+**Prueba del primer exhibidor (fuente 5 V 3 A, Tanix W2 + monitor X-micro):**
+- Consumo estimado: Tanix ~1 A (picos ~1,4 A); monitor ~1,2–1,5 A con brillo medio, ~2 A al máximo.
+- Con brillo al 80 %: entre 4,98 V (picos) y 5,08 V, sin reinicios. Con el brillo más bajo: 5,20 V.
+- Rango correcto: **4,75 V a 5,25 V**. Medir en el jack con un video corriendo: si baja de
+  4,9 V la fuente se queda corta; si pasa de 5,3 V, la fuente está fallada.
+- El brillo se cambia desde el **menú del monitor** (ruedita MENU). Si no deja, apagar ECO,
+  DCR (contraste dinámico) o HDR. Más bajo encandila menos y deja más margen a la fuente.
+
+**Si no se consigue fuente de 5 V 3 A:** fuente de **12 V 2–3 A** (las de routers o
+cámaras) más un conversor reductor adentro, ajustado a **5,1 V con el multímetro antes de
+conectar nada**:
+- **XL4015 5 A**: uno solo alcanza para los dos equipos.
+- **LM2596 (o LM2596HVS)**: aguanta ~2 A continuos, así que van **dos**, uno para el Tanix y
+  otro para el monitor, con las entradas en paralelo al jack.
+- Ojo: ese exhibidor queda con jack de **12 V** (marcarlo).
+
+**Que siga andando sin luz (opcional):** un "mini UPS para router" **afuera**, entre el
+enchufe y el exhibidor. No poner baterías de litio adentro del pie (calor y encierro).
+
+**Patitas:** 4 topes de silicona autoadhesivos de 10–12 mm, en las esquinas a 1,5 cm de los
+bordes. Si va atornillado a la mesa, no apretar a fondo.
 
 **Varios:** PETG 1 kg, barra adhesiva, epoxi o La Gotita gel, cinta doble faz espumada de 1 mm
 (respaldo y tope), VHB (pestaña y tapita), silicona caliente (plaquita y módulo USB),
@@ -105,8 +127,8 @@ USB (el Tanix queda adentro y el control infrarrojo no llega).
    hacia la derecha.
 5. Tanix acostado a la derecha, con el HDMI mirando a la izquierda. El cable sobrante se
    enrolla en vueltas de 8 cm o más.
-6. Jack atrás y alimentación según el esquema. Probar con el monitor al brillo máximo y un
-   video corriendo antes de cerrar.
+6. Jack atrás y alimentación según el esquema. Antes de cerrar, medir el voltaje con un
+   video corriendo y el brillo que va a usar (tiene que dar 4,9 V o más).
 7. Traba superior: engancharla arriba del monitor y atornillarla desde adentro (2 × 3 × 8 mm).
 8. Techo: 8 tornillos.
 9. Pestaña: aplicar el DTF y pegarla al centro, sobre el tope de abajo. Tapa ~1 cm de imagen
