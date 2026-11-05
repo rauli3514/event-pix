@@ -8,6 +8,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInfo
 import android.os.Build
+import android.os.SystemClock
+import android.provider.Settings
 import android.util.Log
 import android.webkit.WebView
 import java.io.PrintWriter
@@ -39,6 +41,9 @@ object CrashReporter {
     private const val K_CRASH_AT = "lastCrashAt"
     private const val K_CRASH_TEXT = "lastCrashText"
     private const val K_LAST_REASON = "lastReason"
+    // Para saber si entre una sesión y la otra se apagó el equipo entero.
+    private const val K_SESSION_BOOT = "sessionBootCount"
+    private const val K_SESSION_UPTIME = "sessionUptime"
 
     @Volatile private var installed = false
 
@@ -109,9 +114,18 @@ object CrashReporter {
         val prevOpen = p.getBoolean(K_SESSION_OPEN, false)
         val crashAt = p.getLong(K_CRASH_AT, 0)
 
+        // ¿Se apagó el equipo entero desde la sesión anterior? (corte de luz, lo
+        // desenchufaron para cerrar el local, reinicio diario). Eso no es una falla
+        // de la app: no cuenta para la pantalla de "se cerró al arrancar".
+        val bootCount = currentBootCount(context)
+        val prevBoot = p.getInt(K_SESSION_BOOT, -1)
+        val uptime = SystemClock.elapsedRealtime()
+        val deviceRestarted = if (bootCount >= 0 && prevBoot >= 0) bootCount != prevBoot
+            else uptime < p.getLong(K_SESSION_UPTIME, Long.MAX_VALUE)
+
         // La sesión anterior terminó sin pasar por onStop (o con un error de Java).
         val crashedLastSession = crashAt >= prevStart && prevStart > 0
-        val diedUnexpectedly = prevOpen || crashedLastSession
+        val diedUnexpectedly = crashedLastSession || (prevOpen && !deviceRestarted)
 
         var reason: String? = null
         var quickDeaths = p.getInt(K_QUICK_DEATHS, 0)
@@ -135,12 +149,19 @@ object CrashReporter {
         p.edit()
             .putBoolean(K_SESSION_OPEN, true)
             .putLong(K_SESSION_START, now)
+            .putInt(K_SESSION_BOOT, bootCount)
+            .putLong(K_SESSION_UPTIME, uptime)
             .putBoolean(K_STABLE, false)
             .putInt(K_QUICK_DEATHS, quickDeaths)
             .commit()
 
         return StartupReport(quickDeaths >= LOOP_THRESHOLD, quickDeaths, reason)
     }
+
+    // Cantidad de veces que arrancó el equipo (Android 7+); -1 si no se puede leer.
+    private fun currentBootCount(context: Context): Int = try {
+        Settings.Global.getInt(context.contentResolver, Settings.Global.BOOT_COUNT)
+    } catch (t: Throwable) { -1 }
 
     // La app quedó estable (pasó un rato abierta): el contador vuelve a cero.
     fun markStable(context: Context) {
@@ -165,7 +186,10 @@ object CrashReporter {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
         return try {
             val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-            val info = am.getHistoricalProcessExitReasons(context.packageName, 0, 1).firstOrNull()
+            // Solo el proceso de la app: el navegador interno tiene procesos propios
+            // ("isolated") que se cierran normalmente y no son una falla.
+            val info = am.getHistoricalProcessExitReasons(context.packageName, 0, 10)
+                .firstOrNull { it.processName == context.packageName }
                 ?: return null
             if (info.timestamp < since) return null
             val name = when (info.reason) {

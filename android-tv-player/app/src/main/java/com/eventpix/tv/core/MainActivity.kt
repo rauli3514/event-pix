@@ -222,7 +222,8 @@ class MainActivity : AppCompatActivity() {
                 setTypeface(typeface, Typeface.BOLD)
             })
             addView(TextView(this@MainActivity).apply {
-                text = "Sacale una foto a esta pantalla y mandásela a soporte de EventPix."
+                text = "Sacale una foto a esta pantalla y mandásela a soporte de EventPix. " +
+                    "Se vuelve a intentar sola en 5 minutos."
                 setTextColor(0xFF94A3B8.toInt())
                 textSize = 14f
                 setPadding(0, dp(8), 0, dp(16))
@@ -238,6 +239,13 @@ class MainActivity : AppCompatActivity() {
         }
         setContentView(root)
         retry.requestFocus()
+
+        // En el local de un cliente no puede quedar esta pantalla para siempre:
+        // a los 5 minutos se reintenta sola (por si fue algo pasajero).
+        uiHandler.postDelayed({
+            CrashReporter.resetLoop(this@MainActivity)
+            recreate()
+        }, 5 * 60_000)
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -361,8 +369,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        uiHandler.removeCallbacks(markStableRunnable)
-        uiHandler.removeCallbacks(bootTimeoutRunnable)
+        uiHandler.removeCallbacksAndMessages(null)
         if (current?.get() === this) current = null
         super.onDestroy()
         watchdog?.stop()

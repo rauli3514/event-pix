@@ -695,7 +695,7 @@ const DisplayDeviceDetail = () => {
                                         <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
                                             <div className="flex items-center gap-2 mb-1">
                                                 <RotateCcw className="w-4 h-4 text-slate-400" />
-                                                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Reinicios Totales</p>
+                                                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Encendidos del equipo</p>
                                             </div>
                                             <p className="text-2xl font-bold text-white">{deviceData.telemetry.boot_count || 0}</p>
                                         </div>
@@ -703,7 +703,7 @@ const DisplayDeviceDetail = () => {
                                         <div className="bg-slate-950 p-4 rounded-xl border border-rose-900/50">
                                             <div className="flex items-center gap-2 mb-1">
                                                 <AlertTriangle className={`w-4 h-4 ${(deviceData.telemetry.crash_count || 0) > 0 ? 'text-rose-500' : 'text-slate-400'}`} />
-                                                <p className={`text-xs font-medium uppercase tracking-wider ${(deviceData.telemetry.crash_count || 0) > 0 ? 'text-rose-400' : 'text-slate-400'}`}>Fallos (Crashes)</p>
+                                                <p className={`text-xs font-medium uppercase tracking-wider ${(deviceData.telemetry.crash_count || 0) > 0 ? 'text-rose-400' : 'text-slate-400'}`}>Fallos de la app</p>
                                             </div>
                                             <p className={`text-2xl font-bold ${(deviceData.telemetry.crash_count || 0) > 0 ? 'text-rose-400' : 'text-white'}`}>{deviceData.telemetry.crash_count || 0}</p>
                                         </div>
