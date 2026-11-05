@@ -9,9 +9,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Las tipografías de Google no frenan el dibujo de la página: se cargan
+       aparte (media=print y al llegar pasan a all). Antes la pantalla esperaba
+       a Google y, en una TV con el Wi-Fi recién conectado, quedaba en negro
+       hasta 2 minutos. Mientras tanto se usa la letra del sistema. -->
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;600;700&family=Orbitron:wght@400;700&family=Pinyon+Script&family=Montserrat:wght@400;500;600;700;800;900&family=Anton&display=swap"
-    rel="stylesheet">
+    rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;600;700&family=Orbitron:wght@400;700&family=Pinyon+Script&family=Montserrat:wght@400;500;600;700;800;900&family=Anton&display=swap"
+      rel="stylesheet">
+  </noscript>
   <script>
     if (typeof globalThis === 'undefined') {
       Object.defineProperty(Object.prototype, 'globalThis', {

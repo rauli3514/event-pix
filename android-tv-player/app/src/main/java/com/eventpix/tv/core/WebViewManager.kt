@@ -24,7 +24,10 @@ class WebViewManager(
     private val bridgeTokenScript: () -> String,
     // Se llama cuando el proceso de render del WebView murió (OOM o crash):
     // la Activity tiene que crear uno nuevo o la pantalla queda en negro.
-    private val onRendererGone: () -> Unit
+    private val onRendererGone: () -> Unit,
+    // Terminó de cargar una página (la Activity saca el logo de arranque si es
+    // la pantalla de "Sin conexión" del APK).
+    private val onPageLoaded: (String?) -> Unit = {}
 ) {
 
     companion object {
@@ -63,7 +66,7 @@ class WebViewManager(
             // Con red: caché normal (respeta los headers), así las TVs toman cada
             // versión nueva de la web. Sin red: lo que haya en caché, para arrancar
             // igual y seguir reproduciendo el último contenido.
-            cacheMode = if (isOnline()) WebSettings.LOAD_DEFAULT else WebSettings.LOAD_CACHE_ELSE_NETWORK
+            cacheMode = cacheModeNow()
             // Optimizations for TV & 60fps GPU CSS Transitions
             useWideViewPort = true
             loadWithOverviewMode = true
@@ -112,7 +115,12 @@ class WebViewManager(
 
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 if (request?.isForMainFrame != true) return false
-                return blockUntrustedNavigation(request.url?.toString())
+                if (blockUntrustedNavigation(request.url?.toString())) return true
+                // La pantalla de "Sin conexión" reintenta sola: si ya hay red, que
+                // traiga la página nueva y no la copia guardada (podía ser de una
+                // versión anterior y quedar en negro).
+                refreshCacheMode()
+                return false
             }
 
             // Android < 7 usa esta variante (solo navegaciones del frame principal).
@@ -131,6 +139,7 @@ class WebViewManager(
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 injectBridgeToken(view, url)
+                onPageLoaded(url)
             }
 
             // Android 6+ llama a esta variante (con WebResourceError).
@@ -169,6 +178,19 @@ class WebViewManager(
         }
     }
 
+    // Con red: caché normal (respeta los headers, así toma cada versión nueva).
+    // Sin red: lo que haya guardado, para arrancar igual.
+    private fun cacheModeNow() = if (isOnline()) WebSettings.LOAD_DEFAULT else WebSettings.LOAD_CACHE_ELSE_NETWORK
+
+    fun refreshCacheMode() {
+        webView.settings.cacheMode = cacheModeNow()
+    }
+
+    fun isOnlineNow(): Boolean = isOnline()
+
+    // Pantalla de "Sin conexión" del APK (botón de Wi-Fi y reintento automático).
+    fun loadOfflinePage() = loadOfflineFallback(webView)
+
     private fun loadOfflineFallback(view: WebView?) {
         if (view?.url?.startsWith("file:///android_asset/") == true) return
         Log.d("WebViewManager", "Main frame load failed offline. Loading local asset offline_boot.html...")
@@ -192,6 +214,7 @@ class WebViewManager(
 
     fun loadUrl(url: String) {
         Log.d("WebViewManager", "Loading URL: $url")
+        refreshCacheMode()
         webView.loadUrl(url)
     }
     
