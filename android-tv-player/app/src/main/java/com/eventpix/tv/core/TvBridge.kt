@@ -466,6 +466,10 @@ class TvBridge(private val activity: MainActivity) {
     @JavascriptInterface
     fun openWifiSettings(token: String?) = call(token, "openWifiSettings") { openWifiSettings() }
 
+    // La web avisa que ya se dibujó: se saca el logo de arranque nativo.
+    @JavascriptInterface
+    fun pageReady(token: String?) = call(token, "pageReady") { activity.runOnUiThread { activity.onWebReady() } }
+
     @JavascriptInterface
     fun openSettings(token: String?) = call(token, "openSettings") { openSettings() }
 

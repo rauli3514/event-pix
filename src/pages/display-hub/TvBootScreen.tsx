@@ -3,13 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { sendDeviceHeartbeat } from '@/lib/displayDeviceApi';
 import { registerCommandSecret } from '@/lib/displayCommands';
-import { openHomeSettings, openWifiSettings } from '@/lib/tvBridge';
+import { callTvBridge, onTvBridgeReady, openHomeSettings, openWifiSettings } from '@/lib/tvBridge';
 import { Wifi, Bluetooth, Power } from 'lucide-react';
 
 export default function TvBootScreen() {
   const [pin, setPin] = useState<string>('');
   const hasBluetoothPairing = typeof (window as any).AndroidKiosk?.startBluetoothServer === 'function';
   const navigate = useNavigate();
+
+  // Avisar a la app TV que la página ya se dibujó (saca su logo de arranque).
+  useEffect(() => onTvBridgeReady(() => { callTvBridge('pageReady'); }), []);
 
   useEffect(() => {
     // Start Bluetooth Server on native Android

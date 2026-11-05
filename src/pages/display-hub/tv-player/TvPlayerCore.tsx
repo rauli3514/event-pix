@@ -60,6 +60,8 @@ class WatchdogBoundary extends Component<{children: ReactNode}, {hasError: boole
 
 // --- Core Player Component ---
 const TvPlayerCore = () => {
+    // Avisar a la app TV que la página ya se dibujó (saca su logo de arranque).
+    useEffect(() => onTvBridgeReady(() => { callTvBridge('pageReady'); }), []);
     const { deviceCode } = useParams<{ deviceCode: string }>();
     // Antes de dibujar el contenido: las apps (Etiquetas) lo usan para leer
     // los precios de este comercio sin sesión.

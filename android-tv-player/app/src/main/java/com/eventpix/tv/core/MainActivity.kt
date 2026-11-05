@@ -9,6 +9,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
@@ -51,6 +52,20 @@ class MainActivity : AppCompatActivity() {
 
     private val uiHandler = Handler(Looper.getMainLooper())
     private val markStableRunnable = Runnable { CrashReporter.markStable(this) }
+
+    // Logo de arranque nativo: se ve desde el primer segundo (antes, negro) hasta
+    // que la web avisa que se dibujó (TvBridge.pageReady) o se muestra la pantalla
+    // de "Sin conexión". Mientras se ve, OK abre los ajustes de Wi-Fi.
+    private var bootOverlayVisible = false
+    private var webReady = false
+    // Si a los 25 s la página no apareció (conexión colgada, Wi-Fi sin internet),
+    // se pasa a la pantalla de "Sin conexión", que tiene el botón de Wi-Fi y reintenta.
+    private val bootTimeoutRunnable = Runnable {
+        if (!webReady && ::webViewManager.isInitialized) {
+            Log.w("MainActivity", "La página no apareció en 25 s: pantalla de Sin conexión")
+            webViewManager.loadOfflinePage()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -142,14 +157,22 @@ class MainActivity : AppCompatActivity() {
             WebView.setWebContentsDebuggingEnabled(true)
         }
 
-        webViewManager = WebViewManager(webView, { tvBridge.tokenInjectionScript() }) {
-            runOnUiThread {
-                val crashPrefs = getSharedPreferences("TvSettings", Context.MODE_PRIVATE)
-                crashPrefs.edit().putInt("crashCount", crashPrefs.getInt("crashCount", 0) + 1).apply()
-                // Vuelve a ejecutar onCreate: layout nuevo, WebView nuevo y carga de /tv-boot.
-                recreate()
+        webViewManager = WebViewManager(
+            webView,
+            { tvBridge.tokenInjectionScript() },
+            {
+                runOnUiThread {
+                    val crashPrefs = getSharedPreferences("TvSettings", Context.MODE_PRIVATE)
+                    crashPrefs.edit().putInt("crashCount", crashPrefs.getInt("crashCount", 0) + 1).apply()
+                    // Vuelve a ejecutar onCreate: layout nuevo, WebView nuevo y carga de /tv-boot.
+                    recreate()
+                }
+            },
+            { url ->
+                // La pantalla de "Sin conexión" del APK ya es una pantalla: sale el logo.
+                if (url?.startsWith("file:///android_asset/") == true) runOnUiThread { hideBootOverlay() }
             }
-        }
+        )
         
         webViewManager.initializeWebView()
         
@@ -257,18 +280,55 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun startBootSequence() {
-        // Transition to WebView for the actual Display App UI immediately
-        diagnosticPanel.visibility = View.GONE
-        logoImageView.visibility = View.GONE
         webView.visibility = View.VISIBLE
-        
-        // Set WebView background to black to prevent white flash
+        // Fondo negro (sin destello blanco) y, encima, el logo hasta que la web se dibuje.
         webView.setBackgroundColor(android.graphics.Color.BLACK)
-        
-        // Carga la app
+        showBootOverlay()
+
+        // Sin red al arrancar (equipo nuevo o Wi-Fi todavía conectando): directo a
+        // la pantalla de "Sin conexión", con el botón de Wi-Fi y reintento automático.
+        if (!webViewManager.isOnlineNow()) {
+            webViewManager.loadOfflinePage()
+            return
+        }
         webViewManager.loadUrl("https://app.event-pix.com.ar/tv-boot")
+        uiHandler.postDelayed(bootTimeoutRunnable, 25_000)
     }
-    
+
+    private fun showBootOverlay() {
+        bootOverlayVisible = true
+        logoImageView.visibility = View.VISIBLE
+        diagnosticPanel.visibility = View.VISIBLE
+        updateStatus("Conectando…")
+        findViewById<TextView>(R.id.versionTextView)?.text =
+            "¿No carga? Presioná OK para configurar el Wi-Fi"
+    }
+
+    private fun hideBootOverlay() {
+        if (!bootOverlayVisible) return
+        bootOverlayVisible = false
+        logoImageView.visibility = View.GONE
+        diagnosticPanel.visibility = View.GONE
+    }
+
+    // La web ya se dibujó (TvBridge.pageReady).
+    fun onWebReady() {
+        webReady = true
+        uiHandler.removeCallbacks(bootTimeoutRunnable)
+        hideBootOverlay()
+    }
+
+    // Con el logo de arranque en pantalla, OK abre los ajustes de Wi-Fi (si la
+    // página no carga, siempre hay forma de configurar la red).
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (bootOverlayVisible && (event.keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
+                event.keyCode == KeyEvent.KEYCODE_ENTER || event.keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER)) {
+            if (event.action == KeyEvent.ACTION_UP) tvBridge.openWifiSettings()
+            return true
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
     private fun updateStatus(message: String) {
         statusTextView.text = message
     }
@@ -302,6 +362,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         uiHandler.removeCallbacks(markStableRunnable)
+        uiHandler.removeCallbacks(bootTimeoutRunnable)
         if (current?.get() === this) current = null
         super.onDestroy()
         watchdog?.stop()
