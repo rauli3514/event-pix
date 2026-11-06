@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Guía rápida Display Digital</title>
+<style>
+  @page { size: A5; margin: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Liberation Sans", "DejaVu Sans", Arial, sans-serif; color: #111; font-size: 9.6pt; line-height: 1.32; }
+  .page { width: 148mm; height: 210mm; padding: 9mm 9mm 8mm; display: flex; flex-direction: column; page-break-after: always; overflow: hidden; }
+  .page:last-child { page-break-after: auto; }
+  header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2.2pt solid #111; padding-bottom: 2.2mm; margin-bottom: 4mm; }
+  .brand { font-weight: 800; font-size: 14pt; letter-spacing: -0.2pt; }
+  .brand small { display: block; font-weight: 400; font-size: 7.5pt; color: #555; letter-spacing: 0; }
+  .tag { font-size: 8pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8pt; background: #111; color: #fff; padding: 1mm 2.4mm; border-radius: 1mm; }
+  h1 { font-size: 15pt; margin-bottom: 1mm; letter-spacing: -0.3pt; }
+  .lead { color: #444; margin-bottom: 3.5mm; }
+  h2 { font-size: 10.5pt; margin: 0 0 1.6mm; display: flex; align-items: center; gap: 1.6mm; }
+  h2 .ico { display: inline-flex; width: 5.2mm; height: 5.2mm; border-radius: 50%; background: #111; color: #fff; font-size: 8pt; align-items: center; justify-content: center; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 3.5mm; }
+  .box { border: 0.8pt solid #bbb; border-radius: 2mm; padding: 3mm; }
+  .box.dark { background: #f1f1f1; border-color: #f1f1f1; }
+  ol { counter-reset: n; list-style: none; }
+  ol li { counter-increment: n; position: relative; padding-left: 5.6mm; margin-bottom: 1.6mm; }
+  ol li::before { content: counter(n); position: absolute; left: 0; top: 0.2mm; width: 4mm; height: 4mm; border-radius: 50%; border: 0.9pt solid #111; font-size: 7pt; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  ul { list-style: none; }
+  ul li { position: relative; padding-left: 3.4mm; margin-bottom: 1.2mm; }
+  ul li::before { content: ""; position: absolute; left: 0; top: 1.6mm; width: 1.4mm; height: 1.4mm; background: #111; border-radius: 50%; }
+  b { font-weight: 700; }
+  .sec { margin-top: 3mm; }
+  .tip { margin-top: 3mm; margin-bottom: 3mm; border-left: 2.2pt solid #111; padding: 1.4mm 0 1.4mm 3mm; background: #f6f6f6; }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 1.1mm 1.4mm; font-size: 8.8pt; vertical-align: top; border-bottom: 0.6pt solid #ddd; }
+  td:first-child { width: 33%; font-weight: 700; }
+  tr:last-child td { border-bottom: 0; }
+  .contact { margin-top: auto; background: #111; color: #fff; border-radius: 2mm; padding: 3mm 3.4mm; display: flex; justify-content: space-between; align-items: center; gap: 3mm; }
+  .contact .big { font-size: 12.5pt; font-weight: 800; letter-spacing: 0.2pt; }
+  .contact .small { font-size: 7.8pt; color: #ccc; }
+  .contact .right { text-align: right; }
+  .url { font-weight: 800; border-bottom: 1pt solid #111; }
+  .steps-inline { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2mm; margin-top: 1mm; }
+  .step { border: 0.8pt solid #bbb; border-radius: 2mm; padding: 2.2mm; }
+  .step .k { font-size: 7pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6pt; color: #666; }
+  .step .t { font-weight: 800; font-size: 9.4pt; margin: 0.6mm 0 0.8mm; }
+  .step .d { font-size: 8.2pt; color: #333; line-height: 1.28; }
+  .foot { font-size: 7pt; color: #777; margin-top: 2mm; text-align: center; }
+</style>
+</head>
+<body>
+
+<!-- PÁGINA 1: INSTALACIÓN -->
+<section class="page">
+  <header>
+    <div class="brand">Display Digital<small>by EventPix</small></div>
+    <div class="tag">Guía rápida · 1/2</div>
+  </header>
+
+  <h1>Instalación</h1>
+  <p class="lead">Viene configurado y vinculado a tu cuenta. Estos pasos sirven si lo cambiás de lugar o lo desenchufaste.</p>
+
+  <div class="cols">
+    <div class="box">
+      <h2><span class="ico">TV</span>Digital Box (en tu TV)</h2>
+      <ol>
+        <li>Conectá el Digital Box al <b>HDMI de la TV</b> con el cable incluido.</li>
+        <li>Enchufá su <b>fuente</b> a un tomacorriente.</li>
+        <li>Prendé la TV y elegí esa <b>entrada HDMI</b> (botón <i>Input</i> o <i>Source</i>).</li>
+        <li>Aparece el logo y en menos de 2 minutos, el contenido.</li>
+      </ol>
+    </div>
+    <div class="box">
+      <h2><span class="ico">D</span>Display Desktop</h2>
+      <ol>
+        <li>Apoyalo en una superficie firme, bajo techo y sin sol directo.</li>
+        <li>Enchufá la <b>fuente original 5 V 3 A</b> en el conector de atrás.</li>
+        <li>Prende solo: aparece el logo y en menos de 2 minutos, el contenido.</li>
+        <li>Brillo: con la ruedita <b>MENU</b> del costado (recomendado 60–80 %).</li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="sec box dark">
+    <h2><span class="ico">W</span>Cambiar el Wi-Fi</h2>
+    <ol>
+      <li>Desenchufá y volvé a enchufar el equipo.</li>
+      <li>Mientras se ve el logo y dice <b>“Conectando…”</b>, apretá <b>OK</b> en el control.</li>
+      <li>Elegí tu red, poné la clave y volvé con <b>Atrás</b>. El contenido arranca solo.</li>
+    </ol>
+  </div>
+
+  <div class="sec box">
+    <h2><span class="ico">#</span>Si aparece un código en pantalla</h2>
+    <p>El equipo no está vinculado. Entrá a <span class="url">app.event-pix.com.ar</span> → <b>Pantallas</b> → <b>Vincular</b> y escribí el código. O mandanos una foto por WhatsApp y lo hacemos nosotros.</p>
+  </div>
+
+  <div class="tip">
+    <b>Cuidados:</b> usá solo la fuente original, no tapes las ranuras, no lo abras y enchufalo en una zapatilla con protección. Desenchufarlo a la noche no le hace daño.
+  </div>
+
+  <div class="contact" style="margin-top:auto">
+    <div>
+      <div class="small">Soporte · lunes a sábado de 9 a 20 h</div>
+      <div class="big">WhatsApp 362 454-7382</div>
+    </div>
+    <div class="right">
+      <div class="small">Solo mensajes, no recibe llamadas</div>
+      <div style="font-weight:700">displaydigital26@gmail.com</div>
+    </div>
+  </div>
+</section>
+
+<!-- PÁGINA 2: USO BÁSICO -->
+<section class="page">
+  <header>
+    <div class="brand">Display Digital<small>by EventPix</small></div>
+    <div class="tag">Guía rápida · 2/2</div>
+  </header>
+
+  <h1>Cambiar lo que se ve</h1>
+  <p class="lead">Desde el celular o la computadora, entrá a <span class="url">app.event-pix.com.ar</span> con el <b>usuario y la contraseña</b> que te damos al instalar. Tu usuario: ______________________</p>
+
+  <div class="steps-inline">
+    <div class="step"><div class="k">Paso 1</div><div class="t">Medios</div><div class="d">Subí fotos y videos, horizontales o verticales según la pantalla.</div></div>
+    <div class="step"><div class="k">Paso 2</div><div class="t">Playlists</div><div class="d">Armá una lista con lo que querés mostrar y cuánto dura cada cosa.</div></div>
+    <div class="step"><div class="k">Paso 3</div><div class="t">Pantallas</div><div class="d">Tocá la foto de la pantalla → <b>Cambiar contenido</b> y elegí la playlist.</div></div>
+    <div class="step"><div class="k">Opcional</div><div class="t">Programación</div><div class="d">Elegí qué se ve según el día y la hora (desayuno, almuerzo, promo).</div></div>
+  </div>
+
+  <div class="sec box">
+    <h2><span class="ico">+</span>También podés</h2>
+    <ul>
+      <li><b>Apps:</b> clima, reloj, cotización del dólar, código QR, reseñas, texto que corre y videos de YouTube.</li>
+            <li>Los cambios llegan en segundos. Sin internet, sigue mostrando lo último que bajó.</li>
+    </ul>
+  </div>
+
+  <div class="sec">
+    <h2><span class="ico">!</span>Si algo no anda</h2>
+    <table>
+      <tr><td>Pantalla en negro</td><td>Esperá 2 minutos. Si sigue, desenchufá 10 segundos y volvé a enchufar.</td></tr>
+      <tr><td>Dice “Sin conexión”</td><td>Revisá que el Wi-Fi del local ande. Para cambiar la red, ver “Cambiar el Wi-Fi” al dorso.</td></tr>
+      <tr><td>Pantalla de diagnóstico</td><td>No hace falta tocar nada: vuelve a intentar sola cada 5 minutos.</td></tr>
+      <tr><td>No se ve lo que cargué</td><td>Revisá en <b>Pantallas</b> qué tiene asignado y en <b>Programación</b>, el horario.</td></tr>
+      <tr><td>La TV no muestra nada</td><td>Revisá la entrada HDMI y que el cable esté bien puesto.</td></tr>
+    </table>
+  </div>
+
+  <div class="tip">
+    <b>¿Sigue sin andar?</b> Mandanos por WhatsApp <b>una foto de la pantalla</b> y contanos qué pasó. Respondemos dentro de las 24 h hábiles.
+  </div>
+
+  <div class="contact">
+    <div>
+      <div class="small">Soporte · lunes a sábado de 9 a 20 h</div>
+      <div class="big">WhatsApp 362 454-7382</div>
+    </div>
+    <div class="right">
+      <div class="small">Panel</div>
+      <div style="font-weight:700">app.event-pix.com.ar</div>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>
