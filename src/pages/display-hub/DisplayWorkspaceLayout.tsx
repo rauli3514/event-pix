@@ -24,7 +24,6 @@ import { Bot, Sparkles } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { BluetoothProvisioningModal } from '@/components/display/BluetoothProvisioningModal';
 import { AIAssistantPanel } from '@/components/display/ai/AIAssistantPanel';
-import { IntelligenceStorageService } from '@/services/intelligence/IntelligenceStorageService';
 import { ScreenDownAlert } from '@/components/display/ScreenDownAlert';
 import { useDownScreens } from '@/hooks/use-down-screens';
 
@@ -174,19 +173,6 @@ export default function DisplayWorkspaceLayout() {
           {moreOpen && (
             <>
               {moreItems.map(renderNavLink)}
-              <button
-                onClick={() => {
-                  if (commerceId) {
-                    IntelligenceStorageService.setActiveBusinessId(commerceId);
-                  }
-                  navigate('/admin/intelligence');
-                  setIsMobileMenuOpen(false);
-                }}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                <Sparkles className="w-5 h-5 shrink-0 text-muted-foreground" />
-                <span className="truncate">EventPix Intelligence</span>
-              </button>
               <button
                 onClick={() => {
                   if (commerceId) localStorage.removeItem(`onboarding_dismissed_${commerceId}`);
