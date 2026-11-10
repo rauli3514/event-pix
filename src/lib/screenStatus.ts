@@ -28,5 +28,9 @@ export function describeContent(d: AnyDevice, now: Date) {
     if (schedule) detail = `Programación: ${schedule.name || 'sin nombre'}`;
     else if (campaign) detail = `Playlist: ${campaign.name}`;
     else if (media) detail = `Archivo: ${media.name}`;
+    // Pantallas sincronizadas (ver la ventana "Enviar a pantallas").
+    const sync = d.assignment?.sync_mode;
+    if (sync === 'mirror') detail += ' · en espejo';
+    else if (sync === 'wave') detail += d.assignment?.sync_offset_s ? ` · en olas (+${d.assignment.sync_offset_s} s)` : ' · en olas (primera)';
     return { title, detail, cover: items[0] || null, campaignId: d.assignment?.campaign_id || null, scheduleId: d.assignment?.schedule_id || null, campaignNowId: campaign?.id || null };
 }

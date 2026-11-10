@@ -78,6 +78,8 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
     const activeContentKeyRef = useRef<string | null>(null);
     const [contentKey, setContentKey] = useState<string | null>(null);
     const [shuffle, setShuffle] = useState(false);
+    // Pantallas sincronizadas: 'mirror' (Espejo) o 'wave' (Olas, con su atraso).
+    const [sync, setSync] = useState<{ mode: 'mirror' | 'wave'; offsetS: number } | null>(null);
     const offlineRef = useRef(false);
     // Ya hay contenido en pantalla (los cambios siguientes no esperan tanto la descarga).
     const hasShownContentRef = useRef(false);
@@ -179,6 +181,12 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
         // Siempre actualizar el estado de items en React para aplicar cambios de transición y duración
         setContentKey(contentKey);
         setShuffle(playlistShuffle);
+        const syncMode = assignment?.sync_mode;
+        const syncOffsetS = Number(assignment?.sync_offset_s) || 0;
+        setSync(prev => {
+            if (syncMode !== 'mirror' && syncMode !== 'wave') return null;
+            return prev && prev.mode === syncMode && prev.offsetS === syncOffsetS ? prev : { mode: syncMode, offsetS: syncOffsetS };
+        });
         setItems(compiledItems);
         setStatus(offlineRef.current ? 'offline_playing' : 'playing');
         hasShownContentRef.current = true;
@@ -512,6 +520,7 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
         fetchCampaign,
         contentKey,
         shuffle,
+        sync,
         hasAssignment
     };
 }

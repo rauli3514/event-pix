@@ -391,28 +391,42 @@ export const useUpdateDisplayDevice = () => {
     });
 };
 
+export type SyncMode = 'mirror' | 'wave';
+
 export const useAssignContentToDevice = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ deviceId, campaignId, mediaId, scheduleId, startTime, endTime }: { deviceId: string; campaignId?: string | null; mediaId?: string | null; scheduleId?: string | null; startTime?: string | null; endTime?: string | null }) => {
+        mutationFn: async ({ deviceId, campaignId, mediaId, scheduleId, startTime, endTime, syncMode, syncOffsetS }: { deviceId: string; campaignId?: string | null; mediaId?: string | null; scheduleId?: string | null; startTime?: string | null; endTime?: string | null; syncMode?: SyncMode | null; syncOffsetS?: number }) => {
             await supabase.from("display_assignments").delete().eq("device_id", deviceId);
 
-            const { data, error } = await supabase
+            const base = {
+                device_id: deviceId,
+                campaign_id: campaignId || null,
+                media_id: mediaId || null,
+                schedule_id: scheduleId || null,
+                start_time: startTime || null,
+                end_time: endTime || null
+            };
+            const insert = (row: Record<string, unknown>) => supabase
                 .from("display_assignments")
-                .insert({
-                    device_id: deviceId,
-                    campaign_id: campaignId || null,
-                    media_id: mediaId || null,
-                    schedule_id: scheduleId || null,
-                    start_time: startTime || null,
-                    end_time: endTime || null
-                })
+                .insert(row)
                 .select()
                 .single();
 
+            // Espejo / Olas (ver la migración display_sync_modes).
+            let { data, error } = syncMode
+                ? await insert({ ...base, sync_mode: syncMode, sync_offset_s: Math.max(0, Math.round(syncOffsetS || 0)) })
+                : await insert(base);
+            // Si la base todavía no tiene esas columnas, se manda igual sin sincronizar.
+            let syncSkipped = false;
+            if (error && syncMode && /sync_mode|sync_offset_s|column/i.test(error.message || '')) {
+                ({ data, error } = await insert(base));
+                syncSkipped = !error;
+            }
+
             if (error) throw error;
-            return data as DisplayAssignment;
+            return { ...(data as DisplayAssignment), syncSkipped };
         },
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: ["display_device", variables.deviceId] });
