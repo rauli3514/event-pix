@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, Component, ErrorInfo, ReactNode } from 'react';
 import { syncServerClock } from '@/lib/serverClock';
+import { useAppUpdate } from './useAppUpdate';
 import { useParams } from 'react-router-dom';
 import { TvSettingsMenu } from '@/components/display/TvSettingsMenu';
 import { useTelemetry } from './useTelemetry';
@@ -88,6 +89,9 @@ const TvPlayerCore = () => {
         hasAssignment
     } = useSyncEngine(deviceCode, sendHeartbeat);
 
+    // Versión nueva publicada: la TV se recarga sola para tomarla.
+    useAppUpdate();
+
     // Pantallas sincronizadas: se corrige la hora contra el servidor al empezar
     // y cada 30 minutos (ver lib/serverClock).
     const isSynced = !!sync;
@@ -108,6 +112,14 @@ const TvPlayerCore = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const items = useMemo(() => itemsActiveNow(allItems, now, weatherOf), [allItems, activeSignature]);
     const nothingNow = allItems.length > 0 && items.length === 0;
+
+    // Mosaico: cada pantalla dibuja la imagen como si fuera una pantalla gigante
+    // (columnas × filas) y muestra solo su pedazo. La imagen llena todo el mosaico.
+    const wall = sync?.mode === 'wall' ? sync.wall : null;
+    const shownItems = useMemo(
+        () => (wall ? items.map(item => ({ ...item, fitMode: 'cover' })) : items),
+        [items, wall]
+    );
 
     // Modo liviano en equipos con poca memoria (ver tvPerformance.ts).
     const { lite } = useLiteMode();
@@ -353,19 +365,37 @@ const TvPlayerCore = () => {
         );
     }
 
+    const media = (
+        <MediaRenderer 
+            items={shownItems} 
+            currentIndex={currentIndex} 
+            prevIndex={prevIndex}
+            nextIndex={nextIndex}
+            deviceCommerceId={deviceCommerceId} 
+            onVideoEnded={onVideoEnded}
+            onVideoError={onVideoError}
+            onVideoDuration={onVideoDuration}
+            lite={lite}
+        />
+    );
+
     return (
         <div style={containerStyle}>
-            <MediaRenderer 
-                items={items} 
-                currentIndex={currentIndex} 
-                prevIndex={prevIndex}
-                nextIndex={nextIndex}
-                deviceCommerceId={deviceCommerceId} 
-                onVideoEnded={onVideoEnded}
-                onVideoError={onVideoError}
-                onVideoDuration={onVideoDuration}
-                lite={lite}
-            />
+            {wall ? (
+                <div className="absolute inset-0 overflow-hidden bg-black">
+                    <div
+                        style={{
+                            position: 'absolute',
+                            width: `${wall.cols * 100}%`,
+                            height: `${wall.rows * 100}%`,
+                            left: `${-(wall.index % wall.cols) * 100}%`,
+                            top: `${-Math.floor(wall.index / wall.cols) * 100}%`,
+                        }}
+                    >
+                        {media}
+                    </div>
+                </div>
+            ) : media}
             {qrOverlay}
             {urgentAlert && <UrgentAlertOverlay alert={urgentAlert} />}
             <TvSettingsMenu deviceCode={deviceCode!} onRefresh={() => fetchCampaign()} />

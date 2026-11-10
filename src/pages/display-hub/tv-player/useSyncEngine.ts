@@ -46,6 +46,28 @@ const REFETCH_DEBOUNCE_MS = 1500;
 const deviceConfigSignature = (d: Record<string, unknown> | null | undefined) =>
     JSON.stringify([d?.pairing_status, d?.group_id, d?.commerce_id, d?.scale, d?.orientation, d?.name]);
 
+export interface SyncState {
+    mode: 'mirror' | 'wave' | 'wall';
+    offsetS: number;
+    wall: { cols: number; rows: number; index: number } | null;
+}
+
+// Modo de sincronización de la asignación (null = cada pantalla a su ritmo).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function readSync(assignment: any): SyncState | null {
+    const mode = assignment?.sync_mode;
+    if (mode !== 'mirror' && mode !== 'wave' && mode !== 'wall') return null;
+    if (mode === 'wall') {
+        const cols = Number(assignment.wall_cols) || 0;
+        const rows = Number(assignment.wall_rows) || 0;
+        const index = Number(assignment.wall_index);
+        const valid = cols >= 1 && rows >= 1 && Number.isInteger(index) && index >= 0 && index < cols * rows;
+        // Sin datos de mosaico válidos se muestra completa, en espejo.
+        return { mode: valid ? 'wall' : 'mirror', offsetS: 0, wall: valid ? { cols, rows, index } : null };
+    }
+    return { mode, offsetS: mode === 'wave' ? Number(assignment.sync_offset_s) || 0 : 0, wall: null };
+}
+
 export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: () => void) {
     const [items, setItems] = useState<CampaignItem[]>([]);
     const [status, setStatus] = useState<PlayerStatus>('loading');
@@ -78,8 +100,9 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
     const activeContentKeyRef = useRef<string | null>(null);
     const [contentKey, setContentKey] = useState<string | null>(null);
     const [shuffle, setShuffle] = useState(false);
-    // Pantallas sincronizadas: 'mirror' (Espejo) o 'wave' (Olas, con su atraso).
-    const [sync, setSync] = useState<{ mode: 'mirror' | 'wave'; offsetS: number } | null>(null);
+    // Pantallas sincronizadas: 'mirror' (Espejo), 'wave' (Olas, con su atraso) o
+    // 'wall' (Mosaico: esta pantalla muestra su pedazo de la imagen).
+    const [sync, setSync] = useState<SyncState | null>(null);
     const offlineRef = useRef(false);
     // Ya hay contenido en pantalla (los cambios siguientes no esperan tanto la descarga).
     const hasShownContentRef = useRef(false);
@@ -181,12 +204,8 @@ export function useSyncEngine(deviceCode: string | undefined, forceHeartbeat: ()
         // Siempre actualizar el estado de items en React para aplicar cambios de transición y duración
         setContentKey(contentKey);
         setShuffle(playlistShuffle);
-        const syncMode = assignment?.sync_mode;
-        const syncOffsetS = Number(assignment?.sync_offset_s) || 0;
-        setSync(prev => {
-            if (syncMode !== 'mirror' && syncMode !== 'wave') return null;
-            return prev && prev.mode === syncMode && prev.offsetS === syncOffsetS ? prev : { mode: syncMode, offsetS: syncOffsetS };
-        });
+        const next = readSync(assignment);
+        setSync(prev => (prev && next && JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
         setItems(compiledItems);
         setStatus(offlineRef.current ? 'offline_playing' : 'playing');
         hasShownContentRef.current = true;

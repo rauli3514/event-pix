@@ -71,6 +71,18 @@ export const SendToScreensModal = ({ isOpen, onClose, selectedAssets, commerceId
         return list.map((d, i) => ({ d, i })).sort((a, b) => rank(a.d.id) - rank(b.d.id) || a.i - b.i).map(x => x.d);
     }, [targetType, selectedZone, selectedScreens, linkedDevices, waveOrder]);
 
+    // Mosaico: formas posibles para la cantidad de pantallas (columnas × filas).
+    const wallShapes = useMemo(() => {
+        const n = targets.length;
+        const shapes: { cols: number; rows: number }[] = [];
+        for (let rows = 1; rows <= n; rows++) {
+            if (n % rows === 0 && n / rows <= 8 && rows <= 8) shapes.push({ cols: n / rows, rows });
+        }
+        return shapes;
+    }, [targets.length]);
+    const [wallShapeKey, setWallShapeKey] = useState('');
+    const wallShape = wallShapes.find(sh => `${sh.cols}x${sh.rows}` === wallShapeKey) || wallShapes[0] || null;
+
     const moveTarget = (index: number, delta: number) => {
         const ids = targets.map(d => d.id);
         const j = index + delta;
@@ -160,6 +172,7 @@ export const SendToScreensModal = ({ isOpen, onClose, selectedAssets, commerceId
                     scheduleId: scheduleIdToAssign,
                     syncMode: synced ? syncMode : null,
                     syncOffsetS: synced && syncMode === 'wave' ? i * step : 0,
+                    wall: synced && syncMode === 'wall' && wallShape ? { cols: wallShape.cols, rows: wallShape.rows, index: i } : null,
                 })
             );
 
@@ -167,7 +180,7 @@ export const SendToScreensModal = ({ isOpen, onClose, selectedAssets, commerceId
             if (results.some(r => r.syncSkipped)) {
                 toast.warning('Se envió, pero sin sincronizar las pantallas: falta un paso en Supabase (ver docs/pantallas-sincronizadas.md).', { duration: 10000 });
             } else {
-                toast.success(`Contenido enviado a ${devicesToUpdate.length} pantalla(s)${synced ? (syncMode === 'mirror' ? ' en espejo' : ' en olas') : ''}`);
+                toast.success(`Contenido enviado a ${devicesToUpdate.length} pantalla(s)${synced ? ({ mirror: ' en espejo', wave: ' en olas', wall: ' en mosaico' } as const)[syncMode] : ''}`);
             }
             onSuccess();
             onClose();
@@ -255,10 +268,11 @@ export const SendToScreensModal = ({ isOpen, onClose, selectedAssets, commerceId
                     {targets.length > 1 && (
                         <div className="space-y-3">
                             <p className="text-sm font-medium text-slate-300">Cómo se ven las {targets.length} pantallas</p>
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-3 gap-2">
                                 {([
                                     { id: 'mirror', label: 'Espejo', desc: 'Todas muestran lo mismo al mismo tiempo.' },
-                                    { id: 'wave', label: 'Olas', desc: 'La misma lista, cada una unos segundos después de la anterior.' },
+                                    { id: 'wave', label: 'Olas', desc: 'La misma lista, cada una unos segundos después.' },
+                                    { id: 'wall', label: 'Mosaico', desc: 'Una imagen repartida entre todas.' },
                                 ] as const).map(option => (
                                     <button
                                         key={option.id}
@@ -301,6 +315,55 @@ export const SendToScreensModal = ({ isOpen, onClose, selectedAssets, commerceId
                                         ))}
                                     </ol>
                                     <p className="text-xs text-slate-500">Si ponés el mismo tiempo que dura cada foto, cada pantalla muestra una foto distinta.</p>
+                                </div>
+                            )}
+                            {syncMode === 'wall' && wallShape && (
+                                <div className="rounded-xl border border-slate-800 bg-slate-900 p-3 space-y-3">
+                                    <div className="flex flex-wrap gap-2">
+                                        {wallShapes.map(sh => {
+                                            const key = `${sh.cols}x${sh.rows}`;
+                                            const active = sh.cols === wallShape.cols && sh.rows === wallShape.rows;
+                                            return (
+                                                <button
+                                                    key={key}
+                                                    type="button"
+                                                    onClick={() => setWallShapeKey(key)}
+                                                    className={`rounded-full border px-3 py-1 text-xs font-medium ${active ? 'border-orange-500/60 bg-orange-500/10 text-orange-300' : 'border-slate-700 text-slate-400 hover:text-slate-200'}`}
+                                                >
+                                                    {sh.cols} × {sh.rows}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                    {/* Cómo queda armado: cada recuadro es una pantalla, en su lugar. */}
+                                    <div
+                                        className="grid gap-1 rounded-lg bg-slate-950 p-1"
+                                        style={{ gridTemplateColumns: `repeat(${wallShape.cols}, minmax(0, 1fr))` }}
+                                    >
+                                        {targets.map((device, i) => (
+                                            <div key={device.id} className="aspect-video rounded bg-gradient-to-br from-orange-500/25 to-indigo-500/25 border border-slate-700 flex flex-col items-center justify-center p-1 text-center">
+                                                <span className="text-xs font-semibold text-white">{i + 1}</span>
+                                                <span className="text-[10px] text-slate-300 truncate max-w-full">{device.name}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <ol className="space-y-1">
+                                        {targets.map((device, i) => (
+                                            <li key={device.id} className="flex items-center gap-2 text-sm">
+                                                <span className="w-5 text-slate-500">{i + 1}.</span>
+                                                <span className="flex-1 truncate text-slate-200">{device.name}</span>
+                                                <button type="button" onClick={() => moveTarget(i, -1)} disabled={i === 0} className="p-1 text-slate-400 hover:text-white disabled:opacity-30" title="Antes">
+                                                    <ChevronUp className="w-4 h-4" />
+                                                </button>
+                                                <button type="button" onClick={() => moveTarget(i, 1)} disabled={i === targets.length - 1} className="p-1 text-slate-400 hover:text-white disabled:opacity-30" title="Después">
+                                                    <ChevronDown className="w-4 h-4" />
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </ol>
+                                    <p className="text-xs text-slate-500">
+                                        Con pantallas horizontales, la imagen ideal mide {wallShape.cols * 1920} × {wallShape.rows * 1080} px. Si es de otra forma se recorta para llenar el mosaico.
+                                    </p>
                                 </div>
                             )}
                         </div>

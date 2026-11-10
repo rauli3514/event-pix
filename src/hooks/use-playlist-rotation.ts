@@ -139,10 +139,15 @@ export function usePlaylistRotation(items: RotationItem[], enabled: boolean, con
             timer = setTimeout(tick, slot.remainingMs + 30);
         };
         tick();
+        // Los navegadores frenan los relojes de las pestañas ocultas: al volver a
+        // verse se recalcula enseguida.
+        const onVisible = () => { if (document.visibilityState === 'visible') tick(); };
         window.addEventListener(SERVER_CLOCK_SYNCED_EVENT, tick);
+        document.addEventListener('visibilitychange', onVisible);
         return () => {
             if (timer) clearTimeout(timer);
             window.removeEventListener(SERVER_CLOCK_SYNCED_EVENT, tick);
+            document.removeEventListener('visibilitychange', onVisible);
         };
     }, [items, enabled, synced, syncOffsetMs]);
 

@@ -6,7 +6,18 @@ import { registerCommandSecret } from '@/lib/displayCommands';
 import { callTvBridge, onTvBridgeReady, openHomeSettings, openWifiSettings } from '@/lib/tvBridge';
 import { Wifi, Bluetooth, Power } from 'lucide-react';
 
+// Pantalla de prueba (app.event-pix.com.ar/tv-boot?prueba): el código se guarda
+// solo en esa pestaña, así se pueden abrir varias pantallas virtuales en el mismo
+// navegador (por ejemplo cuatro para probar un mosaico de 2x2).
+const isVirtualScreen = () => {
+  try { return new URLSearchParams(window.location.search).has('prueba'); } catch { return false; }
+};
+const codeStore = (): Storage => {
+  try { return isVirtualScreen() ? window.sessionStorage : window.localStorage; } catch { return window.localStorage; }
+};
+
 export default function TvBootScreen() {
+  const virtual = isVirtualScreen();
   const [pin, setPin] = useState<string>('');
   const hasBluetoothPairing = typeof (window as any).AndroidKiosk?.startBluetoothServer === 'function';
   const navigate = useNavigate();
@@ -22,12 +33,13 @@ export default function TvBootScreen() {
 
     async function initDevice() {
       // Generar PIN único (solo si no existe en localStorage)
-      let deviceId = localStorage.getItem('device_id');
+      const store = codeStore();
+      let deviceId = store.getItem('device_id');
       if (!deviceId) {
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
         const newPin = Array.from({ length: 6 }).map(() => chars[Math.floor(Math.random() * chars.length)]).join('');
         deviceId = newPin;
-        localStorage.setItem('device_id', deviceId);
+        store.setItem('device_id', deviceId);
       }
       
       try {
@@ -196,6 +208,11 @@ export default function TvBootScreen() {
         ) : (
           <p className="text-sm text-zinc-400">
             Ingresá este código en <strong className="text-white">app.event-pix.com.ar</strong> → Pantallas → Vincular.
+          </p>
+        )}
+        {virtual && (
+          <p className="text-xs text-amber-300/90">
+            Pantalla de prueba: este código vale solo para esta pestaña. Al terminar, borrala desde el panel.
           </p>
         )}
 
