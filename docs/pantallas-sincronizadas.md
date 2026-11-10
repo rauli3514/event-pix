@@ -22,6 +22,25 @@ En Inicio, cada pantalla muestra "· en espejo" o "· en olas (+10 s)" junto a s
   al modo normal (cada una a su ritmo).
 - No hace falta actualizar la app de las TV: el reproductor es parte de la página.
 
+## Probar sin TV: pantallas virtuales
+
+Cualquier navegador sirve de pantalla: abrir `app.event-pix.com.ar/tv-boot` muestra el
+código para vincularla como una TV más (F11 para pantalla completa).
+
+- Normalmente el código queda guardado en el navegador: una pantalla por navegador.
+- Con **`app.event-pix.com.ar/tv-boot?prueba`** el código vale solo para esa pestaña, así
+  se pueden abrir varias en el mismo navegador (por ejemplo 4 para un mosaico de 2×2).
+- Al terminar, borrarlas desde el panel; si no, quedan "sin señal" y mandan avisos.
+
+## Versión nueva publicada: las TV se actualizan solas
+
+Las TV leen `/version.json` (lo genera la compilación) a los 2 minutos de abrir y cada
+10 minutos. Si se publicó otra versión, actualizan la copia guardada (service worker) y se
+recargan. Si después de 3 intentos siguen con la vieja, esperan a la próxima publicación.
+
+Las pantallas que ya estaban abiertas antes de esta función la reciben recién la próxima
+vez que se recargan: desenchufar la TV, o en el navegador recargar dos veces (F5, F5).
+
 ## Paso único en Supabase
 
 Correr una vez en el SQL Editor el archivo

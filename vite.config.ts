@@ -35,8 +35,26 @@ const mediapipeWasm = () => {
   };
 };
 
+// Versión de esta compilación. Las TV leen /version.json cada tanto y, si
+// cambió, se recargan solas para tomar lo nuevo (ver useAppUpdate).
+const BUILD_ID = String(Date.now());
+const buildVersionFile = () => {
+  let written = false;
+  return {
+    name: 'build-version-file',
+    writeBundle(options: { dir?: string }) {
+      if (written || !options.dir) return;
+      written = true;
+      fs.writeFileSync(path.join(options.dir, 'version.json'), JSON.stringify({ build: BUILD_ID }));
+    },
+  };
+};
+
 // https://vitejs.dev/config/
 export default defineConfig({
+  define: {
+    __APP_BUILD_ID__: JSON.stringify(BUILD_ID),
+  },
   server: {
     host: true, // Permite conexiones desde la IP del emulador (10.0.2.2)
     proxy: {
@@ -48,6 +66,7 @@ export default defineConfig({
     }
   },
   plugins: [
+    buildVersionFile(),
     mediapipeWasm(),
     react(),
     legacy({

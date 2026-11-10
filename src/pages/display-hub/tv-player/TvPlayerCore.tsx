@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, Component, ErrorInfo, ReactNode } from 'react';
 import { syncServerClock } from '@/lib/serverClock';
+import { useAppUpdate } from './useAppUpdate';
 import { useParams } from 'react-router-dom';
 import { TvSettingsMenu } from '@/components/display/TvSettingsMenu';
 import { useTelemetry } from './useTelemetry';
@@ -87,6 +88,9 @@ const TvPlayerCore = () => {
         sync,
         hasAssignment
     } = useSyncEngine(deviceCode, sendHeartbeat);
+
+    // Versión nueva publicada: la TV se recarga sola para tomarla.
+    useAppUpdate();
 
     // Pantallas sincronizadas: se corrige la hora contra el servidor al empezar
     // y cada 30 minutos (ver lib/serverClock).
