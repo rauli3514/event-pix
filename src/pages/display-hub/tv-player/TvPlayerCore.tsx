@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, Component, ErrorInfo, ReactNode } from 'react';
+import { syncServerClock } from '@/lib/serverClock';
 import { useParams } from 'react-router-dom';
 import { TvSettingsMenu } from '@/components/display/TvSettingsMenu';
 import { useTelemetry } from './useTelemetry';
@@ -83,8 +84,19 @@ const TvPlayerCore = () => {
         fetchCampaign,
         contentKey,
         shuffle,
+        sync,
         hasAssignment
     } = useSyncEngine(deviceCode, sendHeartbeat);
+
+    // Pantallas sincronizadas: se corrige la hora contra el servidor al empezar
+    // y cada 30 minutos (ver lib/serverClock).
+    const isSynced = !!sync;
+    useEffect(() => {
+        if (!isSynced) return;
+        void syncServerClock();
+        const id = setInterval(() => { void syncServerClock(); }, 30 * 60 * 1000);
+        return () => clearInterval(id);
+    }, [isSynced]);
 
     // Solo lo que toca ahora: en fecha, en su día y horario, y con el clima
     // que pide ("si llueve", "si hace calor"). Se revisa cada minuto; la lista
@@ -189,7 +201,8 @@ const TvPlayerCore = () => {
         items,
         status === 'playing' || status === 'offline_playing',
         contentKey,
-        shuffle
+        shuffle,
+        sync ? sync.offsetS * 1000 : null
     );
 
     // Aviso urgente del panel ("Hoy cerramos a las 18 h"), encima de todo.

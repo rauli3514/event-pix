@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { SERVER_CLOCK_SYNCED_EVENT, serverNow } from '@/lib/serverClock';
 
 const DEFAULT_DURATION_S = 10;
 // Si un video no avisa que terminó (red trabada, archivo roto), se pasa al
@@ -37,25 +38,57 @@ function buildOrder(count: number, shuffle: boolean, opts: { first?: number; avo
     return order;
 }
 
+// Pantallas sincronizadas: el item que toca se calcula con la hora, así todas
+// las TV con la misma lista muestran lo mismo al mismo tiempo (Espejo) aunque
+// se prendan en momentos distintos. offsetMs atrasa una pantalla respecto de
+// las otras (Olas). Cada item dura exactamente su tiempo en la lista.
+export function syncedSlot(items: RotationItem[], nowMs: number, offsetMs: number): { index: number; remainingMs: number } {
+    const durations = items.map(item => (item.duration && item.duration > 0 ? item.duration : DEFAULT_DURATION_S) * 1000);
+    const cycle = durations.reduce((a, b) => a + b, 0);
+    if (cycle <= 0) return { index: 0, remainingMs: DEFAULT_DURATION_S * 1000 };
+    const t = (((nowMs - offsetMs) % cycle) + cycle) % cycle;
+    let start = 0;
+    for (let i = 0; i < durations.length; i++) {
+        if (t < start + durations[i]) return { index: i, remainingMs: start + durations[i] - t };
+        start += durations[i];
+    }
+    return { index: 0, remainingMs: durations[0] };
+}
+
+const syncedPosition = (items: RotationItem[], offsetMs: number) => {
+    const { index } = syncedSlot(items, serverNow(), offsetMs);
+    return { current: index, prev: -1, next: items.length > 1 ? (index + 1) % items.length : -1 };
+};
+
 // Rotación de una playlist. La duración de cada item es un mínimo para los
 // videos: nunca se cortan a la mitad. Un video más largo que su tiempo se ve
 // completo; uno más corto se repite hasta cumplirlo, terminando la vuelta en curso.
 // contentKey: cuando cambia (otra playlist, otra franja horaria) se arranca de nuevo.
 // shuffle: "Orden aleatorio" de la playlist; se mezcla de nuevo en cada vuelta.
-export function usePlaylistRotation(items: RotationItem[], enabled: boolean, contentKey?: string | null, shuffle = false) {
+// syncOffsetMs: con un número, la pantalla va sincronizada por la hora (ver
+// syncedSlot): no se mezcla y los videos duran su tiempo en la lista.
+export function usePlaylistRotation(items: RotationItem[], enabled: boolean, contentKey?: string | null, shuffleSetting = false, syncOffsetMs: number | null = null) {
+    const synced = syncOffsetMs !== null && Number.isFinite(syncOffsetMs);
+    const shuffle = shuffleSetting && !synced;
     // current = item en pantalla; prev = el que sale (transición); next = el que se precarga.
-    const [position, setPosition] = useState({ current: 0, prev: -1, next: -1 });
+    const [position, setPosition] = useState(() => (synced && items.length > 0
+        ? syncedPosition(items, syncOffsetMs as number)
+        : { current: 0, prev: -1, next: -1 }));
     const currentIndex = position.current;
 
     // Contenido nuevo (otra playlist o franja, otra cantidad de items, cambio de
     // aleatorio): se vuelve al primer item durante el render, así nunca se pinta
     // un item de la playlist anterior.
-    const resetKey = `${contentKey ?? ''}|${items.length}|${shuffle}`;
+    const resetKey = `${contentKey ?? ''}|${items.length}|${shuffle}|${synced ? syncOffsetMs : 'free'}`;
     const [lastResetKey, setLastResetKey] = useState(resetKey);
     if (resetKey !== lastResetKey) {
         setLastResetKey(resetKey);
-        setPosition({ current: 0, prev: -1, next: -1 });
+        setPosition(synced && items.length > 0
+            ? syncedPosition(items, syncOffsetMs as number)
+            : { current: 0, prev: -1, next: -1 });
     }
+    const syncedRef = useRef(synced);
+    useLayoutEffect(() => { syncedRef.current = synced; }, [synced]);
 
     const itemsRef = useRef(items);
     const shuffleRef = useRef(shuffle);
@@ -83,9 +116,35 @@ export function usePlaylistRotation(items: RotationItem[], enabled: boolean, con
     }, []);
 
     useLayoutEffect(() => {
+        if (syncedRef.current) return;
         buildCycles(0);
         setPosition(p => ({ ...p, next: peekNext(p.current) }));
     }, [lastResetKey, buildCycles]);
+
+    // Sincronizada: en cada cambio de item se vuelve a calcular con la hora, así
+    // no se acumula desfase. También al corregir la hora contra el servidor.
+    useEffect(() => {
+        if (!enabled || items.length === 0 || !synced) return;
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        const tick = () => {
+            if (timer) clearTimeout(timer);
+            const list = itemsRef.current;
+            if (list.length === 0) return;
+            const slot = syncedSlot(list, serverNow(), syncOffsetMs as number);
+            const next = list.length > 1 ? (slot.index + 1) % list.length : -1;
+            setPosition(p => (p.current === slot.index && p.next === next
+                ? p
+                : { current: slot.index, prev: p.current !== slot.index ? p.current : -1, next }));
+            // Unos milisegundos de más para caer ya dentro del item siguiente.
+            timer = setTimeout(tick, slot.remainingMs + 30);
+        };
+        tick();
+        window.addEventListener(SERVER_CLOCK_SYNCED_EVENT, tick);
+        return () => {
+            if (timer) clearTimeout(timer);
+            window.removeEventListener(SERVER_CLOCK_SYNCED_EVENT, tick);
+        };
+    }, [items, enabled, synced, syncOffsetMs]);
 
     const setCurrentIndex = useCallback((index: number) => {
         setPosition(p => ({ current: index, prev: p.current !== index ? p.current : -1, next: peekNext(index) }));
@@ -125,7 +184,7 @@ export function usePlaylistRotation(items: RotationItem[], enabled: boolean, con
     }, [buildCycles]);
 
     useEffect(() => {
-        if (!enabled || items.length === 0) return;
+        if (!enabled || items.length === 0 || synced) return;
 
         const item = items[currentIndex];
         if (!item) {
@@ -156,7 +215,7 @@ export function usePlaylistRotation(items: RotationItem[], enabled: boolean, con
             if (errorSkipRef.current) clearTimeout(errorSkipRef.current);
             errorSkipRef.current = null;
         };
-    }, [currentIndex, items, enabled, advance]);
+    }, [currentIndex, items, enabled, advance, synced]);
 
     // Devuelve true si el reproductor se encargó (pasó al siguiente o el video
     // queda quieto en el último cuadro); false para volver a reproducirlo.
@@ -164,6 +223,14 @@ export function usePlaylistRotation(items: RotationItem[], enabled: boolean, con
         const state = itemStateRef.current;
         if (index !== state.index) return true;
         const item = itemsRef.current[index];
+        // Sincronizada: el cambio lo marca la hora; el video se repite hasta entonces.
+        if (syncedRef.current) {
+            if (item?.loop === false) {
+                state.videoStopped = true;
+                return true;
+            }
+            return false;
+        }
         if (state.timeUp && itemsRef.current.length > 1) {
             advance();
             return true;
@@ -181,7 +248,7 @@ export function usePlaylistRotation(items: RotationItem[], enabled: boolean, con
         if (index !== state.index) return;
         if (state.videoStopped) return;
         state.videoStopped = true;
-        if (itemsRef.current.length > 1) {
+        if (itemsRef.current.length > 1 && !syncedRef.current) {
             if (errorSkipRef.current) clearTimeout(errorSkipRef.current);
             errorSkipRef.current = setTimeout(advance, BROKEN_VIDEO_SKIP_MS);
         }

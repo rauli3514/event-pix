@@ -197,6 +197,9 @@ export interface DisplayAssignment {
     start_time: string | null;
     end_time: string | null;
     created_at: string;
+    // Pantallas sincronizadas: Espejo ('mirror') u Olas ('wave', atrasada sync_offset_s).
+    sync_mode?: 'mirror' | 'wave' | null;
+    sync_offset_s?: number | null;
     
     // Relations
     campaign?: DisplayCampaign;

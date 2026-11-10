@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Send, Monitor, Layers } from 'lucide-react';
-import { useDisplayDevices, useDisplayGroups, useAssignContentToDevice, useCreateCampaign, useUpdateCampaign } from '@/hooks/use-display-hub';
+import { Send, Monitor, Layers, ChevronUp, ChevronDown } from 'lucide-react';
+import { useDisplayDevices, useDisplayGroups, useAssignContentToDevice, useCreateCampaign, useUpdateCampaign, SyncMode } from '@/hooks/use-display-hub';
 import { supabase } from '@/lib/supabase';
 import type { DisplayCampaign } from '@/types/display';
 import { toast } from 'sonner';
@@ -48,6 +48,10 @@ export const SendToScreensModal = ({ isOpen, onClose, selectedAssets, commerceId
     const [selectedZone, setSelectedZone] = useState<string>('');
     const [selectedScreens, setSelectedScreens] = useState<string[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    // Con varias pantallas: Espejo (todas iguales) u Olas (cada una atrasada).
+    const [syncMode, setSyncMode] = useState<SyncMode>('mirror');
+    const [waveStep, setWaveStep] = useState(10);
+    const [waveOrder, setWaveOrder] = useState<string[]>([]);
 
     const { data: groups } = useDisplayGroups(commerceId);
     const { data: devices } = useDisplayDevices(commerceId);
@@ -55,7 +59,25 @@ export const SendToScreensModal = ({ isOpen, onClose, selectedAssets, commerceId
     const createCampaign = useCreateCampaign();
     const updateCampaign = useUpdateCampaign();
 
-    const linkedDevices = devices?.filter(d => d.derived_status !== 'pending') || [];
+    const linkedDevices = useMemo(() => devices?.filter(d => d.derived_status !== 'pending') || [], [devices]);
+
+    // Pantallas de destino, en el orden de la ola (el orden en que se eligieron,
+    // o el que se acomode con las flechas).
+    const targets = useMemo(() => {
+        const list = targetType === 'zone'
+            ? linkedDevices.filter(d => d.group_id === selectedZone)
+            : selectedScreens.map(id => linkedDevices.find(d => d.id === id)).filter((d): d is NonNullable<typeof d> => !!d);
+        const rank = (id: string) => { const i = waveOrder.indexOf(id); return i === -1 ? Number.MAX_SAFE_INTEGER : i; };
+        return list.map((d, i) => ({ d, i })).sort((a, b) => rank(a.d.id) - rank(b.d.id) || a.i - b.i).map(x => x.d);
+    }, [targetType, selectedZone, selectedScreens, linkedDevices, waveOrder]);
+
+    const moveTarget = (index: number, delta: number) => {
+        const ids = targets.map(d => d.id);
+        const j = index + delta;
+        if (j < 0 || j >= ids.length) return;
+        [ids[index], ids[j]] = [ids[j], ids[index]];
+        setWaveOrder(ids);
+    };
 
     const handleSend = async () => {
         if (selectedAssets.length === 0) return;
@@ -68,9 +90,7 @@ export const SendToScreensModal = ({ isOpen, onClose, selectedAssets, commerceId
         setIsSubmitting(true);
 
         try {
-            const devicesToUpdate = targetType === 'zone'
-                ? linkedDevices.filter(d => d.group_id === selectedZone)
-                : linkedDevices.filter(d => selectedScreens.includes(d.id));
+            const devicesToUpdate = targets;
 
             if (devicesToUpdate.length === 0) {
                 toast.error('No hay pantallas en el destino seleccionado.');
@@ -130,17 +150,25 @@ export const SendToScreensModal = ({ isOpen, onClose, selectedAssets, commerceId
                 }
             }
 
-            const promises = devicesToUpdate.map(device => 
+            const synced = devicesToUpdate.length > 1;
+            const step = Math.max(1, Math.round(waveStep) || 10);
+            const promises = devicesToUpdate.map((device, i) =>
                 assignContent.mutateAsync({
                     deviceId: device.id,
                     mediaId: mediaIdToAssign,
                     campaignId: campaignIdToAssign,
-                    scheduleId: scheduleIdToAssign
+                    scheduleId: scheduleIdToAssign,
+                    syncMode: synced ? syncMode : null,
+                    syncOffsetS: synced && syncMode === 'wave' ? i * step : 0,
                 })
             );
 
-            await Promise.all(promises);
-            toast.success(`Contenido enviado a ${devicesToUpdate.length} pantalla(s)`);
+            const results = await Promise.all(promises);
+            if (results.some(r => r.syncSkipped)) {
+                toast.warning('Se envió, pero sin sincronizar las pantallas: falta un paso en Supabase (ver docs/pantallas-sincronizadas.md).', { duration: 10000 });
+            } else {
+                toast.success(`Contenido enviado a ${devicesToUpdate.length} pantalla(s)${synced ? (syncMode === 'mirror' ? ' en espejo' : ' en olas') : ''}`);
+            }
             onSuccess();
             onClose();
         } catch (error) {
@@ -167,7 +195,7 @@ export const SendToScreensModal = ({ isOpen, onClose, selectedAssets, commerceId
                     </div>
                 </DialogHeader>
 
-                <div className="p-6 space-y-6">
+                <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
                     <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-800">
                         <button 
                             className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-colors ${targetType === 'zone' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-slate-200'}`}
@@ -221,6 +249,60 @@ export const SendToScreensModal = ({ isOpen, onClose, selectedAssets, commerceId
                                     </div>
                                 </button>
                             ))}
+                        </div>
+                    )}
+
+                    {targets.length > 1 && (
+                        <div className="space-y-3">
+                            <p className="text-sm font-medium text-slate-300">Cómo se ven las {targets.length} pantallas</p>
+                            <div className="grid grid-cols-2 gap-2">
+                                {([
+                                    { id: 'mirror', label: 'Espejo', desc: 'Todas muestran lo mismo al mismo tiempo.' },
+                                    { id: 'wave', label: 'Olas', desc: 'La misma lista, cada una unos segundos después de la anterior.' },
+                                ] as const).map(option => (
+                                    <button
+                                        key={option.id}
+                                        type="button"
+                                        onClick={() => setSyncMode(option.id)}
+                                        className={`rounded-xl border p-3 text-left transition-colors ${syncMode === option.id ? 'bg-orange-500/10 border-orange-500/50' : 'bg-slate-900 border-slate-800 hover:bg-slate-800'}`}
+                                    >
+                                        <span className={`block font-medium ${syncMode === option.id ? 'text-orange-400' : 'text-slate-200'}`}>{option.label}</span>
+                                        <span className="block text-xs text-slate-400 mt-1">{option.desc}</span>
+                                    </button>
+                                ))}
+                            </div>
+                            {syncMode === 'wave' && (
+                                <div className="rounded-xl border border-slate-800 bg-slate-900 p-3 space-y-3">
+                                    <label className="flex flex-wrap items-center gap-2 text-sm text-slate-300">
+                                        Cada pantalla va
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            max={600}
+                                            value={waveStep}
+                                            onChange={e => setWaveStep(Number(e.target.value))}
+                                            className="w-16 rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-white"
+                                        />
+                                        segundos después de la anterior
+                                    </label>
+                                    <ol className="space-y-1">
+                                        {targets.map((device, i) => (
+                                            <li key={device.id} className="flex items-center gap-2 text-sm">
+                                                <span className="w-5 text-slate-500">{i + 1}.</span>
+                                                <span className="flex-1 truncate text-slate-200">{device.name}</span>
+                                                <span className="text-xs text-slate-400">{i === 0 ? 'primera' : `+${i * (Math.max(1, Math.round(waveStep) || 10))} s`}</span>
+                                                <button type="button" onClick={() => moveTarget(i, -1)} disabled={i === 0} className="p-1 text-slate-400 hover:text-white disabled:opacity-30" title="Subir">
+                                                    <ChevronUp className="w-4 h-4" />
+                                                </button>
+                                                <button type="button" onClick={() => moveTarget(i, 1)} disabled={i === targets.length - 1} className="p-1 text-slate-400 hover:text-white disabled:opacity-30" title="Bajar">
+                                                    <ChevronDown className="w-4 h-4" />
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </ol>
+                                    <p className="text-xs text-slate-500">Si ponés el mismo tiempo que dura cada foto, cada pantalla muestra una foto distinta.</p>
+                                </div>
+                            )}
                         </div>
                     )}
 
