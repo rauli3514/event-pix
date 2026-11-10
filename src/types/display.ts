@@ -204,6 +204,7 @@ export interface DisplayAssignment {
     wall_cols?: number | null;
     wall_rows?: number | null;
     wall_index?: number | null;
+    wall_fit?: 'cover' | 'contain' | null;
     
     // Relations
     campaign?: DisplayCampaign;

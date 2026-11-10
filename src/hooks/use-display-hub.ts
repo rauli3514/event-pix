@@ -392,8 +392,10 @@ export const useUpdateDisplayDevice = () => {
 };
 
 export type SyncMode = 'mirror' | 'wave' | 'wall';
-// Mosaico: forma (columnas × filas) y lugar de esta pantalla (0 = arriba a la izquierda).
-export interface WallSpot { cols: number; rows: number; index: number }
+// Mosaico: forma (columnas × filas), lugar de esta pantalla (0 = arriba a la izquierda)
+// y cómo entra la imagen ('cover' llena y recorta, 'contain' completa con franjas).
+export type WallFit = 'cover' | 'contain';
+export interface WallSpot { cols: number; rows: number; index: number; fit?: WallFit }
 
 export const useAssignContentToDevice = () => {
     const queryClient = useQueryClient();
@@ -422,8 +424,18 @@ export const useAssignContentToDevice = () => {
                 : {};
             if (syncMode === 'wall' && wall) {
                 Object.assign(syncFields, { wall_cols: wall.cols, wall_rows: wall.rows, wall_index: wall.index });
+                // Solo si no es el de siempre: así anda aunque falte la columna wall_fit.
+                if (wall.fit === 'contain') syncFields.wall_fit = 'contain';
             }
             let { data, error } = syncMode ? await insert({ ...base, ...syncFields }) : await insert(base);
+            // Falta la columna wall_fit (migración display_wall_fit): se manda el mosaico igual, recortando.
+            let fitSkipped = false;
+            if (error && 'wall_fit' in syncFields && /wall_fit/i.test(error.message || '')) {
+                const { wall_fit: _omit, ...rest } = syncFields;
+                void _omit;
+                ({ data, error } = await insert({ ...base, ...rest }));
+                fitSkipped = !error;
+            }
             // Si la base todavía no tiene esas columnas (o el modo), se manda igual sin sincronizar.
             let syncSkipped = false;
             if (error && syncMode && /sync_mode|sync_offset_s|wall_|column|check constraint/i.test(error.message || '')) {
@@ -432,7 +444,7 @@ export const useAssignContentToDevice = () => {
             }
 
             if (error) throw error;
-            return { ...(data as DisplayAssignment), syncSkipped };
+            return { ...(data as DisplayAssignment), syncSkipped, fitSkipped };
         },
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: ["display_device", variables.deviceId] });

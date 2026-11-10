@@ -14,6 +14,11 @@ o Programación) se elige cómo se ven:
   3840×1080). Las pantallas van en espejo, así que las fotos cambian juntas. Con videos
   funciona, pero cada TV reproduce su pedazo y puede notarse alguna décima de diferencia.
   Pantallas de distinto tamaño físico no van a calzar perfecto.
+  Se elige cómo entra la imagen: **Llenar todo** (recorta lo que sobra, por defecto) o
+  **Ajustar sin recortar** (se ve completa, con franjas negras donde no llega).
+  La ventana muestra una **vista previa**: la primera foto recortada tal como va a salir
+  (según si las pantallas son horizontales o verticales), con el corte y el lugar de cada
+  pantalla, el tamaño ideal y cuánto se recorta de la imagen elegida.
 
 En Inicio, cada pantalla muestra "· en espejo", "· en olas (+10 s)" o "· mosaico 2×1
 (pantalla 1 de 2)" junto a su contenido.
@@ -60,4 +65,6 @@ Sin ese paso el contenido se manda igual, pero sin sincronizar, y el panel avisa
 Para el Mosaico hay un segundo paso: correr también
 `supabase/migrations/20261111000000_display_wall.sql` (suma el modo y las columnas
 `wall_cols`, `wall_rows`, `wall_index`). Sin él, el mosaico se manda sin sincronizar y el
-panel avisa.
+panel avisa. Para "Ajustar sin recortar", además,
+`supabase/migrations/20261112000000_display_wall_fit.sql` (columna `wall_fit`); sin él se
+manda recortando y el panel avisa.

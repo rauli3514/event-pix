@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Send, Monitor, Layers, ChevronUp, ChevronDown } from 'lucide-react';
 import { useDisplayDevices, useDisplayGroups, useAssignContentToDevice, useCreateCampaign, useUpdateCampaign, SyncMode } from '@/hooks/use-display-hub';
 import { supabase } from '@/lib/supabase';
+import { WallPreview } from '@/components/display/WallPreview';
+import { previewImageOf } from '@/lib/wallPreview';
 import type { DisplayCampaign } from '@/types/display';
 import { toast } from 'sonner';
 
@@ -81,6 +83,7 @@ export const SendToScreensModal = ({ isOpen, onClose, selectedAssets, commerceId
         return shapes;
     }, [targets.length]);
     const [wallShapeKey, setWallShapeKey] = useState('');
+    const [wallFit, setWallFit] = useState<'cover' | 'contain'>('cover');
     const wallShape = wallShapes.find(sh => `${sh.cols}x${sh.rows}` === wallShapeKey) || wallShapes[0] || null;
 
     const moveTarget = (index: number, delta: number) => {
@@ -172,12 +175,14 @@ export const SendToScreensModal = ({ isOpen, onClose, selectedAssets, commerceId
                     scheduleId: scheduleIdToAssign,
                     syncMode: synced ? syncMode : null,
                     syncOffsetS: synced && syncMode === 'wave' ? i * step : 0,
-                    wall: synced && syncMode === 'wall' && wallShape ? { cols: wallShape.cols, rows: wallShape.rows, index: i } : null,
+                    wall: synced && syncMode === 'wall' && wallShape ? { cols: wallShape.cols, rows: wallShape.rows, index: i, fit: wallFit } : null,
                 })
             );
 
             const results = await Promise.all(promises);
-            if (results.some(r => r.syncSkipped)) {
+            if (results.some(r => r.fitSkipped)) {
+                toast.warning('Se envió en mosaico, pero recortando: para "Ajustar sin recortar" falta un paso en Supabase (ver docs/pantallas-sincronizadas.md).', { duration: 10000 });
+            } else if (results.some(r => r.syncSkipped)) {
                 toast.warning('Se envió, pero sin sincronizar las pantallas: falta un paso en Supabase (ver docs/pantallas-sincronizadas.md).', { duration: 10000 });
             } else {
                 toast.success(`Contenido enviado a ${devicesToUpdate.length} pantalla(s)${synced ? ({ mirror: ' en espejo', wave: ' en olas', wall: ' en mosaico' } as const)[syncMode] : ''}`);
@@ -335,18 +340,24 @@ export const SendToScreensModal = ({ isOpen, onClose, selectedAssets, commerceId
                                             );
                                         })}
                                     </div>
-                                    {/* Cómo queda armado: cada recuadro es una pantalla, en su lugar. */}
-                                    <div
-                                        className="grid gap-1 rounded-lg bg-slate-950 p-1"
-                                        style={{ gridTemplateColumns: `repeat(${wallShape.cols}, minmax(0, 1fr))` }}
-                                    >
-                                        {targets.map((device, i) => (
-                                            <div key={device.id} className="aspect-video rounded bg-gradient-to-br from-orange-500/25 to-indigo-500/25 border border-slate-700 flex flex-col items-center justify-center p-1 text-center">
-                                                <span className="text-xs font-semibold text-white">{i + 1}</span>
-                                                <span className="text-[10px] text-slate-300 truncate max-w-full">{device.name}</span>
-                                            </div>
+                                    {/* Cómo queda: la foto recortada como en las TV, con el lugar de cada pantalla. */}
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {([
+                                            { id: 'cover', label: 'Llenar todo', desc: 'Sin franjas; recorta lo que sobra.' },
+                                            { id: 'contain', label: 'Ajustar sin recortar', desc: 'Se ve completa, con franjas negras.' },
+                                        ] as const).map(option => (
+                                            <button
+                                                key={option.id}
+                                                type="button"
+                                                onClick={() => setWallFit(option.id)}
+                                                className={`rounded-lg border px-3 py-2 text-left ${wallFit === option.id ? 'border-orange-500/60 bg-orange-500/10' : 'border-slate-700 hover:bg-slate-800'}`}
+                                            >
+                                                <span className={`block text-xs font-medium ${wallFit === option.id ? 'text-orange-300' : 'text-slate-200'}`}>{option.label}</span>
+                                                <span className="block text-[11px] text-slate-400">{option.desc}</span>
+                                            </button>
                                         ))}
                                     </div>
+                                    <WallPreview cols={wallShape.cols} rows={wallShape.rows} screens={targets} imageUrl={previewImageOf(selectedAssets)} fit={wallFit} />
                                     <ol className="space-y-1">
                                         {targets.map((device, i) => (
                                             <li key={device.id} className="flex items-center gap-2 text-sm">
@@ -361,9 +372,6 @@ export const SendToScreensModal = ({ isOpen, onClose, selectedAssets, commerceId
                                             </li>
                                         ))}
                                     </ol>
-                                    <p className="text-xs text-slate-500">
-                                        Con pantallas horizontales, la imagen ideal mide {wallShape.cols * 1920} × {wallShape.rows * 1080} px. Si es de otra forma se recorta para llenar el mosaico.
-                                    </p>
                                 </div>
                             )}
                         </div>

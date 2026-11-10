@@ -114,10 +114,11 @@ const TvPlayerCore = () => {
     const nothingNow = allItems.length > 0 && items.length === 0;
 
     // Mosaico: cada pantalla dibuja la imagen como si fuera una pantalla gigante
-    // (columnas × filas) y muestra solo su pedazo. La imagen llena todo el mosaico.
+    // (columnas × filas) y muestra solo su pedazo. La imagen llena todo el mosaico
+    // ('cover') o entra completa con franjas negras ('contain').
     const wall = sync?.mode === 'wall' ? sync.wall : null;
     const shownItems = useMemo(
-        () => (wall ? items.map(item => ({ ...item, fitMode: 'cover' })) : items),
+        () => (wall ? items.map(item => ({ ...item, fitMode: wall.fit })) : items),
         [items, wall]
     );
 
