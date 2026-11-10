@@ -40,6 +40,10 @@ export const useSaveAlertSettings = () => {
             });
             if (error) throw error;
         },
-        onSuccess: (_, p) => queryClient.invalidateQueries({ queryKey: ['display_alert_settings', p.commerceId] }),
+        onSuccess: (_, p) => {
+            queryClient.invalidateQueries({ queryKey: ['display_alert_settings', p.commerceId] });
+            // El horario del local también decide qué pantallas sin señal se avisan en el panel.
+            queryClient.invalidateQueries({ queryKey: ['display_commerce_hours'] });
+        },
     });
 };

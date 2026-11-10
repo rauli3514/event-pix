@@ -2,8 +2,38 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Send, Monitor, Layers } from 'lucide-react';
-import { useDisplayDevices, useDisplayGroups, useAssignContentToDevice, useCreateCampaign } from '@/hooks/use-display-hub';
+import { useDisplayDevices, useDisplayGroups, useAssignContentToDevice, useCreateCampaign, useUpdateCampaign } from '@/hooks/use-display-hub';
+import { supabase } from '@/lib/supabase';
+import type { DisplayCampaign } from '@/types/display';
 import { toast } from 'sonner';
+
+// Marca de las listas que se arman solas al mandar varios archivos juntos.
+const QUICK_LIST_DESCRIPTION = 'Generada desde la biblioteca de medios';
+
+// "Lista rápida 10/11 20:18"
+const quickListName = (d = new Date()) =>
+    `Lista rápida ${d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })} ${d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })}`;
+
+// La lista rápida que ya tienen las pantallas elegidas, si se puede reemplazar:
+// asignada directo a todas ellas y a ninguna otra pantalla.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const reusableQuickList = (targets: any[], all: any[]): { id: string } | null => {
+    const campaign = targets[0]?.assignment?.campaign;
+    if (!campaign || campaign.description !== QUICK_LIST_DESCRIPTION) return null;
+    const onAllTargets = targets.every(d => d.assignment?.device_id === d.id && d.assignment?.campaign_id === campaign.id);
+    const onOthers = all.some(d => !targets.includes(d) && d.assignment?.campaign_id === campaign.id);
+    return onAllTargets && !onOthers ? campaign : null;
+};
+
+// Si la lista está en alguna programación no se toca (se arma otra).
+const usedInSchedules = async (campaignId: string): Promise<boolean> => {
+    const [events, schedules] = await Promise.all([
+        supabase.from('display_schedule_events').select('id', { count: 'exact', head: true }).eq('campaign_id', campaignId),
+        supabase.from('display_schedules').select('id', { count: 'exact', head: true }).eq('default_campaign_id', campaignId),
+    ]);
+    if (events.error || schedules.error) return true;
+    return (events.count || 0) + (schedules.count || 0) > 0;
+};
 
 interface SendToScreensModalProps {
     isOpen: boolean;
@@ -23,6 +53,7 @@ export const SendToScreensModal = ({ isOpen, onClose, selectedAssets, commerceId
     const { data: devices } = useDisplayDevices(commerceId);
     const assignContent = useAssignContentToDevice();
     const createCampaign = useCreateCampaign();
+    const updateCampaign = useUpdateCampaign();
 
     const linkedDevices = devices?.filter(d => d.derived_status !== 'pending') || [];
 
@@ -37,10 +68,17 @@ export const SendToScreensModal = ({ isOpen, onClose, selectedAssets, commerceId
         setIsSubmitting(true);
 
         try {
+            const devicesToUpdate = targetType === 'zone'
+                ? linkedDevices.filter(d => d.group_id === selectedZone)
+                : linkedDevices.filter(d => selectedScreens.includes(d.id));
+
+            if (devicesToUpdate.length === 0) {
+                toast.error('No hay pantallas en el destino seleccionado.');
+                setIsSubmitting(false);
+                return;
+            }
+
             if (isMultiple) {
-                // Crear campaña automáticamente en formato V2
-                const campaignName = `Lista Rápida ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
-                
                 const playlist = selectedAssets.map(asset => ({
                     id: crypto.randomUUID(),
                     type: asset.type === 'web' ? 'url' : asset.type,
@@ -53,7 +91,7 @@ export const SendToScreensModal = ({ isOpen, onClose, selectedAssets, commerceId
                 }));
 
                 const items_json = {
-                    version: '2.0',
+                    version: '2.0' as const,
                     settings: {
                         orientation: 'landscape',
                         background: { type: 'color', value: '#000000' },
@@ -67,14 +105,21 @@ export const SendToScreensModal = ({ isOpen, onClose, selectedAssets, commerceId
                     }]
                 };
 
-                const campaign = await createCampaign.mutateAsync({
-                    commerceId,
-                    name: campaignName,
-                    description: 'Generada desde la biblioteca de medios',
-                    items_json
-                });
-                
-                campaignIdToAssign = campaign.id;
+                // Si esas pantallas ya pasan una lista rápida, se reemplaza su
+                // contenido en vez de crear otra (antes se acumulaban listas sin usar).
+                const previous = reusableQuickList(devicesToUpdate, devices || []);
+                if (previous && !(await usedInSchedules(previous.id))) {
+                    await updateCampaign.mutateAsync({ id: previous.id, updates: { name: quickListName(), items_json: items_json as unknown as DisplayCampaign['items_json'] } });
+                    campaignIdToAssign = previous.id;
+                } else {
+                    const campaign = await createCampaign.mutateAsync({
+                        commerceId,
+                        name: quickListName(),
+                        description: QUICK_LIST_DESCRIPTION,
+                        items_json
+                    });
+                    campaignIdToAssign = campaign.id;
+                }
             } else {
                 if (selectedAssets[0].type === 'schedule') {
                     scheduleIdToAssign = selectedAssets[0].id;
@@ -83,17 +128,6 @@ export const SendToScreensModal = ({ isOpen, onClose, selectedAssets, commerceId
                 } else {
                     mediaIdToAssign = selectedAssets[0].id;
                 }
-            }
-
-            // Asignar
-            const devicesToUpdate = targetType === 'zone' 
-                ? linkedDevices.filter(d => d.group_id === selectedZone)
-                : linkedDevices.filter(d => selectedScreens.includes(d.id));
-
-            if (devicesToUpdate.length === 0) {
-                toast.error('No hay pantallas en el destino seleccionado.');
-                setIsSubmitting(false);
-                return;
             }
 
             const promises = devicesToUpdate.map(device => 
@@ -192,7 +226,7 @@ export const SendToScreensModal = ({ isOpen, onClose, selectedAssets, commerceId
 
                     {selectedAssets.length > 1 && (
                         <div className="bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 p-4 rounded-xl text-sm">
-                            <strong>Nota:</strong> Al seleccionar múltiples archivos, se creará automáticamente una Lista de Reproducción con estos medios para que vayan rotando en las pantallas elegidas.
+                            <strong>Nota:</strong> con varios archivos se arma una lista rápida que los pasa uno tras otro. Si la pantalla ya tenía una lista rápida, se reemplaza (no se acumulan listas).
                         </div>
                     )}
                 </div>

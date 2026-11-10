@@ -5,7 +5,8 @@ import { Bell, BellOff, CalendarClock, Megaphone, ChevronDown, FolderOpen, ListV
 import { Button } from '@/components/ui/button';
 import { useDisplayCampaigns, useDisplayDevices, useDisplaySchedules } from '@/hooks/use-display-hub';
 import { useDisplayMedia } from '@/hooks/use-display-media';
-import { describeAlertSchedule } from '@/lib/screenAlerts';
+import { describeAlertSchedule, formatOffSince, isLocalOpen } from '@/lib/screenAlerts';
+import { useCommerceHours } from '@/hooks/use-down-screens';
 import { describeContent, downText, isPortrait, screenName } from '@/lib/screenStatus';
 import { useAlertSettings } from '@/hooks/use-alert-settings';
 import { AlertSettingsModal } from '@/components/display/AlertSettingsModal';
@@ -73,6 +74,16 @@ export default function WorkspaceDashboard() {
         .filter(d => d.derived_status !== 'online')
         .sort((a, b) => (b.last_seen || '').localeCompare(a.last_seen || ''));
     const downListed = showAllDown ? down : down.slice(0, MAX_DOWN_LISTED);
+
+    // Fuera del horario del local una pantalla sin señal está apagada (la
+    // desenchufan al cerrar): se muestra en gris, sin "Qué hacer".
+    const { data: commerceHours } = useCommerceHours(commerceId);
+    const localHours = commerceId ? commerceHours?.get(commerceId) : undefined;
+    const localOpen = isLocalOpen(localHours, now);
+    const isOff = (d: AnyDevice) => !localOpen && !!d.last_seen && d.derived_status !== 'online';
+    const statusText = (d: AnyDevice) => isOff(d)
+        ? `apagada ${formatOffSince(new Date(d.last_seen as string), now, localHours?.timezone || 'America/Argentina/Buenos_Aires')} (fuera de horario)`
+        : downText(d, nowMs);
 
     const files = media.filter(m => m.type !== 'folder');
     const images = files.filter(m => m.type === 'image' || m.type === 'image_ad').length;
@@ -171,7 +182,7 @@ export default function WorkspaceDashboard() {
                                 {screens.map((d, i) => (
                                     <span
                                         key={d.id}
-                                        className={`flex-1 ${d.derived_status === 'online' ? 'bg-emerald-500' : 'bg-amber-500'} ${i === 0 ? 'rounded-l-full' : ''} ${i === screens.length - 1 ? 'rounded-r-full' : ''}`}
+                                        className={`flex-1 ${d.derived_status === 'online' ? 'bg-emerald-500' : isOff(d) ? 'bg-slate-400 dark:bg-slate-600' : 'bg-amber-500'} ${i === 0 ? 'rounded-l-full' : ''} ${i === screens.length - 1 ? 'rounded-r-full' : ''}`}
                                     />
                                 ))}
                             </div>
@@ -180,19 +191,19 @@ export default function WorkspaceDashboard() {
                             ) : (
                                 <ul className="space-y-2">
                                     {downListed.map(d => (
-                                        <li key={d.id} className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2.5">
+                                        <li key={d.id} className={`rounded-xl border px-4 py-2.5 ${isOff(d) ? 'border-border bg-muted/40' : 'border-amber-500/40 bg-amber-500/10'}`}>
                                             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm">
                                                 <span className="font-semibold">{screenName(d)}</span>
-                                                <span className="text-amber-700 dark:text-amber-300">{downText(d, nowMs)}</span>
-                                                <button
+                                                <span className={isOff(d) ? 'text-muted-foreground' : 'text-amber-700 dark:text-amber-300'}>{statusText(d)}</span>
+                                                {!isOff(d) && <button
                                                     onClick={() => setOpenHelp(openHelp === d.id ? null : d.id)}
                                                     className="ml-auto flex items-center gap-1 font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
                                                     aria-expanded={openHelp === d.id}
                                                 >
                                                     Qué hacer <ChevronDown className={`w-3.5 h-3.5 transition-transform ${openHelp === d.id ? 'rotate-180' : ''}`} />
-                                                </button>
+                                                </button>}
                                             </div>
-                                            {openHelp === d.id && <WhatToDo device={d} />}
+                                            {openHelp === d.id && !isOff(d) && <WhatToDo device={d} />}
                                         </li>
                                     ))}
                                     {down.length > MAX_DOWN_LISTED && (
@@ -313,11 +324,11 @@ export default function WorkspaceDashboard() {
                                     <div className="p-4 flex-1 flex flex-col gap-3">
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-2">
-                                                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isOnline ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                                                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isOnline ? 'bg-emerald-500' : isOff(d) ? 'bg-slate-400 dark:bg-slate-600' : 'bg-amber-500'}`} />
                                                 <h3 className="font-semibold truncate">{screenName(d)}</h3>
                                             </div>
-                                            <p className={`text-sm mt-0.5 ${isOnline ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-300'}`}>
-                                                {isOnline ? 'En línea' : downText(d, nowMs).replace(/^./, c => c.toUpperCase())}
+                                            <p className={`text-sm mt-0.5 ${isOnline ? 'text-emerald-600 dark:text-emerald-400' : isOff(d) ? 'text-muted-foreground' : 'text-amber-700 dark:text-amber-300'}`}>
+                                                {isOnline ? 'En línea' : statusText(d).replace(/^./, c => c.toUpperCase())}
                                             </p>
                                             <p className="text-sm text-muted-foreground truncate mt-1">{content.detail}</p>
                                         </div>
