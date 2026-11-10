@@ -22,6 +22,7 @@ export interface AlertDevice {
 export interface DownScreen {
     id: string;
     name: string;
+    commerceId: string | null;
     commerceName: string | null;
     lastSeen: Date;
     downForMs: number;
@@ -35,6 +36,7 @@ export function findDownScreens(devices: AlertDevice[] | null | undefined, now: 
             return {
                 id: d.id,
                 name: d.name || (d.device_id ? `Pantalla ${d.device_id}` : 'Pantalla'),
+                commerceId: d.commerce_id || null,
                 commerceName: d.commerce?.name || null,
                 lastSeen,
                 downForMs: now - lastSeen.getTime(),
@@ -82,3 +84,66 @@ export function describeAlertSchedule(s: { alert_days: number[]; alert_from: str
     return `${dayText}, de ${hour(s.alert_from)} a ${hour(s.alert_to)} h`;
 }
 
+
+// Horario del local (el mismo de los avisos por email). Desde el panel no se
+// puede saber si una pantalla sin señal se desenchufó o perdió el Wi-Fi: en los
+// dos casos deja de mandar latido. Por eso, fuera del horario del local una
+// pantalla sin señal se muestra como "apagada" (en gris) y no como caída.
+export interface LocalHours {
+    days: number[]; // 0 = domingo
+    from: string; // "09:00:00"
+    to: string;
+    timezone: string;
+}
+
+const toMinutes = (t: string) => {
+    const [h, m] = hhmm(t).split(':').map(Number);
+    return (h || 0) * 60 + (m || 0);
+};
+
+// Día (0 = domingo) y minutos desde las 0 h en la zona horaria del local.
+function localDayAndMinutes(date: Date, timezone: string): { day: number; minutes: number } {
+    try {
+        const parts = new Intl.DateTimeFormat('en-US', {
+            timeZone: timezone, weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+        }).formatToParts(date);
+        const get = (type: string) => parts.find(p => p.type === type)?.value || '';
+        const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(get('weekday'));
+        return { day, minutes: Number(get('hour')) * 60 + Number(get('minute')) };
+    } catch {
+        return { day: date.getDay(), minutes: date.getHours() * 60 + date.getMinutes() };
+    }
+}
+
+// Margen al abrir para que prendan las pantallas (igual que los emails).
+export const OPENING_GRACE_MIN = 30;
+
+// ¿Está abierto el local? Sin horario cargado se avisa siempre (como antes).
+export function isLocalOpen(hours: LocalHours | null | undefined, now: Date): boolean {
+    if (!hours) return true;
+    const { day, minutes } = localDayAndMinutes(now, hours.timezone);
+    if (!hours.days.includes(day)) return false;
+    return minutes >= toMinutes(hours.from) + OPENING_GRACE_MIN && minutes < toMinutes(hours.to);
+}
+
+// "desde hoy 09:10", "desde anoche 22:10", "desde ayer 15:00", "desde el 08/11 22:10".
+export function formatOffSince(lastSeen: Date, now: Date, timezone: string): string {
+    let time: string;
+    let dayKey: (d: Date) => string;
+    try {
+        time = new Intl.DateTimeFormat('es-AR', { timeZone: timezone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(lastSeen);
+        const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' });
+        dayKey = d => fmt.format(d);
+    } catch {
+        time = lastSeen.toTimeString().slice(0, 5);
+        dayKey = d => d.toDateString();
+    }
+    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    if (dayKey(lastSeen) === dayKey(now)) return `desde hoy ${time}`;
+    if (dayKey(lastSeen) === dayKey(yesterday)) {
+        const hour = Number(time.slice(0, 2));
+        return hour >= 19 ? `desde anoche ${time}` : `desde ayer ${time}`;
+    }
+    const [, mm, dd] = dayKey(lastSeen).split('-');
+    return dd && mm ? `desde el ${dd}/${mm} ${time}` : `desde ${time}`;
+}

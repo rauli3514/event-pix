@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, X } from 'lucide-react';
+import { AlertTriangle, Moon, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDownScreensState } from '@/hooks/use-down-screens';
-import { downScreensKey, formatDownFor } from '@/lib/screenAlerts';
+import { DownScreen, LocalHours, downScreensKey, formatDownFor, formatOffSince, hhmm } from '@/lib/screenAlerts';
 
 const HIDDEN_KEY = 'display_down_alert_hidden';
+const OFF_HIDDEN_KEY = 'display_off_notice_hidden';
 const MAX_LISTED = 4;
 
 interface Props {
@@ -20,10 +21,14 @@ interface Props {
 // Cartel arriba del panel con las pantallas caídas, aviso emergente cuando se
 // cae una mientras el panel está abierto y contador en el título de la pestaña.
 export function ScreenDownAlert({ commerceId, showCommerce, className = 'mx-4 mt-4 md:mx-8', hideBanner }: Props) {
-    const { screens: down, loaded } = useDownScreensState(commerceId);
+    const { screens: down, offScreens, hours, loaded } = useDownScreensState(commerceId);
     const key = downScreensKey(down);
     const [hiddenKey, setHiddenKey] = useState(() => {
         try { return sessionStorage.getItem(HIDDEN_KEY) || ''; } catch { return ''; }
+    });
+    const offKey = downScreensKey(offScreens);
+    const [offHiddenKey, setOffHiddenKey] = useState(() => {
+        try { return sessionStorage.getItem(OFF_HIDDEN_KEY) || ''; } catch { return ''; }
     });
 
     // Aviso emergente solo para las que se caen con el panel abierto: la primera
@@ -52,18 +57,31 @@ export function ScreenDownAlert({ commerceId, showCommerce, className = 'mx-4 mt
         return () => { document.title = document.title.replace(/^\(\d+\) /, ''); };
     }, [down.length]);
 
-    if (hideBanner || down.length === 0 || key === hiddenKey) return null;
+    if (hideBanner) return null;
+    const showDown = down.length > 0 && key !== hiddenKey;
+    const showOff = offScreens.length > 0 && offKey !== offHiddenKey;
+    if (!showDown && !showOff) return null;
 
     const hide = () => {
         setHiddenKey(key);
         try { sessionStorage.setItem(HIDDEN_KEY, key); } catch { /* sin almacenamiento */ }
     };
+    const hideOff = () => {
+        setOffHiddenKey(offKey);
+        try { sessionStorage.setItem(OFF_HIDDEN_KEY, offKey); } catch { /* sin almacenamiento */ }
+    };
+
+    const offNotice = showOff ? (
+        <OffScreensNotice screens={offScreens} hours={hours} showCommerce={showCommerce} onHide={hideOff} />
+    ) : null;
+    if (!showDown) return <div className={className}>{offNotice}</div>;
 
     const listed = down.slice(0, MAX_LISTED);
     const more = down.length - listed.length;
 
     return (
-        <div className={`${className} rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm relative z-10`}>
+        <div className={className}>
+        <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm relative z-10">
             <div className="flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
@@ -87,6 +105,52 @@ export function ScreenDownAlert({ commerceId, showCommerce, className = 'mx-4 mt
                     </p>
                 </div>
                 <button onClick={hide} className="text-muted-foreground hover:text-foreground p-1 -m-1" title="Ocultar hasta que se caiga otra">
+                    <X className="w-4 h-4" />
+                </button>
+            </div>
+        </div>
+        {offNotice && <div className="mt-2">{offNotice}</div>}
+        </div>
+    );
+}
+
+// Pantallas sin señal fuera del horario del local: lo normal es que las
+// desenchufen al cerrar, así que se muestran en gris y sin alarma.
+function OffScreensNotice({ screens, hours, showCommerce, onHide }: {
+    screens: DownScreen[];
+    hours: Map<string, LocalHours> | null;
+    showCommerce?: boolean;
+    onHide: () => void;
+}) {
+    const now = new Date();
+    const listed = screens.slice(0, MAX_LISTED);
+    const more = screens.length - listed.length;
+    const local = (s: DownScreen) => (s.commerceId ? hours?.get(s.commerceId) : undefined);
+    const first = local(listed[0]);
+    return (
+        <div className="rounded-xl border border-border bg-muted/40 px-4 py-2.5 text-sm relative z-10">
+            <div className="flex items-start gap-3">
+                <Moon className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                    <ul className="space-y-0.5">
+                        {listed.map(screen => (
+                            <li key={screen.id} className="text-muted-foreground truncate">
+                                <Link to={`/admin/display/${screen.id}`} className="font-medium text-foreground/80 hover:underline">
+                                    {screen.name}
+                                </Link>
+                                {showCommerce && screen.commerceName ? <span> · {screen.commerceName}</span> : null}
+                                <span> · apagada {formatOffSince(screen.lastSeen, now, local(screen)?.timezone || 'America/Argentina/Buenos_Aires')}</span>
+                            </li>
+                        ))}
+                        {more > 0 && <li className="text-muted-foreground">y {more} más</li>}
+                    </ul>
+                    {!showCommerce && first && (
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                            Fuera del horario del local ({hhmm(first.from)} a {hhmm(first.to)} h). Si sigue sin señal al abrir, te avisamos.
+                        </p>
+                    )}
+                </div>
+                <button onClick={onHide} className="text-muted-foreground hover:text-foreground p-1 -m-1" title="Ocultar">
                     <X className="w-4 h-4" />
                 </button>
             </div>
