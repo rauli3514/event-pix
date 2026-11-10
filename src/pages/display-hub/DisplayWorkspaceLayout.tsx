@@ -57,6 +57,10 @@ const MENU_GROUPS: { title: string; items: MenuItem[] }[] = [
   },
 ];
 
+// Asistente IA (botón flotante): responde con OpenAI y la cuenta no tiene
+// crédito, así que queda apagado. Para volver a mostrarlo, poner true.
+const AI_ASSISTANT_ENABLED = false;
+
 const MORE_ITEMS: MenuItem[] = [
   { id: 'labels', label: 'Etiquetas', icon: Database, path: 'labels' },
   { id: 'ai-knowledge', label: 'Conocimiento IA', icon: Bot, path: 'ai-knowledge' },
@@ -282,7 +286,7 @@ export default function DisplayWorkspaceLayout() {
       </main>
 
       {/* Floating AI Button */}
-      {!isAIPanelOpen && (
+      {AI_ASSISTANT_ENABLED && !isAIPanelOpen && (
         <button
           onClick={() => setIsAIPanelOpen(true)}
           className="fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-2xl hover:bg-indigo-700 hover:scale-105 transition-all flex items-center justify-center z-40 group border-4 border-white/10"
@@ -292,7 +296,7 @@ export default function DisplayWorkspaceLayout() {
       )}
 
       {/* AI Assistant Panel */}
-      <AIAssistantPanel isOpen={isAIPanelOpen} onClose={() => setIsAIPanelOpen(false)} />
+      {AI_ASSISTANT_ENABLED && <AIAssistantPanel isOpen={isAIPanelOpen} onClose={() => setIsAIPanelOpen(false)} />}
 
       {/* Bluetooth Setup Modal */}
       <BluetoothProvisioningModal 
