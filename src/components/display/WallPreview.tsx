@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { isPortrait } from '@/lib/screenStatus';
 
-// Vista previa del Mosaico en "Enviar a pantallas": la imagen recortada tal
-// como va a salir (las TV la estiran para llenar todo el mosaico, "cover"),
+// Vista previa del Mosaico en "Enviar a pantallas": la imagen tal como va a
+// salir (llenando todo el mosaico y recortada, o completa con franjas negras),
 // con las líneas de corte y el número y nombre de cada pantalla en su lugar.
 
 interface Props {
@@ -12,12 +12,14 @@ interface Props {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     screens: any[];
     imageUrl: string | null;
+    // 'cover': llena y recorta. 'contain': completa, con franjas negras.
+    fit?: 'cover' | 'contain';
 }
 
 const SCREEN_LONG = 1920;
 const SCREEN_SHORT = 1080;
 
-export function WallPreview({ cols, rows, screens, imageUrl }: Props) {
+export function WallPreview({ cols, rows, screens, imageUrl, fit = 'cover' }: Props) {
     const [natural, setNatural] = useState<{ url: string; w: number; h: number } | null>(null);
 
     // Forma de cada pantalla: si son mezcla, se toma la de la primera y se avisa.
@@ -37,6 +39,9 @@ export function WallPreview({ cols, rows, screens, imageUrl }: Props) {
         const lost = imgAspect > wallAspect ? 1 - wallAspect / imgAspect : 1 - imgAspect / wallAspect;
         const pct = Math.round(lost * 100);
         if (pct < 5) cropText = 'Entra completa.';
+        else if (fit === 'contain') cropText = imgAspect > wallAspect
+            ? `Se ve completa, con franjas negras arriba y abajo (${pct} % del mosaico).`
+            : `Se ve completa, con franjas negras a los costados (${pct} % del mosaico).`;
         else cropText = imgAspect > wallAspect
             ? `Se recortan los costados (se pierde un ${pct} %).`
             : `Se recorta arriba y abajo (se pierde un ${pct} %).`;
@@ -51,7 +56,7 @@ export function WallPreview({ cols, rows, screens, imageUrl }: Props) {
                         <img
                             src={imageUrl}
                             alt=""
-                            className="absolute inset-0 h-full w-full object-cover"
+                            className={`absolute inset-0 h-full w-full ${fit === 'contain' ? 'object-contain' : 'object-cover'}`}
                             onLoad={e => setNatural({ url: imageUrl, w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
                         />
                     ) : (

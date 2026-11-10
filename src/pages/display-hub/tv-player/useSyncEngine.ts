@@ -49,7 +49,7 @@ const deviceConfigSignature = (d: Record<string, unknown> | null | undefined) =>
 export interface SyncState {
     mode: 'mirror' | 'wave' | 'wall';
     offsetS: number;
-    wall: { cols: number; rows: number; index: number } | null;
+    wall: { cols: number; rows: number; index: number; fit: 'cover' | 'contain' } | null;
 }
 
 // Modo de sincronización de la asignación (null = cada pantalla a su ritmo).
@@ -63,7 +63,8 @@ function readSync(assignment: any): SyncState | null {
         const index = Number(assignment.wall_index);
         const valid = cols >= 1 && rows >= 1 && Number.isInteger(index) && index >= 0 && index < cols * rows;
         // Sin datos de mosaico válidos se muestra completa, en espejo.
-        return { mode: valid ? 'wall' : 'mirror', offsetS: 0, wall: valid ? { cols, rows, index } : null };
+        const fit = assignment.wall_fit === 'contain' ? 'contain' : 'cover';
+        return { mode: valid ? 'wall' : 'mirror', offsetS: 0, wall: valid ? { cols, rows, index, fit } : null };
     }
     return { mode, offsetS: mode === 'wave' ? Number(assignment.sync_offset_s) || 0 : 0, wall: null };
 }
