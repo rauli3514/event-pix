@@ -32,5 +32,11 @@ export function describeContent(d: AnyDevice, now: Date) {
     const sync = d.assignment?.sync_mode;
     if (sync === 'mirror') detail += ' · en espejo';
     else if (sync === 'wave') detail += d.assignment?.sync_offset_s ? ` · en olas (+${d.assignment.sync_offset_s} s)` : ' · en olas (primera)';
+    else if (sync === 'wall') {
+        const a = d.assignment;
+        detail += a?.wall_cols && a?.wall_rows
+            ? ` · mosaico ${a.wall_cols}×${a.wall_rows} (pantalla ${(Number(a.wall_index) || 0) + 1} de ${a.wall_cols * a.wall_rows})`
+            : ' · en mosaico';
+    }
     return { title, detail, cover: items[0] || null, campaignId: d.assignment?.campaign_id || null, scheduleId: d.assignment?.schedule_id || null, campaignNowId: campaign?.id || null };
 }

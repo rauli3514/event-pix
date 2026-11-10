@@ -391,13 +391,15 @@ export const useUpdateDisplayDevice = () => {
     });
 };
 
-export type SyncMode = 'mirror' | 'wave';
+export type SyncMode = 'mirror' | 'wave' | 'wall';
+// Mosaico: forma (columnas × filas) y lugar de esta pantalla (0 = arriba a la izquierda).
+export interface WallSpot { cols: number; rows: number; index: number }
 
 export const useAssignContentToDevice = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ deviceId, campaignId, mediaId, scheduleId, startTime, endTime, syncMode, syncOffsetS }: { deviceId: string; campaignId?: string | null; mediaId?: string | null; scheduleId?: string | null; startTime?: string | null; endTime?: string | null; syncMode?: SyncMode | null; syncOffsetS?: number }) => {
+        mutationFn: async ({ deviceId, campaignId, mediaId, scheduleId, startTime, endTime, syncMode, syncOffsetS, wall }: { deviceId: string; campaignId?: string | null; mediaId?: string | null; scheduleId?: string | null; startTime?: string | null; endTime?: string | null; syncMode?: SyncMode | null; syncOffsetS?: number; wall?: WallSpot | null }) => {
             await supabase.from("display_assignments").delete().eq("device_id", deviceId);
 
             const base = {
@@ -415,12 +417,16 @@ export const useAssignContentToDevice = () => {
                 .single();
 
             // Espejo / Olas (ver la migración display_sync_modes).
-            let { data, error } = syncMode
-                ? await insert({ ...base, sync_mode: syncMode, sync_offset_s: Math.max(0, Math.round(syncOffsetS || 0)) })
-                : await insert(base);
-            // Si la base todavía no tiene esas columnas, se manda igual sin sincronizar.
+            const syncFields: Record<string, unknown> = syncMode
+                ? { sync_mode: syncMode, sync_offset_s: Math.max(0, Math.round(syncOffsetS || 0)) }
+                : {};
+            if (syncMode === 'wall' && wall) {
+                Object.assign(syncFields, { wall_cols: wall.cols, wall_rows: wall.rows, wall_index: wall.index });
+            }
+            let { data, error } = syncMode ? await insert({ ...base, ...syncFields }) : await insert(base);
+            // Si la base todavía no tiene esas columnas (o el modo), se manda igual sin sincronizar.
             let syncSkipped = false;
-            if (error && syncMode && /sync_mode|sync_offset_s|column/i.test(error.message || '')) {
+            if (error && syncMode && /sync_mode|sync_offset_s|wall_|column|check constraint/i.test(error.message || '')) {
                 ({ data, error } = await insert(base));
                 syncSkipped = !error;
             }

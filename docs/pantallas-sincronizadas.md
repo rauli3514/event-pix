@@ -1,4 +1,4 @@
-# Pantallas sincronizadas: Espejo y Olas
+# Pantallas sincronizadas: Espejo, Olas y Mosaico
 
 Al mandar contenido a **dos o más pantallas** desde "Enviar a pantallas" (Medios, Playlists
 o Programación) se elige cómo se ven:
@@ -7,8 +7,16 @@ o Programación) se elige cómo se ven:
 - **Olas:** la misma lista, cada pantalla unos segundos después de la anterior. Se elige
   cuántos segundos y el orden (flechas). Con el mismo tiempo que dura cada foto, cada
   pantalla muestra una foto distinta y la "ola" recorre la fila.
+- **Mosaico:** una imagen repartida entre todas (2×1, 4×1, 2×2…, según cuántas sean). Se
+  elige la forma y el lugar de cada pantalla (flechas; se ve un dibujito de cómo queda). La
+  imagen llena todo el mosaico: si no tiene su misma forma, se recorta. Con pantallas
+  horizontales de 1920×1080 la imagen ideal mide columnas × 1920 por filas × 1080 (2×1:
+  3840×1080). Las pantallas van en espejo, así que las fotos cambian juntas. Con videos
+  funciona, pero cada TV reproduce su pedazo y puede notarse alguna décima de diferencia.
+  Pantallas de distinto tamaño físico no van a calzar perfecto.
 
-En Inicio, cada pantalla muestra "· en espejo" o "· en olas (+10 s)" junto a su contenido.
+En Inicio, cada pantalla muestra "· en espejo", "· en olas (+10 s)" o "· mosaico 2×1
+(pantalla 1 de 2)" junto a su contenido.
 
 ## Cómo funciona
 
@@ -49,7 +57,7 @@ Correr una vez en el SQL Editor el archivo
 
 Sin ese paso el contenido se manda igual, pero sin sincronizar, y el panel avisa que falta.
 
-## Próximo: Mosaico
-
-Una imagen repartida entre varias pantallas (2×1, 4×1, 2×2). Usa esta misma
-sincronización; primero con fotos y después con videos, probando con TV reales.
+Para el Mosaico hay un segundo paso: correr también
+`supabase/migrations/20261111000000_display_wall.sql` (suma el modo y las columnas
+`wall_cols`, `wall_rows`, `wall_index`). Sin él, el mosaico se manda sin sincronizar y el
+panel avisa.

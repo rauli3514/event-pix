@@ -197,9 +197,13 @@ export interface DisplayAssignment {
     start_time: string | null;
     end_time: string | null;
     created_at: string;
-    // Pantallas sincronizadas: Espejo ('mirror') u Olas ('wave', atrasada sync_offset_s).
-    sync_mode?: 'mirror' | 'wave' | null;
+    // Pantallas sincronizadas: Espejo ('mirror'), Olas ('wave', atrasada sync_offset_s)
+    // o Mosaico ('wall': su pedazo wall_index de un mosaico wall_cols × wall_rows).
+    sync_mode?: 'mirror' | 'wave' | 'wall' | null;
     sync_offset_s?: number | null;
+    wall_cols?: number | null;
+    wall_rows?: number | null;
+    wall_index?: number | null;
     
     // Relations
     campaign?: DisplayCampaign;
