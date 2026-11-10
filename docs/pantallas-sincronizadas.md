@@ -14,6 +14,9 @@ o Programación) se elige cómo se ven:
   3840×1080). Las pantallas van en espejo, así que las fotos cambian juntas. Con videos
   funciona, pero cada TV reproduce su pedazo y puede notarse alguna décima de diferencia.
   Pantallas de distinto tamaño físico no van a calzar perfecto.
+  La ventana muestra una **vista previa**: la primera foto recortada tal como va a salir
+  (según si las pantallas son horizontales o verticales), con el corte y el lugar de cada
+  pantalla, el tamaño ideal y cuánto se recorta de la imagen elegida.
 
 En Inicio, cada pantalla muestra "· en espejo", "· en olas (+10 s)" o "· mosaico 2×1
 (pantalla 1 de 2)" junto a su contenido.

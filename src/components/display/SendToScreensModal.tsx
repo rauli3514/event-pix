@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Send, Monitor, Layers, ChevronUp, ChevronDown } from 'lucide-react';
 import { useDisplayDevices, useDisplayGroups, useAssignContentToDevice, useCreateCampaign, useUpdateCampaign, SyncMode } from '@/hooks/use-display-hub';
 import { supabase } from '@/lib/supabase';
+import { WallPreview } from '@/components/display/WallPreview';
+import { previewImageOf } from '@/lib/wallPreview';
 import type { DisplayCampaign } from '@/types/display';
 import { toast } from 'sonner';
 
@@ -335,18 +337,8 @@ export const SendToScreensModal = ({ isOpen, onClose, selectedAssets, commerceId
                                             );
                                         })}
                                     </div>
-                                    {/* Cómo queda armado: cada recuadro es una pantalla, en su lugar. */}
-                                    <div
-                                        className="grid gap-1 rounded-lg bg-slate-950 p-1"
-                                        style={{ gridTemplateColumns: `repeat(${wallShape.cols}, minmax(0, 1fr))` }}
-                                    >
-                                        {targets.map((device, i) => (
-                                            <div key={device.id} className="aspect-video rounded bg-gradient-to-br from-orange-500/25 to-indigo-500/25 border border-slate-700 flex flex-col items-center justify-center p-1 text-center">
-                                                <span className="text-xs font-semibold text-white">{i + 1}</span>
-                                                <span className="text-[10px] text-slate-300 truncate max-w-full">{device.name}</span>
-                                            </div>
-                                        ))}
-                                    </div>
+                                    {/* Cómo queda: la foto recortada como en las TV, con el lugar de cada pantalla. */}
+                                    <WallPreview cols={wallShape.cols} rows={wallShape.rows} screens={targets} imageUrl={previewImageOf(selectedAssets)} />
                                     <ol className="space-y-1">
                                         {targets.map((device, i) => (
                                             <li key={device.id} className="flex items-center gap-2 text-sm">
@@ -361,9 +353,6 @@ export const SendToScreensModal = ({ isOpen, onClose, selectedAssets, commerceId
                                             </li>
                                         ))}
                                     </ol>
-                                    <p className="text-xs text-slate-500">
-                                        Con pantallas horizontales, la imagen ideal mide {wallShape.cols * 1920} × {wallShape.rows * 1080} px. Si es de otra forma se recorta para llenar el mosaico.
-                                    </p>
                                 </div>
                             )}
                         </div>
