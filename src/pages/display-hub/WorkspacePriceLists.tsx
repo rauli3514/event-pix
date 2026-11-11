@@ -11,8 +11,10 @@ import { cn } from '@/lib/utils';
 import { usePriceLists, useCreatePriceList, useUpdatePriceList, useDeletePriceList } from '@/hooks/use-price-lists';
 import { useDisplayLabelGroups } from '@/hooks/use-display-labels';
 import {
-    PriceList, PriceListItem, emptyItem, formatPrice, increasePrice, newItemId, normalizeItemName, parsePastedList, parsePrice,
+    PriceList, PriceListItem, PriceListPromo, activePromo, emptyItem, formatPercent, formatPrice, formatRemaining, increasePrice,
+    formatEnd, newItemId, normalizeItemName, parsePastedList, parsePrice, promoPrice,
 } from '@/lib/priceLists';
+import { useNow } from '@/hooks/use-now';
 
 // Listas de precios: el comerciante carga sus precios una vez ("Pizzas",
 // "Oferta de la tarde") y se actualizan en todas las pantallas que los usan.
@@ -175,6 +177,23 @@ export default function WorkspacePriceLists() {
         }));
     };
 
+    // Descuento (o aumento) temporal: se guarda aparte, sin tocar los precios.
+    const now = useNow(30000);
+    const promo = activePromo(selected, now);
+    const setPromo = async (next: PriceListPromo | null) => {
+        if (!selected || !commerceId) return false;
+        try {
+            await updateList.mutateAsync({ commerceId, id: selected.id, promo: next });
+            toast.success(next ? `Listo: ${formatPercent(next.percent)} hasta ${formatEnd(next.endsAt)}. Las pantallas lo toman en menos de un minuto.` : 'Volvieron los precios de siempre.');
+            return true;
+        } catch (e) {
+            toast.error((e as Error).message === 'promo_missing'
+                ? 'Falta un paso en Supabase: correr supabase/migrations/20261114000000_display_price_list_promo.sql en el SQL Editor.'
+                : 'No se pudo guardar. Revisá la conexión y probá de nuevo.');
+            return false;
+        }
+    };
+
     const base = `/admin/display/commerce/${commerceId}/workspace`;
 
     return (
@@ -213,7 +232,10 @@ export default function WorkspacePriceLists() {
                                             active ? 'border-indigo-500 bg-indigo-500/10' : 'border-border bg-card hover:bg-muted'
                                         )}
                                     >
-                                        <span className={cn('block font-semibold truncate', active && 'text-indigo-600 dark:text-indigo-400')}>{list.name}</span>
+                                        <span className={cn('flex items-center gap-1.5 font-semibold', active && 'text-indigo-600 dark:text-indigo-400')}>
+                                            <span className="truncate">{list.name}</span>
+                                            {activePromo(list, now) && <span className="shrink-0 rounded-full bg-rose-600 px-1.5 py-0.5 text-[10px] font-bold text-white">{formatPercent(list.promo!.percent)}</span>}
+                                        </span>
                                         <span className="block text-xs text-muted-foreground">{count} {count === 1 ? 'producto' : 'productos'}</span>
                                     </button>
                                 );
@@ -261,6 +283,17 @@ export default function WorkspacePriceLists() {
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             </div>
+
+                            {promo && (
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-rose-500/10 px-4 py-3 text-sm">
+                                    <span className="inline-flex items-center justify-center rounded-full bg-rose-600 px-2.5 py-1 text-xs font-extrabold text-white">{formatPercent(promo.percent)}</span>
+                                    <span className="flex-1 min-w-[12rem]">
+                                        <strong>{promo.percent < 0 ? 'Descuento activo' : 'Aumento temporal activo'}</strong> hasta {formatEnd(promo.endsAt)}
+                                        <span className="text-muted-foreground"> · faltan {formatRemaining(Date.parse(promo.endsAt) - now)}. Después vuelven solos los precios de siempre.</span>
+                                    </span>
+                                    <Button size="sm" variant="outline" onClick={() => setPromo(null)} disabled={updateList.isPending}>Terminar ahora</Button>
+                                </div>
+                            )}
 
                             {/* Barra: buscar y atajos */}
                             <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border">
@@ -320,6 +353,11 @@ export default function WorkspacePriceLists() {
                                                     className={cn(GHOST, 'h-8 md:h-9 w-28 md:w-32 text-right font-mono font-semibold')}
                                                     aria-label="Precio"
                                                 />
+                                                {promo && (
+                                                    <span className="w-20 shrink-0 text-right font-mono text-xs font-semibold text-rose-600 dark:text-rose-400" title="Precio mientras dura el descuento">
+                                                        {formatPrice(promoPrice(parsePrice(item.priceText), promo)) || '—'}
+                                                    </span>
+                                                )}
                                                 <button
                                                     type="button"
                                                     onClick={() => patchItem(item.id, { available: !item.available })}
@@ -381,6 +419,8 @@ export default function WorkspacePriceLists() {
                     onClose={() => setRaiseOpen(false)}
                     items={draft.items}
                     onApply={(percent, roundTo) => { applyIncrease(percent, roundTo); setRaiseOpen(false); }}
+                    onTemporary={async (percent, roundTo, endsAt) => { if (await setPromo({ percent, roundTo, startsAt: new Date().toISOString(), endsAt: endsAt.toISOString() })) setRaiseOpen(false); }}
+                    saving={updateList.isPending}
                 />
             )}
         </div>
@@ -425,46 +465,96 @@ function PasteListDialog({ open, onClose, onAdd }: { open: boolean; onClose: () 
     );
 }
 
-// Aumentar (o bajar) todos los precios de la lista en un %, redondeando hacia arriba.
-function RaisePricesDialog({ open, onClose, items, onApply }: {
+// Aumentar o bajar todos los precios de la lista en un %, redondeando hacia arriba.
+// Para siempre (cambia los precios) o solo por un tiempo (los precios no se
+// tocan: las pantallas muestran el original tachado y vuelve solo al terminar).
+const DURATIONS: { id: string; label: string; ends: (now: number) => Date }[] = [
+    { id: '1h', label: '1 hora', ends: now => new Date(now + 3600e3) },
+    { id: '2h', label: '2 horas', ends: now => new Date(now + 2 * 3600e3) },
+    { id: '4h', label: '4 horas', ends: now => new Date(now + 4 * 3600e3) },
+    { id: 'today', label: 'Hasta el final del día', ends: now => { const d = new Date(now); d.setHours(23, 59, 0, 0); return d; } },
+    { id: '24h', label: '24 horas', ends: now => new Date(now + 24 * 3600e3) },
+    { id: '7d', label: '7 días', ends: now => new Date(now + 7 * 24 * 3600e3) },
+];
+
+const toLocalInput = (d: Date) => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+function RaisePricesDialog({ open, onClose, items, onApply, onTemporary, saving }: {
     open: boolean;
     onClose: () => void;
     items: DraftItem[];
     onApply: (percent: number, roundTo: number) => void;
+    onTemporary: (percent: number, roundTo: number, endsAt: Date) => void;
+    saving?: boolean;
 }) {
-    const [percentText, setPercentText] = useState('10');
+    const [percentText, setPercentText] = useState('-10');
     const [roundTo, setRoundTo] = useState(50);
-    const percent = Number(percentText.replace(',', '.'));
+    const [mode, setMode] = useState<'temporary' | 'permanent'>('temporary');
+    const [duration, setDuration] = useState('2h');
+    const now = useNow(30000);
+    const [customEnd, setCustomEnd] = useState(() => toLocalInput(new Date(Date.now() + 3 * 3600e3)));
+    const percent = Number(percentText.replace(',', '.').replace(/\s/g, ''));
     const valid = Number.isFinite(percent) && percent !== 0 && percent > -100;
+    const endsAt = duration === 'custom' ? new Date(customEnd) : DURATIONS.find(d => d.id === duration)!.ends(now);
+    const endValid = mode === 'permanent' || (Number.isFinite(endsAt.getTime()) && endsAt.getTime() > now + 60e3);
     const sample = items.filter(i => parsePrice(i.priceText) !== null).slice(0, 4);
+    const chip = (active: boolean) => cn('rounded-full border px-3 py-1 text-xs', active ? 'border-indigo-500 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' : 'border-border');
     return (
         <Dialog open={open} onOpenChange={o => { if (!o) onClose(); }}>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-md max-h-[92dvh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>Aumentar precios</DialogTitle>
+                    <DialogTitle>Aumentar o bajar precios</DialogTitle>
                     <DialogDescription>Cambia todos los precios de la lista de una vez. Para bajarlos, poné un número negativo (ej: -10).</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-1 rounded-xl bg-muted p-1 text-sm">
+                        {([['temporary', 'Solo por un tiempo'], ['permanent', 'Para siempre']] as const).map(([id, label]) => (
+                            <button key={id} type="button" onClick={() => setMode(id)}
+                                className={cn('rounded-lg py-2 font-medium', mode === id ? 'bg-background shadow-sm' : 'text-muted-foreground')}>
+                                {label}
+                            </button>
+                        ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                        {mode === 'temporary'
+                            ? 'Los precios de la lista no se tocan. Mientras dura, las pantallas muestran el precio de antes tachado, el nuevo y un cartelito con el %; cuando termina vuelve solo. Lo podés terminar antes cuando quieras.'
+                            : 'Cambia los precios de la lista; después tocás Guardar.'}
+                    </p>
                     <label className="flex items-center gap-3 text-sm">
                         <span className="w-28">Porcentaje</span>
                         <Input value={percentText} onChange={e => setPercentText(e.target.value)} inputMode="decimal" className="w-24 text-right" />
                         <span>%</span>
                     </label>
-                    <div className="flex items-center gap-3 text-sm">
-                        <span className="w-28">Redondear a</span>
+                    <div className="flex items-start gap-3 text-sm">
+                        <span className="w-28 pt-1">Redondear a</span>
                         <div className="flex flex-wrap gap-1.5">
                             {ROUND_OPTIONS.map(r => (
-                                <button
-                                    key={r}
-                                    type="button"
-                                    onClick={() => setRoundTo(r)}
-                                    className={cn('rounded-full border px-3 py-1 text-xs', roundTo === r ? 'border-indigo-500 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' : 'border-border')}
-                                >
+                                <button key={r} type="button" onClick={() => setRoundTo(r)} className={chip(roundTo === r)}>
                                     {r === 1 ? 'Sin redondear' : `$ ${r}`}
                                 </button>
                             ))}
                         </div>
                     </div>
+                    {mode === 'temporary' && (
+                        <div className="flex items-start gap-3 text-sm">
+                            <span className="w-28 pt-1">Por cuánto</span>
+                            <div className="flex-1 space-y-2">
+                                <div className="flex flex-wrap gap-1.5">
+                                    {DURATIONS.map(d => (
+                                        <button key={d.id} type="button" onClick={() => setDuration(d.id)} className={chip(duration === d.id)}>{d.label}</button>
+                                    ))}
+                                    <button type="button" onClick={() => setDuration('custom')} className={chip(duration === 'custom')}>Hasta…</button>
+                                </div>
+                                {duration === 'custom' && (
+                                    <Input type="datetime-local" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="w-56" aria-label="Termina" />
+                                )}
+                                <p className="text-xs text-muted-foreground">{endValid ? `Termina ${formatEnd(endsAt.toISOString())}.` : 'Elegí una fecha y hora que todavía no pasó.'}</p>
+                            </div>
+                        </div>
+                    )}
                     {valid && sample.length > 0 && (
                         <ul className="rounded-lg border border-border divide-y divide-border text-sm">
                             {sample.map(item => {
@@ -473,18 +563,22 @@ function RaisePricesDialog({ open, onClose, items, onApply }: {
                                     <li key={item.id} className="flex justify-between gap-3 px-3 py-1.5">
                                         <span className="truncate">{item.name || 'Sin nombre'}</span>
                                         <span className="font-mono whitespace-nowrap">
-                                            <span className="text-muted-foreground">{formatPrice(before)}</span> → <strong>{formatPrice(increasePrice(before, percent, roundTo))}</strong>
+                                            <span className={cn('text-muted-foreground', mode === 'temporary' && 'line-through')}>{formatPrice(before)}</span> → <strong>{formatPrice(increasePrice(before, percent, roundTo))}</strong>
                                         </span>
                                     </li>
                                 );
                             })}
                         </ul>
                     )}
-                    <p className="text-xs text-muted-foreground">Se aplica a la lista y después tocás Guardar.</p>
                 </div>
                 <div className="flex justify-end gap-2">
                     <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-                    <Button disabled={!valid} onClick={() => onApply(percent, roundTo)}>Aplicar</Button>
+                    <Button
+                        disabled={!valid || !endValid || saving}
+                        onClick={() => (mode === 'temporary' ? onTemporary(percent, roundTo, endsAt) : onApply(percent, roundTo))}
+                    >
+                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : mode === 'temporary' ? `Activar ${formatPercent(percent)}` : 'Aplicar'}
+                    </Button>
                 </div>
             </DialogContent>
         </Dialog>

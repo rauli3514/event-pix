@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useLivePriceLists } from '@/hooks/use-live-price-lists';
-import { formatPrice, type PriceList } from '@/lib/priceLists';
+import { activePromo, formatPrice, promoPrice, type PriceList, type PriceListPromo } from '@/lib/priceLists';
+import { serverNow } from '@/lib/serverClock';
 import {
     POSTER_FONTS, QR_DEFAULT_LABEL, fitList, parseQrUrl, posterColors, scheduleBadge,
     type PosterConfig, type PosterListRow as Row, type PosterPart, type PosterTemplate, type TextStyle,
@@ -52,6 +53,22 @@ function useClock(enabled: boolean) {
     return now;
 }
 
+// Hora para los descuentos temporales: se actualiza cada 15 s solo mientras
+// alguna lista del cartel tiene uno, así al terminar vuelve solo el precio de siempre.
+function usePromoClock(promos: (PriceListPromo | null | undefined)[]) {
+    const [now, setNow] = useState(() => serverNow());
+    const key = promos.map(p => p?.endsAt || '').join('|');
+    const hasPromo = promos.some(p => !!p?.endsAt);
+    useEffect(() => {
+        if (!hasPromo) return;
+        const tick = () => setNow(serverNow());
+        const first = setTimeout(tick, 0);
+        const id = setInterval(tick, 15000);
+        return () => { clearTimeout(first); clearInterval(id); };
+    }, [hasPromo, key]);
+    return now;
+}
+
 const abs = (s: CSSProperties): CSSProperties => ({ position: 'absolute', ...s });
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
 
@@ -75,16 +92,32 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList, o
 
     // Renglones: la lista vinculada (sin los "sin stock") o el ejemplo de la plantilla.
     const list = config.listId ? lists.find(l => l.id === config.listId) : undefined;
+    // Descuento (o aumento) temporal de la lista: precio nuevo y, si baja, el de antes tachado.
+    const priceRefList = config.priceRef ? lists.find(l => l.id === config.priceRef?.listId) : undefined;
+    const promoClock = usePromoClock([list?.promo, priceRefList?.promo]);
+    const listPromo = activePromo(list, promoClock);
+    const refPromo = activePromo(priceRefList, promoClock);
+    const shownPrice = (p: number | null, promo: PriceListPromo | null) => {
+        const now = formatPrice(promoPrice(p, promo));
+        const before = formatPrice(p);
+        return { price: now, oldPrice: promo && promo.percent < 0 && before && before !== now ? before : undefined };
+    };
     const rows: Row[] = list
-        ? (list.items || []).filter(i => i.available !== false && i.name).map(i => ({ name: i.name, detail: i.detail, price: formatPrice(i.price) }))
+        ? (list.items || []).filter(i => i.available !== false && i.name).map(i => ({ name: i.name, detail: i.detail, ...shownPrice(i.price, listPromo) }))
         : !config.listId && sampleList ? sampleList : [];
 
     // Precio grande: vinculado a un producto o escrito a mano.
     let price = config.price || '';
+    let oldPrice: string | undefined;
     if (config.priceRef) {
-        const item = lists.find(l => l.id === config.priceRef?.listId)?.items.find(i => i.id === config.priceRef?.itemId);
-        price = item && item.available !== false ? formatPrice(item.price) : '';
+        const item = priceRefList?.items.find(i => i.id === config.priceRef?.itemId);
+        const shown = item && item.available !== false ? shownPrice(item.price, refPromo) : null;
+        price = shown?.price || '';
+        oldPrice = shown?.oldPrice;
     }
+    // El cartelito "-10 %": solo con descuento (no con aumento) y si el cartel muestra esa lista.
+    const stickerPromo = config.showPromoBadge === false ? null
+        : [listPromo && rows.length ? listPromo : null, refPromo && price ? refPromo : null].find(p => p && p.percent < 0) || null;
     const badge = config.badge || (config.autoBadge ? scheduleBadge(config.schedule) : null) || '';
 
     const landscape = W / Math.max(1, H) >= 1.2;
@@ -205,6 +238,11 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList, o
         if (maxWidth && maxWidth > 0) size = Math.min(size, maxWidth / Math.max(1, price.length * priceFont.charEm));
         return wrap('price',
         <div style={{ marginTop: 2 * u, textAlign: align }}>
+            {oldPrice && (
+                <div style={{ fontSize: size * 0.36, lineHeight: 1.1, marginBottom: size * 0.06, color: config.styles?.price?.color || theme.accent, opacity: 0.75, textDecoration: 'line-through', fontFamily: priceFont.family, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                    {oldPrice}
+                </div>
+            )}
             <div
                 className={config.pricePulse ? 'poster-motion' : undefined}
                 style={{
@@ -252,7 +290,10 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList, o
                                     <div style={{ fontWeight: 700, lineHeight: 1.15, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', wordWrap: 'break-word' }}>{r.name}</div>
                                     {details && r.detail && <div style={{ fontSize: '0.62em', opacity: 0.7, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.detail}</div>}
                                 </div>
-                                <div style={{ fontWeight: 800, color: config.styles?.list?.color ? color : theme.accent, whiteSpace: 'nowrap' }}>{r.price}</div>
+                                <div style={{ fontWeight: 800, color: config.styles?.list?.color ? color : theme.accent, whiteSpace: 'nowrap' }}>
+                                    {r.oldPrice && <span style={{ fontSize: '0.7em', fontWeight: 600, opacity: 0.65, textDecoration: 'line-through', marginRight: '0.35em' }}>{r.oldPrice}</span>}
+                                    {r.price}
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -446,6 +487,24 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList, o
             {W > 0 && config.showClock && (
                 <div {...partHandlers('clock')} style={abs({ right: 3 * u, top: 3 * u, background: 'rgba(0,0,0,0.55)', color: config.styles?.clock?.color || '#fff', fontFamily: POSTER_FONTS.modern.family, fontWeight: 700, fontSize: 3 * u * scaleOf('clock'), padding: '0.2em 0.53em', borderRadius: 99, ...partStyle('clock') })}>
                     {now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                </div>
+            )}
+            {W > 0 && stickerPromo && (
+                <div {...partHandlers('promo')} style={abs({ right: 3 * u, top: (config.showClock ? 10 : 3) * u, ...partStyle('promo') })}>
+                    <div style={{
+                        width: 16 * u * scaleOf('promo'), height: 16 * u * scaleOf('promo'), borderRadius: '50%',
+                        background: config.styles?.promo?.color || '#e11d48', color: '#fff',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                        transform: 'rotate(-12deg)', boxShadow: `0 ${0.8 * u}px ${2.5 * u}px rgba(0,0,0,0.4)`,
+                        border: `${0.5 * u}px solid rgba(255,255,255,0.85)`, boxSizing: 'border-box',
+                        fontFamily: POSTER_FONTS.modern.family, textAlign: 'center',
+                        animation: entrance ? 'poster-pop 0.6s ease-out 0.9s both' : undefined,
+                    }}>
+                        <div style={{ fontSize: 4.6 * u * scaleOf('promo'), fontWeight: 900, lineHeight: 1 }}>−{Math.abs(stickerPromo.percent)}%</div>
+                        <div style={{ fontSize: 1.5 * u * scaleOf('promo'), fontWeight: 800, letterSpacing: '0.06em', marginTop: 0.4 * u }}>
+                            HASTA {new Date(stickerPromo.endsAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                        </div>
+                    </div>
                 </div>
             )}
             {W > 0 && config.qrUrl && (

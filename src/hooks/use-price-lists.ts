@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import type { PriceList, PriceListItem } from '@/lib/priceLists';
+import type { PriceList, PriceListItem, PriceListPromo } from '@/lib/priceLists';
 
 // Listas de precios del comercio (ver la migración display_price_lists).
 // Si la tabla todavía no existe (falta correr el paso en Supabase), `missing` es true.
@@ -49,17 +49,22 @@ export const useCreatePriceList = () => {
 export const useUpdatePriceList = () => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: async (p: { commerceId: string; id: string; name?: string; items?: PriceListItem[] }) => {
+        mutationFn: async (p: { commerceId: string; id: string; name?: string; items?: PriceListItem[]; promo?: PriceListPromo | null }) => {
             const updates: Record<string, unknown> = {};
             if (p.name !== undefined) updates.name = p.name.trim();
             if (p.items !== undefined) updates.items = p.items;
+            if (p.promo !== undefined) updates.promo = p.promo;
             const { data, error } = await supabase
                 .from('display_price_lists')
                 .update(updates)
                 .eq('id', p.id)
                 .select()
                 .single();
-            if (error) throw error;
+            if (error) {
+                // Falta correr 20261114000000_display_price_list_promo.sql.
+                if (p.promo !== undefined && /promo/i.test(error.message || '')) throw new Error('promo_missing');
+                throw error;
+            }
             return data as PriceList;
         },
         onSuccess: (_, p) => invalidate(queryClient, p.commerceId),
