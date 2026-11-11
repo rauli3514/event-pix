@@ -4,7 +4,7 @@ import { useLivePriceLists } from '@/hooks/use-live-price-lists';
 import { formatPrice, type PriceList } from '@/lib/priceLists';
 import {
     POSTER_FONTS, QR_DEFAULT_LABEL, fitList, parseQrUrl, posterColors, scheduleBadge,
-    type PosterConfig, type PosterListRow as Row, type PosterTemplate, type TextStyle,
+    type PosterConfig, type PosterListRow as Row, type PosterPart, type PosterTemplate, type TextStyle,
 } from '@/lib/posters';
 
 // Dibuja un cartel (ver lib/posters). Todo se mide en "u" = 1 % del lado corto
@@ -20,6 +20,12 @@ interface Props {
     sampleList?: PosterTemplate['sampleList'];
     // Editor: la tarjeta se puede arrastrar con el dedo o el mouse.
     onCardMove?: (pos: { x: number; y: number }) => void;
+    // Editor: cada parte se toca para elegirla y se arrastra para moverla.
+    editParts?: {
+        selected: PosterPart | null;
+        onSelect: (part: PosterPart | null) => void;
+        onMove: (part: PosterPart, offset: { x: number; y: number }) => void;
+    };
 }
 
 function useBox(ref: React.RefObject<HTMLDivElement | null>) {
@@ -55,9 +61,10 @@ const ENTRANCE: Record<string, { name: string; dur: number; ease: string }> = {
     pop: { name: 'poster-pop', dur: 0.6, ease: 'ease-out' },
 };
 
-export function PosterView({ config, commerceId, lists: listsProp, sampleList, onCardMove }: Props) {
+export function PosterView({ config, commerceId, lists: listsProp, sampleList, onCardMove, editParts }: Props) {
     const ref = useRef<HTMLDivElement>(null);
     const drag = useRef<{ sx: number; sy: number; x: number; y: number } | null>(null);
+    const partDrag = useRef<{ part: PosterPart; sx: number; sy: number; x: number; y: number } | null>(null);
     const { w: W, h: H } = useBox(ref);
     const live = useLivePriceLists(listsProp ? null : commerceId);
     const lists = listsProp || live;
@@ -97,6 +104,47 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList, o
         textShadow: style?.shadow ? '0 0.08em 0.35em rgba(0,0,0,0.6)' : undefined,
     });
 
+    const scaleOf = (part: PosterPart) => config.styles?.[part]?.scale || 1;
+
+    // Cada parte puede estar corrida de su lugar; en el editor se elige y se arrastra.
+    const partStyle = (part: PosterPart): CSSProperties => {
+        const off = config.offsets?.[part];
+        const style: CSSProperties = off && (off.x || off.y) ? { transform: `translate(${Math.round(off.x * W)}px, ${Math.round(off.y * H)}px)` } : {};
+        if (editParts) {
+            style.cursor = 'move';
+            style.touchAction = 'none';
+            style.outline = editParts.selected === part ? '2px solid #6366f1' : '1px dashed rgba(255,255,255,0.55)';
+            style.outlineOffset = 2;
+        }
+        return style;
+    };
+    const partHandlers = (part: PosterPart) => (editParts ? {
+        onPointerDown: (e: ReactPointerEvent<HTMLDivElement>) => {
+            e.stopPropagation();
+            e.preventDefault();
+            editParts.onSelect(part);
+            const off = config.offsets?.[part];
+            partDrag.current = { part, sx: e.clientX, sy: e.clientY, x: off?.x || 0, y: off?.y || 0 };
+            e.currentTarget.setPointerCapture?.(e.pointerId);
+        },
+        onPointerMove: (e: ReactPointerEvent<HTMLDivElement>) => {
+            const d = partDrag.current;
+            if (!d || d.part !== part || W <= 0 || H <= 0) return;
+            const dx = e.clientX - d.sx;
+            const dy = e.clientY - d.sy;
+            if (Math.abs(dx) + Math.abs(dy) < 3) return;
+            editParts.onMove(part, {
+                x: Math.round(clamp(d.x + dx / W, -1, 1) * 1000) / 1000,
+                y: Math.round(clamp(d.y + dy / H, -1, 1) * 1000) / 1000,
+            });
+        },
+        onPointerUp: () => { partDrag.current = null; },
+        onPointerCancel: () => { partDrag.current = null; },
+    } : {});
+    const wrap = (part: PosterPart, node: ReactNode, display: 'block' | 'table' = 'block', extra?: CSSProperties) => (node ? (
+        <div style={{ display, position: 'relative', ...extra, ...partStyle(part) }} {...partHandlers(part)}>{node}</div>
+    ) : null);
+
     const renderPhoto = (url: string | undefined, style: CSSProperties, key?: string) => (
         <div key={key} style={abs({ ...style, overflow: 'hidden', backgroundColor: '#222', animation: entrance ? 'poster-fade 1s ease-out both' : undefined })}>
             <div
@@ -130,26 +178,26 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList, o
         );
     };
 
-    const renderBadge = () => (badge ? (
-        <div style={{ display: 'inline-block', background: theme.accent, color: theme.panel, fontFamily: POSTER_FONTS.modern.family, fontWeight: 800, letterSpacing: '0.08em', fontSize: 2.2 * u, padding: `${0.5 * u}px ${1.4 * u}px`, borderRadius: 99, marginBottom: 2 * u, whiteSpace: 'nowrap' }}>
+    const renderBadge = () => (badge ? wrap('badge', (
+        <div style={{ display: 'inline-block', background: config.styles?.badge?.color || theme.accent, color: theme.panel, fontFamily: POSTER_FONTS.modern.family, fontWeight: 800, letterSpacing: '0.08em', fontSize: 2.2 * u * scaleOf('badge'), padding: '0.22em 0.64em', borderRadius: 99, whiteSpace: 'nowrap' }}>
             {badge}
         </div>
-    ) : null);
+    ), 'table', { marginBottom: 2 * u, alignSelf: 'flex-start' }) : null);
 
     const titleFamily = font.family;
-    const renderTitle = (base: number, align: 'left' | 'center' = 'left') => (config.title ? (
+    const renderTitle = (base: number, align: 'left' | 'center' = 'left') => (config.title ? wrap('title',
         <div style={{ ...textStyle(base, config.styles?.title, theme.text), fontFamily: titleFamily, fontWeight: font.weight, lineHeight: config.font === 'script' ? 1.15 : 1.02, textAlign: align, letterSpacing: config.font === 'impact' ? '0.01em' : undefined, wordWrap: 'break-word' }}>
             {config.title}
-        </div>
+        </div>,
     ) : null);
 
-    const renderSubtitle = (base: number, align: 'left' | 'center' = 'left') => (config.subtitle ? (
-        <div style={{ fontSize: base * u, color: theme.accent, fontFamily: POSTER_FONTS.modern.family, fontWeight: 700, marginTop: 1 * u, textAlign: align }}>
+    const renderSubtitle = (base: number, align: 'left' | 'center' = 'left') => (config.subtitle ? wrap('subtitle',
+        <div style={{ ...textStyle(base, config.styles?.subtitle, theme.accent), fontFamily: POSTER_FONTS.modern.family, fontWeight: 700, marginTop: 1 * u, textAlign: align }}>
             {config.subtitle}
-        </div>
+        </div>,
     ) : null);
 
-    const renderPrice = (base: number, align: 'left' | 'center' | 'right' = 'left') => (price ? (
+    const renderPrice = (base: number, align: 'left' | 'center' | 'right' = 'left') => (price ? wrap('price',
         <div style={{ marginTop: 2 * u, textAlign: align }}>
             <div
                 className={config.pricePulse ? 'poster-motion' : undefined}
@@ -166,7 +214,7 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList, o
             >
                 {price}
             </div>
-        </div>
+        </div>,
     ) : null);
 
     // Lista de precios: se achica sola para entrar en el alto disponible.
@@ -186,7 +234,7 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList, o
         const colWidth = (width - (cols - 1) * 3 * u) / cols;
         const columns: Row[][] = [];
         for (let c = 0; c < cols; c++) columns.push(rows.slice(c * perCol, (c + 1) * perCol));
-        return (
+        return wrap('list',
             <div style={{ display: 'flex', width, marginTop: 2.5 * u, fontFamily: POSTER_FONTS.modern.family }}>
                 {columns.map((col, c) => (
                     <div key={c} style={{ width: colWidth, marginLeft: c ? 3 * u : 0 }}>
@@ -201,7 +249,7 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList, o
                         ))}
                     </div>
                 ))}
-            </div>
+            </div>,
         );
     };
 
@@ -273,8 +321,9 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList, o
                                 <>
                                     <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap' }}>
                                         {renderTitle(8)}
-                                        {config.subtitle && (
-                                            <div style={{ marginLeft: 1.6 * u, fontSize: 2.6 * u, color: theme.accent, fontFamily: POSTER_FONTS.modern.family, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{config.subtitle}</div>
+                                        {config.subtitle && wrap('subtitle',
+                                            <div style={{ fontSize: 2.6 * u * scaleOf('subtitle'), color: config.styles?.subtitle?.color || theme.accent, fontFamily: POSTER_FONTS.modern.family, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{config.subtitle}</div>,
+                                            'block', { marginLeft: 1.6 * u },
                                         )}
                                     </div>
                                     <div style={{ width: 8 * u, height: 0.6 * u, background: theme.accent, marginTop: 1.4 * u, borderRadius: 99 }} />
@@ -363,7 +412,8 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList, o
                                 borderRadius: 1.4 * u,
                                 boxShadow: `0 ${1.5 * u}px ${5 * u}px rgba(0,0,0,0.45)`,
                                 transform: config.tilt ? 'rotate(-4deg)' : undefined,
-                                overflow: 'hidden',
+                                // Con partes corridas, pueden salir de la tarjeta.
+                                overflow: Object.values(config.offsets || {}).some(o => o && (o.x || o.y)) ? 'visible' : 'hidden',
                                 outline: editable ? '2px dashed rgba(255,255,255,0.75)' : undefined,
                                 outlineOffset: editable ? 3 : undefined,
                             }}
@@ -383,18 +433,18 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList, o
     const qrLabel = config.qrUrl ? (config.qrLabel ?? QR_DEFAULT_LABEL[parseQrUrl(config.qrUrl).kind]) : '';
 
     return (
-        <div ref={ref} style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: theme.panel }}>
+        <div ref={ref} onPointerDown={editParts ? () => editParts.onSelect(null) : undefined} style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: theme.panel }}>
             {body}
             {W > 0 && config.showClock && (
-                <div style={abs({ right: 3 * u, top: 3 * u, background: 'rgba(0,0,0,0.55)', color: '#fff', fontFamily: POSTER_FONTS.modern.family, fontWeight: 700, fontSize: 3 * u, padding: `${0.6 * u}px ${1.6 * u}px`, borderRadius: 99 })}>
+                <div {...partHandlers('clock')} style={abs({ right: 3 * u, top: 3 * u, background: 'rgba(0,0,0,0.55)', color: config.styles?.clock?.color || '#fff', fontFamily: POSTER_FONTS.modern.family, fontWeight: 700, fontSize: 3 * u * scaleOf('clock'), padding: '0.2em 0.53em', borderRadius: 99, ...partStyle('clock') })}>
                     {now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })}
                 </div>
             )}
             {W > 0 && config.qrUrl && (
-                <div style={abs({ right: 3 * u, bottom: 3 * u, background: '#fff', padding: 1.2 * u, borderRadius: 1.2 * u, width: 17 * u, boxSizing: 'content-box', textAlign: 'center' })}>
-                    <QRCodeSVG value={config.qrUrl} size={Math.round(17 * u)} level="M" style={{ display: 'block' }} />
+                <div {...partHandlers('qr')} style={abs({ right: 3 * u, bottom: 3 * u, background: '#fff', padding: 1.2 * u * scaleOf('qr'), borderRadius: 1.2 * u, width: 17 * u * scaleOf('qr'), boxSizing: 'content-box', textAlign: 'center', ...partStyle('qr') })}>
+                    <QRCodeSVG value={config.qrUrl} size={Math.round(17 * u * scaleOf('qr'))} level="M" style={{ display: 'block' }} />
                     {qrLabel && (
-                        <div style={{ marginTop: 0.8 * u, fontSize: 2.1 * u, lineHeight: 1.15, fontWeight: 700, color: '#111', fontFamily: POSTER_FONTS.modern.family }}>{qrLabel}</div>
+                        <div style={{ marginTop: 0.8 * u, fontSize: 2.1 * u * scaleOf('qr'), lineHeight: 1.15, fontWeight: 700, color: '#111', fontFamily: POSTER_FONTS.modern.family }}>{qrLabel}</div>
                     )}
                 </div>
             )}

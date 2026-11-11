@@ -8,8 +8,11 @@ todas las pantallas. Menú **Contenido → Carteles**.
 
 1. El banner **"Armá tu cartel en un minuto"** muestra algunos diseños: se toca uno y se
    abre el editor con ese diseño. También **Empezar de cero** (cartel en blanco) y
-   **Ver todos los diseños** (galería con buscador por rubro y formato de pantalla:
-   horizontal 16:9, vertical 9:16, pantalla larga 21:9, 4:3, cuadrada).
+   **Ver todos los diseños** (galería con buscador por rubro y formato de pantalla).
+   Los formatos son las mismas medidas que los mosaicos: 1 TV horizontal (1920×1080) o
+   vertical (1080×1920), y mosaicos de 2×1, 1×2 y 2×2 con las TV acostadas o paradas
+   (por ejemplo 3840×1080 o 2160×3840). En un mosaico la vista previa marca con líneas
+   punteadas dónde se juntan las TV.
 2. Editar en tres pestañas, con la vista previa arriba:
    - **Diseño:** cómo se arma (Mitad y mitad, Fotos con tarjeta, Foto con franja, Carta) y
      **Acomodar**: foto de un lado o del otro (o franja arriba) y tamaño de la foto; en
@@ -17,6 +20,9 @@ todas las pantallas. Menú **Contenido → Carteles**.
      achica. Paletas, **colores propios** (fondo y precios, con cualquier color), letra del
      título y **animación** (aparece suave, entra desde abajo, salta; la foto que se acerca
      despacio y el precio que late).
+   - **Mover cada parte:** en la vista previa se toca el título, el subtítulo, la etiqueta,
+     la lista, el precio, el QR o la hora; se arrastra para moverla y abajo aparecen
+     **− / +** para el tamaño y "Como estaba". "Volver todo a su lugar" deshace todo.
    - **Contenido:** etiqueta, título, subtítulo, hasta 2 fotos de Medios, **lista de
      precios** (columnas, aclaraciones, tamaño, color y sombra), **precio grande** (escrito
      a mano o de un producto de una lista), **QR** y hora.
@@ -42,7 +48,10 @@ todas las pantallas. Menú **Contenido → Carteles**.
 - **Cuándo aparece:** fuera de ese horario el cartel no sale y pasa lo demás de la
   playlist. Con "Mostrar el horario" la etiqueta dice sola "DE 15 A 19 H".
 - El cartel se acomoda a la forma de cada pantalla (horizontal o vertical) aunque se haya
-  armado en otro formato.
+  armado en otro formato. En **Mosaico** cada TV dibuja el cartel al tamaño de todo el
+  mosaico y muestra su parte, así que conviene armarlo en el formato de ese mosaico.
+- Las partes movidas se guardan como un corrimiento relativo al tamaño de la pantalla
+  (`offsets`), y el tamaño en `styles[parte].scale`.
 - Al editar un cartel, las playlists que lo usan se actualizan solas.
 - Técnicamente es una app de Medios (`metadata.appId = 'poster'`, ver `src/lib/posters.ts`
   y `src/components/display/posters/`). No necesita tablas nuevas: usa la de Listas de
@@ -50,5 +59,4 @@ todas las pantallas. Menú **Contenido → Carteles**.
 
 ## Próximo
 
-Más plantillas (apuntar a 50+), fotos de ejemplo, mover libremente cada parte del cartel y
-carta repartida en varias pantallas.
+Más plantillas (apuntar a 50+) y fotos de ejemplo.

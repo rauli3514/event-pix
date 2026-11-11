@@ -7,7 +7,7 @@
 export const POSTER_APP_ID = 'poster';
 
 export type PosterLayout = 'split' | 'card' | 'band' | 'menu';
-export type PosterFormat = '16:9' | '9:16' | '21:9' | '4:3' | '1:1';
+export type PosterFormat = '16:9' | 'h2x1' | 'h1x2' | 'h2x2' | '9:16' | 'v2x1' | 'v1x2' | 'v2x2' | '21:9' | '4:3' | '1:1';
 export type PosterFont = 'modern' | 'elegant' | 'impact' | 'script' | 'simple';
 
 export interface TextStyle {
@@ -44,7 +44,9 @@ export interface PosterConfig {
     showDetails?: boolean;    // aclaraciones de cada producto
     qrUrl?: string;
     showClock?: boolean;
-    styles?: { title?: TextStyle; list?: TextStyle; price?: TextStyle };
+    styles?: Partial<Record<PosterPart, TextStyle>>;
+    // Cuánto se corrió cada parte de su lugar (fracción del ancho y del alto).
+    offsets?: Partial<Record<PosterPart, { x: number; y: number }>>;
     // Cuándo aparece (mismas claves que las reglas de cada item de playlist).
     schedule?: { showDays?: number[]; showFrom?: string; showTo?: string } | null;
     autoBadge?: boolean;      // "DE 15 A 19 H" según el horario
@@ -63,6 +65,19 @@ export interface PosterConfig {
 }
 
 export type PosterAnimation = 'none' | 'fade' | 'slide' | 'pop';
+
+// Partes del cartel que se pueden mover y agrandar.
+export type PosterPart = 'badge' | 'title' | 'subtitle' | 'list' | 'price' | 'qr' | 'clock';
+
+export const POSTER_PARTS: Record<PosterPart, string> = {
+    badge: 'Etiqueta',
+    title: 'Título',
+    subtitle: 'Subtítulo',
+    list: 'Lista de precios',
+    price: 'Precio grande',
+    qr: 'Código QR',
+    clock: 'Hora',
+};
 
 export const POSTER_ANIMATIONS: { id: PosterAnimation; label: string }[] = [
     { id: 'none', label: 'Sin animación' },
@@ -174,13 +189,47 @@ export const POSTER_LAYOUTS: Record<PosterLayout, { label: string; description: 
     menu: { label: 'Carta', description: 'La lista de precios grande, con foto al costado.' },
 };
 
-export const POSTER_FORMATS: { id: PosterFormat; label: string; ratio: number; hint: string }[] = [
-    { id: '16:9', label: 'Tele horizontal · 16:9', ratio: 16 / 9, hint: 'La más común.' },
-    { id: '9:16', label: 'Tele vertical · 9:16', ratio: 9 / 16, hint: 'TV parada o el exhibidor de mostrador.' },
-    { id: '21:9', label: 'Pantalla larga · 21:9', ratio: 21 / 9, hint: 'La pantalla larga arriba del mostrador.' },
-    { id: '4:3', label: 'Tele clásica · 4:3', ratio: 4 / 3, hint: 'Monitores viejos.' },
-    { id: '1:1', label: 'Cuadrada · 1:1', ratio: 1, hint: 'Pantallas cuadradas.' },
+// Formatos: los mismos que los mosaicos. Cada TV es 1920×1080 (o 1080×1920
+// parada) y un mosaico suma columnas y filas. En Mosaico, cada TV dibuja el
+// cartel al tamaño de todo el mosaico y muestra su parte.
+export interface PosterFormatInfo {
+    id: PosterFormat;
+    label: string;
+    group: 'TV horizontal' | 'TV vertical' | 'Otros';
+    cols: number;
+    rows: number;
+    width: number;
+    height: number;
+    ratio: number;
+    hint: string;
+    legacy?: boolean; // formatos viejos: solo para carteles ya guardados
+}
+
+const tvFormat = (id: PosterFormat, portraitTv: boolean, cols: number, rows: number, name: string, hint: string): PosterFormatInfo => {
+    const width = cols * (portraitTv ? 1080 : 1920);
+    const height = rows * (portraitTv ? 1920 : 1080);
+    return {
+        id, cols, rows, width, height, ratio: width / height, hint,
+        group: portraitTv ? 'TV vertical' : 'TV horizontal',
+        label: `${name} · ${width}×${height}`,
+    };
+};
+
+export const POSTER_FORMATS: PosterFormatInfo[] = [
+    tvFormat('16:9', false, 1, 1, '1 TV horizontal', 'La más común.'),
+    tvFormat('h2x1', false, 2, 1, '2 TV una al lado de la otra (2×1)', 'Mosaico de 2 TV acostadas, lado a lado.'),
+    tvFormat('h1x2', false, 1, 2, '2 TV una arriba de la otra (1×2)', 'Mosaico de 2 TV acostadas, una sobre otra.'),
+    tvFormat('h2x2', false, 2, 2, '4 TV (2×2)', 'Mosaico de 4 TV acostadas.'),
+    tvFormat('9:16', true, 1, 1, '1 TV vertical', 'TV parada o el exhibidor de mostrador.'),
+    tvFormat('v2x1', true, 2, 1, '2 TV paradas una al lado de la otra (2×1)', 'Mosaico de 2 TV paradas, lado a lado.'),
+    tvFormat('v1x2', true, 1, 2, '2 TV paradas una arriba de la otra (1×2)', 'Mosaico de 2 TV paradas, una sobre otra.'),
+    tvFormat('v2x2', true, 2, 2, '4 TV paradas (2×2)', 'Mosaico de 4 TV paradas.'),
+    { id: '21:9', label: 'Pantalla larga · 21:9', group: 'Otros', cols: 1, rows: 1, width: 2560, height: 1080, ratio: 21 / 9, hint: '', legacy: true },
+    { id: '4:3', label: 'Tele clásica · 4:3', group: 'Otros', cols: 1, rows: 1, width: 1440, height: 1080, ratio: 4 / 3, hint: '', legacy: true },
+    { id: '1:1', label: 'Cuadrada · 1:1', group: 'Otros', cols: 1, rows: 1, width: 1080, height: 1080, ratio: 1, hint: '', legacy: true },
 ];
+
+export const formatInfo = (f?: PosterFormat) => POSTER_FORMATS.find(x => x.id === f) || POSTER_FORMATS[0];
 
 export const formatRatio = (f?: PosterFormat) => POSTER_FORMATS.find(x => x.id === f)?.ratio || 16 / 9;
 
@@ -354,7 +403,9 @@ export function fitList(rows: Row[], opts: {
         const nameFits = (s: number) => columns.every(col => col.every(r => {
             const priceW = r.price.length * PRICE_EM * s;
             const nameW = Math.max(s * 2, colW - priceW - 0.6 * s);
-            return r.name.length * NAME_EM * s <= nameW * 2;
+            // Entra en dos renglones y ninguna palabra queda cortada por la mitad.
+            const longestWord = r.name.split(/\s+/).reduce((m, w) => Math.max(m, w.length), 0);
+            return r.name.length * NAME_EM * s <= nameW * 2 && longestWord * NAME_EM * s <= nameW;
         }));
         let s = maxSize;
         while (s > minSize && (heightAt(s) > height || !nameFits(s))) s *= 0.95;
