@@ -62,6 +62,64 @@ todas las pantallas. Menú **Contenido → Carteles**.
   y `src/components/display/posters/`). No necesita tablas nuevas: usa la de Listas de
   precios (`display_device_price_lists`).
 
-## Próximo
+## Fotos de ejemplo
 
-Fotos de ejemplo en las plantillas.
+Los diseños traen fotos de ejemplo (en `public/poster-samples/`, 1280 px en WebP). En el
+editor dicen "Ejemplo · Cambiar": se pueden dejar o cambiar por fotos propias de Medios.
+Son de [Unsplash](https://unsplash.com/license): uso libre, también comercial, sin
+obligación de nombrar al autor. Se eligieron sin marcas ni logos a la vista.
+
+| Archivo | Foto original |
+|---|---|
+| `bag1.webp` | https://unsplash.com/photos/1584917865442-de89df76afd3 |
+| `bar.webp` | https://unsplash.com/photos/1572116469696-31de0f17cc34 |
+| `beer1.webp` | https://unsplash.com/photos/1535958636474-b021ee887b13 |
+| `beer2.webp` | https://unsplash.com/photos/1608270586620-248524c67de9 |
+| `breakfast.webp` | https://unsplash.com/photos/1533089860892-a7c6f0a88666 |
+| `burger1.webp` | https://unsplash.com/photos/1568901346375-23c9450c58cd |
+| `burger3.webp` | https://unsplash.com/photos/1571091718767-18b5b1457add |
+| `cake1.webp` | https://unsplash.com/photos/1578985545062-69928b1d9587 |
+| `charcut.webp` | https://unsplash.com/photos/1541529086526-db283c563270 |
+| `cocktail1.webp` | https://unsplash.com/photos/1514362545857-3bc16c4c7d1b |
+| `coffee1.webp` | https://unsplash.com/photos/1495474472287-4d71bcdd2085 |
+| `coffee2.webp` | https://unsplash.com/photos/1509042239860-f550ce710b93 |
+| `concert2.webp` | https://unsplash.com/photos/1514525253161-7a46d19cd819 |
+| `croissant1.webp` | https://unsplash.com/photos/1555507036-ab1f4038808a |
+| `croissant2.webp` | https://unsplash.com/photos/1530610476181-d83430b64dcd |
+| `electro1.webp` | https://unsplash.com/photos/1498049794561-7780e7231661 |
+| `fashion1.webp` | https://unsplash.com/photos/1441986300917-64674bd600d8 |
+| `fashion2.webp` | https://unsplash.com/photos/1445205170230-053b83016050 |
+| `fashion3.webp` | https://unsplash.com/photos/1490481651871-ab68de25d43d |
+| `fashion4.webp` | https://unsplash.com/photos/1483985988355-763728e1935b |
+| `fries.webp` | https://unsplash.com/photos/1573080496219-bb080dd4f877 |
+| `gaming1.webp` | https://unsplash.com/photos/1542751371-adc38448a05e |
+| `gaming4.webp` | https://unsplash.com/photos/1550745165-9bc0b252726f |
+| `glasses2.webp` | https://unsplash.com/photos/1511499767150-a48a237f0083 |
+| `grill1.webp` | https://unsplash.com/photos/1544025162-d76694265947 |
+| `grocery1.webp` | https://unsplash.com/photos/1542838132-92c53300491e |
+| `grocery2.webp` | https://unsplash.com/photos/1604719312566-8912e9227c6a |
+| `grocery3.webp` | https://unsplash.com/photos/1534723452862-4c874018d66d |
+| `gym1.webp` | https://unsplash.com/photos/1534438327276-14e5300c3a48 |
+| `gym2.webp` | https://unsplash.com/photos/1517836357463-d25dfeac3438 |
+| `gym3.webp` | https://unsplash.com/photos/1571019613454-1cb2f99b2d8b |
+| `gym4.webp` | https://unsplash.com/photos/1540497077202-7c8a3999166f |
+| `house2.webp` | https://unsplash.com/photos/1560448204-e02f11c3d0e2 |
+| `icecream1.webp` | https://unsplash.com/photos/1497034825429-c343d7c6a68f |
+| `icecream2.webp` | https://unsplash.com/photos/1563805042-7684c019e1cb |
+| `icecream3.webp` | https://unsplash.com/photos/1501443762994-82bd5dace89a |
+| `jeans1.webp` | https://unsplash.com/photos/1541099649105-f69ad21f3246 |
+| `pasta1.webp` | https://unsplash.com/photos/1621996346565-e3dbc646d9a9 |
+| `pay1.webp` | https://unsplash.com/photos/1556742049-0cfed4f6a45d |
+| `phone.webp` | https://unsplash.com/photos/1585060544812-6b45742d762f |
+| `pizza1.webp` | https://unsplash.com/photos/1513104890138-7c749659a591 |
+| `pizza2.webp` | https://unsplash.com/photos/1565299624946-b28f40a0ae38 |
+| `plate.webp` | https://unsplash.com/photos/1504674900247-0877df9cc836 |
+| `repair.webp` | https://unsplash.com/photos/1581092160562-40aa08e78837 |
+| `sandwich.webp` | https://unsplash.com/photos/1528735602780-2552fd46c7af |
+| `stadium.webp` | https://unsplash.com/photos/1574629810360-7efbbe195018 |
+| `sushi2.webp` | https://unsplash.com/photos/1553621042-f6e147245754 |
+| `wine1.webp` | https://unsplash.com/photos/1510812431401-41d2bd2722f3 |
+| `wine2.webp` | https://unsplash.com/photos/1506377247377-2a5b3b417ebb |
+| `wine3.webp` | https://unsplash.com/photos/1553361371-9b22f78e8b1d |
+| `wine4.webp` | https://unsplash.com/photos/1474722883778-792e7990302f |
+

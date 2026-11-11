@@ -18,7 +18,7 @@ import { formatPrice, fromDraftRows, newItemId, parsePrice, toDraftRows, type Dr
 import { DAY_LETTER, WEEK_ORDER } from '@/lib/itemRules';
 import {
     POSTER_ANIMATIONS, POSTER_APP_ID, POSTER_FONTS, POSTER_FORMATS, POSTER_GROUPS, POSTER_LAYOUTS, POSTER_PARTS, POSTER_TEMPLATES, POSTER_THEMES,
-    configFromTemplate, formatInfo, playlistsWithNewMetadata, posterColors, scheduleBadge,
+    configFromTemplate, formatInfo, isSamplePhoto, playlistsWithNewMetadata, posterColors, scheduleBadge,
     type PosterConfig, type PosterFont, type PosterFormat, type PosterGroup, type PosterLayout, type PosterPart, type PosterTemplate, type TextStyle,
 } from '@/lib/posters';
 import type { DisplayMedia } from '@/types/display';
@@ -391,6 +391,9 @@ function PosterEditorDialog({ onClose, commerceId, editing, initialTemplate, ini
                                                             {url ? (
                                                                 <>
                                                                     <img src={url} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                                                                    <button type="button" onClick={() => setPickingPhoto(i)} className="absolute inset-x-0 bottom-0 bg-black/60 py-0.5 text-[11px] font-medium text-white hover:bg-black/75">
+                                                                        {isSamplePhoto(url) ? 'Ejemplo · Cambiar' : 'Cambiar'}
+                                                                    </button>
                                                                     <button type="button" onClick={() => set({ photos: (config.photos || []).filter((_, j) => j !== i) })} className="absolute top-1 right-1 rounded-full bg-black/70 p-1 text-white" aria-label="Quitar foto"><X className="w-3 h-3" /></button>
                                                                 </>
                                                             ) : (i === 0 || config.photos?.[0]) && (
@@ -402,7 +405,12 @@ function PosterEditorDialog({ onClose, commerceId, editing, initialTemplate, ini
                                                     );
                                                 })}
                                             </div>
-                                            <p className="text-xs text-muted-foreground">De tus Medios. Con dos fotos se ven una al lado de la otra.</p>
+                                            <p className="text-xs text-muted-foreground">
+                                                {(config.photos || []).some(isSamplePhoto)
+                                                    ? 'Las del diseño son fotos de ejemplo: podés dejarlas o cambiarlas por fotos tuyas de Medios. '
+                                                    : 'De tus Medios. '}
+                                                Con dos fotos se ven una al lado de la otra.
+                                            </p>
                                         </Field>
                                         <Field label="Lista de precios">
                                             <select
