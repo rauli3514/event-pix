@@ -444,6 +444,7 @@ function PosterEditorDialog({ onClose, commerceId, editing, initialTemplate, ini
                                                         ))}
                                                     </div>
                                                     <Toggle label="Mostrar aclaraciones" checked={config.showDetails !== false} onChange={v => set({ showDetails: v })} />
+                                                    <Toggle label='Mostrar el cartelito "−10 %" cuando la lista tiene un descuento por tiempo' checked={config.showPromoBadge !== false} onChange={v => set({ showPromoBadge: v })} />
                                                     <StyleControls style={config.styles?.list} onChange={p => setStyle('list', p)} />
                                                 </>
                                             )}

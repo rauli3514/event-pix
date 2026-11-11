@@ -62,12 +62,13 @@ export interface PosterConfig {
     animation?: PosterAnimation;
     photoMotion?: boolean;    // la foto se acerca despacio
     pricePulse?: boolean;     // el precio grande late
+    showPromoBadge?: boolean; // con un descuento temporal en la lista: cartelito "-10 %" (sí, salvo false)
 }
 
 export type PosterAnimation = 'none' | 'fade' | 'slide' | 'pop';
 
 // Partes del cartel que se pueden mover y agrandar.
-export type PosterPart = 'badge' | 'title' | 'subtitle' | 'list' | 'price' | 'qr' | 'clock';
+export type PosterPart = 'badge' | 'title' | 'subtitle' | 'list' | 'price' | 'qr' | 'clock' | 'promo';
 
 export const POSTER_PARTS: Record<PosterPart, string> = {
     badge: 'Etiqueta',
@@ -77,6 +78,7 @@ export const POSTER_PARTS: Record<PosterPart, string> = {
     price: 'Precio grande',
     qr: 'Código QR',
     clock: 'Hora',
+    promo: 'Cartelito de descuento',
 };
 
 export const POSTER_ANIMATIONS: { id: PosterAnimation; label: string }[] = [
@@ -700,7 +702,8 @@ export function playlistsWithNewMetadata(campaigns: any[], mediaId: string, meta
 export const isPosterItem = (item: any) => item?.metadata?.appId === POSTER_APP_ID;
 
 // ── Lista de precios dentro del cartel ──
-export interface PosterListRow { name: string; detail?: string; price: string }
+// oldPrice: el precio de antes, tachado (mientras hay un descuento temporal).
+export interface PosterListRow { name: string; detail?: string; price: string; oldPrice?: string }
 type Row = PosterListRow;
 
 // Ancho aproximado de un texto en negrita (en "em").
@@ -729,7 +732,7 @@ export function fitList(rows: Row[], opts: {
             for (const col of columns) {
                 let h = 0;
                 for (const r of col) {
-                    const priceW = r.price.length * PRICE_EM * s;
+                    const priceW = (r.price.length + (r.oldPrice ? r.oldPrice.length * 0.7 + 0.5 : 0)) * PRICE_EM * s;
                     const nameW = Math.max(s * 2, colW - priceW - 0.6 * s);
                     const lines = Math.min(2, Math.max(1, Math.ceil((r.name.length * NAME_EM * s) / nameW)));
                     h += (lines * 1.15 + 0.64) * s + (details && r.detail ? 0.62 * 1.25 * s : 0) + 1;
@@ -739,7 +742,7 @@ export function fitList(rows: Row[], opts: {
             return tallest;
         };
         const nameFits = (s: number) => columns.every(col => col.every(r => {
-            const priceW = r.price.length * PRICE_EM * s;
+            const priceW = (r.price.length + (r.oldPrice ? r.oldPrice.length * 0.7 + 0.5 : 0)) * PRICE_EM * s;
             const nameW = Math.max(s * 2, colW - priceW - 0.6 * s);
             // Entra en dos renglones y ninguna palabra queda cortada por la mitad.
             const longestWord = r.name.split(/\s+/).reduce((m, w) => Math.max(m, w.length), 0);
