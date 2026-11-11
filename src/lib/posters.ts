@@ -49,6 +49,100 @@ export interface PosterConfig {
     schedule?: { showDays?: number[]; showFrom?: string; showTo?: string } | null;
     autoBadge?: boolean;      // "DE 15 A 19 H" según el horario
     durationS?: number;
+    // Armado fino (todo opcional: sin esto queda como la plantilla).
+    flip?: boolean;           // foto del otro lado (split, menu) o franja arriba (band)
+    photoShare?: number;      // cuánto ocupa la foto, 0.25 a 0.75 (split, menu, band)
+    cardPos?: { x: number; y: number } | null; // centro de la tarjeta, 0 a 1 (card)
+    cardSize?: number;        // tamaño de la tarjeta, 0.6 a 1.5 (card)
+    panelColor?: string;      // fondo propio (si no, el de la paleta)
+    accentColor?: string;     // color de precios y etiqueta (si no, el de la paleta)
+    qrLabel?: string;         // texto al lado del QR ("Pedí por WhatsApp")
+    animation?: PosterAnimation;
+    photoMotion?: boolean;    // la foto se acerca despacio
+    pricePulse?: boolean;     // el precio grande late
+}
+
+export type PosterAnimation = 'none' | 'fade' | 'slide' | 'pop';
+
+export const POSTER_ANIMATIONS: { id: PosterAnimation; label: string }[] = [
+    { id: 'none', label: 'Sin animación' },
+    { id: 'fade', label: 'Aparece suave' },
+    { id: 'slide', label: 'Entra desde abajo' },
+    { id: 'pop', label: 'Salta' },
+];
+
+// Paleta con los colores propios del cartel aplicados.
+export function posterColors(config: Pick<PosterConfig, 'themeId' | 'panelColor' | 'accentColor'>): PosterTheme {
+    const t = themeOf(config.themeId);
+    const panel = config.panelColor || t.panel;
+    return {
+        ...t,
+        panel,
+        accent: config.accentColor || t.accent,
+        // Con fondo propio, el texto va claro u oscuro según cuánta luz tenga el fondo.
+        text: config.panelColor ? (isLightColor(panel) ? '#111827' : '#f8fafc') : t.text,
+    };
+}
+
+export function isLightColor(hex: string): boolean {
+    const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+    if (!m) return false;
+    const n = parseInt(m[1], 16);
+    const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.6;
+}
+
+// ── Código QR: se arma el link a partir de lo que entiende la gente. ──
+export type QrKind = 'web' | 'whatsapp' | 'instagram';
+
+export const QR_DEFAULT_LABEL: Record<QrKind, string> = {
+    web: 'Escaneá para ver más',
+    whatsapp: 'Pedí por WhatsApp',
+    instagram: 'Seguinos en Instagram',
+};
+
+// Número argentino a formato wa.me: "362 454-7382" → 5493624547382.
+export function whatsappNumber(raw: string): string {
+    let d = (raw || '').replace(/\D/g, '');
+    if (!d) return '';
+    if (d.startsWith('00')) d = d.slice(2);
+    if (d.startsWith('54')) {
+        d = d.slice(2);
+        if (d.startsWith('9')) d = d.slice(1);
+    }
+    if (d.startsWith('0')) d = d.slice(1);
+    // "362 15 454-7382": se saca el 15 después de la característica.
+    const m15 = /^(\d{2,4})15(\d{6,8})$/.exec(d);
+    if (m15 && (m15[1] + m15[2]).length === 10) d = m15[1] + m15[2];
+    return d.length === 10 ? `549${d}` : d;
+}
+
+export function buildQrUrl(kind: QrKind, value: string, message = ''): string {
+    const v = (value || '').trim();
+    if (!v) return '';
+    if (kind === 'whatsapp') {
+        const n = whatsappNumber(v);
+        if (!n) return '';
+        return `https://wa.me/${n}${message.trim() ? `?text=${encodeURIComponent(message.trim())}` : ''}`;
+    }
+    if (kind === 'instagram') {
+        const user = v.replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/^@/, '').replace(/[/?#].*$/, '');
+        return user ? `https://instagram.com/${user}` : '';
+    }
+    return /^[a-z][a-z0-9+.-]*:/i.test(v) ? v : `https://${v}`;
+}
+
+export function parseQrUrl(url?: string | null): { kind: QrKind; value: string; message: string } {
+    const u = (url || '').trim();
+    const wa = /^https?:\/\/(?:wa\.me|api\.whatsapp\.com\/send)\/?(\d*)(?:\?(.*))?$/i.exec(u);
+    if (wa) {
+        const params = new URLSearchParams(wa[2] || '');
+        const phone = wa[1] || params.get('phone') || '';
+        return { kind: 'whatsapp', value: phone, message: params.get('text') || '' };
+    }
+    const ig = /^https?:\/\/(?:www\.)?instagram\.com\/([^/?#]+)/i.exec(u);
+    if (ig) return { kind: 'instagram', value: `@${ig[1]}`, message: '' };
+    return { kind: 'web', value: u, message: '' };
 }
 
 export const POSTER_THEMES: PosterTheme[] = [
@@ -108,6 +202,12 @@ export interface PosterTemplate {
     // Lista de ejemplo para la vista previa (hasta que se vincule una de verdad).
     sampleList?: { name: string; price: string; detail?: string }[];
 }
+
+// Cartel en blanco ("Empezar de cero").
+export const BLANK_TEMPLATE: PosterTemplate = {
+    id: 'blank', name: 'Cartel nuevo', rubro: 'Desde cero',
+    config: { layout: 'split', themeId: 'noche', font: 'modern', title: 'Tu título acá', subtitle: 'Una frase corta', price: '' },
+};
 
 // Plantillas iniciales: formas de armado × colores × textos de ejemplo por rubro.
 export const POSTER_TEMPLATES: PosterTemplate[] = [
@@ -211,3 +311,60 @@ export function playlistsWithNewMetadata(campaigns: any[], mediaId: string, meta
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const isPosterItem = (item: any) => item?.metadata?.appId === POSTER_APP_ID;
+
+// ── Lista de precios dentro del cartel ──
+export interface PosterListRow { name: string; detail?: string; price: string }
+type Row = PosterListRow;
+
+// Ancho aproximado de un texto en negrita (en "em").
+const NAME_EM = 0.58;
+const PRICE_EM = 0.62;
+
+// Tamaño de letra y columnas para que la lista entre: los nombres largos pasan
+// a dos renglones antes de cortarse, y "columnas solas" elige lo que deja la
+// letra más grande.
+export function fitList(rows: Row[], opts: {
+    width: number; height: number; u: number; maxSize: number; minSize: number;
+    columns: 'auto' | 1 | 2; details: boolean;
+}): { size: number; cols: number } {
+    const { width, height, u, maxSize, minSize, details } = opts;
+    const candidates = opts.columns === 'auto' ? (rows.length >= 4 && width / u > 60 ? [1, 2] : [1]) : [opts.columns];
+    let best = { size: minSize, cols: candidates[0] };
+    let bestFits = false;
+    for (const cols of candidates) {
+        const gapW = 3 * u;
+        const colW = (width - (cols - 1) * gapW) / cols;
+        const perCol = Math.ceil(rows.length / cols);
+        const columns: Row[][] = [];
+        for (let c = 0; c < cols; c++) columns.push(rows.slice(c * perCol, (c + 1) * perCol));
+        const heightAt = (s: number) => {
+            let tallest = 0;
+            for (const col of columns) {
+                let h = 0;
+                for (const r of col) {
+                    const priceW = r.price.length * PRICE_EM * s;
+                    const nameW = Math.max(s * 2, colW - priceW - 0.6 * s);
+                    const lines = Math.min(2, Math.max(1, Math.ceil((r.name.length * NAME_EM * s) / nameW)));
+                    h += (lines * 1.15 + 0.64) * s + (details && r.detail ? 0.62 * 1.25 * s : 0) + 1;
+                }
+                tallest = Math.max(tallest, h);
+            }
+            return tallest;
+        };
+        const nameFits = (s: number) => columns.every(col => col.every(r => {
+            const priceW = r.price.length * PRICE_EM * s;
+            const nameW = Math.max(s * 2, colW - priceW - 0.6 * s);
+            return r.name.length * NAME_EM * s <= nameW * 2;
+        }));
+        let s = maxSize;
+        while (s > minSize && (heightAt(s) > height || !nameFits(s))) s *= 0.95;
+        s = Math.max(minSize, s);
+        const fits = heightAt(s) <= height && nameFits(s);
+        if ((fits && !bestFits) || (fits === bestFits && s > best.size * 1.04)) {
+            best = { size: s, cols };
+            bestFits = fits;
+        }
+    }
+    return best;
+}
+

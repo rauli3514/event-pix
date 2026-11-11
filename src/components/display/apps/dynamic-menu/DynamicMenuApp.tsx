@@ -1,10 +1,12 @@
 import { useState, useRef, useMemo, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, Copy, Image as ImageIcon, Save, FolderOpen, Sheet, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Copy, Image as ImageIcon, Save, FolderOpen, Sheet, Loader2, ListOrdered } from 'lucide-react';
+import { usePriceLists } from '@/hooks/use-price-lists';
+import { formatPrice, priceListTexts } from '@/lib/priceLists';
 import { MediaPickerModal } from '../../MediaPickerModal';
 import { toast } from 'sonner';
 import { useDisplayLabelGroups, useCreateLabelGroup } from '@/hooks/use-display-labels';
@@ -51,6 +53,16 @@ export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Part
     const [sheetInput, setSheetInput] = useState(config.sheetUrl || '');
     const sheetNames = new Set((sheet.data || []).map(p => normalizeLabelName(p.name)));
     const labelNames = new Set(labels.map(l => normalizeLabelName(l.name)).filter(Boolean));
+    // Listas de precios: cada producto se puede sumar como etiqueta que se actualiza sola.
+    const { data: priceListsData } = usePriceLists(commerceId);
+    const priceLists = priceListsData?.lists ?? [];
+    const priceListNames = useMemo(() => new Set(priceListTexts(priceListsData?.lists ?? []).keys()), [priceListsData]);
+    const [pickedListId, setPickedListId] = useState('');
+    const pickedList = priceLists.find(l => l.id === pickedListId) || priceLists[0];
+    const listProducts = (pickedList?.items || [])
+        .filter(i => i.name)
+        .map(i => ({ name: i.name, text: i.available === false ? 'Sin stock' : formatPrice(i.price) }));
+    const listUnmatched = listProducts.filter(p => !labelNames.has(normalizeLabelName(p.name)));
     const unmatched = (sheet.data || []).filter(p => !labelNames.has(normalizeLabelName(p.name)));
     const matchedCount = (sheet.data || []).length - unmatched.length;
 
@@ -241,6 +253,48 @@ export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Part
                     )}
                 </div>
 
+                <div className="bg-slate-900 border border-indigo-500/40 rounded-xl p-4 space-y-3">
+                    <div>
+                        <h3 className="font-semibold text-white flex items-center gap-2"><ListOrdered className="w-4 h-4 text-indigo-400" /> Precios de tus Listas de precios</h3>
+                        <p className="text-xs text-slate-400 mt-1">Tocá un producto y aparece su precio en el diseño. Cuando lo cambiás en Listas de precios, se actualiza solo en las pantallas.</p>
+                    </div>
+                    {priceLists.length === 0 ? (
+                        <p className="text-xs text-slate-400">
+                            Todavía no tenés listas. <Link to={`/admin/display/commerce/${commerceId}/workspace/price-lists`} className="text-indigo-300 underline">Crear una en Listas de precios</Link>
+                        </p>
+                    ) : (
+                        <div className="space-y-2 text-xs">
+                            {priceLists.length > 1 && (
+                                <select
+                                    value={pickedList?.id || ''}
+                                    onChange={e => setPickedListId(e.target.value)}
+                                    className="h-9 w-full rounded-md border border-slate-700 bg-slate-950 px-2 text-sm text-white"
+                                    aria-label="Lista de precios"
+                                >
+                                    {priceLists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                                </select>
+                            )}
+                            {listUnmatched.length === 0 ? (
+                                <p className="text-emerald-400">✓ Todos los productos de "{pickedList?.name}" ya están en el diseño.</p>
+                            ) : (
+                                <div className="rounded-lg border border-slate-800 bg-slate-950 p-2 space-y-1.5">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="text-slate-300">{pickedList?.name}:</span>
+                                        <button onClick={() => addSheetLabels(listUnmatched)} className="text-indigo-300 hover:underline">Agregar todos</button>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto">
+                                        {listUnmatched.map(p => (
+                                            <button key={p.name} onClick={() => addSheetLabels([p])} className="rounded-md border border-slate-700 px-2 py-0.5 text-slate-300 hover:border-indigo-400 hover:text-white" title="Agregar como etiqueta">
+                                                + {p.name} <span className="text-slate-500">{p.text}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
                 <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
                     <div>
                         <h3 className="font-semibold text-white flex items-center gap-2"><Sheet className="w-4 h-4 text-emerald-400" /> Precios desde una planilla de Google</h3>
@@ -361,7 +415,9 @@ export const DynamicMenuForm = ({ config, onChange, commerceId }: { config: Part
                                         <p className="text-xs text-emerald-500">
                                             {sheetNames.has(normalizeLabelName(selectedLabel.name))
                                                 ? 'Este precio viene de la planilla de Google: cambialo ahí.'
-                                                : 'Este precio se sincroniza en vivo desde la página "Etiquetas".'}
+                                                : priceListNames.has(normalizeLabelName(selectedLabel.name))
+                                                    ? 'Este precio viene de Listas de precios: cambialo ahí y se actualiza solo.'
+                                                    : 'Este precio se sincroniza en vivo desde la página "Etiquetas".'}
                                         </p>
                                     </div>
                                 ) : (

@@ -88,3 +88,22 @@ export function priceListTexts(lists: PriceList[]): Map<string, string> {
     }
     return map;
 }
+
+// Renglón en edición: el precio se escribe libre ("5.000", "$ 5000") y se
+// interpreta al guardar.
+export type DraftRow = PriceListItem & { priceText: string };
+
+export const toDraftRows = (items: PriceListItem[]): DraftRow[] =>
+    items.map(i => ({ ...i, priceText: formatPrice(i.price) }));
+
+export const fromDraftRows = (rows: DraftRow[]): PriceListItem[] =>
+    rows
+        .filter(r => r.name.trim() || r.priceText.trim())
+        .map(({ priceText, ...r }) => ({
+            id: r.id,
+            name: r.name.trim(),
+            detail: (r.detail || '').trim() || undefined,
+            price: parsePrice(priceText),
+            available: r.available !== false,
+        }));
+
