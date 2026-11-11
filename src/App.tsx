@@ -44,6 +44,7 @@ import TvBootScreen from "./pages/display-hub/TvBootScreen";
 import DisplayWorkspaceLayout from "./pages/display-hub/DisplayWorkspaceLayout";
 import WorkspaceLabels from "./pages/display-hub/WorkspaceLabels";
 import WorkspacePriceLists from "./pages/display-hub/WorkspacePriceLists";
+import WorkspacePosters from "./pages/display-hub/WorkspacePosters";
 import WorkspaceDashboard from "./pages/display-hub/WorkspaceDashboard";
 import { 
   WorkspaceAnalytics, 
@@ -125,6 +126,7 @@ const App = () => (
                   <Route path="apps" element={<WorkspaceMedia initialCategory="apps" />} />
                   <Route path="labels" element={<WorkspaceLabels />} />
                   <Route path="price-lists" element={<WorkspacePriceLists />} />
+                  <Route path="posters" element={<WorkspacePosters />} />
                   <Route path="templates" element={<WorkspaceTemplates />} />
                   <Route path="schedule" element={<WorkspaceSchedule />} />
                   <Route path="ai-knowledge" element={<AIKnowledgeManager />} />

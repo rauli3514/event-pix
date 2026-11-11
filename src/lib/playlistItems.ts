@@ -64,7 +64,7 @@ export function mediaToPlaylistItem(media: DisplayMedia, settings?: { defaultDur
         url: media.url,
         content: media.name,
         metadata: media.metadata || {},
-        duration: real ? Math.max(1, Math.floor(real)) : settings?.defaultDuration || DEFAULT_ITEM_DURATION,
+        duration: real ? Math.max(1, Math.floor(real)) : Number(media.metadata?.config?.durationS) || settings?.defaultDuration || DEFAULT_ITEM_DURATION,
         transition: settings?.transition || 'fade',
         fitMode: 'contain',
         source_id: media.id,
