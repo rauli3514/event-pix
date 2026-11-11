@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Check, ImagePlus, Loader2, Move, Play, Plus, Search, X } from 'lucide-react';
+import { ArrowLeft, Check, ImagePlus, Loader2, Minus, Move, Play, Plus, RotateCcw, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -17,9 +17,9 @@ import { useDisplayCampaigns, useUpdateCampaign } from '@/hooks/use-display-hub'
 import { formatPrice, fromDraftRows, newItemId, parsePrice, toDraftRows, type DraftRow, type PriceList } from '@/lib/priceLists';
 import { DAY_LETTER, WEEK_ORDER } from '@/lib/itemRules';
 import {
-    POSTER_ANIMATIONS, POSTER_APP_ID, POSTER_FONTS, POSTER_FORMATS, POSTER_LAYOUTS, POSTER_TEMPLATES, POSTER_THEMES,
-    configFromTemplate, formatRatio, playlistsWithNewMetadata, posterColors, scheduleBadge,
-    type PosterConfig, type PosterFont, type PosterFormat, type PosterLayout, type PosterTemplate, type TextStyle,
+    POSTER_ANIMATIONS, POSTER_APP_ID, POSTER_FONTS, POSTER_FORMATS, POSTER_LAYOUTS, POSTER_PARTS, POSTER_TEMPLATES, POSTER_THEMES,
+    configFromTemplate, formatInfo, playlistsWithNewMetadata, posterColors, scheduleBadge,
+    type PosterConfig, type PosterFont, type PosterFormat, type PosterLayout, type PosterPart, type PosterTemplate, type TextStyle,
 } from '@/lib/posters';
 import type { DisplayMedia } from '@/types/display';
 
@@ -67,6 +67,7 @@ function PosterEditorDialog({ onClose, commerceId, editing, initialTemplate, ini
     const [search, setSearch] = useState('');
     const [pickingPhoto, setPickingPhoto] = useState<number | null>(null);
     const [replay, setReplay] = useState(0);
+    const [selectedPart, setSelectedPart] = useState<PosterPart | null>(null);
     // Productos: lista nueva (los de la plantilla o desde cero) o una lista existente.
     const [newList, setNewList] = useState(() => !existing && !!initialTemplate?.sampleList?.length);
     const [newRows, setNewRows] = useState<DraftRow[]>(() => sampleRows(initialTemplate));
@@ -83,7 +84,7 @@ function PosterEditorDialog({ onClose, commerceId, editing, initialTemplate, ini
     const updateList = useUpdatePriceList();
 
     const set = (patch: Partial<PosterConfig>) => setConfig(c => (c ? { ...c, ...patch } : c));
-    const setStyle = (key: 'title' | 'list' | 'price', patch: Partial<TextStyle>) =>
+    const setStyle = (key: PosterPart, patch: Partial<TextStyle>) =>
         setConfig(c => (c ? { ...c, styles: { ...c.styles, [key]: { ...c.styles?.[key], ...patch } } } : c));
 
     const pickTemplate = (t: PosterTemplate) => {
@@ -159,7 +160,8 @@ function PosterEditorDialog({ onClose, commerceId, editing, initialTemplate, ini
     };
 
     const saving = upload.isPending || update.isPending || createList.isPending || updateList.isPending;
-    const ratio = formatRatio(format);
+    const fmt = formatInfo(format);
+    const ratio = fmt.ratio;
     const landscape = ratio >= 1.2;
     const previewConfig = config ? { ...config, format, listId: newList ? DRAFT_LIST_ID : config.listId } : null;
     // La vista previa usa los productos como están en el editor, aunque no se hayan guardado.
@@ -201,17 +203,10 @@ function PosterEditorDialog({ onClose, commerceId, editing, initialTemplate, ini
                                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                                 <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar un diseño o rubro (pizza, café, gimnasio…)" className="pl-9" />
                             </div>
-                            <select
-                                value={format}
-                                onChange={e => setFormat(e.target.value as PosterFormat)}
-                                className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-                                aria-label="Formato de la pantalla"
-                            >
-                                {POSTER_FORMATS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
-                            </select>
+                            <FormatSelect value={format} onChange={setFormat} className="h-10 text-sm sm:w-80" />
                         </div>
-                        <p className="text-xs text-muted-foreground">{POSTER_FORMATS.find(f => f.id === format)?.hint} El cartel se acomoda solo si después lo pasás en otra pantalla.</p>
-                        <div className={cn('grid gap-4', ratio < 1 ? 'grid-cols-2 sm:grid-cols-4 lg:grid-cols-5' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3')}>
+                        <p className="text-xs text-muted-foreground">{fmt.hint} Son las mismas medidas que los mosaicos de "Enviar a pantallas".</p>
+                        <div className={cn('grid gap-4', ratio < 0.6 ? 'grid-cols-3 sm:grid-cols-6 lg:grid-cols-8' : ratio < 1 ? 'grid-cols-2 sm:grid-cols-4 lg:grid-cols-5' : ratio > 2.5 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3')}>
                             {filtered.map(t => (
                                 <button key={t.id} type="button" onClick={() => pickTemplate(t)} className="group text-left">
                                     <div className="relative w-full overflow-hidden rounded-xl border border-border group-hover:border-indigo-500 transition-colors" style={{ paddingTop: `${100 / ratio}%` }}>
@@ -228,22 +223,45 @@ function PosterEditorDialog({ onClose, commerceId, editing, initialTemplate, ini
                 ) : config && previewConfig && (
                     <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
                         {/* Vista previa */}
-                        <div className="shrink-0 lg:flex-1 bg-muted/40 p-3 lg:p-6 flex items-center justify-center">
-                            <div className="w-full" style={{ maxWidth: ratio < 1 ? 240 : 760 }}>
-                                <div className="relative w-full overflow-hidden rounded-xl shadow-lg" style={{ paddingTop: `${100 / ratio}%` }}>
-                                    <div className="absolute inset-0">
-                                        <PosterView
-                                            key={replay}
-                                            config={previewConfig}
-                                            lists={previewLists}
-                                            onCardMove={config.layout === 'card' ? pos => set({ cardPos: pos }) : undefined}
-                                        />
-                                    </div>
+                        <div className="shrink-0 h-[44dvh] lg:h-auto lg:flex-1 min-h-0 bg-muted/40 p-3 lg:p-6 flex flex-col gap-2">
+                            <FitBox ratio={ratio}>
+                                <div className="relative w-full h-full overflow-hidden rounded-xl shadow-lg">
+                                    <PosterView
+                                        key={replay}
+                                        config={previewConfig}
+                                        lists={previewLists}
+                                        onCardMove={config.layout === 'card' ? pos => set({ cardPos: pos }) : undefined}
+                                        editParts={{
+                                            selected: selectedPart,
+                                            onSelect: setSelectedPart,
+                                            onMove: (part, offset) => setConfig(c => (c ? { ...c, offsets: { ...c.offsets, [part]: offset } } : c)),
+                                        }}
+                                    />
+                                    {/* Uniones de las TV en un mosaico */}
+                                    {Array.from({ length: fmt.cols - 1 }, (_, i) => (
+                                        <div key={`c${i}`} className="pointer-events-none absolute top-0 bottom-0 border-l-2 border-dashed border-white/70 mix-blend-difference" style={{ left: `${((i + 1) / fmt.cols) * 100}%` }} />
+                                    ))}
+                                    {Array.from({ length: fmt.rows - 1 }, (_, i) => (
+                                        <div key={`r${i}`} className="pointer-events-none absolute left-0 right-0 border-t-2 border-dashed border-white/70 mix-blend-difference" style={{ top: `${((i + 1) / fmt.rows) * 100}%` }} />
+                                    ))}
                                 </div>
-                                {config.layout === 'card' && (
-                                    <p className="mt-2 text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><Move className="w-3.5 h-3.5" /> Arrastrá la tarjeta para ubicarla donde no tape la foto.</p>
-                                )}
-                            </div>
+                            </FitBox>
+                            <PartToolbar
+                                part={selectedPart}
+                                scale={selectedPart ? config.styles?.[selectedPart]?.scale || 1 : 1}
+                                moved={!!selectedPart && !!config.offsets?.[selectedPart]}
+                                anyMoved={Object.values(config.offsets || {}).some(o => o && (o.x || o.y)) || !!config.cardPos}
+                                isCard={config.layout === 'card'}
+                                onScale={v => selectedPart && setStyle(selectedPart, { scale: v })}
+                                onReset={() => selectedPart && setConfig(c => {
+                                    if (!c) return c;
+                                    const offsets = { ...c.offsets };
+                                    delete offsets[selectedPart];
+                                    return { ...c, offsets };
+                                })}
+                                onResetAll={() => set({ offsets: {}, cardPos: null })}
+                                onClose={() => setSelectedPart(null)}
+                            />
                         </div>
 
                         {/* Controles */}
@@ -294,9 +312,8 @@ function PosterEditorDialog({ onClose, commerceId, editing, initialTemplate, ini
                                             )}
                                         </Field>
                                         <Field label="Pantalla">
-                                            <select value={format} onChange={e => setFormat(e.target.value as PosterFormat)} className="h-10 w-full rounded-md border border-input bg-background px-3">
-                                                {POSTER_FORMATS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
-                                            </select>
+                                            <FormatSelect value={format} onChange={setFormat} className="h-10 w-full" />
+                                            <p className="text-xs text-muted-foreground">{fmt.hint}{fmt.cols * fmt.rows > 1 ? ' Las líneas punteadas de la vista previa marcan dónde se juntan las TV: conviene no dejar textos ahí.' : ''}</p>
                                         </Field>
                                         <Field label="Colores">
                                             <div className="flex flex-wrap gap-2">
@@ -601,6 +618,75 @@ function StyleControls({ style, onChange }: { style?: TextStyle; onChange: (p: P
                 <span className="text-xs text-muted-foreground">Sombra</span>
                 <Switch checked={!!style?.shadow} onCheckedChange={v => onChange({ shadow: v })} />
             </div>
+        </div>
+    );
+}
+
+// Elegir el formato: las mismas medidas que los mosaicos.
+function FormatSelect({ value, onChange, className }: { value: PosterFormat; onChange: (f: PosterFormat) => void; className?: string }) {
+    const groups = ['TV horizontal', 'TV vertical', 'Otros'] as const;
+    return (
+        <select value={value} onChange={e => onChange(e.target.value as PosterFormat)} aria-label="Formato de la pantalla"
+            className={cn('rounded-md border border-input bg-background px-3', className)}>
+            {groups.map(g => {
+                const options = POSTER_FORMATS.filter(f => f.group === g && (!f.legacy || f.id === value));
+                if (!options.length) return null;
+                return (
+                    <optgroup key={g} label={g}>
+                        {options.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
+                    </optgroup>
+                );
+            })}
+        </select>
+    );
+}
+
+// La vista previa entra entera en el espacio que hay (ancho y alto).
+function FitBox({ ratio, children }: { ratio: number; children: ReactNode }) {
+    const ref = useRef<HTMLDivElement>(null);
+    const [box, setBox] = useState({ w: 0, h: 0 });
+    useLayoutEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        const read = () => setBox(prev => (prev.w === el.clientWidth && prev.h === el.clientHeight ? prev : { w: el.clientWidth, h: el.clientHeight }));
+        read();
+        const ro = new ResizeObserver(read);
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, []);
+    const width = Math.min(box.w, box.h * ratio, 1100);
+    return (
+        <div ref={ref} className="flex-1 min-h-0 flex items-center justify-center">
+            {width > 0 && <div style={{ width, height: width / ratio }}>{children}</div>}
+        </div>
+    );
+}
+
+// Debajo de la vista previa: la parte elegida, su tamaño y volver a su lugar.
+function PartToolbar({ part, scale, moved, anyMoved, isCard, onScale, onReset, onResetAll, onClose }: {
+    part: PosterPart | null; scale: number; moved: boolean; anyMoved: boolean; isCard: boolean;
+    onScale: (v: number) => void; onReset: () => void; onResetAll: () => void; onClose: () => void;
+}) {
+    if (!part) {
+        return (
+            <div className="shrink-0 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1"><Move className="w-3.5 h-3.5" /> Tocá una parte (título, precio, lista, QR…) para moverla o cambiarle el tamaño.{isCard ? ' La tarjeta se arrastra desde el borde.' : ''}</span>
+                {anyMoved && <button type="button" onClick={onResetAll} className="underline inline-flex items-center gap-1"><RotateCcw className="w-3 h-3" /> Volver todo a su lugar</button>}
+            </div>
+        );
+    }
+    const step = (d: number) => onScale(Math.round(Math.min(2.5, Math.max(0.4, scale + d)) * 100) / 100);
+    return (
+        <div className="shrink-0 mx-auto flex flex-wrap items-center justify-center gap-2 rounded-xl border border-indigo-500/40 bg-background px-3 py-1.5 text-sm shadow-sm">
+            <span className="font-semibold text-indigo-600 dark:text-indigo-300">{POSTER_PARTS[part]}</span>
+            <span className="text-muted-foreground text-xs">Tamaño</span>
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => step(-0.1)} aria-label="Más chico"><Minus className="w-4 h-4" /></Button>
+            <span className="w-11 text-center text-xs tabular-nums">{Math.round(scale * 100)}%</span>
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => step(0.1)} aria-label="Más grande"><Plus className="w-4 h-4" /></Button>
+            {(moved || scale !== 1) && (
+                <Button variant="ghost" size="sm" className="h-8" onClick={() => { onReset(); onScale(1); }}><RotateCcw className="w-3.5 h-3.5 mr-1" /> Como estaba</Button>
+            )}
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose} aria-label="Listo"><X className="w-4 h-4" /></Button>
         </div>
     );
 }
