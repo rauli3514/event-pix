@@ -1,8 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useLivePriceLists } from '@/hooks/use-live-price-lists';
 import { formatPrice, type PriceList } from '@/lib/priceLists';
-import { POSTER_FONTS, scheduleBadge, themeOf, type PosterConfig, type PosterTemplate, type TextStyle } from '@/lib/posters';
+import {
+    POSTER_FONTS, QR_DEFAULT_LABEL, fitList, parseQrUrl, posterColors, scheduleBadge,
+    type PosterConfig, type PosterListRow as Row, type PosterTemplate, type TextStyle,
+} from '@/lib/posters';
 
 // Dibuja un cartel (ver lib/posters). Todo se mide en "u" = 1 % del lado corto
 // de la pantalla, así se ve igual en el celular y en una TV de 65". Se usa
@@ -15,9 +18,9 @@ interface Props {
     lists?: PriceList[];
     // Lista de ejemplo de la plantilla, cuando todavía no se vinculó una.
     sampleList?: PosterTemplate['sampleList'];
+    // Editor: la tarjeta se puede arrastrar con el dedo o el mouse.
+    onCardMove?: (pos: { x: number; y: number }) => void;
 }
-
-interface Row { name: string; detail?: string; price: string }
 
 function useBox(ref: React.RefObject<HTMLDivElement | null>) {
     const [box, setBox] = useState({ w: 0, h: 0 });
@@ -44,15 +47,23 @@ function useClock(enabled: boolean) {
 }
 
 const abs = (s: CSSProperties): CSSProperties => ({ position: 'absolute', ...s });
+const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
 
-export function PosterView({ config, commerceId, lists: listsProp, sampleList }: Props) {
+const ENTRANCE: Record<string, { name: string; dur: number; ease: string }> = {
+    fade: { name: 'poster-fade', dur: 0.9, ease: 'ease-out' },
+    slide: { name: 'poster-up', dur: 0.8, ease: 'cubic-bezier(.2,.8,.2,1)' },
+    pop: { name: 'poster-pop', dur: 0.6, ease: 'ease-out' },
+};
+
+export function PosterView({ config, commerceId, lists: listsProp, sampleList, onCardMove }: Props) {
     const ref = useRef<HTMLDivElement>(null);
+    const drag = useRef<{ sx: number; sy: number; x: number; y: number } | null>(null);
     const { w: W, h: H } = useBox(ref);
     const live = useLivePriceLists(listsProp ? null : commerceId);
     const lists = listsProp || live;
     const now = useClock(!!config.showClock);
 
-    const theme = themeOf(config.themeId);
+    const theme = posterColors(config);
     const font = POSTER_FONTS[config.font] || POSTER_FONTS.modern;
 
     // Renglones: la lista vinculada (sin los "sin stock") o el ejemplo de la plantilla.
@@ -73,6 +84,13 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList }:
     const u = Math.min(W, H) / 100;
     const photos = (config.photos || []).filter(Boolean);
 
+    // Animaciones: cada parte entra un poquito después de la anterior.
+    const entrance = config.animation && config.animation !== 'none' ? ENTRANCE[config.animation] : null;
+    const animStyle = (i: number): CSSProperties | undefined => (entrance
+        ? { animation: `${entrance.name} ${entrance.dur}s ${entrance.ease} ${(0.2 + i * 0.14).toFixed(2)}s both` }
+        : undefined);
+    const seq = (node: ReactNode, i: number) => (node ? <div style={animStyle(i)}>{node}</div> : null);
+
     const textStyle = (base: number, style: TextStyle | undefined, color: string): CSSProperties => ({
         fontSize: base * u * (style?.scale || 1),
         color: style?.color || color,
@@ -80,30 +98,31 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList }:
     });
 
     const renderPhoto = (url: string | undefined, style: CSSProperties, key?: string) => (
-        <div
-            key={key}
-            style={abs({
-                ...style,
-                backgroundColor: '#222',
-                backgroundImage: url ? `url("${url}")` : theme.photoTint,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-            })}
-        />
+        <div key={key} style={abs({ ...style, overflow: 'hidden', backgroundColor: '#222', animation: entrance ? 'poster-fade 1s ease-out both' : undefined })}>
+            <div
+                className={config.photoMotion ? 'poster-motion' : undefined}
+                style={abs({
+                    left: 0, top: 0, width: '100%', height: '100%',
+                    backgroundImage: url ? `url("${url}")` : theme.photoTint,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    animation: config.photoMotion ? 'poster-photo-zoom 14s ease-in-out infinite alternate' : undefined,
+                })}
+            />
+        </div>
     );
 
     // Fotos de fondo: una ocupa todo; dos van lado a lado (o una arriba de otra).
-    const renderPhotos = (area: CSSProperties & { width: number; height: number }) => {
-        const { width, height, ...pos } = area;
-        if (photos.length < 2) return renderPhoto(photos[0], { ...pos, width, height });
+    const renderPhotos = (area: { left: number; top: number; width: number; height: number }) => {
+        const { width, height, left, top } = area;
+        if (photos.length < 2) return renderPhoto(photos[0], { left, top, width, height });
         const sideBySide = width / Math.max(1, height) >= 1;
         return (
             <>
-                {renderPhoto(photos[0], { ...pos, width: sideBySide ? width / 2 : width, height: sideBySide ? height : height / 2 }, 'a')}
+                {renderPhoto(photos[0], { left, top, width: sideBySide ? width / 2 : width, height: sideBySide ? height : height / 2 }, 'a')}
                 {renderPhoto(photos[1], {
-                    ...pos,
-                    left: (Number(pos.left) || 0) + (sideBySide ? width / 2 : 0),
-                    top: (Number(pos.top) || 0) + (sideBySide ? 0 : height / 2),
+                    left: left + (sideBySide ? width / 2 : 0),
+                    top: top + (sideBySide ? 0 : height / 2),
                     width: sideBySide ? width / 2 : width,
                     height: sideBySide ? height : height / 2,
                 }, 'b')}
@@ -112,14 +131,14 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList }:
     };
 
     const renderBadge = () => (badge ? (
-        <div style={{ display: 'inline-block', alignSelf: 'flex-start', background: theme.accent, color: theme.panel, fontFamily: POSTER_FONTS.modern.family, fontWeight: 800, letterSpacing: '0.08em', fontSize: 2.2 * u, padding: `${0.5 * u}px ${1.4 * u}px`, borderRadius: 99, marginBottom: 2 * u, whiteSpace: 'nowrap' }}>
+        <div style={{ display: 'inline-block', background: theme.accent, color: theme.panel, fontFamily: POSTER_FONTS.modern.family, fontWeight: 800, letterSpacing: '0.08em', fontSize: 2.2 * u, padding: `${0.5 * u}px ${1.4 * u}px`, borderRadius: 99, marginBottom: 2 * u, whiteSpace: 'nowrap' }}>
             {badge}
         </div>
     ) : null);
 
     const titleFamily = font.family;
     const renderTitle = (base: number, align: 'left' | 'center' = 'left') => (config.title ? (
-        <div style={{ ...textStyle(base, config.styles?.title, theme.text), fontFamily: titleFamily, fontWeight: font.weight, lineHeight: config.font === 'script' ? 1.15 : 1.02, textAlign: align, letterSpacing: config.font === 'impact' ? '0.01em' : undefined }}>
+        <div style={{ ...textStyle(base, config.styles?.title, theme.text), fontFamily: titleFamily, fontWeight: font.weight, lineHeight: config.font === 'script' ? 1.15 : 1.02, textAlign: align, letterSpacing: config.font === 'impact' ? '0.01em' : undefined, wordWrap: 'break-word' }}>
             {config.title}
         </div>
     ) : null);
@@ -131,8 +150,22 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList }:
     ) : null);
 
     const renderPrice = (base: number, align: 'left' | 'center' | 'right' = 'left') => (price ? (
-        <div style={{ ...textStyle(base, config.styles?.price, theme.accent), fontFamily: font.family === POSTER_FONTS.script.family ? POSTER_FONTS.modern.family : font.family, fontWeight: 800, lineHeight: 1, marginTop: 2 * u, textAlign: align, whiteSpace: 'nowrap' }}>
-            {price}
+        <div style={{ marginTop: 2 * u, textAlign: align }}>
+            <div
+                className={config.pricePulse ? 'poster-motion' : undefined}
+                style={{
+                    ...textStyle(base, config.styles?.price, theme.accent),
+                    display: 'inline-block',
+                    fontFamily: font.family === POSTER_FONTS.script.family ? POSTER_FONTS.modern.family : font.family,
+                    fontWeight: 800,
+                    lineHeight: 1,
+                    whiteSpace: 'nowrap',
+                    transformOrigin: align === 'right' ? 'right center' : align === 'center' ? 'center' : 'left center',
+                    animation: config.pricePulse ? 'poster-pulse 1.8s ease-in-out 1.2s infinite' : undefined,
+                }}
+            >
+                {price}
+            </div>
         </div>
     ) : null);
 
@@ -140,14 +173,16 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList }:
     const renderList = (width: number, height: number, maxBase = 3.4) => {
         if (!rows.length || height <= 0) return null;
         const details = config.showDetails !== false && rows.some(r => r.detail);
-        const wide = width / u;
-        const cols = config.listColumns === 1 ? 1 : config.listColumns === 2 ? 2 : ((rows.length > 6 && wide > 70) || (rows.length >= 4 && wide > 140) ? 2 : 1);
-        const perCol = Math.ceil(rows.length / cols);
-        const rowEm = details ? 2.75 : 1.85;
         const scale = config.styles?.list?.scale || 1;
-        const size = Math.max(1.4 * u, Math.min(maxBase * u * scale, height / (perCol * rowEm)));
+        const { size, cols } = fitList(rows, {
+            width, height: height - 2.5 * u, u, details,
+            maxSize: maxBase * u * scale,
+            minSize: 1.1 * u,
+            columns: config.listColumns || 'auto',
+        });
         const color = config.styles?.list?.color || theme.text;
         const shadow = config.styles?.list?.shadow ? '0 0.08em 0.3em rgba(0,0,0,0.6)' : undefined;
+        const perCol = Math.ceil(rows.length / cols);
         const colWidth = (width - (cols - 1) * 3 * u) / cols;
         const columns: Row[][] = [];
         for (let c = 0; c < cols; c++) columns.push(rows.slice(c * perCol, (c + 1) * perCol));
@@ -157,8 +192,8 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList }:
                     <div key={c} style={{ width: colWidth, marginLeft: c ? 3 * u : 0 }}>
                         {col.map((r, i) => (
                             <div key={i} style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', borderBottom: `1px solid ${color}22`, padding: `${size * 0.32}px 0`, fontSize: size, color, textShadow: shadow }}>
-                                <div style={{ minWidth: 0, overflow: 'hidden', marginRight: size * 0.6 }}>
-                                    <div style={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.name}</div>
+                                <div style={{ flex: 1, minWidth: 0, marginRight: size * 0.6 }}>
+                                    <div style={{ fontWeight: 700, lineHeight: 1.15, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', wordWrap: 'break-word' }}>{r.name}</div>
                                     {details && r.detail && <div style={{ fontSize: '0.62em', opacity: 0.7, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.detail}</div>}
                                 </div>
                                 <div style={{ fontWeight: 800, color: config.styles?.list?.color ? color : theme.accent, whiteSpace: 'nowrap' }}>{r.price}</div>
@@ -178,41 +213,54 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList }:
         return (badge ? 6 * u : 0) + titleLines * ft * 1.05 + (config.subtitle ? 4.5 * u : 0) + pt + 3 * u;
     };
 
-    // Panel con todo el contenido (split, menu y la tarjeta).
-    const renderPanel = ({ width, height, pad, titleBase, priceBase }: { width: number; height: number; pad: number; titleBase: number; priceBase: number }) => {
+    // Panel con todo el contenido (split y la tarjeta).
+    const renderPanel = ({ width, height, pad, titleBase, priceBase, stagger = true }: { width: number; height: number; pad: number; titleBase: number; priceBase: number; stagger?: boolean }) => {
         const innerW = width - 2 * pad;
         const innerH = height - 2 * pad;
+        const part = (node: ReactNode, i: number) => (stagger ? seq(node, i) : node);
         return (
             <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', width: innerW, height: innerH }}>
-                {renderBadge()}
-                {renderTitle(titleBase)}
-                {renderSubtitle(3.2)}
-                {renderList(innerW, innerH - reserved(innerW, titleBase))}
-                {renderPrice(priceBase)}
+                {part(renderBadge(), 0)}
+                {part(renderTitle(titleBase), 1)}
+                {part(renderSubtitle(3.2), 2)}
+                {part(renderList(innerW, innerH - reserved(innerW, titleBase)), 3)}
+                {part(renderPrice(priceBase), 4)}
             </div>
         );
     };
 
+    const share = (fallback: number) => clamp(config.photoShare || fallback, 0.25, 0.75);
+
     let body: ReactNode = null;
     if (W > 0 && H > 0) {
         const layout = config.layout;
+        const flip = !!config.flip;
         if (layout === 'split') {
-            const photoArea = landscape ? { left: 0, top: 0, width: W * 0.5, height: H } : { left: 0, top: 0, width: W, height: H * 0.42 };
-            const panel = landscape ? { left: W * 0.5, top: 0, width: W * 0.5, height: H } : { left: 0, top: H * 0.42, width: W, height: H * 0.58 };
+            const s = share(landscape ? 0.5 : 0.42);
+            const photoArea = landscape
+                ? { left: flip ? W * (1 - s) : 0, top: 0, width: W * s, height: H }
+                : { left: 0, top: flip ? H * (1 - s) : 0, width: W, height: H * s };
+            const panel = landscape
+                ? { left: flip ? 0 : W * s, top: 0, width: W * (1 - s), height: H }
+                : { left: 0, top: flip ? 0 : H * s, width: W, height: H * (1 - s) };
             const pad = 6 * u;
             body = (
                 <>
                     {renderPhotos(photoArea)}
                     <div style={abs({ ...panel, background: theme.panel, padding: pad, boxSizing: 'border-box' })}>
-                        {renderPanel({ width: panel.width, height: panel.height, pad: pad, titleBase: rows.length ? 6.5 : 9, priceBase: rows.length ? 9 : 13 })}
+                        {renderPanel({ width: panel.width, height: panel.height, pad, titleBase: rows.length ? 6.5 : 9, priceBase: rows.length ? 9 : 13 })}
                     </div>
                 </>
             );
         } else if (layout === 'menu') {
             const hasPhoto = photos.length > 0;
-            const photoArea = landscape ? { left: W * 0.6, top: 0, width: W * 0.4, height: H } : { left: 0, top: 0, width: W, height: H * 0.28 };
+            const s = share(landscape ? 0.4 : 0.28);
+            const photoArea = landscape
+                ? { left: flip ? 0 : W * (1 - s), top: 0, width: W * s, height: H }
+                : { left: 0, top: flip ? H * (1 - s) : 0, width: W, height: H * s };
             const panel = !hasPhoto ? { left: 0, top: 0, width: W, height: H }
-                : landscape ? { left: 0, top: 0, width: W * 0.6, height: H } : { left: 0, top: H * 0.28, width: W, height: H * 0.72 };
+                : landscape ? { left: flip ? W * s : 0, top: 0, width: W * (1 - s), height: H }
+                    : { left: 0, top: flip ? 0 : H * s, width: W, height: H * (1 - s) };
             const pad = 6 * u;
             body = (
                 <>
@@ -220,55 +268,89 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList }:
                     {hasPhoto && renderPhotos(photoArea)}
                     <div style={abs({ ...panel, padding: pad, boxSizing: 'border-box' })}>
                         <div style={{ display: 'flex', flexDirection: 'column', height: panel.height - 2 * pad }}>
-                            {renderBadge()}
-                            <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap' }}>
-                                {renderTitle(8)}
-                                {config.subtitle && (
-                                    <div style={{ marginLeft: 1.6 * u, fontSize: 2.6 * u, color: theme.accent, fontFamily: POSTER_FONTS.modern.family, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{config.subtitle}</div>
-                                )}
-                            </div>
-                            <div style={{ width: 8 * u, height: 0.6 * u, background: theme.accent, marginTop: 1.4 * u, borderRadius: 99 }} />
-                            {renderList(panel.width - 2 * pad, panel.height - 2 * pad - reserved(panel.width - 2 * pad, 8) - 2 * u, landscape ? 5.5 : 7)}
-                            {renderPrice(9)}
+                            {seq(renderBadge(), 0)}
+                            {seq(
+                                <>
+                                    <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap' }}>
+                                        {renderTitle(8)}
+                                        {config.subtitle && (
+                                            <div style={{ marginLeft: 1.6 * u, fontSize: 2.6 * u, color: theme.accent, fontFamily: POSTER_FONTS.modern.family, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase' }}>{config.subtitle}</div>
+                                        )}
+                                    </div>
+                                    <div style={{ width: 8 * u, height: 0.6 * u, background: theme.accent, marginTop: 1.4 * u, borderRadius: 99 }} />
+                                </>,
+                                1,
+                            )}
+                            {seq(renderList(panel.width - 2 * pad, panel.height - 2 * pad - reserved(panel.width - 2 * pad, 8) - 2 * u, landscape ? 8 : 9), 2)}
+                            {seq(renderPrice(9), 3)}
                         </div>
                     </div>
                 </>
             );
         } else if (layout === 'band') {
-            const bandH = H * (landscape ? 0.32 : 0.36);
+            const bandH = H * (1 - share(landscape ? 0.68 : 0.64));
             const pad = 4 * u;
             const innerW = W - 2 * pad;
             body = (
                 <>
                     {renderPhotos({ left: 0, top: 0, width: W, height: H })}
-                    <div style={abs({ left: 0, top: H - bandH, width: W, height: bandH, background: theme.panel, opacity: 0.96, padding: pad, boxSizing: 'border-box', display: 'flex', flexDirection: landscape ? 'row' : 'column', alignItems: landscape ? 'center' : 'flex-start', justifyContent: 'center' })}>
+                    <div style={abs({ left: 0, top: flip ? 0 : H - bandH, width: W, height: bandH, background: theme.panel, opacity: 0.96, padding: pad, boxSizing: 'border-box', display: 'flex', flexDirection: landscape ? 'row' : 'column', alignItems: landscape ? 'center' : 'flex-start', justifyContent: 'center', ...(animStyle(0) || {}) })}>
                         <div style={{ flex: landscape ? 1 : undefined, minWidth: 0, width: landscape ? undefined : '100%' }}>
-                            {renderBadge()}
-                            {renderTitle(landscape ? 6 : 7)}
-                            {renderSubtitle(3)}
-                            {rows.length > 0 && renderList(price && landscape ? innerW * 0.62 : innerW, bandH - 2 * pad - reserved(innerW * 0.62, landscape ? 6 : 7) + (price && landscape ? 10 * u : 0))}
+                            {seq(renderBadge(), 1)}
+                            {seq(renderTitle(landscape ? 6 : 7), 2)}
+                            {seq(renderSubtitle(3), 3)}
+                            {rows.length > 0 && seq(renderList(price && landscape ? innerW * 0.62 : innerW, bandH - 2 * pad - reserved(innerW * 0.62, landscape ? 6 : 7) + (price && landscape ? 10 * u : 0)), 4)}
                         </div>
-                        {price && <div style={{ marginLeft: landscape ? 3 * u : 0 }}>{renderPrice(landscape ? 11 : 10, landscape ? 'right' : 'left')}</div>}
+                        {price && <div style={{ marginLeft: landscape ? 3 * u : 0, ...(animStyle(5) || {}) }}>{renderPrice(landscape ? 11 : 10, landscape ? 'right' : 'left')}</div>}
                     </div>
                 </>
             );
         } else {
-            // card: fotos de fondo y una tarjeta encima.
-            const cardW = landscape ? Math.min(W * 0.46, H * 1.05) : W * 0.82;
-            const cardMaxH = H * (landscape ? 0.78 : 0.6);
+            // card: fotos de fondo y una tarjeta encima, que se puede mover y agrandar.
+            const size = clamp(config.cardSize || 1, 0.6, 1.5);
+            const cardW = Math.min(W * 0.96, (landscape ? Math.min(W * 0.46, H * 1.05) : W * 0.82) * size);
+            const cardMaxH = Math.min(H * 0.96, H * (landscape ? 0.78 : 0.6) * size);
+            const pos = config.cardPos || { x: 0.5, y: landscape ? 0.5 : 0.66 };
+            const left = clamp(pos.x * W - cardW / 2, 0, W - cardW);
+            const top = clamp(pos.y * H - cardMaxH / 2, 0, H - cardMaxH);
             const pad = 4 * u;
+            const editable = !!onCardMove;
+            const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+                if (!editable) return;
+                e.preventDefault();
+                drag.current = { sx: e.clientX, sy: e.clientY, x: (left + cardW / 2) / W, y: (top + cardMaxH / 2) / H };
+                e.currentTarget.setPointerCapture?.(e.pointerId);
+            };
+            const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+                const d = drag.current;
+                if (!d || !onCardMove) return;
+                const halfW = cardW / 2 / W;
+                const halfH = cardMaxH / 2 / H;
+                onCardMove({
+                    x: Math.round(clamp(d.x + (e.clientX - d.sx) / W, halfW, 1 - halfW) * 1000) / 1000,
+                    y: Math.round(clamp(d.y + (e.clientY - d.sy) / H, halfH, 1 - halfH) * 1000) / 1000,
+                });
+            };
+            const endDrag = () => { drag.current = null; };
             body = (
                 <>
                     {renderPhotos({ left: 0, top: 0, width: W, height: H })}
                     <div
+                        onPointerDown={onPointerDown}
+                        onPointerMove={onPointerMove}
+                        onPointerUp={endDrag}
+                        onPointerCancel={endDrag}
                         style={abs({
-                            left: (W - cardW) / 2,
-                            top: landscape ? (H - cardMaxH) / 2 : H * 0.36,
+                            left,
+                            top,
                             width: cardW,
                             height: cardMaxH,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
+                            cursor: editable ? 'grab' : undefined,
+                            touchAction: editable ? 'none' : undefined,
+                            ...(animStyle(0) || {}),
                         })}
                     >
                         <div
@@ -282,6 +364,8 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList }:
                                 boxShadow: `0 ${1.5 * u}px ${5 * u}px rgba(0,0,0,0.45)`,
                                 transform: config.tilt ? 'rotate(-4deg)' : undefined,
                                 overflow: 'hidden',
+                                outline: editable ? '2px dashed rgba(255,255,255,0.75)' : undefined,
+                                outlineOffset: editable ? 3 : undefined,
                             }}
                         >
                             {renderBadge()}
@@ -296,6 +380,8 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList }:
         }
     }
 
+    const qrLabel = config.qrUrl ? (config.qrLabel ?? QR_DEFAULT_LABEL[parseQrUrl(config.qrUrl).kind]) : '';
+
     return (
         <div ref={ref} style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: theme.panel }}>
             {body}
@@ -305,8 +391,11 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList }:
                 </div>
             )}
             {W > 0 && config.qrUrl && (
-                <div style={abs({ right: 3 * u, bottom: 3 * u, background: '#fff', padding: 1 * u, borderRadius: 1 * u })}>
-                    <QRCodeSVG value={config.qrUrl} size={Math.round(14 * u)} level="M" />
+                <div style={abs({ right: 3 * u, bottom: 3 * u, background: '#fff', padding: 1.2 * u, borderRadius: 1.2 * u, width: 17 * u, boxSizing: 'content-box', textAlign: 'center' })}>
+                    <QRCodeSVG value={config.qrUrl} size={Math.round(17 * u)} level="M" style={{ display: 'block' }} />
+                    {qrLabel && (
+                        <div style={{ marginTop: 0.8 * u, fontSize: 2.1 * u, lineHeight: 1.15, fontWeight: 700, color: '#111', fontFamily: POSTER_FONTS.modern.family }}>{qrLabel}</div>
+                    )}
                 </div>
             )}
         </div>

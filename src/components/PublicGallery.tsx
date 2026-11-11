@@ -84,7 +84,7 @@ export const PublicGallery = ({ eventId }: PublicGalleryProps) => {
                     Ver Galería de Fotos
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 bg-slate-950 border-slate-800">
+            <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 bg-slate-950 border-slate-800 text-white">
                 <GalleryPhotos eventId={eventId} onSelect={setSelectedImage} />
             </DialogContent>
 

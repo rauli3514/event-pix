@@ -1,18 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowDown, ArrowUp, Check, ClipboardPaste, ListOrdered, Loader2, MoreVertical, Percent, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, ClipboardPaste, Copy, Eye, EyeOff, ListOrdered, Loader2, MoreVertical, Percent, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { usePriceLists, useCreatePriceList, useUpdatePriceList, useDeletePriceList } from '@/hooks/use-price-lists';
 import { useDisplayLabelGroups } from '@/hooks/use-display-labels';
 import {
-    PriceList, PriceListItem, emptyItem, formatPrice, increasePrice, parsePastedList, parsePrice,
+    PriceList, PriceListItem, emptyItem, formatPrice, increasePrice, newItemId, normalizeItemName, parsePastedList, parsePrice,
 } from '@/lib/priceLists';
 
 // Listas de precios: el comerciante carga sus precios una vez ("Pizzas",
@@ -48,6 +47,9 @@ const sameItems = (a: PriceListItem[], b: PriceListItem[]) => canonical(a) === c
 
 const ROUND_OPTIONS = [1, 10, 50, 100, 500];
 
+// Campos "fantasma": se ven como texto y se editan con un toque.
+const GHOST = 'border-transparent bg-transparent shadow-none px-2 hover:border-border focus-visible:border-input focus-visible:bg-background';
+
 export default function WorkspacePriceLists() {
     const { commerceId } = useParams();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -66,6 +68,7 @@ export default function WorkspacePriceLists() {
     const [savedAt, setSavedAt] = useState<number | null>(null);
     const [pasteOpen, setPasteOpen] = useState(false);
     const [raiseOpen, setRaiseOpen] = useState(false);
+    const [search, setSearch] = useState('');
     const focusRowRef = useRef<string | null>(null);
 
     const dirty = !!draft && !!selected && draft.listId === selected.id
@@ -135,7 +138,19 @@ export default function WorkspacePriceLists() {
         });
     };
     const removeItem = (id: string) => setDraft(d => d && ({ ...d, items: d.items.filter(item => item.id !== id) }));
+    const duplicateItem = (index: number) => {
+        setSavedAt(null);
+        setDraft(d => {
+            if (!d) return d;
+            const items = [...d.items];
+            const copy = { ...items[index], id: newItemId() };
+            focusRowRef.current = copy.id;
+            items.splice(index + 1, 0, copy);
+            return { ...d, items };
+        });
+    };
     const addItem = () => {
+        setSearch('');
         const item = { ...emptyItem(), priceText: '' };
         focusRowRef.current = item.id;
         setSavedAt(null);
@@ -240,69 +255,105 @@ export default function WorkspacePriceLists() {
                                         <Button variant="ghost" size="icon" aria-label="Más opciones"><MoreVertical className="w-5 h-5" /></Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
-                                        <DropdownMenuItem onClick={() => setPasteOpen(true)}><ClipboardPaste className="w-4 h-4 mr-2" /> Pegar una lista</DropdownMenuItem>
                                         <DropdownMenuItem onClick={() => setRaiseOpen(true)}><Percent className="w-4 h-4 mr-2" /> Aumentar precios</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setPasteOpen(true)}><ClipboardPaste className="w-4 h-4 mr-2" /> Pegar una lista</DropdownMenuItem>
                                         <DropdownMenuItem onClick={removeList} className="text-rose-600"><Trash2 className="w-4 h-4 mr-2" /> Eliminar lista</DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             </div>
 
-                            <div className="flex flex-wrap gap-2 px-4 pt-3">
-                                <Button variant="outline" size="sm" onClick={() => setRaiseOpen(true)}><Percent className="w-4 h-4 mr-1.5" /> Aumentar precios</Button>
-                                <Button variant="outline" size="sm" onClick={() => setPasteOpen(true)}><ClipboardPaste className="w-4 h-4 mr-1.5" /> Pegar una lista</Button>
+                            {/* Barra: buscar y atajos */}
+                            <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border">
+                                <div className="relative flex-1 min-w-0">
+                                    <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                                    <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar producto" className="h-9 pl-8" aria-label="Buscar producto" />
+                                </div>
+                                <Button variant="ghost" size="sm" onClick={() => setRaiseOpen(true)} title="Aumentar o bajar todos los precios en %" className="h-9 px-2.5 text-muted-foreground hover:text-foreground">
+                                    <Percent className="w-4 h-4 sm:mr-1.5" /><span className="hidden sm:inline">Aumentar</span>
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => setPasteOpen(true)} title="Pegar una lista de WhatsApp o Excel" className="h-9 px-2.5 text-muted-foreground hover:text-foreground">
+                                    <ClipboardPaste className="w-4 h-4 sm:mr-1.5" /><span className="hidden sm:inline">Pegar</span>
+                                </Button>
+                                <Button size="sm" onClick={addItem} className="h-9 px-3"><Plus className="w-4 h-4 sm:mr-1.5" /><span className="hidden sm:inline">Producto</span></Button>
+                            </div>
+
+                            {/* Encabezado de columnas (compu) */}
+                            <div className="hidden md:flex items-center gap-2 px-3 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                <span className="flex-1 pl-2">Producto</span>
+                                <span className="w-36 pl-2">Aclaración</span>
+                                <span className="w-32 text-right pr-2">Precio</span>
+                                <span className="w-[4.5rem]" />
                             </div>
 
                             <ul className="divide-y divide-border">
-                                {draft.items.map((item, i) => (
-                                    <li key={item.id} className={cn('p-4 space-y-2', !item.available && 'bg-muted/40')}>
-                                        <div className="flex gap-2">
-                                            <div className="flex-1 min-w-0 space-y-1.5">
+                                {draft.items.map((item, i) => {
+                                    const q = normalizeItemName(search);
+                                    if (q && !normalizeItemName(`${item.name} ${item.detail || ''}`).includes(q)) return null;
+                                    return (
+                                        <li key={item.id} className={cn('px-3 py-1 hover:bg-muted/30 focus-within:bg-muted/40', !item.available && 'bg-muted/40')}>
+                                            {/* Compu: todo en una línea. Celular: el nombre arriba y abajo aclaración, precio y opciones. */}
+                                            <div className="flex flex-wrap md:flex-nowrap items-center gap-x-2">
                                                 <Input
                                                     value={item.name}
                                                     onChange={e => patchItem(item.id, { name: e.target.value })}
                                                     placeholder="Producto (ej: Muzzarella)"
-                                                    className={cn('font-medium', !item.available && 'line-through opacity-60')}
+                                                    className={cn(GHOST, 'h-9 w-full md:w-auto md:flex-1 font-medium', !item.available && 'line-through opacity-60')}
                                                     autoFocus={focusRowRef.current === item.id}
                                                     aria-label="Producto"
                                                 />
                                                 <Input
                                                     value={item.detail || ''}
                                                     onChange={e => patchItem(item.id, { detail: e.target.value })}
-                                                    placeholder="Aclaración (opcional, ej: grande, 8 porciones)"
-                                                    className="h-8 text-xs"
+                                                    placeholder="Aclaración"
+                                                    className={cn(GHOST, 'h-8 md:h-9 flex-1 min-w-0 md:flex-none md:w-36 text-xs md:text-sm text-muted-foreground')}
                                                     aria-label="Aclaración"
                                                 />
+                                                <Input
+                                                    value={item.priceText}
+                                                    onChange={e => patchItem(item.id, { priceText: e.target.value })}
+                                                    onBlur={() => {
+                                                        const price = parsePrice(item.priceText);
+                                                        patchItem(item.id, { priceText: price === null ? item.priceText : formatPrice(price) });
+                                                    }}
+                                                    placeholder="$ 0"
+                                                    inputMode="decimal"
+                                                    className={cn(GHOST, 'h-8 md:h-9 w-28 md:w-32 text-right font-mono font-semibold')}
+                                                    aria-label="Precio"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => patchItem(item.id, { available: !item.available })}
+                                                    title={item.available ? 'Hay stock (tocá si se terminó)' : 'Sin stock: no se muestra en las pantallas'}
+                                                    aria-label={item.available ? 'Marcar sin stock' : 'Marcar con stock'}
+                                                    className={cn('h-8 md:h-9 w-8 shrink-0 rounded-md flex items-center justify-center hover:bg-muted', item.available ? 'text-muted-foreground' : 'text-amber-600 dark:text-amber-400')}
+                                                >
+                                                    {item.available ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                                                </button>
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" size="icon" className="h-8 md:h-9 w-8 shrink-0 text-muted-foreground" aria-label="Opciones del producto"><MoreVertical className="w-4 h-4" /></Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem onClick={() => moveItem(i, -1)} disabled={i === 0}><ArrowUp className="w-4 h-4 mr-2" /> Subir</DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={() => moveItem(i, 1)} disabled={i === draft.items.length - 1}><ArrowDown className="w-4 h-4 mr-2" /> Bajar</DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={() => duplicateItem(i)}><Copy className="w-4 h-4 mr-2" /> Duplicar</DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={() => removeItem(item.id)} className="text-rose-600"><Trash2 className="w-4 h-4 mr-2" /> Quitar</DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
                                             </div>
-                                            <Input
-                                                value={item.priceText}
-                                                onChange={e => patchItem(item.id, { priceText: e.target.value })}
-                                                onBlur={() => {
-                                                    const price = parsePrice(item.priceText);
-                                                    patchItem(item.id, { priceText: price === null ? item.priceText : formatPrice(price) });
-                                                }}
-                                                placeholder="$ 0"
-                                                inputMode="decimal"
-                                                className="w-28 sm:w-32 text-right font-mono font-semibold"
-                                                aria-label="Precio"
-                                            />
-                                        </div>
-                                        <div className="flex items-center gap-1 text-xs">
-                                            <label className="flex items-center gap-2 mr-auto cursor-pointer select-none">
-                                                <Switch checked={item.available} onCheckedChange={checked => patchItem(item.id, { available: checked })} />
-                                                <span className={item.available ? 'text-muted-foreground' : 'text-amber-600 dark:text-amber-400 font-medium'}>
-                                                    {item.available ? 'Hay stock' : 'Sin stock: no se muestra'}
-                                                </span>
-                                            </label>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => moveItem(i, -1)} disabled={i === 0} aria-label="Subir"><ArrowUp className="w-4 h-4" /></Button>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => moveItem(i, 1)} disabled={i === draft.items.length - 1} aria-label="Bajar"><ArrowDown className="w-4 h-4" /></Button>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-600" onClick={() => removeItem(item.id)} aria-label="Quitar"><Trash2 className="w-4 h-4" /></Button>
-                                        </div>
-                                    </li>
-                                ))}
+                                            {!item.available && <p className="pl-2 text-[11px] text-amber-600 dark:text-amber-400">Sin stock: no se muestra en las pantallas</p>}
+                                        </li>
+                                    );
+                                })}
                             </ul>
+                            {search && !draft.items.some(item => normalizeItemName(`${item.name} ${item.detail || ''}`).includes(normalizeItemName(search))) && (
+                                <p className="px-4 py-6 text-center text-sm text-muted-foreground">No hay productos con "{search}".</p>
+                            )}
 
-                            <div className="p-4 border-t border-border">
-                                <Button variant="outline" className="w-full" onClick={addItem}><Plus className="w-4 h-4 mr-2" /> Agregar producto</Button>
+                            <div className="p-2 border-t border-border">
+                                <button type="button" onClick={addItem} className="w-full flex items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:bg-muted/60">
+                                    <Plus className="w-4 h-4" /> Agregar producto
+                                </button>
                             </div>
                         </div>
                     )}

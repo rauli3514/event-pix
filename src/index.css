@@ -457,3 +457,24 @@ body {
 @keyframes vb-road { to { background-position: 0 80px; } }
 @keyframes vb-float { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(2vmax, -2vmax); } }
 .kiosk-lite .vb-anim { animation: none !important; }
+
+/* ── Carteles: animaciones (solo transform y opacity, para los TV box) ── */
+@keyframes poster-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes poster-up {
+  from { opacity: 0; transform: translate3d(0, 40%, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes poster-pop {
+  0% { opacity: 0; transform: scale(0.6); }
+  70% { opacity: 1; transform: scale(1.06); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes poster-photo-zoom {
+  from { transform: scale(1); }
+  to { transform: scale(1.12); }
+}
+@keyframes poster-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.07); }
+}
+.kiosk-lite .poster-motion { animation: none !important; }

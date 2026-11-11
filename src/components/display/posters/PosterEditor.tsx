@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Check, ImagePlus, Loader2, Search, X } from 'lucide-react';
+import { ArrowLeft, Check, ImagePlus, Loader2, Move, Play, Plus, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -9,14 +9,16 @@ import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { MediaPickerModal } from '@/components/display/MediaPickerModal';
 import { PosterView } from './PosterView';
-import { usePriceLists } from '@/hooks/use-price-lists';
+import { PosterListEditor } from './PosterListEditor';
+import { QrBuilder } from './QrBuilder';
+import { useCreatePriceList, usePriceLists, useUpdatePriceList } from '@/hooks/use-price-lists';
 import { useUploadDisplayMedia, useUpdateDisplayMedia } from '@/hooks/use-display-media';
 import { useDisplayCampaigns, useUpdateCampaign } from '@/hooks/use-display-hub';
-import { formatPrice } from '@/lib/priceLists';
+import { formatPrice, fromDraftRows, newItemId, parsePrice, toDraftRows, type DraftRow, type PriceList } from '@/lib/priceLists';
 import { DAY_LETTER, WEEK_ORDER } from '@/lib/itemRules';
 import {
-    POSTER_APP_ID, POSTER_FONTS, POSTER_FORMATS, POSTER_LAYOUTS, POSTER_TEMPLATES, POSTER_THEMES,
-    configFromTemplate, formatRatio, playlistsWithNewMetadata, scheduleBadge,
+    POSTER_ANIMATIONS, POSTER_APP_ID, POSTER_FONTS, POSTER_FORMATS, POSTER_LAYOUTS, POSTER_TEMPLATES, POSTER_THEMES,
+    configFromTemplate, formatRatio, playlistsWithNewMetadata, posterColors, scheduleBadge,
     type PosterConfig, type PosterFont, type PosterFormat, type PosterLayout, type PosterTemplate, type TextStyle,
 } from '@/lib/posters';
 import type { DisplayMedia } from '@/types/display';
@@ -27,29 +29,49 @@ interface Props {
     commerceId: string;
     // Cartel existente (Medios › app 'poster'); sin esto se arranca eligiendo plantilla.
     editing?: DisplayMedia | null;
+    // Arrancar directo con un diseño (el banner de Carteles).
+    initialTemplate?: PosterTemplate | null;
+    initialFormat?: PosterFormat;
 }
 
 type Tab = 'design' | 'content' | 'settings';
 
 const TEXT_COLORS = ['', '#ffffff', '#111827', '#fbbf24', '#f26b3a', '#38bdf8', '#c6f432', '#f9a8d4'];
+const PANEL_COLORS = ['#15171c', '#2b1c14', '#7a1d1d', '#0f2a44', '#4a1d3a', '#14532d', '#ffffff', '#f6efe2', '#c6f432', '#fde047'];
+const ACCENT_COLORS = ['#f26b3a', '#fbbf24', '#e8a85a', '#ef4444', '#38bdf8', '#16a34a', '#f9a8d4', '#a78bfa', '#ffffff', '#111827'];
+
+// Los productos de ejemplo de la plantilla, como renglones editables.
+const sampleRows = (t?: PosterTemplate | null): DraftRow[] =>
+    (t?.sampleList || []).map(r => {
+        const price = parsePrice(r.price);
+        return { id: newItemId(), name: r.name, detail: r.detail, price, available: true, priceText: formatPrice(price) || r.price };
+    });
+
+const DRAFT_LIST_ID = '__draft';
 
 // Se monta de cero cada vez que se abre (así arranca con el cartel que se edita
 // o con la galería de plantillas).
 export function PosterEditor(props: Props) {
     if (!props.open) return null;
-    return <PosterEditorDialog key={props.editing?.id ?? 'new'} {...props} />;
+    return <PosterEditorDialog key={props.editing?.id ?? props.initialTemplate?.id ?? 'new'} {...props} />;
 }
 
-function PosterEditorDialog({ onClose, commerceId, editing }: Props) {
+function PosterEditorDialog({ onClose, commerceId, editing, initialTemplate, initialFormat }: Props) {
     const existing = editing?.metadata?.config as PosterConfig | undefined;
-    const [step, setStep] = useState<'pick' | 'edit'>(existing ? 'edit' : 'pick');
-    const [format, setFormat] = useState<PosterFormat>(existing?.format || '16:9');
-    const [config, setConfig] = useState<PosterConfig | null>(existing || null);
-    const [template, setTemplate] = useState<PosterTemplate | null>(null);
-    const [name, setName] = useState(editing?.name || '');
+    const startFormat = existing?.format || initialFormat || '16:9';
+    const [step, setStep] = useState<'pick' | 'edit'>(existing || initialTemplate ? 'edit' : 'pick');
+    const [format, setFormat] = useState<PosterFormat>(startFormat);
+    const [config, setConfig] = useState<PosterConfig | null>(() => existing || (initialTemplate ? configFromTemplate(initialTemplate, startFormat) : null));
+    const [name, setName] = useState(editing?.name || initialTemplate?.name || '');
     const [tab, setTab] = useState<Tab>('content');
     const [search, setSearch] = useState('');
     const [pickingPhoto, setPickingPhoto] = useState<number | null>(null);
+    const [replay, setReplay] = useState(0);
+    // Productos: lista nueva (los de la plantilla o desde cero) o una lista existente.
+    const [newList, setNewList] = useState(() => !existing && !!initialTemplate?.sampleList?.length);
+    const [newRows, setNewRows] = useState<DraftRow[]>(() => sampleRows(initialTemplate));
+    const [newListName, setNewListName] = useState(initialTemplate?.config.title || initialTemplate?.name || '');
+    const [linkedRows, setLinkedRows] = useState<DraftRow[] | null>(null); // cambios a la lista vinculada
 
     const { data: listsData } = usePriceLists(commerceId);
     const lists = useMemo(() => listsData?.lists ?? [], [listsData]);
@@ -57,16 +79,38 @@ function PosterEditorDialog({ onClose, commerceId, editing }: Props) {
     const upload = useUploadDisplayMedia();
     const update = useUpdateDisplayMedia();
     const updateCampaign = useUpdateCampaign();
+    const createList = useCreatePriceList();
+    const updateList = useUpdatePriceList();
 
     const set = (patch: Partial<PosterConfig>) => setConfig(c => (c ? { ...c, ...patch } : c));
     const setStyle = (key: 'title' | 'list' | 'price', patch: Partial<TextStyle>) =>
         setConfig(c => (c ? { ...c, styles: { ...c.styles, [key]: { ...c.styles?.[key], ...patch } } } : c));
 
     const pickTemplate = (t: PosterTemplate) => {
-        setTemplate(t);
         setConfig(configFromTemplate(t, format));
         setName(t.name);
+        setNewList(!!t.sampleList?.length);
+        setNewRows(sampleRows(t));
+        setNewListName(t.config.title || t.name);
+        setLinkedRows(null);
         setStep('edit');
+    };
+
+    const linkedList = config?.listId ? lists.find(l => l.id === config.listId) : undefined;
+    const rows: DraftRow[] = newList ? newRows : linkedRows ?? (linkedList ? toDraftRows(linkedList.items || []) : []);
+    const setRows = (next: DraftRow[]) => (newList ? setNewRows(next) : setLinkedRows(next));
+
+    const chooseList = (value: string) => {
+        setLinkedRows(null);
+        if (value === DRAFT_LIST_ID) {
+            setNewList(true);
+            if (!newRows.length) setNewRows(toDraftRows([{ id: newItemId(), name: '', price: null, available: true }]));
+            if (!newListName) setNewListName(config?.title || name || 'Lista nueva');
+            set({ listId: null });
+        } else {
+            setNewList(false);
+            set({ listId: value || null });
+        }
     };
 
     const filtered = POSTER_TEMPLATES.filter(t => {
@@ -77,8 +121,21 @@ function PosterEditorDialog({ onClose, commerceId, editing }: Props) {
     const save = async () => {
         if (!config) return;
         const finalName = name.trim() || config.title || 'Cartel';
-        const metadata = { appId: POSTER_APP_ID, config: { ...config, format } };
+        const finalConfig: PosterConfig = { ...config, format };
         try {
+            // Los productos se guardan en Listas de precios (y el cartel queda vinculado).
+            if (newList) {
+                const items = fromDraftRows(newRows);
+                if (items.length) {
+                    const created = await createList.mutateAsync({ commerceId, name: newListName.trim() || config.title || finalName, items });
+                    finalConfig.listId = created.id;
+                } else {
+                    finalConfig.listId = null;
+                }
+            } else if (config.listId && linkedRows) {
+                await updateList.mutateAsync({ commerceId, id: config.listId, items: fromDraftRows(linkedRows) });
+            }
+            const metadata = { appId: POSTER_APP_ID, config: finalConfig };
             if (editing) {
                 await update.mutateAsync({ id: editing.id, updates: { name: finalName, metadata } });
                 // Las playlists guardan una copia: se actualiza para que las pantallas vean el cambio.
@@ -101,11 +158,22 @@ function PosterEditorDialog({ onClose, commerceId, editing }: Props) {
         }
     };
 
-    const saving = upload.isPending || update.isPending;
+    const saving = upload.isPending || update.isPending || createList.isPending || updateList.isPending;
     const ratio = formatRatio(format);
-    const previewConfig = config ? { ...config, format } : null;
-    const linkedList = config?.listId ? lists.find(l => l.id === config.listId) : undefined;
+    const landscape = ratio >= 1.2;
+    const previewConfig = config ? { ...config, format, listId: newList ? DRAFT_LIST_ID : config.listId } : null;
+    // La vista previa usa los productos como están en el editor, aunque no se hayan guardado.
+    const linkedId = config?.listId;
+    const previewLists: PriceList[] = useMemo(() => {
+        if (newList) {
+            const now = new Date().toISOString();
+            return [...lists, { id: DRAFT_LIST_ID, commerce_id: commerceId, name: newListName, items: fromDraftRows(newRows), sort_order: null, created_at: now, updated_at: now }];
+        }
+        if (linkedRows && linkedId) return lists.map(l => (l.id === linkedId ? { ...l, items: fromDraftRows(linkedRows) } : l));
+        return lists;
+    }, [lists, newList, newRows, newListName, linkedRows, linkedId, commerceId]);
     const days = config?.schedule?.showDays || [];
+    const colors = config ? posterColors(config) : null;
 
     return (
         <Dialog open onOpenChange={o => { if (!o) onClose(); }}>
@@ -164,9 +232,17 @@ function PosterEditorDialog({ onClose, commerceId, editing }: Props) {
                             <div className="w-full" style={{ maxWidth: ratio < 1 ? 240 : 760 }}>
                                 <div className="relative w-full overflow-hidden rounded-xl shadow-lg" style={{ paddingTop: `${100 / ratio}%` }}>
                                     <div className="absolute inset-0">
-                                        <PosterView config={previewConfig} lists={lists} sampleList={!config.listId ? template?.sampleList : undefined} />
+                                        <PosterView
+                                            key={replay}
+                                            config={previewConfig}
+                                            lists={previewLists}
+                                            onCardMove={config.layout === 'card' ? pos => set({ cardPos: pos }) : undefined}
+                                        />
                                     </div>
                                 </div>
+                                {config.layout === 'card' && (
+                                    <p className="mt-2 text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><Move className="w-3.5 h-3.5" /> Arrastrá la tarjeta para ubicarla donde no tape la foto.</p>
+                                )}
                             </div>
                         </div>
 
@@ -189,6 +265,34 @@ function PosterEditorDialog({ onClose, commerceId, editing }: Props) {
                                                 ))}
                                             </div>
                                         </Field>
+                                        <Field label="Acomodar">
+                                            {config.layout === 'card' ? (
+                                                <>
+                                                    <p className="text-xs text-muted-foreground">Arrastrá la tarjeta en la vista previa para moverla.</p>
+                                                    <Slider label="Tamaño de la tarjeta" min={0.6} max={1.5} step={0.05} value={config.cardSize || 1} onChange={v => set({ cardSize: v })} />
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <Toggle label="Tarjeta inclinada" checked={!!config.tilt} onChange={v => set({ tilt: v })} />
+                                                    </div>
+                                                    {(config.cardPos || (config.cardSize && config.cardSize !== 1)) && (
+                                                        <button type="button" onClick={() => set({ cardPos: null, cardSize: 1 })} className="text-xs underline text-muted-foreground">Volver al centro y al tamaño original</button>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Toggle
+                                                        label={config.layout === 'band' ? 'Franja arriba' : !landscape ? 'Foto abajo' : config.layout === 'menu' ? 'Foto a la izquierda' : 'Foto a la derecha'}
+                                                        checked={!!config.flip}
+                                                        onChange={v => set({ flip: v })}
+                                                    />
+                                                    <Slider
+                                                        label="Tamaño de la foto"
+                                                        min={0.25} max={0.75} step={0.05}
+                                                        value={config.photoShare || (config.layout === 'split' ? (landscape ? 0.5 : 0.42) : config.layout === 'menu' ? (landscape ? 0.4 : 0.28) : (landscape ? 0.68 : 0.64))}
+                                                        onChange={v => set({ photoShare: v })}
+                                                    />
+                                                </>
+                                            )}
+                                        </Field>
                                         <Field label="Pantalla">
                                             <select value={format} onChange={e => setFormat(e.target.value as PosterFormat)} className="h-10 w-full rounded-md border border-input bg-background px-3">
                                                 {POSTER_FORMATS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
@@ -197,13 +301,17 @@ function PosterEditorDialog({ onClose, commerceId, editing }: Props) {
                                         <Field label="Colores">
                                             <div className="flex flex-wrap gap-2">
                                                 {POSTER_THEMES.map(t => (
-                                                    <button key={t.id} type="button" onClick={() => set({ themeId: t.id })} title={t.label}
-                                                        className={cn('w-11 h-11 rounded-full border-2 flex items-center justify-center', config.themeId === t.id ? 'border-indigo-500' : 'border-border')}
+                                                    <button key={t.id} type="button" onClick={() => set({ themeId: t.id, panelColor: undefined, accentColor: undefined })} title={t.label}
+                                                        className={cn('w-11 h-11 rounded-full border-2 flex items-center justify-center', config.themeId === t.id && !config.panelColor && !config.accentColor ? 'border-indigo-500 ring-2 ring-indigo-500/40' : 'border-border')}
                                                         style={{ background: t.panel }}>
                                                         <span className="w-4 h-4 rounded-full" style={{ background: t.accent }} />
                                                     </button>
                                                 ))}
                                             </div>
+                                        </Field>
+                                        <Field label="Colores propios">
+                                            <ColorRow label="Fondo" colors={PANEL_COLORS} value={config.panelColor} current={colors?.panel} onChange={c => set({ panelColor: c })} />
+                                            <ColorRow label="Precios y etiqueta" colors={ACCENT_COLORS} value={config.accentColor} current={colors?.accent} onChange={c => set({ accentColor: c })} />
                                         </Field>
                                         <Field label="Letra del título">
                                             <div className="flex flex-wrap gap-2">
@@ -216,9 +324,20 @@ function PosterEditorDialog({ onClose, commerceId, editing }: Props) {
                                                 ))}
                                             </div>
                                         </Field>
-                                        {config.layout === 'card' && (
-                                            <Toggle label="Tarjeta inclinada" checked={!!config.tilt} onChange={v => set({ tilt: v })} />
-                                        )}
+                                        <Field label="Animación">
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {POSTER_ANIMATIONS.map(a => (
+                                                    <button key={a.id} type="button" onClick={() => { set({ animation: a.id }); setReplay(r => r + 1); }}
+                                                        className={cn('rounded-full border px-3 py-1 text-xs', (config.animation || 'none') === a.id ? 'border-indigo-500 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300' : 'border-border')}>
+                                                        {a.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <Toggle label="La foto se acerca despacio" checked={!!config.photoMotion} onChange={v => set({ photoMotion: v })} />
+                                            <Toggle label="El precio grande late" checked={!!config.pricePulse} onChange={v => set({ pricePulse: v })} />
+                                            <Button variant="outline" size="sm" onClick={() => setReplay(r => r + 1)}><Play className="w-4 h-4 mr-1.5" /> Ver la animación</Button>
+                                            <p className="text-xs text-muted-foreground">Se ve cada vez que el cartel aparece en la pantalla.</p>
+                                        </Field>
                                     </>
                                 )}
 
@@ -259,20 +378,29 @@ function PosterEditorDialog({ onClose, commerceId, editing }: Props) {
                                         </Field>
                                         <Field label="Lista de precios">
                                             <select
-                                                value={config.listId || ''}
-                                                onChange={e => set({ listId: e.target.value || null })}
+                                                value={newList ? DRAFT_LIST_ID : config.listId || ''}
+                                                onChange={e => chooseList(e.target.value)}
                                                 className="h-10 w-full rounded-md border border-input bg-background px-3"
                                             >
                                                 <option value="">Sin lista</option>
+                                                <option value={DRAFT_LIST_ID}>{newList && newRows.length ? 'Productos de este cartel (lista nueva)' : '+ Lista nueva'}</option>
                                                 {lists.map(l => <option key={l.id} value={l.id}>{l.name} ({l.items.filter(i => i.name).length})</option>)}
                                             </select>
-                                            {lists.length === 0 && (
-                                                <p className="text-xs text-muted-foreground">Todavía no tenés listas. <Link to={`/admin/display/commerce/${commerceId}/workspace/price-lists`} className="underline">Crear una en Listas de precios</Link></p>
+                                            {newList && (
+                                                <label className="block space-y-1">
+                                                    <span className="text-xs text-muted-foreground">Nombre de la lista (así aparece en Listas de precios)</span>
+                                                    <Input value={newListName} onChange={e => setNewListName(e.target.value)} placeholder="Pizzas, Promos de la tarde…" maxLength={80} />
+                                                </label>
                                             )}
-                                            {config.listId && (
+                                            {(newList || config.listId) && (
                                                 <>
-                                                    <p className="text-xs text-muted-foreground">Queda vinculada: si cambiás un precio en "{linkedList?.name}", el cartel se actualiza solo.</p>
-                                                    <div className="flex gap-2">
+                                                    <PosterListEditor rows={rows} onChange={setRows} />
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {newList
+                                                            ? 'Al guardar, estos productos quedan en Listas de precios. Si después cambiás un precio ahí, el cartel se actualiza solo.'
+                                                            : <>Se guarda en la lista "{linkedList?.name}". Si otros carteles la usan, también cambian. <Link to={`/admin/display/commerce/${commerceId}/workspace/price-lists?lista=${config.listId}`} className="underline">Abrir en Listas de precios</Link></>}
+                                                    </p>
+                                                    <div className="flex flex-wrap gap-2">
                                                         {(['auto', 1, 2] as const).map(c => (
                                                             <button key={String(c)} type="button" onClick={() => set({ listColumns: c })} className={cn('rounded-full border px-3 py-1 text-xs', (config.listColumns || 'auto') === c ? 'border-indigo-500 bg-indigo-500/10' : 'border-border')}>
                                                                 {c === 'auto' ? 'Columnas solas' : c === 1 ? '1 columna' : '2 columnas'}
@@ -306,7 +434,7 @@ function PosterEditorDialog({ onClose, commerceId, editing }: Props) {
                                             <StyleControls style={config.styles?.price} onChange={p => setStyle('price', p)} />
                                         </Field>
                                         <Field label="Código QR (opcional)">
-                                            <Input value={config.qrUrl || ''} onChange={e => set({ qrUrl: e.target.value })} placeholder="https://… (menú, WhatsApp, Instagram)" />
+                                            <QrBuilder url={config.qrUrl} label={config.qrLabel} onChange={set} />
                                         </Field>
                                         <Toggle label="Mostrar la hora" checked={!!config.showClock} onChange={v => set({ showClock: v })} />
                                     </>
@@ -407,6 +535,54 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
     );
 }
 
+function Slider({ label, min, max, step, value, onChange }: { label: string; min: number; max: number; step: number; value: number; onChange: (v: number) => void }) {
+    return (
+        <label className="flex items-center gap-3">
+            <span className="text-muted-foreground shrink-0">{label}</span>
+            <input type="range" min={min} max={max} step={step} value={value} onChange={e => onChange(Number(e.target.value))} className="flex-1 accent-indigo-500" />
+            <span className="text-xs w-10 text-right">{Math.round(value * 100)}%</span>
+        </label>
+    );
+}
+
+// Muestras de color + "otro color" (el selector del sistema).
+function ColorSwatches({ colors, value, onChange, auto }: { colors: string[]; value?: string; onChange: (c: string | undefined) => void; auto?: boolean }) {
+    const custom = !!value && !colors.includes(value.toLowerCase());
+    return (
+        <div className="flex flex-wrap items-center gap-1">
+            {auto && (
+                <button type="button" onClick={() => onChange(undefined)} title="El de la plantilla" aria-label="Color de la plantilla"
+                    className={cn('w-6 h-6 rounded-full border border-border', !value && 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-background')}
+                    style={{ background: 'conic-gradient(#f26b3a,#fbbf24,#38bdf8,#f26b3a)' }} />
+            )}
+            {colors.map(c => (
+                <button key={c} type="button" onClick={() => onChange(c)} title={c} aria-label={`Color ${c}`}
+                    className={cn('w-6 h-6 rounded-full border border-border', value?.toLowerCase() === c && 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-background')}
+                    style={{ background: c }} />
+            ))}
+            <label title="Otro color" className={cn('relative w-6 h-6 rounded-full border border-dashed border-muted-foreground/60 flex items-center justify-center cursor-pointer overflow-hidden', custom && 'ring-2 ring-indigo-500 ring-offset-2 ring-offset-background')}
+                style={custom ? { background: value } : undefined}>
+                {!custom && <Plus className="w-3.5 h-3.5 text-muted-foreground" />}
+                <input type="color" value={value || '#ffffff'} onChange={e => onChange(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer" aria-label="Elegir otro color" />
+            </label>
+        </div>
+    );
+}
+
+function ColorRow({ label, colors, value, current, onChange }: { label: string; colors: string[]; value?: string; current?: string; onChange: (c: string | undefined) => void }) {
+    return (
+        <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">{label}</span>
+                {value ? (
+                    <button type="button" onClick={() => onChange(undefined)} className="text-xs underline text-muted-foreground">Usar el de la paleta</button>
+                ) : current ? <span className="w-4 h-4 rounded-full border border-border" style={{ background: current }} title="Color actual" /> : null}
+            </div>
+            <ColorSwatches colors={colors} value={value} onChange={onChange} />
+        </div>
+    );
+}
+
 // Tamaño, color y sombra de un texto.
 function StyleControls({ style, onChange }: { style?: TextStyle; onChange: (p: Partial<TextStyle>) => void }) {
     const scale = style?.scale || 1;
@@ -414,18 +590,12 @@ function StyleControls({ style, onChange }: { style?: TextStyle; onChange: (p: P
         <div className="rounded-lg border border-border p-2.5 space-y-2">
             <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground w-14">Tamaño</span>
-                <input type="range" min={0.6} max={1.8} step={0.1} value={scale} onChange={e => onChange({ scale: Number(e.target.value) })} className="flex-1" />
+                <input type="range" min={0.4} max={1.8} step={0.05} value={scale} onChange={e => onChange({ scale: Number(e.target.value) })} className="flex-1 accent-indigo-500" />
                 <span className="text-xs w-10 text-right">{Math.round(scale * 100)}%</span>
             </div>
-            <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground w-14">Color</span>
-                <div className="flex flex-wrap gap-1.5">
-                    {TEXT_COLORS.map(c => (
-                        <button key={c || 'auto'} type="button" onClick={() => onChange({ color: c || undefined })} title={c ? c : 'El de la plantilla'}
-                            className={cn('w-6 h-6 rounded-full border', (style?.color || '') === c ? 'ring-2 ring-indigo-500 ring-offset-1' : 'border-border')}
-                            style={{ background: c || 'conic-gradient(#f26b3a,#fbbf24,#38bdf8,#f26b3a)' }} />
-                    ))}
-                </div>
+            <div className="flex items-start gap-2">
+                <span className="text-xs text-muted-foreground w-14 pt-1.5">Color</span>
+                <ColorSwatches auto colors={TEXT_COLORS.filter(Boolean)} value={style?.color} onChange={c => onChange({ color: c })} />
             </div>
             <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">Sombra</span>
