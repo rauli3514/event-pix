@@ -18,6 +18,7 @@ import { DisplayMedia } from '@/types/display';
 import { MoveMediaModal } from '@/components/display/MoveMediaModal';
 import { AppCatalogModal, AppId } from '@/components/display/apps/AppCatalogModal';
 import { AppEditorModal } from '@/components/display/apps/AppEditorModal';
+import { PosterEditor } from '@/components/display/posters/PosterEditor';
 import { PlacaMakerModal } from '@/components/display/PlacaMakerModal';
 import { PLACA_TEMPLATE_IDS as PLACA_IDS, placaFromMetadata, type PlacaTemplateId } from '@/lib/placas';
 import { itemIsMedia, playlistItems } from '@/lib/playlistItems';
@@ -681,9 +682,18 @@ export function WorkspaceMedia({ initialCategory = 'all' }: { initialCategory?: 
                     currentFolder={currentFolder}
                 />
             )}
+            {/* Los carteles se editan con su propio editor. */}
+            {commerceId && (
+                <PosterEditor
+                    open={editingApp?.metadata?.appId === 'poster'}
+                    onClose={() => setEditingApp(null)}
+                    commerceId={commerceId}
+                    editing={editingApp?.metadata?.appId === 'poster' ? editingApp : null}
+                />
+            )}
             {commerceId && (
                 <AppEditorModal
-                    isOpen={!!editingApp}
+                    isOpen={!!editingApp && editingApp.metadata?.appId !== 'poster'}
                     onClose={() => setEditingApp(null)}
                     onBack={() => setEditingApp(null)}
                     appId={(editingApp?.metadata?.appId as AppId) || 'dynamic-menu'}

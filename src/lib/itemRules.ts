@@ -93,6 +93,9 @@ export function itemNowStatus(item: AnyItem, now: Date, weatherOf?: WeatherLooku
     const date = itemDateStatus(item, localDayKey(now));
     if (date !== 'active') return date;
     if (!scheduleAllows(item, now)) return 'off_schedule';
+    // Carteles: su propio "Cuándo aparece" (lib/posters), donde sea que estén.
+    const posterSchedule = item?.metadata?.appId === 'poster' ? item.metadata.config?.schedule : null;
+    if (posterSchedule && !scheduleAllows(posterSchedule, now)) return 'off_schedule';
     const rule = itemWeatherRule(item);
     if (rule) {
         const w = weatherOf?.(rule.place) ?? null;

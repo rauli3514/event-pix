@@ -9,6 +9,7 @@ import { ClockPreview } from './apps/clock/ClockApp';
 import { QRPreview } from './apps/qr/QRApp';
 import { ReviewsPreview } from './apps/reviews/ReviewsApp';
 import { DynamicMenuPreview } from './apps/dynamic-menu/DynamicMenuApp';
+import { PosterView } from './posters/PosterView';
 import { YoutubePreview } from './apps/youtube/YoutubeApp';
 import { isYoutubeUrl } from '@/lib/youtube';
 
@@ -340,6 +341,8 @@ export const PlayerRenderer = ({ item, isActive, isPrev, commerceId, defaultTran
                         <ReviewsPreview config={metadata.config || {}} />
                     ) : appId === 'dynamic-menu' ? (
                         <DynamicMenuPreview config={metadata.config || {}} commerceId={commerceId} />
+                    ) : appId === 'poster' && metadata.config ? (
+                        <PosterView config={metadata.config} commerceId={commerceId} />
                     ) : appId === 'youtube' ? (
                         <YoutubePreview config={metadata.config || {}} />
                     ) : (

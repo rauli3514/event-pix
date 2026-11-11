@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Clock, Globe, Play, Star, Tag } from 'lucide-react';
 import { appIdOf, appKindOf } from '@/lib/appCovers';
+import { PosterView } from '@/components/display/posters/PosterView';
 
 // Portadas de las apps y páginas web: cada tipo con su color, su ícono y algo
 // de su contenido (ciudades del clima, zonas de la pantalla dividida, el video
@@ -53,6 +54,15 @@ function AppScene({ item }: { item: AnyItem }) {
                         </div>
                     );
                 })}
+            </div>
+        );
+    }
+
+    // Cartel: el cartel mismo, en chiquito.
+    if (appId === 'poster' && item?.metadata?.config) {
+        return (
+            <div className="absolute inset-0">
+                <PosterView config={item.metadata.config} commerceId={item.commerce_id} />
             </div>
         );
     }

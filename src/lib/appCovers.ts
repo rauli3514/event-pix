@@ -1,5 +1,5 @@
 import {
-    Clock, CloudSun, DollarSign, LayoutGrid, LayoutTemplate, Play, QrCode, Star, Tag, Type,
+    Clock, CloudSun, DollarSign, LayoutGrid, LayoutTemplate, Megaphone, Play, QrCode, Star, Tag, Type,
     type LucideIcon,
 } from 'lucide-react';
 
@@ -29,6 +29,7 @@ const APP_KINDS: Record<string, AppKind> = {
     'dynamic-menu': { label: 'Etiquetas', icon: Tag, bg: 'from-rose-500 to-rose-900' },
     youtube: { label: 'YouTube', icon: Play, bg: 'from-red-500 to-red-900' },
     'split-screen': { label: 'Pantalla dividida', icon: LayoutTemplate, bg: 'from-blue-500 to-indigo-900' },
+    poster: { label: 'Cartel', icon: Megaphone, bg: 'from-orange-500 to-rose-800' },
 };
 const GENERIC_APP: AppKind = { label: 'App', icon: LayoutGrid, bg: 'from-slate-500 to-slate-800' };
 
