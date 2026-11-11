@@ -10,7 +10,7 @@ import {
   ArrowLeft,
   Menu,
   LogOut,
-  Database,
+  ListOrdered,
   Bluetooth,
   ChevronDown,
 } from 'lucide-react';
@@ -53,6 +53,7 @@ const MENU_GROUPS: { title: string; items: MenuItem[] }[] = [
       { id: 'library', label: 'Medios', icon: FolderOpen, path: 'library' },
       { id: 'playlists', label: 'Playlists', icon: ListVideo, path: 'playlists' },
       { id: 'apps', label: 'Apps y plantillas', icon: Puzzle, path: 'apps', alsoActive: ['templates'] },
+      { id: 'price-lists', label: 'Listas de precios', icon: ListOrdered, path: 'price-lists', alsoActive: ['labels'] },
     ],
   },
 ];
@@ -62,7 +63,6 @@ const MENU_GROUPS: { title: string; items: MenuItem[] }[] = [
 const AI_ASSISTANT_ENABLED = false;
 
 const MORE_ITEMS: MenuItem[] = [
-  { id: 'labels', label: 'Etiquetas', icon: Database, path: 'labels' },
   { id: 'ai-knowledge', label: 'Conocimiento IA', icon: Bot, path: 'ai-knowledge' },
 ];
 

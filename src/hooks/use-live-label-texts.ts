@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useDisplayLabelGroups } from '@/hooks/use-display-labels';
+import { usePriceLists } from '@/hooks/use-price-lists';
+import { priceListTexts } from '@/lib/priceLists';
 import { fetchSheetPrices, type SheetPrice } from '@/lib/googleSheets';
 import { getTvDeviceCode } from '@/lib/tvScreenshot';
 
@@ -45,12 +47,13 @@ export function useSheetPrices(sheetUrl?: string | null) {
 }
 
 // Textos en vivo de las etiquetas, por nombre (en minúsculas). Manda la
-// planilla de Google; si no está ahí, lo de la página Etiquetas.
+// planilla de Google; después las Listas de precios; después la página Etiquetas.
 export function useLiveLabelTexts(commerceId?: string, sheetUrl?: string | null): Map<string, string> {
     const deviceCode = getTvDeviceCode();
 
     // Panel (con sesión): los grupos de la página Etiquetas.
     const { data: groups = [] } = useDisplayLabelGroups(deviceCode ? undefined : commerceId);
+    const { data: priceLists } = usePriceLists(deviceCode ? undefined : commerceId);
 
     // TV (sin sesión): los mismos textos, a través de su código.
     const deviceCacheKey = `label_texts:${deviceCode}`;
@@ -79,8 +82,10 @@ export function useLiveLabelTexts(commerceId?: string, sheetUrl?: string | null)
             groups.forEach(g => g.labels?.forEach(l => {
                 if (l.name) map.set(normalizeLabelName(l.name), l.text);
             }));
+            // En la TV esto ya viene junto en display_device_label_texts.
+            priceListTexts(priceLists?.lists || []).forEach((text, name) => map.set(name, text));
         }
         (sheetPrices || []).forEach(p => map.set(normalizeLabelName(p.name), p.text));
         return map;
-    }, [deviceCode, deviceTexts, groups, sheetPrices]);
+    }, [deviceCode, deviceTexts, groups, priceLists, sheetPrices]);
 }
