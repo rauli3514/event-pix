@@ -8,7 +8,7 @@ export const POSTER_APP_ID = 'poster';
 
 export type PosterLayout = 'split' | 'card' | 'band' | 'menu';
 export type PosterFormat = '16:9' | 'h2x1' | 'h1x2' | 'h2x2' | '9:16' | 'v2x1' | 'v1x2' | 'v2x2' | '21:9' | '4:3' | '1:1';
-export type PosterFont = 'modern' | 'elegant' | 'impact' | 'script' | 'simple';
+export type PosterFont = 'modern' | 'elegant' | 'impact' | 'script' | 'simple' | 'bold' | 'retro' | 'luxury' | 'playful' | 'gamer';
 
 export interface TextStyle {
     // Tamaño relativo (1 = el de la plantilla).
@@ -169,17 +169,35 @@ export const POSTER_THEMES: PosterTheme[] = [
     { id: 'lima', label: 'Lima', panel: '#c6f432', text: '#101010', accent: '#101010', photoTint: 'linear-gradient(135deg,#3f3f46,#09090b)' },
     { id: 'mar', label: 'Mar', panel: '#0f2a44', text: '#f0f9ff', accent: '#38bdf8', photoTint: 'linear-gradient(135deg,#94a3b8,#0f2a44)' },
     { id: 'blanco', label: 'Blanco', panel: '#ffffff', text: '#111827', accent: '#16a34a', photoTint: 'linear-gradient(135deg,#d1fae5,#065f46)' },
+    { id: 'fuego', label: 'Fuego', panel: '#141110', text: '#fffaf5', accent: '#ff5a1f', photoTint: 'linear-gradient(135deg,#7c2d12,#1c1917)' },
+    { id: 'cerveza', label: 'Cerveza', panel: '#1b130a', text: '#fff7e6', accent: '#f5b301', photoTint: 'linear-gradient(135deg,#b45309,#1b130a)' },
+    { id: 'neon', label: 'Neón', panel: '#14041c', text: '#fdf4ff', accent: '#ff2bd6', photoTint: 'linear-gradient(135deg,#6d28d9,#14041c)' },
+    { id: 'helado', label: 'Helado', panel: '#d9f7ee', text: '#0f3b33', accent: '#ff4f86', photoTint: 'linear-gradient(135deg,#fbcfe8,#99f6e4)' },
+    { id: 'moda', label: 'Moda', panel: '#0a0a0a', text: '#fafafa', accent: '#d6c7a1', photoTint: 'linear-gradient(135deg,#525252,#0a0a0a)' },
+    { id: 'nude', label: 'Nude', panel: '#efe6dc', text: '#2a211b', accent: '#9a3412', photoTint: 'linear-gradient(135deg,#e7cfb4,#8a6a55)' },
+    { id: 'sale', label: 'Liquidación', panel: '#e3121b', text: '#ffffff', accent: '#ffe600', photoTint: 'linear-gradient(135deg,#fb7185,#7f1d1d)' },
+    { id: 'almacen', label: 'Almacén', panel: '#1f3d2b', text: '#f7f3e8', accent: '#f4c430', photoTint: 'linear-gradient(135deg,#a3b18a,#1f3d2b)' },
+    { id: 'gamer', label: 'Gamer', panel: '#0b0420', text: '#f5f3ff', accent: '#22e3a0', photoTint: 'linear-gradient(135deg,#7c3aed,#0b0420)' },
+    { id: 'electro', label: 'Electro', panel: '#06142b', text: '#e6f1ff', accent: '#00c2ff', photoTint: 'linear-gradient(135deg,#1d4ed8,#06142b)' },
+    { id: 'vino', label: 'Vino', panel: '#3b0a1a', text: '#fdf2f4', accent: '#d4af37', photoTint: 'linear-gradient(135deg,#7f1d1d,#1f0710)' },
+    { id: 'fuerza', label: 'Fuerza', panel: '#0b0b0b', text: '#ffffff', accent: '#c6f432', photoTint: 'linear-gradient(135deg,#3f3f46,#0b0b0b)' },
 ];
 
 export const themeOf = (id?: string) => POSTER_THEMES.find(t => t.id === id) || POSTER_THEMES[0];
 
 // Letras ya cargadas en index.html.
-export const POSTER_FONTS: Record<PosterFont, { label: string; family: string; weight: number }> = {
-    modern: { label: 'Moderna', family: "'Montserrat', 'Inter', sans-serif", weight: 800 },
-    elegant: { label: 'Elegante', family: "'Playfair Display', Georgia, serif", weight: 700 },
-    impact: { label: 'Impacto', family: "'Anton', 'Montserrat', sans-serif", weight: 400 },
-    script: { label: 'Manuscrita', family: "'Pinyon Script', cursive", weight: 400 },
-    simple: { label: 'Simple', family: "'Inter', sans-serif", weight: 700 },
+// size: para que todas se vean del mismo tamaño; charEm: ancho de una letra (aprox.).
+export const POSTER_FONTS: Record<PosterFont, { label: string; family: string; weight: number; size: number; charEm: number }> = {
+    modern: { label: 'Moderna', family: "'Montserrat', 'Inter', sans-serif", weight: 800, size: 1, charEm: 0.62 },
+    elegant: { label: 'Elegante', family: "'Playfair Display', Georgia, serif", weight: 700, size: 1, charEm: 0.56 },
+    impact: { label: 'Impacto', family: "'Anton', 'Montserrat', sans-serif", weight: 400, size: 1.05, charEm: 0.46 },
+    script: { label: 'Manuscrita', family: "'Pinyon Script', cursive", weight: 400, size: 1.1, charEm: 0.5 },
+    simple: { label: 'Simple', family: "'Inter', sans-serif", weight: 700, size: 1, charEm: 0.6 },
+    bold: { label: 'Gruesa', family: "'Bebas Neue', 'Anton', sans-serif", weight: 400, size: 1.25, charEm: 0.42 },
+    retro: { label: 'Retro', family: "'Lobster', cursive", weight: 400, size: 1.05, charEm: 0.52 },
+    luxury: { label: 'Lujo', family: "'Cinzel', 'Playfair Display', serif", weight: 700, size: 0.92, charEm: 0.78 },
+    playful: { label: 'Divertida', family: "'Fredoka', 'Montserrat', sans-serif", weight: 700, size: 1, charEm: 0.6 },
+    gamer: { label: 'Gamer', family: "'Orbitron', 'Montserrat', sans-serif", weight: 700, size: 0.88, charEm: 0.82 },
 };
 
 export const POSTER_LAYOUTS: Record<PosterLayout, { label: string; description: string }> = {
@@ -243,10 +261,25 @@ export function scheduleBadge(schedule?: PosterConfig['schedule']): string | nul
     return `DE ${short(schedule.showFrom)} A ${short(schedule.showTo)} H`;
 }
 
+// Rubros para buscar diseños (los de más llegada primero).
+export const POSTER_GROUPS = [
+    'Comidas y restaurantes',
+    'Bares y cervecerías',
+    'Heladerías y cafeterías',
+    'Moda y accesorios',
+    'Almacén y minoristas',
+    'Videojuegos y electrónica',
+    'Vinotecas',
+    'Gimnasios',
+    'Otros',
+] as const;
+export type PosterGroup = typeof POSTER_GROUPS[number];
+
 export interface PosterTemplate {
     id: string;
     name: string;
     rubro: string;
+    grupo?: PosterGroup;
     config: Omit<PosterConfig, 'version' | 'format' | 'photos'> & { photos?: string[] };
     // Lista de ejemplo para la vista previa (hasta que se vincule una de verdad).
     sampleList?: { name: string; price: string; detail?: string }[];
@@ -258,10 +291,152 @@ export const BLANK_TEMPLATE: PosterTemplate = {
     config: { layout: 'split', themeId: 'noche', font: 'modern', title: 'Tu título acá', subtitle: 'Una frase corta', price: '' },
 };
 
-// Plantillas iniciales: formas de armado × colores × textos de ejemplo por rubro.
+// Plantillas por rubro: formas de armado × colores × textos de ejemplo.
 export const POSTER_TEMPLATES: PosterTemplate[] = [
     {
-        id: 'carta-manana', name: 'Carta de la mañana', rubro: 'Cafetería',
+        id: 'pizzas', name: 'Pizzas', rubro: 'Pizzería', grupo: 'Comidas y restaurantes',
+        config: { layout: 'menu', themeId: 'pizzeria', font: 'impact', title: 'Pizzas', subtitle: 'a la piedra', showDetails: true },
+        sampleList: [
+            { name: 'Muzzarella', price: '$ 5.000', detail: '8 porciones' },
+            { name: 'Napolitana', price: '$ 6.000' },
+            { name: 'Fugazzeta', price: '$ 6.500' },
+            { name: 'Calabresa', price: '$ 7.000' },
+            { name: 'Especial', price: '$ 7.500', detail: 'jamón y morrones' },
+            { name: 'Faina', price: '$ 1.500' },
+        ],
+    },
+    {
+        id: 'hamburguesas', name: 'Hamburguesas', rubro: 'Hamburguesería', grupo: 'Comidas y restaurantes',
+        config: { layout: 'menu', themeId: 'fuego', font: 'bold', title: 'Hamburguesas', subtitle: 'smash', showDetails: true },
+        sampleList: [
+            { name: 'Clásica', price: '$ 9.500', detail: 'carne, cheddar y lechuga' },
+            { name: 'Doble cheddar', price: '$ 12.000' },
+            { name: 'Bacon', price: '$ 12.500', detail: 'panceta crocante' },
+            { name: 'Veggie', price: '$ 10.000', detail: 'medallón de garbanzos' },
+            { name: 'Papas fritas', price: '$ 5.000', detail: 'con cheddar + $ 1.500' },
+        ],
+    },
+    {
+        id: 'combo-burger', name: 'Combo burger', rubro: 'Hamburguesería', grupo: 'Comidas y restaurantes',
+        config: { layout: 'card', themeId: 'fuego', font: 'bold', tilt: true, badge: 'COMBO', title: 'Burger + papas + gaseosa', price: '$ 13.900', pricePulse: true, animation: 'pop' },
+    },
+    {
+        id: 'parrilla', name: 'Parrilla', rubro: 'Parrilla', grupo: 'Comidas y restaurantes',
+        config: { layout: 'menu', themeId: 'fuego', font: 'elegant', title: 'Parrilla', subtitle: 'a la leña', showDetails: true },
+        sampleList: [
+            { name: 'Asado', price: '$ 18.000', detail: 'porción de 400 g' },
+            { name: 'Vacío', price: '$ 17.500' },
+            { name: 'Matambre a la pizza', price: '$ 16.000' },
+            { name: 'Chorizo', price: '$ 4.500' },
+            { name: 'Morcilla', price: '$ 4.000' },
+            { name: 'Provoleta', price: '$ 7.500' },
+        ],
+    },
+    {
+        id: 'menu-del-dia', name: 'Menú del día', rubro: 'Restaurante', grupo: 'Comidas y restaurantes',
+        config: { layout: 'split', themeId: 'crema', font: 'elegant', badge: 'MENÚ DEL DÍA', title: 'Milanesa con puré', subtitle: 'incluye bebida y postre', price: '$ 12.500' },
+    },
+    {
+        id: 'empanadas', name: 'Empanadas', rubro: 'Rotisería', grupo: 'Comidas y restaurantes',
+        config: { layout: 'menu', themeId: 'crema', font: 'impact', title: 'Empanadas', subtitle: 'al horno', showDetails: true },
+        sampleList: [
+            { name: 'Carne cortada a cuchillo', price: '$ 2.000' },
+            { name: 'Jamón y queso', price: '$ 2.000' },
+            { name: 'Pollo', price: '$ 2.000' },
+            { name: 'Humita', price: '$ 2.000' },
+            { name: 'Caprese', price: '$ 2.200' },
+            { name: 'Docena', price: '$ 21.000', detail: 'surtidas' },
+        ],
+    },
+    {
+        id: 'lomito', name: 'Lomito completo', rubro: 'Rotisería', grupo: 'Comidas y restaurantes',
+        config: { layout: 'card', themeId: 'pizzeria', font: 'bold', title: 'Lomito completo', subtitle: 'con papas fritas', price: '$ 14.000' },
+    },
+    {
+        id: 'pastas', name: 'Pastas caseras', rubro: 'Restaurante', grupo: 'Comidas y restaurantes',
+        config: { layout: 'menu', themeId: 'crema', font: 'elegant', title: 'Pastas', subtitle: 'caseras', showDetails: true },
+        sampleList: [
+            { name: 'Ñoquis', price: '$ 9.000', detail: 'de papa' },
+            { name: 'Sorrentinos', price: '$ 11.000', detail: 'jamón y queso' },
+            { name: 'Ravioles', price: '$ 10.000', detail: 'de verdura' },
+            { name: 'Tallarines', price: '$ 8.500' },
+            { name: 'Lasaña', price: '$ 12.000', detail: 'bolognesa' },
+        ],
+    },
+    {
+        id: 'sushi', name: 'Sushi para compartir', rubro: 'Restaurante', grupo: 'Comidas y restaurantes',
+        config: { layout: 'split', themeId: 'noche', font: 'elegant', badge: 'DELIVERY', title: 'Sushi para compartir', subtitle: '30 piezas', price: '$ 28.000' },
+    },
+    {
+        id: 'envios', name: 'Hacemos envíos', rubro: 'Restaurante', grupo: 'Comidas y restaurantes',
+        config: { layout: 'band', themeId: 'blanco', font: 'bold', badge: 'DELIVERY', title: 'Hacemos envíos a domicilio', subtitle: 'pedí por WhatsApp' },
+    },
+    {
+        id: 'happy-hour', name: 'Happy hour', rubro: 'Bar', grupo: 'Bares y cervecerías',
+        config: { layout: 'card', themeId: 'neon', font: 'bold', tilt: true, title: 'Happy hour 2×1', subtitle: 'en tragos y pintas', autoBadge: true, schedule: { showFrom: '19:00', showTo: '21:00' }, animation: 'pop' },
+    },
+    {
+        id: 'pintas', name: 'Cervezas tiradas', rubro: 'Cervecería', grupo: 'Bares y cervecerías',
+        config: { layout: 'menu', themeId: 'cerveza', font: 'bold', title: 'Cervezas', subtitle: 'tiradas', showDetails: true },
+        sampleList: [
+            { name: 'Golden', price: '$ 4.500', detail: 'pinta' },
+            { name: 'Honey', price: '$ 4.800', detail: 'pinta' },
+            { name: 'IPA', price: '$ 5.500', detail: 'pinta' },
+            { name: 'Scottish', price: '$ 5.000', detail: 'pinta' },
+            { name: 'Stout', price: '$ 5.200', detail: 'pinta' },
+            { name: 'APA', price: '$ 5.300', detail: 'pinta' },
+        ],
+    },
+    {
+        id: 'tragos', name: 'Tragos', rubro: 'Bar', grupo: 'Bares y cervecerías',
+        config: { layout: 'menu', themeId: 'neon', font: 'retro', title: 'Tragos', subtitle: 'de la casa' },
+        sampleList: [
+            { name: 'Fernet con coca', price: '$ 6.000' },
+            { name: 'Gin tonic', price: '$ 7.500' },
+            { name: 'Aperol spritz', price: '$ 7.800' },
+            { name: 'Mojito', price: '$ 7.000' },
+            { name: 'Campari', price: '$ 6.500' },
+            { name: 'Daiquiri', price: '$ 7.000' },
+        ],
+    },
+    {
+        id: 'picada', name: 'Picada + pintas', rubro: 'Cervecería', grupo: 'Bares y cervecerías',
+        config: { layout: 'split', themeId: 'cerveza', font: 'bold', badge: 'PARA DOS', title: 'Picada + 2 pintas', subtitle: 'fiambres, quesos y papas', price: '$ 22.000' },
+    },
+    {
+        id: 'partido', name: 'Partido en pantalla gigante', rubro: 'Bar', grupo: 'Bares y cervecerías',
+        config: { layout: 'band', themeId: 'noche', font: 'bold', badge: 'HOY', title: 'Partido en pantalla gigante', subtitle: 'reservá tu mesa' },
+    },
+    {
+        id: 'musica-vivo', name: 'Música en vivo', rubro: 'Bar', grupo: 'Bares y cervecerías',
+        config: { layout: 'card', themeId: 'neon', font: 'retro', badge: 'SÁBADO', title: 'Música en vivo', subtitle: 'desde las 22 h', animation: 'fade' },
+    },
+    {
+        id: 'helados-precios', name: 'Helados', rubro: 'Heladería', grupo: 'Heladerías y cafeterías',
+        config: { layout: 'menu', themeId: 'helado', font: 'playful', title: 'Helados', subtitle: 'artesanales', showDetails: true },
+        sampleList: [
+            { name: '1/4 kg', price: '$ 6.500', detail: '2 gustos' },
+            { name: '1/2 kg', price: '$ 11.500', detail: '3 gustos' },
+            { name: '1 kg', price: '$ 21.000', detail: '4 gustos' },
+            { name: 'Cucurucho', price: '$ 3.500' },
+            { name: 'Vasito', price: '$ 3.000' },
+            { name: 'Batido', price: '$ 5.500' },
+        ],
+    },
+    {
+        id: 'gusto-del-mes', name: 'Gusto del mes', rubro: 'Heladería', grupo: 'Heladerías y cafeterías',
+        config: { layout: 'split', themeId: 'helado', font: 'playful', badge: 'NUEVO', title: 'Pistacho con almendras', subtitle: 'el gusto del mes' },
+    },
+    {
+        id: 'kilo-promo', name: 'Promo kilo', rubro: 'Heladería', grupo: 'Heladerías y cafeterías',
+        config: { layout: 'card', themeId: 'rosa', font: 'playful', tilt: true, badge: 'PROMO', title: '1 kg + 1/4 de regalo', price: '$ 21.000', pricePulse: true },
+    },
+    {
+        id: 'jueves-2x1', name: 'Jueves 2×1', rubro: 'Heladería', grupo: 'Heladerías y cafeterías',
+        config: { layout: 'card', themeId: 'rosa', font: 'elegant', tilt: true, badge: 'CUCURUCHOS', title: 'Jueves 2×1', subtitle: 'todos los gustos' },
+    },
+    {
+        id: 'carta-manana', name: 'Carta de la mañana', rubro: 'Cafetería', grupo: 'Heladerías y cafeterías',
         config: { layout: 'menu', themeId: 'noche', font: 'modern', title: 'Carta', subtitle: 'de la mañana', showDetails: true },
         sampleList: [
             { name: 'Café con leche', price: '$ 2.800', detail: 'taza grande' },
@@ -272,52 +447,210 @@ export const POSTER_TEMPLATES: PosterTemplate[] = [
         ],
     },
     {
-        id: 'mitad-cafe', name: 'Para acompañar', rubro: 'Cafetería',
+        id: 'mitad-cafe', name: 'Para acompañar', rubro: 'Cafetería', grupo: 'Heladerías y cafeterías',
         config: { layout: 'split', themeId: 'cafe', font: 'modern', badge: 'HOY', title: 'Para acompañar la música', price: '$ 3.900' },
         sampleList: [
-            { name: 'Café', price: '$ 1.800' }, { name: 'Medialuna', price: '$ 900' },
-            { name: 'Tostado', price: '$ 3.500' }, { name: 'Jugo de naranja', price: '$ 3.100' },
+            { name: 'Café', price: '$ 1.800' },
+            { name: 'Medialuna', price: '$ 900' },
+            { name: 'Tostado', price: '$ 3.500' },
+            { name: 'Jugo de naranja', price: '$ 3.100' },
         ],
     },
     {
-        id: 'promo-tarde', name: 'Promo de la tarde', rubro: 'Cafetería',
-        config: {
-            layout: 'card', themeId: 'noche', font: 'modern', title: 'Café + medialuna', subtitle: 'la promo de la tarde', price: '$ 3.900',
-            autoBadge: true, schedule: { showDays: [1, 2, 3, 4, 5], showFrom: '15:00', showTo: '19:00' },
-        },
+        id: 'promo-tarde', name: 'Promo de la tarde', rubro: 'Cafetería', grupo: 'Heladerías y cafeterías',
+        config: { layout: 'card', themeId: 'noche', font: 'modern', title: 'Café + medialuna', subtitle: 'la promo de la tarde', price: '$ 3.900',
+            autoBadge: true, schedule: { showDays: [1, 2, 3, 4, 5], showFrom: '15:00', showTo: '19:00' } },
     },
     {
-        id: 'pizzas', name: 'Pizzas', rubro: 'Pizzería',
-        config: { layout: 'menu', themeId: 'pizzeria', font: 'impact', title: 'Pizzas', subtitle: 'a la piedra', showDetails: true },
+        id: 'cafe-especialidad', name: 'Café de especialidad', rubro: 'Cafetería', grupo: 'Heladerías y cafeterías',
+        config: { layout: 'menu', themeId: 'crema', font: 'retro', title: 'Café', subtitle: 'de especialidad' },
         sampleList: [
-            { name: 'Muzzarella', price: '$ 5.000', detail: '8 porciones' }, { name: 'Napolitana', price: '$ 6.000' },
-            { name: 'Fugazzeta', price: '$ 6.500' }, { name: 'Calabresa', price: '$ 7.000' },
-            { name: 'Especial', price: '$ 7.500', detail: 'jamón y morrones' }, { name: 'Faina', price: '$ 1.500' },
+            { name: 'Espresso', price: '$ 2.500' },
+            { name: 'Cortado', price: '$ 2.800' },
+            { name: 'Latte', price: '$ 3.500' },
+            { name: 'Flat white', price: '$ 3.800' },
+            { name: 'Cold brew', price: '$ 4.200' },
+            { name: 'Medialuna', price: '$ 1.000' },
         ],
     },
     {
-        id: 'jueves-2x1', name: 'Jueves 2×1', rubro: 'Heladería',
-        config: { layout: 'card', themeId: 'rosa', font: 'elegant', tilt: true, badge: 'CUCURUCHOS', title: 'Jueves 2×1', subtitle: 'todos los gustos' },
+        id: 'desayunos', name: 'Desayunos y meriendas', rubro: 'Cafetería', grupo: 'Heladerías y cafeterías',
+        config: { layout: 'card', themeId: 'cafe', font: 'elegant', badge: 'TODO EL DÍA', title: 'Desayunos y meriendas' },
     },
     {
-        id: 'clase-sala', name: 'Clase y sala', rubro: 'Gimnasio',
-        config: { layout: 'card', themeId: 'lima', font: 'impact', tilt: true, title: 'Clases y sala libre', price: '$ 45.000', subtitle: 'por mes' },
+        id: 'tortas', name: 'Tortas por encargo', rubro: 'Pastelería', grupo: 'Heladerías y cafeterías',
+        config: { layout: 'split', themeId: 'rosa', font: 'retro', title: 'Tortas por encargo', subtitle: 'pedila con 48 h', price: 'desde $ 25.000' },
     },
     {
-        id: 'living-cocina', name: 'Living y cocina', rubro: 'Inmobiliaria',
-        config: { layout: 'band', themeId: 'mar', font: 'modern', badge: 'EN VENTA', title: 'Luz, balcón y cocina integrada', price: 'US$ 98.000' },
+        id: 'nueva-temporada', name: 'Nueva temporada', rubro: 'Tienda de ropa', grupo: 'Moda y accesorios',
+        config: { layout: 'split', themeId: 'moda', font: 'luxury', badge: 'NUEVA COLECCIÓN', title: 'Primavera · Verano', subtitle: 'ya en el local', animation: 'fade' },
     },
     {
-        id: 'optica', name: 'Sol, receta y control', rubro: 'Óptica',
-        config: { layout: 'band', themeId: 'crema', font: 'elegant', badge: 'ÓPTICA', title: 'Sol, receta y control visual', subtitle: 'turnos sin espera' },
+        id: 'liquidacion', name: 'Liquidación', rubro: 'Tienda de ropa', grupo: 'Moda y accesorios',
+        config: { layout: 'card', themeId: 'sale', font: 'bold', tilt: true, badge: 'LIQUIDACIÓN', title: 'Hasta 50% OFF', subtitle: 'en toda la tienda', animation: 'pop' },
     },
     {
-        id: 'precio-grande', name: 'Oferta', rubro: 'Comercio',
+        id: 'cuotas', name: 'Cuotas sin interés', rubro: 'Tienda de ropa', grupo: 'Moda y accesorios',
+        config: { layout: 'band', themeId: 'nude', font: 'modern', badge: 'TODOS LOS BANCOS', title: '3 y 6 cuotas sin interés', subtitle: 'con tarjetas de crédito' },
+    },
+    {
+        id: 'accesorios', name: 'Carteras y bijou', rubro: 'Accesorios', grupo: 'Moda y accesorios',
+        config: { layout: 'split', themeId: 'nude', font: 'luxury', badge: 'NUEVOS INGRESOS', title: 'Carteras y bijou', price: 'desde $ 15.000' },
+    },
+    {
+        id: 'jeans', name: 'Jeans', rubro: 'Tienda de ropa', grupo: 'Moda y accesorios',
+        config: { layout: 'menu', themeId: 'moda', font: 'bold', title: 'Jeans', subtitle: 'todos los talles' },
+        sampleList: [
+            { name: 'Mom', price: '$ 39.000' },
+            { name: 'Recto', price: '$ 37.000' },
+            { name: 'Wide leg', price: '$ 42.000' },
+            { name: 'Skinny', price: '$ 35.000' },
+            { name: 'Bermuda', price: '$ 28.000' },
+        ],
+    },
+    {
+        id: 'zapatillas', name: 'Zapatillas', rubro: 'Calzado', grupo: 'Moda y accesorios',
+        config: { layout: 'card', themeId: 'moda', font: 'bold', badge: 'NUEVAS', title: 'Zapatillas urbanas', subtitle: 'del 35 al 45', price: '$ 69.900' },
+    },
+    {
+        id: 'ofertas-semana', name: 'Ofertas de la semana', rubro: 'Almacén', grupo: 'Almacén y minoristas',
+        config: { layout: 'menu', themeId: 'almacen', font: 'bold', title: 'Ofertas', subtitle: 'de la semana' },
+        sampleList: [
+            { name: 'Yerba 1 kg', price: '$ 4.900' },
+            { name: 'Aceite 1,5 L', price: '$ 5.200' },
+            { name: 'Fideos 500 g', price: '$ 1.400' },
+            { name: 'Arroz 1 kg', price: '$ 1.800' },
+            { name: 'Leche 1 L', price: '$ 1.500' },
+            { name: 'Azúcar 1 kg', price: '$ 1.300' },
+        ],
+    },
+    {
+        id: 'fiambres', name: 'Fiambrería', rubro: 'Almacén', grupo: 'Almacén y minoristas',
+        config: { layout: 'menu', themeId: 'crema', font: 'modern', title: 'Fiambrería', subtitle: 'por 1/4 kg' },
+        sampleList: [
+            { name: 'Jamón cocido', price: '$ 4.500' },
+            { name: 'Queso de máquina', price: '$ 4.200' },
+            { name: 'Salame', price: '$ 5.000' },
+            { name: 'Mortadela', price: '$ 2.800' },
+            { name: 'Paleta', price: '$ 3.500' },
+        ],
+    },
+    {
+        id: 'oferta-dia', name: 'Oferta del día', rubro: 'Almacén', grupo: 'Almacén y minoristas',
+        config: { layout: 'split', themeId: 'almacen', font: 'bold', badge: 'OFERTA', title: 'Yerba 1 kg', subtitle: 'hasta agotar stock', price: '$ 4.900', pricePulse: true },
+    },
+    {
+        id: 'precio-grande', name: 'Oferta', rubro: 'Comercio', grupo: 'Almacén y minoristas',
         config: { layout: 'split', themeId: 'blanco', font: 'impact', badge: 'OFERTA', title: 'Hamburguesa con papas', price: '$ 10.000', subtitle: 'solo por hoy' },
     },
     {
-        id: 'desayunos', name: 'Desayunos y meriendas', rubro: 'Cafetería',
-        config: { layout: 'card', themeId: 'cafe', font: 'elegant', badge: 'TODO EL DÍA', title: 'Desayunos y meriendas' },
+        id: 'medios-pago', name: 'Medios de pago', rubro: 'Comercio', grupo: 'Almacén y minoristas',
+        config: { layout: 'band', themeId: 'blanco', font: 'modern', badge: 'ACEPTAMOS', title: 'Débito, crédito, QR y transferencia', subtitle: 'pagá como quieras' },
+    },
+    {
+        id: 'kiosco', name: 'Kiosco', rubro: 'Kiosco', grupo: 'Almacén y minoristas',
+        config: { layout: 'menu', themeId: 'mar', font: 'bold', title: 'Kiosco', subtitle: 'bebidas y golosinas' },
+        sampleList: [
+            { name: 'Gaseosa 500 ml', price: '$ 1.800' },
+            { name: 'Agua 500 ml', price: '$ 1.200' },
+            { name: 'Alfajor', price: '$ 1.200' },
+            { name: 'Chocolate', price: '$ 2.500' },
+            { name: 'Papas fritas', price: '$ 2.200' },
+            { name: 'Energizante', price: '$ 2.800' },
+        ],
+    },
+    {
+        id: 'lanzamiento-juego', name: 'Lanzamiento', rubro: 'Videojuegos', grupo: 'Videojuegos y electrónica',
+        config: { layout: 'split', themeId: 'gamer', font: 'gamer', badge: 'YA DISPONIBLE', title: 'El juego del año', subtitle: 'reservá tu copia', price: '$ 89.999', animation: 'slide' },
+    },
+    {
+        id: 'consolas', name: 'Consolas', rubro: 'Videojuegos', grupo: 'Videojuegos y electrónica',
+        config: { layout: 'menu', themeId: 'gamer', font: 'gamer', title: 'Consolas', subtitle: 'y accesorios' },
+        sampleList: [
+            { name: 'PlayStation 5', price: '$ 999.999' },
+            { name: 'Xbox Series S', price: '$ 699.999' },
+            { name: 'Nintendo Switch', price: '$ 649.999' },
+            { name: 'Joystick extra', price: '$ 99.999' },
+            { name: 'Auriculares gamer', price: '$ 79.999' },
+        ],
+    },
+    {
+        id: 'torneo', name: 'Torneo', rubro: 'Videojuegos', grupo: 'Videojuegos y electrónica',
+        config: { layout: 'card', themeId: 'gamer', font: 'gamer', tilt: true, badge: 'SÁBADO 18 H', title: 'Torneo de fútbol', subtitle: 'inscripción en el local', price: '$ 10.000' },
+    },
+    {
+        id: 'celulares', name: 'Celulares en cuotas', rubro: 'Electrónica', grupo: 'Videojuegos y electrónica',
+        config: { layout: 'split', themeId: 'electro', font: 'modern', badge: 'CUOTAS', title: 'Celulares de última generación', price: '12 × $ 49.999' },
+    },
+    {
+        id: 'tecnologia', name: 'Tecnología', rubro: 'Electrónica', grupo: 'Videojuegos y electrónica',
+        config: { layout: 'menu', themeId: 'electro', font: 'modern', title: 'Tecnología', subtitle: 'precios de contado' },
+        sampleList: [
+            { name: 'Smart TV 50"', price: '$ 549.999' },
+            { name: 'Notebook 14"', price: '$ 799.999' },
+            { name: 'Auriculares bluetooth', price: '$ 39.999' },
+            { name: 'Parlante portátil', price: '$ 59.999' },
+            { name: 'Cargador rápido', price: '$ 19.999' },
+            { name: 'Smartwatch', price: '$ 89.999' },
+        ],
+    },
+    {
+        id: 'servicio-tecnico', name: 'Servicio técnico', rubro: 'Electrónica', grupo: 'Videojuegos y electrónica',
+        config: { layout: 'band', themeId: 'electro', font: 'modern', badge: 'SERVICIO TÉCNICO', title: 'Reparamos celulares y notebooks', subtitle: 'presupuesto sin cargo' },
+    },
+    {
+        id: 'vinos', name: 'Vinos', rubro: 'Vinoteca', grupo: 'Vinotecas',
+        config: { layout: 'menu', themeId: 'vino', font: 'luxury', title: 'Vinos', subtitle: 'selección de la casa', showDetails: true },
+        sampleList: [
+            { name: 'Malbec reserva', price: '$ 18.000', detail: 'Mendoza' },
+            { name: 'Cabernet sauvignon', price: '$ 16.500', detail: 'San Juan' },
+            { name: 'Blend de tintos', price: '$ 21.000', detail: 'Valle de Uco' },
+            { name: 'Torrontés', price: '$ 12.000', detail: 'Salta' },
+            { name: 'Espumante', price: '$ 15.000', detail: 'extra brut' },
+        ],
+    },
+    {
+        id: 'vino-semana', name: 'Vino de la semana', rubro: 'Vinoteca', grupo: 'Vinotecas',
+        config: { layout: 'split', themeId: 'vino', font: 'luxury', badge: 'RECOMENDADO', title: 'Malbec reserva 2022', subtitle: 'Valle de Uco', price: '$ 18.000' },
+    },
+    {
+        id: 'degustacion', name: 'Degustación', rubro: 'Vinoteca', grupo: 'Vinotecas',
+        config: { layout: 'card', themeId: 'vino', font: 'elegant', badge: 'VIERNES 20 H', title: 'Degustación de vinos', subtitle: 'cupos limitados', price: '$ 15.000' },
+    },
+    {
+        id: 'seis-botellas', name: 'Llevá 6, pagá 5', rubro: 'Vinoteca', grupo: 'Vinotecas',
+        config: { layout: 'band', themeId: 'vino', font: 'luxury', badge: 'PROMO', title: 'Llevá 6 y pagá 5', subtitle: 'en vinos seleccionados' },
+    },
+    {
+        id: 'gym-planes', name: 'Planes', rubro: 'Gimnasio', grupo: 'Gimnasios',
+        config: { layout: 'menu', themeId: 'fuerza', font: 'bold', title: 'Planes', subtitle: 'por mes' },
+        sampleList: [
+            { name: 'Pase libre', price: '$ 45.000' },
+            { name: '3 veces por semana', price: '$ 35.000' },
+            { name: 'Funcional', price: '$ 30.000' },
+            { name: 'Spinning', price: '$ 28.000' },
+            { name: 'Clase suelta', price: '$ 6.000' },
+        ],
+    },
+    {
+        id: 'clase-sala', name: 'Clases y sala libre', rubro: 'Gimnasio', grupo: 'Gimnasios',
+        config: { layout: 'card', themeId: 'lima', font: 'impact', tilt: true, title: 'Clases y sala libre', price: '$ 45.000', subtitle: 'por mes' },
+    },
+    {
+        id: 'gym-inscripcion', name: 'Inscripción sin cargo', rubro: 'Gimnasio', grupo: 'Gimnasios',
+        config: { layout: 'split', themeId: 'fuerza', font: 'bold', badge: 'ESTE MES', title: 'Inscripción sin cargo', subtitle: 'empezá hoy', animation: 'slide' },
+    },
+    {
+        id: 'gym-amigo', name: 'Entrená con un amigo', rubro: 'Gimnasio', grupo: 'Gimnasios',
+        config: { layout: 'card', themeId: 'fuerza', font: 'bold', tilt: true, badge: '2×1', title: 'Entrená con un amigo', subtitle: 'y paguen uno solo', animation: 'pop' },
+    },
+    {
+        id: 'living-cocina', name: 'Living y cocina', rubro: 'Inmobiliaria', grupo: 'Otros',
+        config: { layout: 'band', themeId: 'mar', font: 'modern', badge: 'EN VENTA', title: 'Luz, balcón y cocina integrada', price: 'US$ 98.000' },
+    },
+    {
+        id: 'optica', name: 'Sol, receta y control', rubro: 'Óptica', grupo: 'Otros',
+        config: { layout: 'band', themeId: 'crema', font: 'elegant', badge: 'ÓPTICA', title: 'Sol, receta y control visual', subtitle: 'turnos sin espera' },
     },
 ];
 
@@ -366,8 +699,8 @@ export interface PosterListRow { name: string; detail?: string; price: string }
 type Row = PosterListRow;
 
 // Ancho aproximado de un texto en negrita (en "em").
-const NAME_EM = 0.58;
-const PRICE_EM = 0.62;
+const NAME_EM = 0.66;
+const PRICE_EM = 0.64;
 
 // Tamaño de letra y columnas para que la lista entre: los nombres largos pasan
 // a dos renglones antes de cortarse, y "columnas solas" elige lo que deja la

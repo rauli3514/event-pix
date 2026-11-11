@@ -17,9 +17,9 @@ import { useDisplayCampaigns, useUpdateCampaign } from '@/hooks/use-display-hub'
 import { formatPrice, fromDraftRows, newItemId, parsePrice, toDraftRows, type DraftRow, type PriceList } from '@/lib/priceLists';
 import { DAY_LETTER, WEEK_ORDER } from '@/lib/itemRules';
 import {
-    POSTER_ANIMATIONS, POSTER_APP_ID, POSTER_FONTS, POSTER_FORMATS, POSTER_LAYOUTS, POSTER_PARTS, POSTER_TEMPLATES, POSTER_THEMES,
+    POSTER_ANIMATIONS, POSTER_APP_ID, POSTER_FONTS, POSTER_FORMATS, POSTER_GROUPS, POSTER_LAYOUTS, POSTER_PARTS, POSTER_TEMPLATES, POSTER_THEMES,
     configFromTemplate, formatInfo, playlistsWithNewMetadata, posterColors, scheduleBadge,
-    type PosterConfig, type PosterFont, type PosterFormat, type PosterLayout, type PosterPart, type PosterTemplate, type TextStyle,
+    type PosterConfig, type PosterFont, type PosterFormat, type PosterGroup, type PosterLayout, type PosterPart, type PosterTemplate, type TextStyle,
 } from '@/lib/posters';
 import type { DisplayMedia } from '@/types/display';
 
@@ -65,6 +65,7 @@ function PosterEditorDialog({ onClose, commerceId, editing, initialTemplate, ini
     const [name, setName] = useState(editing?.name || initialTemplate?.name || '');
     const [tab, setTab] = useState<Tab>('content');
     const [search, setSearch] = useState('');
+    const [group, setGroup] = useState<PosterGroup | null>(null);
     const [pickingPhoto, setPickingPhoto] = useState<number | null>(null);
     const [replay, setReplay] = useState(0);
     const [selectedPart, setSelectedPart] = useState<PosterPart | null>(null);
@@ -116,7 +117,8 @@ function PosterEditorDialog({ onClose, commerceId, editing, initialTemplate, ini
 
     const filtered = POSTER_TEMPLATES.filter(t => {
         const q = search.trim().toLowerCase();
-        return !q || `${t.name} ${t.rubro} ${POSTER_LAYOUTS[t.config.layout].label}`.toLowerCase().includes(q);
+        if (group && t.grupo !== group) return false;
+        return !q || `${t.name} ${t.rubro} ${t.grupo || ''} ${POSTER_LAYOUTS[t.config.layout].label}`.toLowerCase().includes(q);
     });
 
     const save = async () => {
@@ -205,7 +207,16 @@ function PosterEditorDialog({ onClose, commerceId, editing, initialTemplate, ini
                             </div>
                             <FormatSelect value={format} onChange={setFormat} className="h-10 text-sm sm:w-80" />
                         </div>
+                        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+                            {[null, ...POSTER_GROUPS].map(g => (
+                                <button key={g || 'todos'} type="button" onClick={() => setGroup(g)}
+                                    className={cn('shrink-0 rounded-full border px-3 py-1 text-xs whitespace-nowrap', group === g ? 'border-indigo-500 bg-indigo-500 text-white' : 'border-border hover:bg-muted')}>
+                                    {g || `Todos (${POSTER_TEMPLATES.length})`}
+                                </button>
+                            ))}
+                        </div>
                         <p className="text-xs text-muted-foreground">{fmt.hint} Son las mismas medidas que los mosaicos de "Enviar a pantallas".</p>
+                        {filtered.length === 0 && <p className="text-sm text-muted-foreground py-8 text-center">No hay diseños con "{search}" en este rubro. Probá con "Todos" o con "Empezar de cero".</p>}
                         <div className={cn('grid gap-4', ratio < 0.6 ? 'grid-cols-3 sm:grid-cols-6 lg:grid-cols-8' : ratio < 1 ? 'grid-cols-2 sm:grid-cols-4 lg:grid-cols-5' : ratio > 2.5 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3')}>
                             {filtered.map(t => (
                                 <button key={t.id} type="button" onClick={() => pickTemplate(t)} className="group text-left">
@@ -215,7 +226,7 @@ function PosterEditorDialog({ onClose, commerceId, editing, initialTemplate, ini
                                         </div>
                                     </div>
                                     <p className="mt-1.5 text-sm font-medium">{t.name}</p>
-                                    <p className="text-xs text-muted-foreground">{t.rubro} · {POSTER_LAYOUTS[t.config.layout].label}</p>
+                                    <p className="text-xs text-muted-foreground">{t.rubro}</p>
                                 </button>
                             ))}
                         </div>

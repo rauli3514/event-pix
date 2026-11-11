@@ -186,7 +186,7 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList, o
 
     const titleFamily = font.family;
     const renderTitle = (base: number, align: 'left' | 'center' = 'left') => (config.title ? wrap('title',
-        <div style={{ ...textStyle(base, config.styles?.title, theme.text), fontFamily: titleFamily, fontWeight: font.weight, lineHeight: config.font === 'script' ? 1.15 : 1.02, textAlign: align, letterSpacing: config.font === 'impact' ? '0.01em' : undefined, wordWrap: 'break-word' }}>
+        <div style={{ ...textStyle(base * font.size, config.styles?.title, theme.text), fontFamily: titleFamily, fontWeight: font.weight, lineHeight: config.font === 'script' || config.font === 'retro' ? 1.15 : 1.02, textAlign: align, letterSpacing: config.font === 'impact' || config.font === 'bold' ? '0.02em' : config.font === 'luxury' ? '0.04em' : undefined, wordWrap: 'break-word' }}>
             {config.title}
         </div>,
     ) : null);
@@ -197,14 +197,21 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList, o
         </div>,
     ) : null);
 
-    const renderPrice = (base: number, align: 'left' | 'center' | 'right' = 'left') => (price ? wrap('price',
+    // El precio va en un renglón: si es largo ("desde $ 25.000") se achica para entrar en el ancho.
+    const priceFont = config.font === 'script' ? POSTER_FONTS.modern : font;
+    const renderPrice = (base: number, align: 'left' | 'center' | 'right' = 'left', maxWidth?: number) => {
+        if (!price) return null;
+        let size = base * u * priceFont.size * scaleOf('price');
+        if (maxWidth && maxWidth > 0) size = Math.min(size, maxWidth / Math.max(1, price.length * priceFont.charEm));
+        return wrap('price',
         <div style={{ marginTop: 2 * u, textAlign: align }}>
             <div
                 className={config.pricePulse ? 'poster-motion' : undefined}
                 style={{
                     ...textStyle(base, config.styles?.price, theme.accent),
+                    fontSize: size,
                     display: 'inline-block',
-                    fontFamily: font.family === POSTER_FONTS.script.family ? POSTER_FONTS.modern.family : font.family,
+                    fontFamily: priceFont.family,
                     fontWeight: 800,
                     lineHeight: 1,
                     whiteSpace: 'nowrap',
@@ -215,7 +222,8 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList, o
                 {price}
             </div>
         </div>,
-    ) : null);
+        );
+    };
 
     // Lista de precios: se achica sola para entrar en el alto disponible.
     const renderList = (width: number, height: number, maxBase = 3.4) => {
@@ -256,7 +264,7 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList, o
     // Lo que se lleva un bloque de texto, para darle el resto a la lista.
     const reserved = (innerW: number, titleBase: number) => {
         const ft = titleBase * u * (config.styles?.title?.scale || 1);
-        const titleLines = config.title ? Math.min(3, Math.max(1, Math.ceil((config.title.length * 0.55 * ft) / Math.max(1, innerW)))) : 0;
+        const titleLines = config.title ? Math.min(3, Math.max(1, Math.ceil((config.title.length * font.charEm * font.size * ft) / Math.max(1, innerW)))) : 0;
         const pt = price ? 10 * u * (config.styles?.price?.scale || 1) + 2 * u : 0;
         return (badge ? 6 * u : 0) + titleLines * ft * 1.05 + (config.subtitle ? 4.5 * u : 0) + pt + 3 * u;
     };
@@ -272,7 +280,7 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList, o
                 {part(renderTitle(titleBase), 1)}
                 {part(renderSubtitle(3.2), 2)}
                 {part(renderList(innerW, innerH - reserved(innerW, titleBase)), 3)}
-                {part(renderPrice(priceBase), 4)}
+                {part(renderPrice(priceBase, 'left', innerW), 4)}
             </div>
         );
     };
@@ -331,7 +339,7 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList, o
                                 1,
                             )}
                             {seq(renderList(panel.width - 2 * pad, panel.height - 2 * pad - reserved(panel.width - 2 * pad, 8) - 2 * u, landscape ? 8 : 9), 2)}
-                            {seq(renderPrice(9), 3)}
+                            {seq(renderPrice(9, 'left', panel.width - 2 * pad), 3)}
                         </div>
                     </div>
                 </>
@@ -346,11 +354,11 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList, o
                     <div style={abs({ left: 0, top: flip ? 0 : H - bandH, width: W, height: bandH, background: theme.panel, opacity: 0.96, padding: pad, boxSizing: 'border-box', display: 'flex', flexDirection: landscape ? 'row' : 'column', alignItems: landscape ? 'center' : 'flex-start', justifyContent: 'center', ...(animStyle(0) || {}) })}>
                         <div style={{ flex: landscape ? 1 : undefined, minWidth: 0, width: landscape ? undefined : '100%' }}>
                             {seq(renderBadge(), 1)}
-                            {seq(renderTitle(landscape ? 6 : 7), 2)}
+                            {seq(renderTitle(rows.length ? (landscape ? 6 : 7) : (landscape ? 7.5 : 8.5)), 2)}
                             {seq(renderSubtitle(3), 3)}
                             {rows.length > 0 && seq(renderList(price && landscape ? innerW * 0.62 : innerW, bandH - 2 * pad - reserved(innerW * 0.62, landscape ? 6 : 7) + (price && landscape ? 10 * u : 0)), 4)}
                         </div>
-                        {price && <div style={{ marginLeft: landscape ? 3 * u : 0, ...(animStyle(5) || {}) }}>{renderPrice(landscape ? 11 : 10, landscape ? 'right' : 'left')}</div>}
+                        {price && <div style={{ marginLeft: landscape ? 3 * u : 0, ...(animStyle(5) || {}) }}>{renderPrice(landscape ? 11 : 10, landscape ? 'right' : 'left', landscape ? W * 0.4 : innerW)}</div>}
                     </div>
                 </>
             );
@@ -419,10 +427,10 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList, o
                             }}
                         >
                             {renderBadge()}
-                            {renderTitle(rows.length ? 6 : 8)}
+                            {renderTitle(rows.length ? 6 : price ? 8 : 10)}
                             {renderSubtitle(3)}
-                            {renderList(cardW - 2 * pad, cardMaxH - 2 * pad - reserved(cardW - 2 * pad, rows.length ? 6 : 8))}
-                            {renderPrice(rows.length ? 8 : 11)}
+                            {renderList(cardW - 2 * pad, cardMaxH - 2 * pad - reserved(cardW - 2 * pad, rows.length ? 6 : price ? 8 : 10))}
+                            {renderPrice(rows.length ? 8 : 11, 'left', cardW - 2 * pad)}
                         </div>
                     </div>
                 </>
