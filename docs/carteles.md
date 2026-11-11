@@ -8,7 +8,12 @@ todas las pantallas. Menú **Contenido → Carteles**.
 
 1. El banner **"Armá tu cartel en un minuto"** muestra algunos diseños: se toca uno y se
    abre el editor con ese diseño. También **Empezar de cero** (cartel en blanco) y
-   **Ver todos los diseños** (galería con buscador por rubro y formato de pantalla).
+   **Ver todos los diseños** (galería con buscador, filtro por rubro y formato de pantalla).
+   Hay 54 diseños en rubros: Comidas y restaurantes, Bares y cervecerías, Heladerías y
+   cafeterías, Moda y accesorios, Almacén y minoristas, Videojuegos y electrónica,
+   Vinotecas, Gimnasios y Otros. Cada rubro tiene su paleta (Fuego, Cerveza, Neón, Helado,
+   Moda, Nude, Liquidación, Almacén, Gamer, Electro, Vino, Fuerza…) y letras (Gruesa, Retro,
+   Lujo, Divertida, Gamer, además de las de antes).
    Los formatos son las mismas medidas que los mosaicos: 1 TV horizontal (1920×1080) o
    vertical (1080×1920), y mosaicos de 2×1, 1×2 y 2×2 con las TV acostadas o paradas
    (por ejemplo 3840×1080 o 2160×3840). En un mosaico la vista previa marca con líneas
@@ -59,4 +64,4 @@ todas las pantallas. Menú **Contenido → Carteles**.
 
 ## Próximo
 
-Más plantillas (apuntar a 50+) y fotos de ejemplo.
+Fotos de ejemplo en las plantillas.

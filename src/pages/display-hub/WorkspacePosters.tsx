@@ -17,7 +17,7 @@ import {
 } from '@/lib/posters';
 
 // Los diseños que se muestran en el banner (los demás, en "Ver todos").
-const FEATURED = ['pizzas', 'mitad-cafe', 'promo-tarde', 'jueves-2x1', 'precio-grande'];
+const FEATURED = ['hamburguesas', 'pintas', 'helados-precios', 'nueva-temporada', 'ofertas-semana', 'consolas', 'vinos', 'gym-planes', 'liquidacion'];
 import type { DisplayMedia } from '@/types/display';
 
 // Carteles: avisos armados con plantillas (promo, carta, oferta), con las
@@ -65,7 +65,7 @@ export default function WorkspacePosters() {
                         <div className="space-y-1">
                             <p className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-semibold"><Sparkles className="w-3.5 h-3.5" /> Diseños listos</p>
                             <h2 className={cn('font-extrabold tracking-tight', compact ? 'text-xl' : 'text-2xl md:text-3xl')}>Armá tu cartel en un minuto</h2>
-                            <p className="text-sm text-white/85 max-w-xl">Tocá uno de nuestros diseños y cambiá los textos, las fotos y los precios. O empezá de cero con el tuyo.</p>
+                            <p className="text-sm text-white/85 max-w-xl">Hay más de 50 diseños para comidas, bares, heladerías, moda, almacenes, videojuegos, vinotecas y gimnasios. Tocá uno y cambiá los textos, las fotos y los precios, o empezá de cero.</p>
                         </div>
                         <div className="flex flex-wrap gap-2 shrink-0">
                             <Button onClick={() => openNew(BLANK_TEMPLATE)} className="bg-white text-indigo-700 hover:bg-white/90"><Plus className="w-4 h-4 mr-1.5" /> Empezar de cero</Button>
