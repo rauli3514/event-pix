@@ -5,7 +5,7 @@ import { Send, Monitor, Layers, ChevronUp, ChevronDown } from 'lucide-react';
 import { useDisplayDevices, useDisplayGroups, useAssignContentToDevice, useCreateCampaign, useUpdateCampaign, SyncMode } from '@/hooks/use-display-hub';
 import { supabase } from '@/lib/supabase';
 import { WallPreview } from '@/components/display/WallPreview';
-import { previewImageOf } from '@/lib/wallPreview';
+import { previewItemsOf } from '@/lib/wallPreview';
 import type { DisplayCampaign } from '@/types/display';
 import { toast } from 'sonner';
 
@@ -357,7 +357,7 @@ export const SendToScreensModal = ({ isOpen, onClose, selectedAssets, commerceId
                                             </button>
                                         ))}
                                     </div>
-                                    <WallPreview cols={wallShape.cols} rows={wallShape.rows} screens={targets} imageUrl={previewImageOf(selectedAssets)} fit={wallFit} />
+                                    <WallPreview cols={wallShape.cols} rows={wallShape.rows} screens={targets} items={previewItemsOf(selectedAssets)} commerceId={commerceId} fit={wallFit} />
                                     <ol className="space-y-1">
                                         {targets.map((device, i) => (
                                             <li key={device.id} className="flex items-center gap-2 text-sm">
