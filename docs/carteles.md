@@ -35,7 +35,9 @@ todas las pantallas. Menú **Contenido → Carteles**.
      los productos de la plantilla ("lista nueva"), al guardar se crea esa lista en Listas
      de precios y el cartel queda vinculado. Si usa una lista existente, los cambios se
      guardan en esa lista (y cambian los otros carteles que la usen).
-   - **QR:** se elige qué abre (WhatsApp, Instagram o una página) y el link se arma solo.
+   - **QR:** se elige qué abre (Menú Fudo, WhatsApp, Instagram o una página) y el link se
+     arma solo. "Menú Fudo" toma el local que ya se conectó en Listas de precios
+     (menu.fu.do/<local>) y pone "Mirá la carta y pedí"; si no hay, se pega el link.
      En WhatsApp alcanza con el número con característica ("362 454-7382") y un mensaje
      opcional. Debajo del código va un texto corto ("Pedí por WhatsApp").
    - **Ajustes:** nombre, cuánto dura y **cuándo aparece** (días y horario).
