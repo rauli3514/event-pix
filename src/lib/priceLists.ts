@@ -9,7 +9,16 @@ export interface PriceListItem {
     price: number | null;
     // false = "sin stock": no se muestra (o se marca) en las pantallas.
     available: boolean;
+    // Productos que vienen de Fudo (ver lib/fudo): su id, el nombre que tiene
+    // allá (para saber si se cambió acá) y si Fudo lo marca sin stock.
+    fudoId?: number;
+    fudoName?: string;
+    fudoOff?: boolean;
 }
+
+// Campos de Fudo que hay que conservar al guardar desde el panel.
+export const fudoFields = (item: PriceListItem): Partial<PriceListItem> =>
+    (item.fudoId != null ? { fudoId: item.fudoId, fudoName: item.fudoName, fudoOff: item.fudoOff } : {});
 
 // Cambio temporal (descuento o aumento) de toda la lista: no toca los precios.
 // Mientras está vigente se muestra el precio con el cambio (y en los carteles
@@ -27,6 +36,9 @@ export interface PriceList {
     name: string;
     items: PriceListItem[];
     promo?: PriceListPromo | null;
+    // De dónde viene (Fudo) y el color para separarla de las demás.
+    source?: import('./fudo').FudoSource | null;
+    color?: string | null;
     sort_order: number | null;
     created_at: string;
     updated_at: string;
@@ -153,7 +165,9 @@ export const fromDraftRows = (rows: DraftRow[]): PriceListItem[] =>
             id: r.id,
             name: r.name.trim(),
             detail: (r.detail || '').trim() || undefined,
-            price: parsePrice(priceText),
+            // Lo que viene de Fudo mantiene su precio (se cambia en Fudo).
+            price: r.fudoId != null ? r.price : parsePrice(priceText),
             available: r.available !== false,
+            ...fudoFields(r),
         }));
 

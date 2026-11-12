@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowDown, ArrowUp, Check, ClipboardPaste, Copy, Eye, EyeOff, ListOrdered, Loader2, MoreVertical, Percent, Plus, Search, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, ClipboardPaste, Copy, DownloadCloud, Eye, EyeOff, ListOrdered, Loader2, MoreVertical, Percent, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,11 +8,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { usePriceLists, useCreatePriceList, useUpdatePriceList, useDeletePriceList } from '@/hooks/use-price-lists';
+import { usePriceLists, useCreatePriceList, useUpdatePriceList, useDeletePriceList, useFudoRefresh } from '@/hooks/use-price-lists';
+import { FudoImportDialog } from '@/components/display/FudoImportDialog';
+import { LIST_COLORS, fudoErrorText, isFudoList, timeAgo } from '@/lib/fudo';
 import { useDisplayLabelGroups } from '@/hooks/use-display-labels';
 import {
     PriceList, PriceListItem, PriceListPromo, activePromo, emptyItem, formatPercent, formatPrice, formatRemaining, increasePrice,
-    formatEnd, newItemId, normalizeItemName, parsePastedList, parsePrice, promoPrice,
+    formatEnd, fudoFields, newItemId, normalizeItemName, parsePastedList, parsePrice, promoPrice,
 } from '@/lib/priceLists';
 import { useNow } from '@/hooks/use-now';
 
@@ -38,13 +40,15 @@ const fromDraft = (draft: Draft): PriceListItem[] =>
             id: item.id,
             name: item.name.trim(),
             detail: (item.detail || '').trim() || undefined,
-            price: parsePrice(priceText),
+            // Lo que viene de Fudo mantiene su precio (se cambia en Fudo).
+            price: item.fudoId != null ? item.price : parsePrice(priceText),
             available: item.available !== false,
+            ...fudoFields(item),
         }));
 
 // Postgres reordena las claves del JSON: se compara campo por campo.
 const canonical = (items: PriceListItem[]) =>
-    JSON.stringify(items.map(i => [i.id, i.name || '', i.detail || '', i.price ?? null, i.available !== false]));
+    JSON.stringify(items.map(i => [i.id, i.name || '', i.detail || '', i.price ?? null, i.available !== false, i.fudoId ?? null]));
 const sameItems = (a: PriceListItem[], b: PriceListItem[]) => canonical(a) === canonical(b);
 
 const ROUND_OPTIONS = [1, 10, 50, 100, 500];
@@ -71,6 +75,9 @@ export default function WorkspacePriceLists() {
     const [pasteOpen, setPasteOpen] = useState(false);
     const [raiseOpen, setRaiseOpen] = useState(false);
     const [search, setSearch] = useState('');
+    const [fudoOpen, setFudoOpen] = useState(false);
+    const [listFilter, setListFilter] = useState<'all' | 'fudo' | 'mine'>('all');
+    const refreshFudo = useFudoRefresh();
     const focusRowRef = useRef<string | null>(null);
 
     const dirty = !!draft && !!selected && draft.listId === selected.id
@@ -194,6 +201,24 @@ export default function WorkspacePriceLists() {
         }
     };
 
+    const setColor = async (color: string | null) => {
+        if (!selected || !commerceId) return;
+        try {
+            await updateList.mutateAsync({ commerceId, id: selected.id, color });
+        } catch {
+            toast.error('No se pudo guardar el color. Si recién se agregó Fudo, falta correr el paso en Supabase.');
+        }
+    };
+    const doRefreshFudo = async () => {
+        if (!commerceId) return;
+        try {
+            const n = await refreshFudo.mutateAsync({ commerceId });
+            toast.success(`Listo: ${n} ${n === 1 ? 'lista actualizada' : 'listas actualizadas'} desde Fudo.`);
+        } catch (e) {
+            toast.error(fudoErrorText((e as Error).message));
+        }
+    };
+
     const base = `/admin/display/commerce/${commerceId}/workspace`;
 
     return (
@@ -215,11 +240,21 @@ export default function WorkspacePriceLists() {
             {isLoading ? (
                 <div className="flex justify-center py-16 text-muted-foreground"><Loader2 className="w-6 h-6 animate-spin" /></div>
             ) : !missing && (
-                <div className="grid gap-4 md:grid-cols-[240px_minmax(0,1fr)]">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-[240px_minmax(0,1fr)]">
                     {/* Listas */}
-                    <div className="space-y-2">
-                        <div className="flex gap-2 overflow-x-auto pb-1 md:flex-col md:overflow-visible">
-                            {lists.map(list => {
+                    <div className="space-y-2 min-w-0">
+                        {lists.some(isFudoList) && (
+                            <div className="flex gap-1.5">
+                                {([['all', 'Todas'], ['fudo', 'De Fudo'], ['mine', 'Mías']] as const).map(([id, label]) => (
+                                    <button key={id} type="button" onClick={() => setListFilter(id)}
+                                        className={cn('rounded-full border px-3 py-1 text-xs', listFilter === id ? 'border-indigo-500 bg-indigo-500 text-white' : 'border-border hover:bg-muted')}>
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        <div className="flex gap-2 overflow-x-auto pb-1 md:flex-col md:overflow-visible md:max-h-[60vh] md:overflow-y-auto">
+                            {lists.filter(l => listFilter === 'all' || (listFilter === 'fudo') === isFudoList(l)).map(list => {
                                 const active = list.id === selectedId;
                                 const count = (list.items || []).filter(i => i.name).length;
                                 return (
@@ -228,12 +263,14 @@ export default function WorkspacePriceLists() {
                                         type="button"
                                         onClick={() => selectList(list.id)}
                                         className={cn(
-                                            'shrink-0 rounded-xl border px-4 py-3 text-left transition-colors md:w-full',
+                                            'shrink-0 max-w-[15rem] md:max-w-none rounded-xl border px-4 py-3 text-left transition-colors md:w-full',
                                             active ? 'border-indigo-500 bg-indigo-500/10' : 'border-border bg-card hover:bg-muted'
                                         )}
                                     >
                                         <span className={cn('flex items-center gap-1.5 font-semibold', active && 'text-indigo-600 dark:text-indigo-400')}>
+                                            {list.color && <span className="w-2.5 h-2.5 shrink-0 rounded-full" style={{ background: list.color }} />}
                                             <span className="truncate">{list.name}</span>
+                                            {isFudoList(list) && <span className="shrink-0 rounded bg-orange-500/15 px-1 py-0.5 text-[9px] font-bold uppercase text-orange-600 dark:text-orange-400">Fudo</span>}
                                             {activePromo(list, now) && <span className="shrink-0 rounded-full bg-rose-600 px-1.5 py-0.5 text-[10px] font-bold text-white">{formatPercent(list.promo!.percent)}</span>}
                                         </span>
                                         <span className="block text-xs text-muted-foreground">{count} {count === 1 ? 'producto' : 'productos'}</span>
@@ -243,6 +280,9 @@ export default function WorkspacePriceLists() {
                         </div>
                         <Button variant="outline" className="w-full" onClick={addList} disabled={createList.isPending}>
                             <Plus className="w-4 h-4 mr-2" /> Nueva lista
+                        </Button>
+                        <Button variant="outline" className="w-full border-orange-500/40 text-orange-600 hover:bg-orange-500/10 hover:text-orange-600 dark:text-orange-400" onClick={() => setFudoOpen(true)}>
+                            <DownloadCloud className="w-4 h-4 mr-2" /> Traer desde Fudo
                         </Button>
                         {oldLabelGroups.length > 0 && (
                             <p className="text-xs text-muted-foreground px-1">
@@ -256,10 +296,15 @@ export default function WorkspacePriceLists() {
                         <div className="rounded-2xl border border-dashed border-border p-10 text-center text-muted-foreground">
                             <ListOrdered className="w-10 h-10 mx-auto mb-3 opacity-40" />
                             <p className="font-medium text-foreground">Todavía no tenés listas</p>
-                            <p className="text-sm mt-1">Creá la primera, por ejemplo "Pizzas" o "Cafetería".</p>
-                            <Button className="mt-4" onClick={addList} disabled={createList.isPending}>
-                                <Plus className="w-4 h-4 mr-2" /> Nueva lista
-                            </Button>
+                            <p className="text-sm mt-1">Creá la primera, por ejemplo "Pizzas" o "Cafetería", o traé tus precios desde Fudo.</p>
+                            <div className="mt-4 flex flex-wrap justify-center gap-2">
+                                <Button onClick={addList} disabled={createList.isPending}>
+                                    <Plus className="w-4 h-4 mr-2" /> Nueva lista
+                                </Button>
+                                <Button variant="outline" onClick={() => setFudoOpen(true)}>
+                                    <DownloadCloud className="w-4 h-4 mr-2" /> Traer desde Fudo
+                                </Button>
+                            </div>
                         </div>
                     ) : (
                         <div className="rounded-2xl border border-border bg-card">
@@ -279,10 +324,36 @@ export default function WorkspacePriceLists() {
                                     <DropdownMenuContent align="end">
                                         <DropdownMenuItem onClick={() => setRaiseOpen(true)}><Percent className="w-4 h-4 mr-2" /> Aumentar precios</DropdownMenuItem>
                                         <DropdownMenuItem onClick={() => setPasteOpen(true)}><ClipboardPaste className="w-4 h-4 mr-2" /> Pegar una lista</DropdownMenuItem>
+                                        <div className="px-2 py-1.5">
+                                            <p className="mb-1.5 text-xs text-muted-foreground">Color de la lista</p>
+                                            <div className="flex flex-wrap gap-1.5 max-w-[11rem]">
+                                                {LIST_COLORS.map(c => (
+                                                    <button key={c} type="button" aria-label={`Color ${c}`} onClick={() => setColor(c)}
+                                                        className={cn('w-5 h-5 rounded-full border border-border', selected?.color === c && 'ring-2 ring-indigo-500 ring-offset-1 ring-offset-background')}
+                                                        style={{ background: c }} />
+                                                ))}
+                                                {selected?.color && <button type="button" onClick={() => setColor(null)} className="text-[11px] underline text-muted-foreground">Sin color</button>}
+                                            </div>
+                                        </div>
                                         <DropdownMenuItem onClick={removeList} className="text-rose-600"><Trash2 className="w-4 h-4 mr-2" /> Eliminar lista</DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             </div>
+
+                            {isFudoList(selected) && (
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-orange-500/10 px-4 py-3 text-sm">
+                                    <span className="rounded bg-orange-500 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">Fudo</span>
+                                    <span className="flex-1 min-w-[12rem]">
+                                        Viene de <strong>menu.fu.do/{selected.source.slug}</strong>{selected.source.parentName ? ` · ${selected.source.parentName}` : ''}
+                                        <span className="text-muted-foreground"> · actualizada {timeAgo(selected.source.syncedAt, now) || 'nunca'}. Los precios se cambian en Fudo; acá podés cambiar nombres, aclaraciones, sin stock y descuentos.</span>
+                                        {selected.source.lastError && <span className="block text-xs text-amber-600 dark:text-amber-400">La última vez Fudo no respondió: se siguen mostrando los precios anteriores.</span>}
+                                    </span>
+                                    <Button size="sm" variant="outline" onClick={doRefreshFudo} disabled={refreshFudo.isPending || dirty}
+                                        title={dirty ? 'Guardá los cambios primero' : undefined}>
+                                        {refreshFudo.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><RefreshCw className="w-4 h-4 mr-1.5" /> Actualizar desde Fudo</>}
+                                    </Button>
+                                </div>
+                            )}
 
                             {promo && (
                                 <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border bg-rose-500/10 px-4 py-3 text-sm">
@@ -343,6 +414,8 @@ export default function WorkspacePriceLists() {
                                                 />
                                                 <Input
                                                     value={item.priceText}
+                                                    readOnly={item.fudoId != null}
+                                                    title={item.fudoId != null ? 'Este precio viene de Fudo: se cambia en Fudo' : undefined}
                                                     onChange={e => patchItem(item.id, { priceText: e.target.value })}
                                                     onBlur={() => {
                                                         const price = parsePrice(item.priceText);
@@ -350,7 +423,7 @@ export default function WorkspacePriceLists() {
                                                     }}
                                                     placeholder="$ 0"
                                                     inputMode="decimal"
-                                                    className={cn(GHOST, 'h-8 md:h-9 w-28 md:w-32 text-right font-mono font-semibold')}
+                                                    className={cn(GHOST, 'h-8 md:h-9 w-28 md:w-32 text-right font-mono font-semibold', item.fudoId != null && 'text-orange-600 dark:text-orange-400 cursor-default')}
                                                     aria-label="Precio"
                                                 />
                                                 {promo && (
@@ -412,6 +485,15 @@ export default function WorkspacePriceLists() {
                 </div>
             )}
 
+            {commerceId && (
+                <FudoImportDialog
+                    open={fudoOpen}
+                    onClose={() => setFudoOpen(false)}
+                    commerceId={commerceId}
+                    lists={lists}
+                    onImported={() => setListFilter('fudo')}
+                />
+            )}
             <PasteListDialog open={pasteOpen} onClose={() => setPasteOpen(false)} onAdd={items => { appendItems(items); setPasteOpen(false); }} />
             {draft && (
                 <RaisePricesDialog

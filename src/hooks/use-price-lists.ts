@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import type { PriceList, PriceListItem, PriceListPromo } from '@/lib/priceLists';
+import type { FudoMenu } from '@/lib/fudo';
 
 // Listas de precios del comercio (ver la migración display_price_lists).
 // Si la tabla todavía no existe (falta correr el paso en Supabase), `missing` es true.
@@ -49,11 +50,12 @@ export const useCreatePriceList = () => {
 export const useUpdatePriceList = () => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: async (p: { commerceId: string; id: string; name?: string; items?: PriceListItem[]; promo?: PriceListPromo | null }) => {
+        mutationFn: async (p: { commerceId: string; id: string; name?: string; items?: PriceListItem[]; promo?: PriceListPromo | null; color?: string | null }) => {
             const updates: Record<string, unknown> = {};
             if (p.name !== undefined) updates.name = p.name.trim();
             if (p.items !== undefined) updates.items = p.items;
             if (p.promo !== undefined) updates.promo = p.promo;
+            if (p.color !== undefined) updates.color = p.color;
             const { data, error } = await supabase
                 .from('display_price_lists')
                 .update(updates)
@@ -77,6 +79,39 @@ export const useDeletePriceList = () => {
         mutationFn: async (p: { commerceId: string; id: string }) => {
             const { error } = await supabase.from('display_price_lists').delete().eq('id', p.id);
             if (error) throw error;
+        },
+        onSuccess: (_, p) => invalidate(queryClient, p.commerceId),
+    });
+};
+
+// Fudo: leer el menú, traer categorías como listas y actualizarlas (ver lib/fudo).
+export const useFudoMenu = () => useMutation({
+    mutationFn: async (slug: string): Promise<FudoMenu> => {
+        const { data, error } = await supabase.rpc('display_fudo_menu', { p_slug: slug });
+        if (error) throw new Error(error.message || error.code);
+        return data as FudoMenu;
+    },
+});
+
+export const useFudoImport = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (p: { commerceId: string; slug: string; categories: { id: number; name: string; parentName: string | null; color: string }[] }) => {
+            const { data, error } = await supabase.rpc('display_fudo_import', { p_commerce_id: p.commerceId, p_slug: p.slug, p_categories: p.categories });
+            if (error) throw new Error(error.message || error.code);
+            return data as number;
+        },
+        onSuccess: (_, p) => invalidate(queryClient, p.commerceId),
+    });
+};
+
+export const useFudoRefresh = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (p: { commerceId: string }) => {
+            const { data, error } = await supabase.rpc('display_fudo_refresh', { p_commerce_id: p.commerceId });
+            if (error) throw new Error(error.message || error.code);
+            return data as number;
         },
         onSuccess: (_, p) => invalidate(queryClient, p.commerceId),
     });

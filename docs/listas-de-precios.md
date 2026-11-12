@@ -45,7 +45,36 @@ que los usan.
 La página Etiquetas sigue existiendo para lo ya armado: si el comercio tiene
 etiquetas, aparece el enlace "Ver etiquetas anteriores".
 
+## Traer precios desde Fudo
+
+Para comercios que ya cargan su menú en Fudo (menu.fu.do/<local>):
+
+- **Traer desde Fudo** (en Listas de precios): se pega el link, se ven las categorías con
+  sus productos y precios, y se eligen cuáles traer. Cada categoría queda como una lista
+  con su **color** y la marca "Fudo". Las subcategorías se agrupan bajo la de arriba
+  ("EMPANADAS › solo horno").
+- **No se duplica:** si se trae de nuevo, se actualiza la misma lista.
+- **Se actualiza sola una vez por día** (5 de la mañana, pg_cron) o con **Actualizar desde
+  Fudo**. Fudo no se consulta en cada pantalla: lo lee la base una vez para todas.
+- **Qué manda Fudo y qué se respeta de acá:**
+  - de Fudo: precios (en el panel se ven en naranja y no se editan), productos nuevos y
+    lo que Fudo marca sin stock;
+  - de acá: nombres cambiados, aclaraciones, "sin stock" a mano, descuentos por tiempo,
+    el color y los productos agregados a mano;
+  - lo que ya no está en Fudo queda "sin stock" (no se borra, por si lo usa un cartel).
+- **Filtros** en la columna de listas: Todas, De Fudo y Mías. El color de cualquier lista
+  se cambia en su menú ⋮.
+- Cómo lo lee: la página de Fudo pide `https://integrations.fu.do/fudo/products/?a=<local>`
+  (y `product-categories`) con los encabezados `fudo-account-id` (el local en base64) y
+  `fudo-app: online-menu`. No es una API documentada por Fudo: si la cambian, la lista
+  muestra "Fudo no respondió" y quedan los últimos precios hasta ajustarlo.
+
 ## Pasos en Supabase
+
+Para traer desde Fudo: activar la extensión **http** (Database → Extensions) y correr una vez
+`supabase/migrations/20261115000000_display_fudo_import.sql` (agrega `source` y `color` a
+las listas, las funciones `display_fudo_*` y la actualización diaria con pg_cron).
+
 
 Para el descuento por un tiempo hay que correr una vez
 `supabase/migrations/20261114000000_display_price_list_promo.sql` en el SQL Editor (agrega
