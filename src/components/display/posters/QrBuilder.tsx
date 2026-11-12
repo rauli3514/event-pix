@@ -9,12 +9,14 @@ import { QR_DEFAULT_LABEL, buildQrUrl, parseQrUrl, type QrKind } from '@/lib/pos
 
 const KINDS: { id: QrKind | 'none'; label: string }[] = [
     { id: 'none', label: 'Sin QR' },
+    { id: 'fudo', label: 'Menú Fudo' },
     { id: 'whatsapp', label: 'WhatsApp' },
     { id: 'instagram', label: 'Instagram' },
     { id: 'web', label: 'Página web' },
 ];
 
 const HELP: Record<QrKind, string> = {
+    fudo: 'El cliente apunta la cámara del celular al código y se le abre tu menú de Fudo, donde ve la carta y puede pedir.',
     whatsapp: 'El cliente apunta la cámara del celular al código y se le abre un chat con tu WhatsApp, con el mensaje ya escrito.',
     instagram: 'El cliente apunta la cámara del celular al código y se le abre tu perfil de Instagram para seguirte.',
     web: 'El cliente apunta la cámara del celular al código y se le abre esa página: tu menú, la tienda online o las reseñas de Google.',
@@ -23,10 +25,12 @@ const HELP: Record<QrKind, string> = {
 interface Props {
     url?: string;
     label?: string;
+    // Locales de Fudo ya conectados en Listas de precios (para no tener que escribir el link).
+    fudoSlugs?: string[];
     onChange: (patch: { qrUrl?: string; qrLabel?: string }) => void;
 }
 
-export function QrBuilder({ url, label, onChange }: Props) {
+export function QrBuilder({ url, label, onChange, fudoSlugs = [] }: Props) {
     const initial = parseQrUrl(url);
     const [kind, setKind] = useState<QrKind | 'none'>(url ? initial.kind : 'none');
     const [value, setValue] = useState(url ? initial.value : '');
@@ -41,9 +45,11 @@ export function QrBuilder({ url, label, onChange }: Props) {
         // Si el texto al lado del QR era el de antes, pasa al del tipo nuevo.
         const wasDefault = label === undefined || (kind !== 'none' && label === QR_DEFAULT_LABEL[kind]);
         setKind(k);
-        setValue('');
         setMessage('');
-        onChange({ qrUrl: '', ...(wasDefault ? { qrLabel: undefined } : {}) });
+        // Menú Fudo: si ya está conectado en Listas de precios, queda listo solo.
+        const auto = k === 'fudo' && fudoSlugs.length ? fudoSlugs[0] : '';
+        setValue(auto);
+        onChange({ qrUrl: auto ? buildQrUrl('fudo', auto) : '', ...(wasDefault ? { qrLabel: undefined } : {}) });
     };
 
     const shownLabel = label ?? (kind !== 'none' ? QR_DEFAULT_LABEL[kind] : '');
@@ -75,6 +81,22 @@ export function QrBuilder({ url, label, onChange }: Props) {
                                     onChange={e => { setMessage(e.target.value); emit(kind, value, e.target.value); }} />
                             </label>
                         </>
+                    )}
+                    {kind === 'fudo' && (
+                        <label className="block space-y-1">
+                            <span className="text-xs text-muted-foreground">
+                                {fudoSlugs.length ? 'Tu menú de Fudo (el que conectaste en Listas de precios)' : 'Link de tu menú de Fudo'}
+                            </span>
+                            {fudoSlugs.length > 1 ? (
+                                <select value={value} onChange={e => { setValue(e.target.value); emit(kind, e.target.value, ''); }}
+                                    className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+                                    {fudoSlugs.map(s => <option key={s} value={s}>menu.fu.do/{s}</option>)}
+                                </select>
+                            ) : (
+                                <Input value={value} placeholder="menu.fu.do/tulocal" autoCapitalize="off"
+                                    onChange={e => { setValue(e.target.value); emit(kind, e.target.value, ''); }} />
+                            )}
+                        </label>
                     )}
                     {kind === 'instagram' && (
                         <label className="block space-y-1">

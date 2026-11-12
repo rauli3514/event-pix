@@ -110,9 +110,10 @@ export function isLightColor(hex: string): boolean {
 }
 
 // ── Código QR: se arma el link a partir de lo que entiende la gente. ──
-export type QrKind = 'web' | 'whatsapp' | 'instagram';
+export type QrKind = 'web' | 'whatsapp' | 'instagram' | 'fudo';
 
 export const QR_DEFAULT_LABEL: Record<QrKind, string> = {
+    fudo: 'Mirá la carta y pedí',
     web: 'Escaneá para ver más',
     whatsapp: 'Pedí por WhatsApp',
     instagram: 'Seguinos en Instagram',
@@ -142,6 +143,11 @@ export function buildQrUrl(kind: QrKind, value: string, message = ''): string {
         if (!n) return '';
         return `https://wa.me/${n}${message.trim() ? `?text=${encodeURIComponent(message.trim())}` : ''}`;
     }
+    if (kind === 'fudo') {
+        // El menú de Fudo del local: "yoca", "menu.fu.do/yoca" o el link entero.
+        const local = v.replace(/^https?:\/\//i, '').replace(/^menu\.fu\.do\//i, '').replace(/[/?#].*$/, '');
+        return /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(local) ? `https://menu.fu.do/${local}` : '';
+    }
     if (kind === 'instagram') {
         const user = v.replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/^@/, '').replace(/[/?#].*$/, '');
         return user ? `https://instagram.com/${user}` : '';
@@ -157,6 +163,8 @@ export function parseQrUrl(url?: string | null): { kind: QrKind; value: string; 
         const phone = wa[1] || params.get('phone') || '';
         return { kind: 'whatsapp', value: phone, message: params.get('text') || '' };
     }
+    const fudo = /^https?:\/\/menu\.fu\.do\/([^/?#]+)/i.exec(u);
+    if (fudo) return { kind: 'fudo', value: fudo[1], message: '' };
     const ig = /^https?:\/\/(?:www\.)?instagram\.com\/([^/?#]+)/i.exec(u);
     if (ig) return { kind: 'instagram', value: `@${ig[1]}`, message: '' };
     return { kind: 'web', value: u, message: '' };

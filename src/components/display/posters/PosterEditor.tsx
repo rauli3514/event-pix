@@ -11,6 +11,7 @@ import { MediaPickerModal } from '@/components/display/MediaPickerModal';
 import { PosterView } from './PosterView';
 import { PosterListEditor } from './PosterListEditor';
 import { QrBuilder } from './QrBuilder';
+import { isFudoList } from '@/lib/fudo';
 import { useCreatePriceList, usePriceLists, useUpdatePriceList } from '@/hooks/use-price-lists';
 import { useUploadDisplayMedia, useUpdateDisplayMedia } from '@/hooks/use-display-media';
 import { useDisplayCampaigns, useUpdateCampaign } from '@/hooks/use-display-hub';
@@ -78,6 +79,8 @@ function PosterEditorDialog({ onClose, commerceId, editing, initialTemplate, ini
 
     const { data: listsData } = usePriceLists(commerceId);
     const lists = useMemo(() => listsData?.lists ?? [], [listsData]);
+    // Locales de Fudo conectados (para el QR "Menú Fudo").
+    const fudoSlugs = useMemo(() => [...new Set(lists.filter(isFudoList).map(l => l.source.slug))], [lists]);
     const { data: campaigns = [] } = useDisplayCampaigns(commerceId);
     const upload = useUploadDisplayMedia();
     const update = useUpdateDisplayMedia();
@@ -478,7 +481,7 @@ function PosterEditorDialog({ onClose, commerceId, editing, initialTemplate, ini
                                             <StyleControls style={config.styles?.price} onChange={p => setStyle('price', p)} />
                                         </Field>
                                         <Field label="Código QR (opcional)">
-                                            <QrBuilder url={config.qrUrl} label={config.qrLabel} onChange={set} />
+                                            <QrBuilder url={config.qrUrl} label={config.qrLabel} onChange={set} fudoSlugs={fudoSlugs} />
                                         </Field>
                                         <Toggle label="Mostrar la hora" checked={!!config.showClock} onChange={v => set({ showClock: v })} />
                                     </>
