@@ -69,6 +69,7 @@ function PosterEditorDialog({ onClose, commerceId, editing, initialTemplate, ini
     const [pickingPhoto, setPickingPhoto] = useState<number | null>(null);
     const [replay, setReplay] = useState(0);
     const [selectedPart, setSelectedPart] = useState<PosterPart | null>(null);
+    const [hiddenRows, setHiddenRows] = useState(0);
     // Productos: lista nueva (los de la plantilla o desde cero) o una lista existente.
     const [newList, setNewList] = useState(() => !existing && !!initialTemplate?.sampleList?.length);
     const [newRows, setNewRows] = useState<DraftRow[]>(() => sampleRows(initialTemplate));
@@ -242,6 +243,7 @@ function PosterEditorDialog({ onClose, commerceId, editing, initialTemplate, ini
                                         config={previewConfig}
                                         lists={previewLists}
                                         onCardMove={config.layout === 'card' ? pos => set({ cardPos: pos }) : undefined}
+                                        onListOverflow={setHiddenRows}
                                         editParts={{
                                             selected: selectedPart,
                                             onSelect: setSelectedPart,
@@ -257,6 +259,11 @@ function PosterEditorDialog({ onClose, commerceId, editing, initialTemplate, ini
                                     ))}
                                 </div>
                             </FitBox>
+                            {hiddenRows > 0 && (
+                                <p className="shrink-0 mx-auto rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-700 dark:text-amber-300 text-center">
+                                    Así como está, {hiddenRows === 1 ? 'queda 1 producto' : `quedan ${hiddenRows} productos`} afuera de la pantalla. Probá bajar el tamaño de la lista, usar 2 columnas, achicar la foto (Diseño → Acomodar) o mover el título.
+                                </p>
+                            )}
                             <PartToolbar
                                 part={selectedPart}
                                 scale={selectedPart ? config.styles?.[selectedPart]?.scale || 1 : 1}

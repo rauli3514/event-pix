@@ -21,6 +21,8 @@ interface Props {
     sampleList?: PosterTemplate['sampleList'];
     // Editor: la tarjeta se puede arrastrar con el dedo o el mouse.
     onCardMove?: (pos: { x: number; y: number }) => void;
+    // Editor: cuántos productos de la lista quedan afuera de la pantalla.
+    onListOverflow?: (hiddenRows: number) => void;
     // Editor: cada parte se toca para elegirla y se arrastra para moverla.
     editParts?: {
         selected: PosterPart | null;
@@ -78,11 +80,33 @@ const ENTRANCE: Record<string, { name: string; dur: number; ease: string }> = {
     pop: { name: 'poster-pop', dur: 0.6, ease: 'ease-out' },
 };
 
-export function PosterView({ config, commerceId, lists: listsProp, sampleList, onCardMove, editParts }: Props) {
+export function PosterView({ config, commerceId, lists: listsProp, sampleList, onCardMove, editParts, onListOverflow }: Props) {
     const ref = useRef<HTMLDivElement>(null);
     const drag = useRef<{ sx: number; sy: number; x: number; y: number } | null>(null);
     const partDrag = useRef<{ part: PosterPart; sx: number; sy: number; x: number; y: number } | null>(null);
     const { w: W, h: H } = useBox(ref);
+
+    // Editor: avisar si hay productos que no entran (por ejemplo, con la lista muy agrandada).
+    const lastHidden = useRef(-1);
+    useLayoutEffect(() => {
+        if (!onListOverflow || !ref.current) return;
+        const box = ref.current.getBoundingClientRect();
+        let hidden = 0;
+        ref.current.querySelectorAll('[data-list-row]').forEach(row => {
+            const r = row.getBoundingClientRect();
+            // En la tarjeta, lo que sale de la tarjeta tampoco se ve.
+            const clip = row.closest('[data-clip]');
+            if (clip && getComputedStyle(clip).overflow === 'hidden') {
+                const c = clip.getBoundingClientRect();
+                if (r.bottom > c.bottom + 2 || r.right > c.right + 2) { hidden++; return; }
+            }
+            if (r.bottom > box.bottom + 2 || r.top < box.top - 2 || r.right > box.right + 2 || r.left < box.left - 2) hidden++;
+        });
+        if (hidden !== lastHidden.current) {
+            lastHidden.current = hidden;
+            onListOverflow(hidden);
+        }
+    });
     const live = useLivePriceLists(listsProp ? null : commerceId);
     const lists = listsProp || live;
     const now = useClock(!!config.showClock);
@@ -267,11 +291,15 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList, o
     const renderList = (width: number, height: number, maxBase = 3.4) => {
         if (!rows.length || height <= 0) return null;
         const details = config.showDetails !== false && rows.some(r => r.detail);
+        // El tamaño elegido agranda o achica el lugar que puede ocupar la lista
+        // (alto y letra máxima): al 180 % puede ser casi el doble de alta y pasar
+        // abajo de su lugar; al 50 % ocupa la mitad. El ancho no cambia, así los
+        // nombres se siguen acomodando en sus renglones.
         const scale = config.styles?.list?.scale || 1;
         const { size, cols } = fitList(rows, {
-            width, height: height - 2.5 * u, u, details,
+            width, height: (height - 2.5 * u) * scale, u, details,
             maxSize: maxBase * u * scale,
-            minSize: 1.1 * u,
+            minSize: Math.min(1.1, 1.1 * scale) * u,
             columns: config.listColumns || 'auto',
         });
         const color = config.styles?.list?.color || theme.text;
@@ -285,7 +313,7 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList, o
                 {columns.map((col, c) => (
                     <div key={c} style={{ width: colWidth, marginLeft: c ? 3 * u : 0 }}>
                         {col.map((r, i) => (
-                            <div key={i} style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', borderBottom: `1px solid ${color}22`, padding: `${size * 0.32}px 0`, fontSize: size, color, textShadow: shadow }}>
+                            <div key={i} data-list-row="" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', borderBottom: `1px solid ${color}22`, padding: `${size * 0.32}px 0`, fontSize: size, color, textShadow: shadow }}>
                                 <div style={{ flex: 1, minWidth: 0, marginRight: size * 0.6 }}>
                                     <div style={{ fontWeight: 700, lineHeight: 1.15, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', wordWrap: 'break-word' }}>{r.name}</div>
                                     {details && r.detail && <div style={{ fontSize: '0.62em', opacity: 0.7, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.detail}</div>}
@@ -452,6 +480,7 @@ export function PosterView({ config, commerceId, lists: listsProp, sampleList, o
                         })}
                     >
                         <div
+                            data-clip=""
                             style={{
                                 width: cardW,
                                 maxHeight: cardMaxH,

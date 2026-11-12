@@ -15,6 +15,8 @@ import { QRPreview } from '../qr/QRApp';
 import { ReviewsPreview } from '../reviews/ReviewsApp';
 import { DynamicMenuPreview } from '../dynamic-menu/DynamicMenuApp';
 import { YoutubePreview } from '../youtube/YoutubeApp';
+import { PosterView } from '../../posters/PosterView';
+import { POSTER_APP_ID } from '@/lib/posters';
 import { RetryBoundary } from '../RetryBoundary';
 import { isYoutubeUrl } from '@/lib/youtube';
 import { cn } from '@/lib/utils';
@@ -674,6 +676,14 @@ const ZoneRenderer = ({ media, commerceId, editing }: { media: DisplayMedia, com
         }
         if (media.metadata?.appId === 'youtube') {
             return <YoutubePreview config={media.metadata.config || {}} />;
+        }
+        // Cartel: se arma al tamaño de la zona, con los precios en vivo.
+        if (media.metadata?.appId === POSTER_APP_ID && media.metadata?.config) {
+            return (
+                <div className="w-full h-full pointer-events-none">
+                    <PosterView config={media.metadata.config} commerceId={commerceId} />
+                </div>
+            );
         }
         return <div className="text-white w-full h-full flex items-center justify-center pointer-events-none">App: {media.metadata?.appId}</div>;
     }

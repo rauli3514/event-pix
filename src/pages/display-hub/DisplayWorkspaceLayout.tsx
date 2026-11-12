@@ -37,6 +37,8 @@ interface MenuItem {
   path: string;
   // Otras páginas que marcan este item como activo.
   alsoActive?: string[];
+  // Destacada en naranja con "Nuevo" (lo que más conviene mostrar).
+  highlight?: boolean;
 }
 
 const MENU_GROUPS: { title: string; items: MenuItem[] }[] = [
@@ -54,7 +56,7 @@ const MENU_GROUPS: { title: string; items: MenuItem[] }[] = [
       { id: 'library', label: 'Medios', icon: FolderOpen, path: 'library' },
       { id: 'playlists', label: 'Playlists', icon: ListVideo, path: 'playlists' },
       { id: 'apps', label: 'Apps y plantillas', icon: Puzzle, path: 'apps', alsoActive: ['templates'] },
-      { id: 'posters', label: 'Carteles', icon: Megaphone, path: 'posters' },
+      { id: 'posters', label: 'Carteles', icon: Megaphone, path: 'posters', highlight: true },
       { id: 'price-lists', label: 'Listas de precios', icon: ListOrdered, path: 'price-lists', alsoActive: ['labels'] },
     ],
   },
@@ -121,13 +123,20 @@ export default function DisplayWorkspaceLayout() {
         to={`${basePath}/${item.path}`}
         className={cn(
           "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-          isActive
-            ? "bg-indigo-600/10 text-indigo-600 dark:text-indigo-400"
-            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          item.highlight
+            ? (isActive
+              ? "bg-orange-500/20 text-orange-600 dark:text-orange-400 ring-1 ring-orange-500/40"
+              : "bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-500/20")
+            : isActive
+              ? "bg-indigo-600/10 text-indigo-600 dark:text-indigo-400"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground"
         )}
       >
-        <item.icon className={cn("w-5 h-5 shrink-0", isActive ? "text-indigo-600 dark:text-indigo-400" : "text-muted-foreground")} />
-        <span className="truncate">{item.label}</span>
+        <item.icon className={cn("w-5 h-5 shrink-0", item.highlight ? "text-orange-500" : isActive ? "text-indigo-600 dark:text-indigo-400" : "text-muted-foreground")} />
+        <span className={cn("truncate", item.highlight && "font-semibold")}>{item.label}</span>
+        {item.highlight && (
+          <span className="ml-auto rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Nuevo</span>
+        )}
         {item.id === 'screens' && downCount > 0 && (
           <span className="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-rose-500 text-white text-[11px] font-bold flex items-center justify-center" title="Pantallas sin conexión">
             {downCount}
