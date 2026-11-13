@@ -15,7 +15,7 @@ cliente y sigue con todo lo que armó.
 
 El estado solo lo cambia el super admin (los clientes pueden leer su negocio, no modificarlo).
 
-## Admin: Directorio de Clientes (`/admin/display`)
+## Admin: pestaña Display Digital (Cartelería) en `/admin` (y `/admin/display`)
 
 - Pestañas **Clientes · En prueba · Pruebas vencidas · Bajas**, con cuántos hay en cada una.
   Las pruebas se ordenan por la que vence primero.
@@ -24,6 +24,7 @@ El estado solo lo cambia el super admin (los clientes pueden leer su negocio, no
   carteles armó, cuándo se registró y su último ingreso.
 - Menú ⋮: **Pasar a cliente**, **Extender 7 días** (suma desde hoy, o desde el vencimiento si
   todavía no venció), **Notas** (solo las ve el equipo) y **Dar de baja**.
+  También **Eliminar comercio** (borra el comercio y sus pantallas; antes era el tacho de basura).
 
 ## Reglas
 

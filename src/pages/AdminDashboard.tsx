@@ -10,12 +10,13 @@ import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
     Plus, Calendar, ExternalLink, Settings, LogOut, Trash2, Lock, Unlock, 
-    Users, Monitor, Activity, Tv, ServerCrash, Building2, ChevronRight, PenTool, Video 
+    Users, Monitor, Activity, Tv, ServerCrash, PenTool, Video 
 } from 'lucide-react';
 import TemplateManager from './admin/TemplateManager';
 
 import { useUserProfile, useIsSuperAdmin } from "@/hooks/use-roles";
 import { useDisplayDevices, useCommerces, useCreateCommerce, useDeleteCommerce } from "@/hooks/use-display-hub";
+import { CommerceDirectory } from "@/components/display/admin/CommerceDirectory";
 
 type Event = {
     id: string;
@@ -464,7 +465,7 @@ const AdminDashboard = () => {
 
                         <div className="space-y-4">
                             <div className="flex justify-between items-center mb-4">
-                                <h2 className="text-xl font-bold text-white">Comercios / Clientes Registrados</h2>
+                                <h2 className="text-xl font-bold text-white">Comercios</h2>
                                 {isSuperAdmin && (
                                     <Dialog open={isCreateCommerceOpen} onOpenChange={setIsCreateCommerceOpen}>
                                         <DialogTrigger asChild>
@@ -508,79 +509,12 @@ const AdminDashboard = () => {
                                 )}
                             </div>
                             
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {commerces?.map(commerce => {
-                                    const commerceDevices = linkedDevices.filter(d => d.commerce_id === commerce.id);
-                                    const commerceOnline = commerceDevices.filter(d => d.derived_status === 'online').length;
-                                    const commerceOffline = commerceDevices.filter(d => d.derived_status === 'offline').length;
-                                    
-                                    return (
-                                        <Link 
-                                            key={commerce.id}
-                                            to={`/admin/display/commerce/${commerce.id}/workspace`}
-                                            className="group bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl p-6 hover:bg-slate-800/80 hover:border-indigo-500/50 transition-all duration-300 block"
-                                        >
-                                            <div className="flex justify-between items-start mb-4">
-                                                <div>
-                                                    <h3 className="text-xl font-bold text-white group-hover:text-indigo-400 transition-colors">{commerce.name || 'Sin Nombre'}</h3>
-                                                    <p className="text-xs text-slate-500 mt-1">{commerce.email}</p>
-                                                </div>
-                                                <div className="flex gap-2">
-                                                    <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center group-hover:bg-indigo-600 transition-colors">
-                                                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-white" />
-                                                    </div>
-                                                    {isSuperAdmin && (
-                                                        <Button
-                                                            size="icon"
-                                                            variant="ghost"
-                                                            className="w-8 h-8 rounded-full text-slate-500 hover:text-red-400 hover:bg-red-950/30 transition-colors relative z-20"
-                                                            onClick={(e) => {
-                                                                e.preventDefault();
-                                                                e.stopPropagation();
-                                                                if (confirm(`¿Eliminar el comercio "${commerce.name}" y todas sus pantallas?`)) {
-                                                                    deleteCommerce.mutate(commerce.id);
-                                                                }
-                                                            }}
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </Button>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            
-                                            <div className="flex items-center justify-between border-t border-slate-800/80 pt-4 mt-2">
-                                                <div className="flex items-center gap-1.5 text-sm text-slate-400">
-                                                    <Monitor className="w-4 h-4" />
-                                                    <span>{commerceDevices.length} Pantallas</span>
-                                                </div>
-                                                
-                                                <div className="flex gap-3">
-                                                    {commerceOnline > 0 && (
-                                                        <div className="flex items-center text-xs font-bold text-emerald-400 gap-1 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                                            {commerceOnline}
-                                                        </div>
-                                                    )}
-                                                    {commerceOffline > 0 && (
-                                                        <div className="flex items-center text-xs font-bold text-rose-400 gap-1 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                                                            {commerceOffline}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </Link>
-                                    );
-                                })}
-
-                                {commerces?.length === 0 && (
-                                    <div className="col-span-full py-12 text-center border-2 border-dashed border-slate-800 rounded-2xl">
-                                        <Building2 className="w-12 h-12 text-slate-700 mx-auto mb-4" />
-                                        <h3 className="text-lg font-bold text-white">No hay clientes de cartelería</h3>
-                                        <p className="text-slate-400 text-sm mt-2">Crea un comercio para empezar a gestionar pantallas.</p>
-                                    </div>
-                                )}
-                            </div>
+                            <CommerceDirectory
+                                commerces={commerces}
+                                devices={linkedDevices}
+                                isSuperAdmin={!!isSuperAdmin}
+                                onDelete={commerce => deleteCommerce.mutate(commerce.id)}
+                            />
                         </div>
                     </TabsContent>
 
