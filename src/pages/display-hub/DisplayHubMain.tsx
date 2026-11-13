@@ -1,9 +1,31 @@
+import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Monitor, ArrowLeft, Activity, Tv, ServerCrash, Building2, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Activity, Tv, ServerCrash, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useIsSuperAdmin } from "@/hooks/use-roles";
 import { useDisplayDevices, useCommerces } from "@/hooks/use-display-hub";
+import { useAdminAccounts } from "@/hooks/use-accounts";
+import { useNow } from "@/hooks/use-now";
 import { ScreenDownAlert } from "@/components/display/ScreenDownAlert";
+import { AccountCard } from "@/components/display/admin/AccountCard";
+import { accountStatus, accountsErrorText, type AccountStatus } from "@/lib/accounts";
+import { cn } from "@/lib/utils";
+
+// Pestañas del directorio: los que contrataron, los que están probando, las
+// pruebas vencidas (para llamarlos) y las bajas.
+const TABS: { id: AccountStatus; label: string }[] = [
+    { id: 'cliente', label: 'Clientes' },
+    { id: 'prueba', label: 'En prueba' },
+    { id: 'vencida', label: 'Pruebas vencidas' },
+    { id: 'baja', label: 'Bajas' },
+];
+
+const EMPTY: Record<AccountStatus, { title: string; text: string }> = {
+    cliente: { title: 'Todavía no hay clientes', text: 'Cuando pases una prueba a cliente, o crees un comercio, aparece acá.' },
+    prueba: { title: 'Nadie está probando ahora', text: 'Los que se registren en "Probalo" aparecen acá con sus datos.' },
+    vencida: { title: 'No hay pruebas vencidas', text: 'Acá quedan los que no contrataron, para llamarlos.' },
+    baja: { title: 'No hay bajas', text: 'Los comercios dados de baja quedan acá.' },
+};
 
 const DisplayHubMain = () => {
     const navigate = useNavigate();
@@ -12,6 +34,13 @@ const DisplayHubMain = () => {
     // For Super Admin: Load all commerces and all devices to calculate metrics
     const { data: devices, isLoading: isDevicesLoading } = useDisplayDevices(null);
     const { data: commerces, isLoading: isCommercesLoading } = useCommerces();
+    const { data: accountsData } = useAdminAccounts(isSuperAdmin === true);
+    const now = useNow(60000);
+    const [tab, setTab] = useState<AccountStatus>('cliente');
+
+    // Estado de cada negocio (si la migración no se corrió, todos quedan como clientes).
+    const byId = useMemo(() => new Map((accountsData?.accounts || []).map(a => [a.id, a])), [accountsData]);
+    const statusOf = (id: string) => accountStatus(byId.get(id), now);
 
     // Si es un provider, redirigirlo a su vista directamente.
     // Asumimos que si no es super admin, lo enviamos al listado genérico que internamente estará filtrado por su ID gracias al hook/RLS.
@@ -32,6 +61,18 @@ const DisplayHubMain = () => {
     );
 
     const linkedDevices = devices?.filter(d => d.derived_status !== 'pending') || [];
+    // Pruebas: las que vencen antes, primero. El resto, por nombre.
+    const visible = (commerces || [])
+        .filter(c => statusOf(c.id) === tab)
+        .sort((a, b) => {
+            if (tab === 'prueba' || tab === 'vencida') {
+                const ea = Date.parse(byId.get(a.id)?.trial_ends_at || '') || 0;
+                const eb = Date.parse(byId.get(b.id)?.trial_ends_at || '') || 0;
+                return tab === 'prueba' ? ea - eb : eb - ea;
+            }
+            return (a.name || '').localeCompare(b.name || '');
+        });
+
     const onlineCount = linkedDevices.filter(d => d.derived_status === 'online').length;
     const offlineCount = linkedDevices.filter(d => d.derived_status === 'offline').length;
 
@@ -99,61 +140,56 @@ const DisplayHubMain = () => {
 
                 {/* Lista de Clientes / Comercios */}
                 <div className="space-y-4 pt-4">
-                    <h2 className="text-xl font-bold text-white mb-4">Comercios Registrados</h2>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {commerces?.map(commerce => {
-                            // Calcular métricas para este comercio específico
-                            const commerceDevices = linkedDevices.filter(d => d.commerce_id === commerce.id);
-                            const commerceOnline = commerceDevices.filter(d => d.derived_status === 'online').length;
-                            const commerceOffline = commerceDevices.filter(d => d.derived_status === 'offline').length;
-                            
+                    <h2 className="text-xl font-bold text-white">Comercios</h2>
+
+                    {accountsData?.error && (
+                        <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                            {accountsErrorText(accountsData.error)} Mientras tanto se muestran todos como clientes.
+                        </p>
+                    )}
+
+                    <div className="flex flex-wrap gap-2" role="tablist">
+                        {TABS.map(t => {
+                            const count = commerces?.filter(c => statusOf(c.id) === t.id).length || 0;
                             return (
-                                <Link 
-                                    key={commerce.id}
-                                    to={`/admin/display/commerce/${commerce.id}/workspace`}
-                                    className="group bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-2xl p-6 hover:bg-slate-800/80 hover:border-indigo-500/50 transition-all duration-300 block"
+                                <button
+                                    key={t.id}
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={tab === t.id}
+                                    onClick={() => setTab(t.id)}
+                                    className={cn('rounded-full border px-4 py-1.5 text-sm font-medium transition-colors',
+                                        tab === t.id ? 'border-indigo-500 bg-indigo-500/15 text-white' : 'border-slate-800 text-slate-400 hover:text-white hover:border-slate-600')}
                                 >
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div>
-                                            <h3 className="text-xl font-bold text-white group-hover:text-indigo-400 transition-colors">{commerce.name || 'Sin Nombre'}</h3>
-                                            <p className="text-xs text-slate-500 mt-1">{commerce.email}</p>
-                                        </div>
-                                        <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center group-hover:bg-indigo-600 transition-colors">
-                                            <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-white" />
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="flex items-center justify-between border-t border-slate-800/80 pt-4 mt-2">
-                                        <div className="flex items-center gap-1.5 text-sm text-slate-400">
-                                            <Monitor className="w-4 h-4" />
-                                            <span>{commerceDevices.length} Pantallas</span>
-                                        </div>
-                                        
-                                        <div className="flex gap-3">
-                                            {commerceOnline > 0 && (
-                                                <div className="flex items-center text-xs font-bold text-emerald-400 gap-1 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                                    {commerceOnline}
-                                                </div>
-                                            )}
-                                            {commerceOffline > 0 && (
-                                                <div className="flex items-center text-xs font-bold text-rose-400 gap-1 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                                                    {commerceOffline}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </Link>
+                                    {t.label} <span className={cn('ml-1 rounded-full px-1.5 text-xs', t.id === 'prueba' && count > 0 ? 'bg-orange-500 text-white' : 'bg-slate-800 text-slate-300')}>{count}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {visible.map(commerce => {
+                            const commerceDevices = linkedDevices.filter(d => d.commerce_id === commerce.id);
+                            return (
+                                <AccountCard
+                                    key={commerce.id}
+                                    commerce={commerce}
+                                    account={byId.get(commerce.id) || null}
+                                    screens={{
+                                        total: commerceDevices.length,
+                                        online: commerceDevices.filter(d => d.derived_status === 'online').length,
+                                        offline: commerceDevices.filter(d => d.derived_status === 'offline').length,
+                                    }}
+                                    now={now}
+                                />
                             );
                         })}
 
-                        {commerces?.length === 0 && (
+                        {visible.length === 0 && (
                             <div className="col-span-full py-12 text-center border-2 border-dashed border-slate-800 rounded-2xl">
                                 <Building2 className="w-12 h-12 text-slate-700 mx-auto mb-4" />
-                                <h3 className="text-lg font-bold text-white">No hay clientes (Providers)</h3>
-                                <p className="text-slate-400 text-sm mt-2">Los usuarios que se registren como Proveedores aparecerán aquí.</p>
+                                <h3 className="text-lg font-bold text-white">{EMPTY[tab].title}</h3>
+                                <p className="text-slate-400 text-sm mt-2">{EMPTY[tab].text}</p>
                             </div>
                         )}
                     </div>
