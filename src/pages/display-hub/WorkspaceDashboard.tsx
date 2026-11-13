@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Bell, BellOff, CalendarClock, Megaphone, ChevronDown, FolderOpen, ListVideo, MonitorPlay, Plus, QrCode, RefreshCw, Upload } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { useDisplayCampaigns, useDisplayDevices, useDisplaySchedules } from '@/hooks/use-display-hub';
+import { useCommerces, useDisplayCampaigns, useDisplayDevices, useDisplaySchedules } from '@/hooks/use-display-hub';
 import { useDisplayMedia } from '@/hooks/use-display-media';
 import { describeAlertSchedule, formatOffSince, isLocalOpen } from '@/lib/screenAlerts';
 import { useCommerceHours } from '@/hooks/use-down-screens';
@@ -19,7 +19,11 @@ import { useDeviceScreens } from '@/hooks/use-device-screens';
 import { ChangeScreenContentModal } from '@/components/display/ChangeScreenContentModal';
 import { ScreenQrModal } from '@/components/display/ScreenQrModal';
 import { parseScreenQr } from '@/lib/qr';
-import { OnboardingWizardWidget } from '@/components/display/OnboardingWizardWidget';
+import { SetupGuide } from '@/components/display/SetupGuide';
+import { useSetupProgress } from '@/hooks/use-setup-progress';
+import { useCommercePlan } from '@/hooks/use-commerce-plan';
+import { accountStatus } from '@/lib/accounts';
+import { openTestScreen } from '@/lib/trial';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyDevice = any;
@@ -104,10 +108,23 @@ export default function WorkspaceDashboard() {
     const screensWithSchedule = screens.filter(d => d.assignment?.schedule_id).length;
 
     const base = `/admin/display/commerce/${commerceId}/workspace`;
-    // La guía aparece mientras falta configurar algo, o si se pidió desde el menú (?guia=1).
+    // La guía para empezar aparece en Inicio mientras falte algún paso (se puede
+    // cerrar; sigue a mano en el botón "Guía" del menú) o si se pidió con ?guia=1.
     const [searchParams] = useSearchParams();
-    const setupPending = searchParams.get('guia') === '1'
-        || (!isLoading && (screens.length === 0 || files.length === 0 || campaigns.length === 0));
+    const setup = useSetupProgress(commerceId);
+    const { data: plan } = useCommercePlan(commerceId);
+    const inTrial = ['prueba', 'vencida'].includes(accountStatus(plan));
+    const { data: commerces } = useCommerces();
+    const commerceName = commerces?.find(c => c.id === commerceId)?.name;
+    const guideKey = `setup_guide_hidden_${commerceId}`;
+    const [guideHidden, setGuideHidden] = useState(() => {
+        try { return localStorage.getItem(guideKey) === '1'; } catch { return false; }
+    });
+    const hideGuide = () => {
+        setGuideHidden(true);
+        try { localStorage.setItem(guideKey, '1'); } catch { /* sin espacio */ }
+    };
+    const showGuide = searchParams.get('guia') === '1' || (!setup.loading && !setup.complete && !guideHidden);
 
     return (
         <div className="p-4 md:p-8 w-full max-w-7xl mx-auto space-y-6">
@@ -168,9 +185,18 @@ export default function WorkspaceDashboard() {
                     ) : screens.length === 0 ? (
                         <div>
                             <p className="text-xl font-semibold">Todavía no tenés pantallas vinculadas</p>
-                            <p className="text-muted-foreground mt-1">Prendé el equipo, anotá el código que aparece en la TV y vinculalo desde{' '}
-                                <Link to={`${base}/screens`} className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline">Pantallas</Link>.
-                            </p>
+                            {inTrial ? (
+                                <p className="text-muted-foreground mt-1">
+                                    Abrí la{' '}
+                                    <button type="button" onClick={openTestScreen} className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline">pantalla de prueba</button>,
+                                    anotá el código que aparece y vinculala desde{' '}
+                                    <Link to={`${base}/screens?openModal=link`} className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline">Pantallas</Link>.
+                                </p>
+                            ) : (
+                                <p className="text-muted-foreground mt-1">Prendé el equipo, anotá el código que aparece en la TV y vinculalo desde{' '}
+                                    <Link to={`${base}/screens`} className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline">Pantallas</Link>.
+                                </p>
+                            )}
                         </div>
                     ) : (
                         <>
@@ -277,7 +303,14 @@ export default function WorkspaceDashboard() {
                 </div>
             </div>
 
-            {setupPending && <OnboardingWizardWidget className="w-full max-w-none" />}
+            {showGuide && commerceId && (
+                <SetupGuide
+                    commerceId={commerceId}
+                    commerceName={commerceName}
+                    trial={inTrial}
+                    onClose={hideGuide}
+                />
+            )}
 
             {/* Pantallas */}
             {screens.length > 0 && (

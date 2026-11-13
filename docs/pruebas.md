@@ -26,6 +26,38 @@ El estado solo lo cambia el super admin (los clientes pueden leer su negocio, no
   todavía no venció), **Notas** (solo las ve el equipo) y **Dar de baja**.
   También **Eliminar comercio** (borra el comercio y sus pantallas; antes era el tacho de basura).
 
+## Registro: `app.event-pix.com.ar/probar`
+
+1. **Tu cuenta:** nombre, negocio, rubro, WhatsApp, email y contraseña. Se crea la cuenta (sin
+   confirmar el email: en Supabase, *Confirm email* tiene que estar apagado), el negocio en prueba y
+   un **cartel de ejemplo** de su rubro con el nombre del negocio.
+2. **Unas preguntas (opcional):** ciudad, cuántas TV tiene, si usa Fudo y cómo nos conoció.
+
+Después entra al **mismo panel que los clientes**:
+
+- Barra naranja arriba: días que le quedan, **Pantalla de prueba** y **Quiero contratarlo**
+  (WhatsApp de ventas). Aclara que el servicio contratado funciona con el **equipo Display
+  Digital**. Al vencer, la barra se pone roja.
+- **Pantalla de prueba** abre `/tv-boot?prueba` en otra pestaña: muestra un código que se vincula a
+  mano en Pantallas → Vincular pantalla, igual que con el equipo (así practica).
+
+## Guía para empezar
+
+Botón **Guía para empezar** arriba del menú (con cuántos pasos lleva), que abre la guía desde
+cualquier página. En Inicio aparece mientras falte algún paso (se puede cerrar). Los pasos se marcan
+solos:
+
+1. Abrí la pantalla de prueba (en prueba) / Conectá el equipo a la TV (clientes)
+2. Vinculala con el código
+3. Armá tu cartel
+4. Cargá tus precios (o traelos de Fudo)
+5. Mandalo a la pantalla
+
+Abajo, **Escribinos** por WhatsApp. En el menú **Más** está **Ayuda por WhatsApp**.
+
+En **Gestión de Usuarios**, los que se registraron para probar llevan la etiqueta naranja
+**Prueba · N días** (o **Prueba vencida**).
+
 ## Reglas
 
 - Una prueba por email y una por WhatsApp (el número se compara sin espacios, 54, 9, 0 ni 15:
@@ -47,8 +79,6 @@ Migración `supabase/migrations/20261116000000_display_trials.sql`:
 
 ## Lo que falta (próximos PR)
 
-1. Página de registro `/probar`, barra de días en el panel, guías más a mano y pantalla de
-   prueba (se vincula con el código, igual que un equipo).
-2. Vencimiento: panel solo para mirar, cartel "Prueba terminada" en la TV, emails y aviso al
+1. Vencimiento: panel solo para mirar, cartel "Prueba terminada" en la TV, emails y aviso al
    equipo cuando alguien se registra.
-3. Botón "Probalo" en event-pix.com.ar.
+2. Botón "Probalo" en event-pix.com.ar.

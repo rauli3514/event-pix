@@ -26,6 +26,7 @@ import DemoUpload from "./pages/DemoUpload";
 import Display from "./pages/Display";
 import Login from "./pages/Login";
 import DisplayUserLogin from "./pages/DisplayUserLogin";
+import TrialSignup from "./pages/TrialSignup";
 import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
 
@@ -77,6 +78,8 @@ const App = () => (
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/usuarios" element={<DisplayUserLogin />} />
+            {/* "Probalo": registro para probar 7 días (ver docs/pruebas.md) */}
+            <Route path="/probar" element={<TrialSignup />} />
             <Route path="/register" element={<Register />} />
             <Route path="/intelligence/login" element={<IntelligenceLogin />} />
 
