@@ -38,7 +38,8 @@ const DisplayHubList = () => {
     const urlCode = searchParams.get('code') || searchParams.get('bt')?.replace('EventPix-TV-', '');
     
     // States for linking
-    const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+    // ?openModal=link (desde la guía para empezar): abre "Vincular pantalla".
+    const [isLinkModalOpen, setIsLinkModalOpen] = useState(() => searchParams.get('openModal') === 'link');
     const [isBluetoothModalOpen, setIsBluetoothModalOpen] = useState(!!urlCode);
     const [initialDeviceCode, setInitialDeviceCode] = useState<string | undefined>(urlCode || undefined);
     

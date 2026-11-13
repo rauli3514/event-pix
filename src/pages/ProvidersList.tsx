@@ -13,11 +13,15 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useEventProviders, useUserEventAssignments, useCommerceAssignments, useUserCommerceAssignments } from '@/hooks/use-roles';
 import { useCommerces } from '@/hooks/use-display-hub';
+import { useTrialUsers } from '@/hooks/use-accounts';
+import { accountStatus, daysLeft } from '@/lib/accounts';
 
 const ProvidersList = () => {
     const queryClient = useQueryClient();
     const isSuperAdmin = useIsSuperAdmin();
     const { data: providers, isLoading } = useProviders();
+    // Los que se registraron para probar llevan la etiqueta "Prueba" (naranja).
+    const { data: trialUsers = {} } = useTrialUsers(isSuperAdmin);
     const createProvider = useCreateProvider();
     const updatePassword = useUpdateProviderPassword();
     const toggleStatus = useToggleProviderStatus();
@@ -258,13 +262,7 @@ const ProvidersList = () => {
                                     }`}>
                                     {provider.is_active !== false ? 'Activo' : 'Inactivo'}
                                 </span>
-                                <span className={`px-2 py-1 rounded-full text-xs font-medium border ${provider.role === 'super_admin' ? 'bg-purple-100 text-purple-700 border-purple-200' :
-                                        provider.user_type === 'client' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
-                                            'bg-indigo-100 text-indigo-700 border-indigo-200'
-                                    }`}>
-                                    {provider.role === 'super_admin' ? 'Super Admin' :
-                                        provider.user_type === 'client' ? 'Cliente' : 'Proveedor'}
-                                </span>
+                                <TypeBadge provider={provider} trial={trialUsers[provider.id]} />
                             </div>
                         </CardContent>
                         <CardFooter className="pt-3 border-t bg-muted/30 grid grid-cols-3 gap-2">
@@ -425,5 +423,21 @@ const ProvidersList = () => {
         </div>
     );
 };
+
+// Tipo de usuario: Super Admin, Proveedor, Cliente o Prueba (se registró en "Probalo").
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function TypeBadge({ provider, trial }: { provider: any; trial?: { plan: 'cliente' | 'prueba' | 'baja'; trial_ends_at: string | null } }) {
+    const status = trial ? accountStatus(trial) : null;
+    const cls = 'px-2 py-1 rounded-full text-xs font-medium border';
+    if (provider.role === 'super_admin') return <span className={`${cls} bg-purple-100 text-purple-700 border-purple-200`}>Super Admin</span>;
+    if (status === 'prueba') {
+        const left = daysLeft(trial?.trial_ends_at);
+        return <span className={`${cls} bg-orange-100 text-orange-700 border-orange-300`}>Prueba · {left === 1 ? '1 día' : `${left} días`}</span>;
+    }
+    if (status === 'vencida') return <span className={`${cls} bg-rose-100 text-rose-700 border-rose-200`}>Prueba vencida</span>;
+    if (status === 'baja') return <span className={`${cls} bg-slate-200 text-slate-600 border-slate-300`}>Baja</span>;
+    if (provider.user_type === 'client') return <span className={`${cls} bg-emerald-100 text-emerald-700 border-emerald-200`}>Cliente</span>;
+    return <span className={`${cls} bg-indigo-100 text-indigo-700 border-indigo-200`}>Proveedor</span>;
+}
 
 export default ProvidersList;

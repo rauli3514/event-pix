@@ -14,6 +14,7 @@ import {
   Megaphone,
   Bluetooth,
   ChevronDown,
+  MessageCircle,
 } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { cn } from '@/lib/utils';
@@ -27,6 +28,12 @@ import { BluetoothProvisioningModal } from '@/components/display/BluetoothProvis
 import { AIAssistantPanel } from '@/components/display/ai/AIAssistantPanel';
 import { ScreenDownAlert } from '@/components/display/ScreenDownAlert';
 import { useDownScreens } from '@/hooks/use-down-screens';
+import { useCommercePlan } from '@/hooks/use-commerce-plan';
+import { useSetupProgress } from '@/hooks/use-setup-progress';
+import { SetupGuide } from '@/components/display/SetupGuide';
+import { TrialBar } from '@/components/display/TrialBar';
+import { accountStatus } from '@/lib/accounts';
+import { supportWhatsappUrl } from '@/lib/trial';
 
 // Menú en grupos: lo de todos los días arriba y lo que se usa poco dentro de
 // "Más" (cerrado salvo que se esté en una de sus páginas).
@@ -90,6 +97,11 @@ export default function DisplayWorkspaceLayout() {
   };
   
   const currentCommerce = commerces?.find(c => c.id === commerceId);
+  // Estado del negocio (prueba o cliente) y avance de la guía para empezar.
+  const { data: plan } = useCommercePlan(commerceId);
+  const inTrial = ['prueba', 'vencida'].includes(accountStatus(plan));
+  const setup = useSetupProgress(commerceId);
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
   // Pantallas sin conexión hace más de 10 min (número rojo en "Pantallas").
   const downCount = useDownScreens(commerceId).length;
   const basePath = `/admin/display/commerce/${commerceId}/workspace`;
@@ -169,6 +181,29 @@ export default function DisplayWorkspaceLayout() {
       </div>
 
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-5">
+        {/* Guía para empezar: siempre a mano, con cuántos pasos faltan. */}
+        <button
+          type="button"
+          onClick={() => { setIsMobileMenuOpen(false); setIsGuideOpen(true); }}
+          className={cn(
+            "w-full rounded-xl border px-3 py-2.5 text-left transition-colors",
+            setup.complete
+              ? "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+              : "border-indigo-500/40 bg-indigo-500/10 hover:bg-indigo-500/15"
+          )}
+        >
+          <span className="flex items-center gap-2 text-sm font-semibold">
+            <Sparkles className={cn("w-4 h-4 shrink-0", setup.complete ? "text-muted-foreground" : "text-indigo-500")} />
+            <span className="flex-1 truncate">Guía para empezar</span>
+            {!setup.loading && <span className="text-xs font-bold text-muted-foreground">{setup.count}/{setup.total}</span>}
+          </span>
+          {!setup.complete && !setup.loading && (
+            <span className="mt-2 block h-1 rounded-full bg-muted overflow-hidden">
+              <span className="block h-full rounded-full bg-indigo-500" style={{ width: `${(setup.count / setup.total) * 100}%` }} />
+            </span>
+          )}
+        </button>
+
         {MENU_GROUPS.map(group => (
           <div key={group.title} className="space-y-1">
             <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">{group.title}</p>
@@ -188,17 +223,15 @@ export default function DisplayWorkspaceLayout() {
           {moreOpen && (
             <>
               {moreItems.map(renderNavLink)}
-              <button
-                onClick={() => {
-                  if (commerceId) localStorage.removeItem(`onboarding_dismissed_${commerceId}`);
-                  navigate(`${basePath}/dashboard?guia=1`);
-                  setIsMobileMenuOpen(false);
-                }}
+              <a
+                href={supportWhatsappUrl(currentCommerce?.name)}
+                target="_blank"
+                rel="noreferrer"
                 className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-muted-foreground hover:bg-muted hover:text-foreground"
               >
-                <Sparkles className="w-5 h-5 shrink-0 text-muted-foreground" />
-                <span className="truncate">Guía para empezar</span>
-              </button>
+                <MessageCircle className="w-5 h-5 shrink-0 text-muted-foreground" />
+                <span className="truncate">Ayuda por WhatsApp</span>
+              </a>
               {/* Bluetooth — solo en app Android nativa (celular) */}
               {isNativeAndroid && (
                 <button
@@ -272,6 +305,7 @@ export default function DisplayWorkspaceLayout() {
         {/* Decorative background blurs for aesthetics */}
         <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] bg-indigo-600/5 rounded-full mix-blend-screen filter blur-[100px] pointer-events-none" />
         
+        <TrialBar plan={plan} commerceName={currentCommerce?.name} />
         <div className="flex-1 overflow-y-auto">
           <ScreenDownAlert commerceId={commerceId} hideBanner={location.pathname.endsWith('/dashboard')} />
           {appsTab && (
@@ -308,6 +342,22 @@ export default function DisplayWorkspaceLayout() {
 
       {/* AI Assistant Panel */}
       {AI_ASSISTANT_ENABLED && <AIAssistantPanel isOpen={isAIPanelOpen} onClose={() => setIsAIPanelOpen(false)} />}
+
+      {/* Guía para empezar (panel lateral, desde cualquier página) */}
+      {commerceId && (
+        <Sheet open={isGuideOpen} onOpenChange={setIsGuideOpen}>
+          <SheetContent side="right" className="w-full sm:max-w-md p-0 overflow-y-auto bg-background">
+            <SheetTitle className="sr-only">Guía para empezar</SheetTitle>
+            <SetupGuide
+              commerceId={commerceId}
+              commerceName={currentCommerce?.name}
+              trial={inTrial}
+              onNavigate={() => setIsGuideOpen(false)}
+              className="border-0 rounded-none shadow-none"
+            />
+          </SheetContent>
+        </Sheet>
+      )}
 
       {/* Bluetooth Setup Modal */}
       <BluetoothProvisioningModal 

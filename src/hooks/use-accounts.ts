@@ -48,3 +48,22 @@ export const useSaveTrialNotes = () => {
         },
     });
 };
+
+// Admin: qué usuarios se registraron para probar, con el estado de su negocio
+// (para la etiqueta "Prueba" en Gestión de Usuarios). Sin la migración, vacío.
+export const useTrialUsers = (enabled = true) => useQuery({
+    queryKey: ['display_trial_users'],
+    enabled,
+    retry: false,
+    queryFn: async (): Promise<Record<string, { plan: AccountPlan; trial_ends_at: string | null }>> => {
+        const { data, error } = await supabase
+            .from('display_trial_signups')
+            .select('user_id, commerce:display_commerces(plan, trial_ends_at)');
+        if (error || !data) return {};
+        const out: Record<string, { plan: AccountPlan; trial_ends_at: string | null }> = {};
+        for (const row of data as unknown as { user_id: string | null; commerce: { plan: AccountPlan; trial_ends_at: string | null } | null }[]) {
+            if (row.user_id && row.commerce) out[row.user_id] = row.commerce;
+        }
+        return out;
+    },
+});
