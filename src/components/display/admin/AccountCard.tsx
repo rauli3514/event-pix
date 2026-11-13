@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarPlus, ChevronRight, Loader2, Monitor, MoreVertical, NotebookPen, Presentation, UserCheck, UserX } from 'lucide-react';
+import { CalendarPlus, ChevronRight, Loader2, Monitor, MoreVertical, NotebookPen, Presentation, Trash2, UserCheck, UserX } from 'lucide-react';
 import { FaWhatsapp } from 'react-icons/fa';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,8 @@ interface Props {
     account: AdminAccount | null;   // null: la migración todavía no se corrió
     screens: { total: number; online: number; offline: number };
     now: number;
+    // Super admin: borrar el comercio con todas sus pantallas.
+    onDelete?: () => void;
 }
 
 const BADGE: Record<string, string> = {
@@ -28,7 +30,7 @@ const BADGE: Record<string, string> = {
 
 // Un negocio en el Directorio de Clientes: estado, datos del registro de prueba,
 // cuánto usó la cuenta y las acciones (pasar a cliente, extender, dar de baja).
-export function AccountCard({ commerce, account, screens, now }: Props) {
+export function AccountCard({ commerce, account, screens, now, onDelete }: Props) {
     const status = accountStatus(account, now);
     const signup = account?.signup || null;
     const setPlan = useSetAccountPlan();
@@ -62,7 +64,7 @@ export function AccountCard({ commerce, account, screens, now }: Props) {
                     <p className="text-xs text-slate-500 mt-1 truncate">{commerce.email}</p>
                 </Link>
                 <div className="flex items-center gap-1 shrink-0">
-                    {account && (
+                    {(account || onDelete) && (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <button type="button" aria-label={`Acciones de ${name}`} className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800">
@@ -70,12 +72,12 @@ export function AccountCard({ commerce, account, screens, now }: Props) {
                                 </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-56">
-                                {status !== 'cliente' && (
+                                {account && status !== 'cliente' && (
                                     <DropdownMenuItem onClick={() => change('cliente', undefined, `${name} pasó a cliente`)}>
                                         <UserCheck className="w-4 h-4 mr-2" /> Pasar a cliente
                                     </DropdownMenuItem>
                                 )}
-                                {(status === 'prueba' || status === 'vencida') && (
+                                {account && (status === 'prueba' || status === 'vencida') && (
                                     <DropdownMenuItem onClick={() => change('prueba', TRIAL_DAYS, `Prueba extendida ${TRIAL_DAYS} días`)}>
                                         <CalendarPlus className="w-4 h-4 mr-2" /> Extender {TRIAL_DAYS} días
                                     </DropdownMenuItem>
@@ -85,7 +87,7 @@ export function AccountCard({ commerce, account, screens, now }: Props) {
                                         <NotebookPen className="w-4 h-4 mr-2" /> Notas
                                     </DropdownMenuItem>
                                 )}
-                                {status !== 'baja' && (
+                                {account && status !== 'baja' && (
                                     <>
                                         <DropdownMenuSeparator />
                                         <DropdownMenuItem
@@ -93,6 +95,17 @@ export function AccountCard({ commerce, account, screens, now }: Props) {
                                             onClick={() => { if (window.confirm(`¿Dar de baja a ${name}?`)) change('baja', undefined, `${name} quedó dado de baja`); }}
                                         >
                                             <UserX className="w-4 h-4 mr-2" /> Dar de baja
+                                        </DropdownMenuItem>
+                                    </>
+                                )}
+                                {onDelete && (
+                                    <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
+                                            className="text-rose-500 focus:text-rose-500"
+                                            onClick={() => { if (window.confirm(`¿Eliminar el comercio "${name}" y todas sus pantallas? No se puede deshacer.`)) onDelete(); }}
+                                        >
+                                            <Trash2 className="w-4 h-4 mr-2" /> Eliminar comercio
                                         </DropdownMenuItem>
                                     </>
                                 )}

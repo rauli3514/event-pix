@@ -141,21 +141,21 @@ const ProvidersList = () => {
     if (isLoading) return <div className="min-h-screen flex items-center justify-center">Cargando usuarios...</div>;
 
     return (
-        <div className="min-h-screen bg-slate-50 p-8">
+        <div className="min-h-screen bg-background text-foreground p-4 md:p-8">
             <header className="max-w-5xl mx-auto flex justify-between items-center mb-12">
                 <div className="flex items-center gap-4">
-                    <Link to="/admin" className="text-slate-500 hover:text-slate-900 transition-colors">
+                    <Link to="/admin" className="text-muted-foreground hover:text-foreground transition-colors">
                         <ArrowLeft className="w-6 h-6" />
                     </Link>
                     <div>
-                        <h1 className="text-3xl font-bold text-slate-900">Gestión de Usuarios</h1>
-                        <p className="text-slate-500">Administra los providers del sistema</p>
+                        <h1 className="text-3xl font-bold text-foreground">Gestión de Usuarios</h1>
+                        <p className="text-muted-foreground">Administra los providers del sistema</p>
                     </div>
                 </div>
 
                 <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                     <DialogTrigger asChild>
-                        <Button className="bg-violet-600 hover:bg-violet-700">
+                        <Button className="bg-violet-600 hover:bg-violet-700 text-white">
                             <UserPlus className="w-4 h-4 mr-2" /> Nuevo Provider
                         </Button>
                     </DialogTrigger>
@@ -188,7 +188,7 @@ const ProvidersList = () => {
                             <div className="space-y-2">
                                 <Label>Tipo de Usuario</Label>
                                 <div className="flex gap-4 p-1">
-                                    <label className="flex items-center gap-2 text-sm cursor-pointer hover:bg-slate-100 p-2 rounded w-full border border-slate-200">
+                                    <label className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted p-2 rounded w-full border border-border">
                                         <input
                                             type="radio"
                                             name="user_type"
@@ -199,7 +199,7 @@ const ProvidersList = () => {
                                         />
                                         Proveedor
                                     </label>
-                                    <label className="flex items-center gap-2 text-sm cursor-pointer hover:bg-slate-100 p-2 rounded w-full border border-slate-200">
+                                    <label className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted p-2 rounded w-full border border-border">
                                         <input
                                             type="radio"
                                             name="user_type"
@@ -225,7 +225,7 @@ const ProvidersList = () => {
                                     minLength={6}
                                 />
                             </div>
-                            <Button type="submit" className="w-full bg-violet-600 hover:bg-violet-700" disabled={createProvider.isPending}>
+                            <Button type="submit" className="w-full bg-violet-600 hover:bg-violet-700 text-white" disabled={createProvider.isPending}>
                                 {createProvider.isPending ? 'Creando...' : 'Crear Provider'}
                             </Button>
                         </form>
@@ -235,20 +235,20 @@ const ProvidersList = () => {
 
             <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {providers?.map(provider => (
-                    <Card key={provider.id} className={`hover:shadow-lg transition-shadow border-slate-200 ${!provider.is_active ? 'opacity-75 bg-slate-100' : ''}`}>
+                    <Card key={provider.id} className={`hover:shadow-lg transition-shadow border-border ${!provider.is_active ? 'opacity-70' : ''}`}>
                         <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
-                            <CardTitle className="text-lg font-bold text-slate-800 truncate pr-2">
+                            <CardTitle className="text-lg font-bold text-foreground truncate pr-2">
                                 {provider.name || 'Sin nombre'}
                             </CardTitle>
-                            <Shield className={`w-4 h-4 ${provider.is_active ? 'text-violet-500' : 'text-slate-400'}`} />
+                            <Shield className={`w-4 h-4 ${provider.is_active ? 'text-violet-500' : 'text-muted-foreground'}`} />
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            <div className="flex items-center text-sm text-slate-600">
-                                <Mail className="w-4 h-4 mr-2 text-slate-400" />
+                            <div className="flex items-center text-sm text-muted-foreground min-w-0">
+                                <Mail className="w-4 h-4 mr-2 shrink-0" />
                                 <span className="truncate">{provider.email}</span>
                             </div>
-                            <div className="flex items-center text-sm text-slate-500">
-                                <Calendar className="w-4 h-4 mr-2 text-slate-400" />
+                            <div className="flex items-center text-sm text-muted-foreground">
+                                <Calendar className="w-4 h-4 mr-2 shrink-0" />
                                 <span>Registrado: {new Date(provider.created_at).toLocaleDateString()}</span>
                             </div>
                             <div className="pt-2 flex items-center justify-between">
@@ -267,11 +267,11 @@ const ProvidersList = () => {
                                 </span>
                             </div>
                         </CardContent>
-                        <CardFooter className="pt-2 border-t bg-slate-50/50 grid grid-cols-3 gap-2">
+                        <CardFooter className="pt-3 border-t bg-muted/30 grid grid-cols-3 gap-2">
                             <Button
                                 variant="outline"
                                 size="sm"
-                                className="w-full text-xs h-8"
+                                className="w-full min-w-0 px-2 text-xs h-8"
                                 onClick={() => {
                                     setSelectedProvider(provider);
                                     setPasswordDialogOpen(true);
@@ -283,7 +283,7 @@ const ProvidersList = () => {
                             <Button
                                 variant="outline"
                                 size="sm"
-                                className="w-full text-xs h-8 bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+                                className="w-full min-w-0 px-2 text-xs h-8 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-300 border-blue-500/30"
                                 onClick={() => {
                                     setSelectedProvider(provider);
                                     setAccessDialogOpen(true);
@@ -295,8 +295,8 @@ const ProvidersList = () => {
                             <Button
                                 variant={provider.is_active !== false ? "outline" : "default"}
                                 size="sm"
-                                className={`w-full text-xs h-8 ${provider.is_active !== false
-                                    ? 'text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200'
+                                className={`w-full min-w-0 px-2 text-xs h-8 ${provider.is_active !== false
+                                    ? 'text-red-600 dark:text-red-400 hover:text-red-700 hover:bg-red-500/10 border-red-500/30'
                                     : 'bg-green-600 hover:bg-green-700 text-white'
                                     }`}
                                 onClick={() => handleToggleStatus(provider)}
@@ -318,10 +318,10 @@ const ProvidersList = () => {
                 ))}
 
                 {providers?.length === 0 && (
-                    <div className="col-span-full text-center py-20 bg-white rounded-xl border border-dashed border-slate-300">
-                        <Users className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                        <h3 className="text-lg font-medium text-slate-900">No hay providers registrados</h3>
-                        <p className="text-slate-500 mt-2">Crea el primer usuario para comenzar a delegar eventos.</p>
+                    <div className="col-span-full text-center py-20 bg-card rounded-xl border border-dashed border-border">
+                        <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-foreground">No hay providers registrados</h3>
+                        <p className="text-muted-foreground mt-2">Crea el primer usuario para comenzar a delegar eventos.</p>
                     </div>
                 )}
             </div>
@@ -334,7 +334,7 @@ const ProvidersList = () => {
                     <form onSubmit={handlePasswordUpdate} className="space-y-4 mt-4">
                         <div className="space-y-2">
                             <Label>Usuario</Label>
-                            <div className="p-2 bg-slate-100 rounded text-sm text-slate-600">
+                            <div className="p-2 bg-muted rounded text-sm text-muted-foreground">
                                 {selectedProvider?.email}
                             </div>
                         </div>
@@ -354,7 +354,7 @@ const ProvidersList = () => {
                             <Button type="button" variant="outline" onClick={() => setPasswordDialogOpen(false)}>
                                 Cancelar
                             </Button>
-                            <Button type="submit" className="bg-violet-600 hover:bg-violet-700" disabled={updatePassword.isPending}>
+                            <Button type="submit" className="bg-violet-600 hover:bg-violet-700 text-white" disabled={updatePassword.isPending}>
                                 {updatePassword.isPending ? 'Actualizando...' : 'Actualizar Contraseña'}
                             </Button>
                         </DialogFooter>
@@ -370,13 +370,13 @@ const ProvidersList = () => {
                     <div className="space-y-6 mt-4">
                         
                         <div>
-                            <h3 className="font-bold text-slate-800 border-b pb-2 mb-3">Accesos Display Digital (Cartelería)</h3>
+                            <h3 className="font-bold text-foreground border-b pb-2 mb-3">Accesos Display Digital (Cartelería)</h3>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 {allCommerces?.map((commerce: any) => {
                                     const hasAccess = userCommerces?.includes(commerce.id);
                                     return (
-                                        <div key={commerce.id} className="flex items-center justify-between p-3 bg-slate-50 border rounded-lg">
-                                            <span className="text-sm font-medium text-slate-700">{commerce.name}</span>
+                                        <div key={commerce.id} className="flex items-center justify-between p-3 bg-muted/40 border rounded-lg">
+                                            <span className="text-sm font-medium text-foreground">{commerce.name}</span>
                                             <Button 
                                                 size="sm" 
                                                 variant={hasAccess ? "default" : "outline"}
@@ -389,19 +389,19 @@ const ProvidersList = () => {
                                     )
                                 })}
                                 {(!allCommerces || allCommerces.length === 0) && (
-                                    <p className="text-sm text-slate-500 italic">No hay comercios creados.</p>
+                                    <p className="text-sm text-muted-foreground italic">No hay comercios creados.</p>
                                 )}
                             </div>
                         </div>
 
                         <div>
-                            <h3 className="font-bold text-slate-800 border-b pb-2 mb-3">Accesos EventPix (Eventos)</h3>
+                            <h3 className="font-bold text-foreground border-b pb-2 mb-3">Accesos EventPix (Eventos)</h3>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 {allEvents?.map((evt: any) => {
                                     const hasAccess = userEvents?.includes(evt.id);
                                     return (
-                                        <div key={evt.id} className="flex items-center justify-between p-3 bg-slate-50 border rounded-lg">
-                                            <span className="text-sm font-medium text-slate-700 truncate mr-2">{evt.name}</span>
+                                        <div key={evt.id} className="flex items-center justify-between p-3 bg-muted/40 border rounded-lg">
+                                            <span className="text-sm font-medium text-foreground truncate mr-2">{evt.name}</span>
                                             <Button 
                                                 size="sm" 
                                                 variant={hasAccess ? "default" : "outline"}
@@ -414,7 +414,7 @@ const ProvidersList = () => {
                                     )
                                 })}
                                 {(!allEvents || allEvents.length === 0) && (
-                                    <p className="text-sm text-slate-500 italic">No hay eventos creados.</p>
+                                    <p className="text-sm text-muted-foreground italic">No hay eventos creados.</p>
                                 )}
                             </div>
                         </div>
