@@ -1,7 +1,8 @@
 // Prueba de 7 días (página /probar): datos del formulario, el cartel de ejemplo
 // que se crea según el rubro y los mensajes de error. Ver docs/pruebas.md.
 
-import { POSTER_APP_ID, POSTER_GROUPS, POSTER_TEMPLATES, configFromTemplate, type PosterGroup } from '@/lib/posters';
+import { POSTER_APP_ID, POSTER_GROUPS, POSTER_TEMPLATES, configFromTemplate, type PosterConfig, type PosterGroup } from '@/lib/posters';
+import { newItemId, parsePrice, type PriceListItem } from '@/lib/priceLists';
 
 export const RUBROS: readonly PosterGroup[] = POSTER_GROUPS;
 
@@ -26,13 +27,29 @@ const STARTER_BY_RUBRO: Record<PosterGroup, string> = {
     'Otros': 'ofertas-semana',
 };
 
-export function starterPoster(rubro: string, businessName: string): { name: string; metadata: { appId: string; config: unknown } } | null {
+// El cartel de ejemplo y su lista de precios (con los productos del diseño):
+// así en la TV se ve con precios y, al cambiar uno en la lista, cambia el cartel.
+export function starterPoster(rubro: string, businessName: string): {
+    name: string;
+    listName: string;
+    items: PriceListItem[];
+    config: PosterConfig;
+} | null {
     const id = STARTER_BY_RUBRO[rubro as PosterGroup] || STARTER_BY_RUBRO['Otros'];
     const template = POSTER_TEMPLATES.find(t => t.id === id);
     if (!template) return null;
-    const config = { ...configFromTemplate(template, '16:9'), subtitle: businessName.trim().slice(0, 40) };
-    return { name: `${template.name} (ejemplo)`, metadata: { appId: POSTER_APP_ID, config } };
+    const config: PosterConfig = { ...configFromTemplate(template, '16:9'), subtitle: businessName.trim().slice(0, 40) };
+    const items: PriceListItem[] = (template.sampleList || []).map(r => ({
+        id: newItemId(),
+        name: r.name,
+        ...(r.detail ? { detail: r.detail } : {}),
+        price: parsePrice(r.price),
+        available: true,
+    }));
+    return { name: `${template.name} (ejemplo)`, listName: `${template.name} (ejemplo)`, items, config };
 }
+
+export const posterMetadata = (config: PosterConfig) => ({ appId: POSTER_APP_ID, config });
 
 export function contractWhatsappUrl(businessName?: string | null): string {
     const text = businessName

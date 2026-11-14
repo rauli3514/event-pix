@@ -27,6 +27,7 @@ export interface AdminAccount {
     plan: AccountPlan;
     trial_ends_at: string | null;
     plan_changed_at: string | null;
+    data_cleaned_at?: string | null;
     created_at: string;
     screens: number;
     posters: number;
@@ -37,6 +38,12 @@ export interface AdminAccount {
 export const TRIAL_DAYS = 7;
 // Lo que armó alguien que no contrató se guarda este tiempo después de vencer.
 export const KEEP_DAYS_AFTER_END = 30;
+
+// Prueba vencida hace más de 30 días y con los archivos todavía guardados.
+export function canCleanData(a: Pick<AdminAccount, 'plan' | 'trial_ends_at' | 'data_cleaned_at'> | null | undefined, now = Date.now()): boolean {
+    if (!a || a.plan !== 'prueba' || !a.trial_ends_at || a.data_cleaned_at) return false;
+    return Date.parse(a.trial_ends_at) + KEEP_DAYS_AFTER_END * 86400000 <= now;
+}
 
 export function accountStatus(a: Pick<AdminAccount, 'plan' | 'trial_ends_at'> | null | undefined, now = Date.now()): AccountStatus {
     if (!a) return 'cliente';

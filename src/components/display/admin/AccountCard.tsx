@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarPlus, ChevronRight, Loader2, Monitor, MoreVertical, NotebookPen, Presentation, Trash2, UserCheck, UserX } from 'lucide-react';
+import { CalendarPlus, ChevronRight, Eraser, Loader2, Monitor, MoreVertical, NotebookPen, Presentation, Trash2, UserCheck, UserX } from 'lucide-react';
 import { FaWhatsapp } from 'react-icons/fa';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -9,8 +9,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/fudo';
-import { STATUS_LABEL, TRIAL_DAYS, accountStatus, accountsErrorText, daysLeft, trialWhatsappUrl, type AccountPlan, type AdminAccount } from '@/lib/accounts';
-import { useSaveTrialNotes, useSetAccountPlan } from '@/hooks/use-accounts';
+import { KEEP_DAYS_AFTER_END, STATUS_LABEL, TRIAL_DAYS, accountStatus, accountsErrorText, canCleanData, daysLeft, trialWhatsappUrl, type AccountPlan, type AdminAccount } from '@/lib/accounts';
+import { useCleanAccountData, useSaveTrialNotes, useSetAccountPlan } from '@/hooks/use-accounts';
 
 interface Props {
     commerce: { id: string; name: string | null; email: string | null };
@@ -34,6 +34,17 @@ export function AccountCard({ commerce, account, screens, now, onDelete }: Props
     const status = accountStatus(account, now);
     const signup = account?.signup || null;
     const setPlan = useSetAccountPlan();
+    const clean = useCleanAccountData();
+    const cleanable = canCleanData(account, now);
+    const cleanData = async () => {
+        if (!window.confirm(`¿Borrar los archivos, carteles y medios de ${name}? Venció hace más de ${KEEP_DAYS_AFTER_END} días. Quedan sus datos de contacto. No se puede deshacer.`)) return;
+        try {
+            const r = await clean.mutateAsync(commerce.id);
+            toast.success(`Listo: se borraron ${r.items} ${r.items === 1 ? 'medio' : 'medios'} (${r.files} ${r.files === 1 ? 'archivo' : 'archivos'}).`);
+        } catch (e) {
+            toast.error(accountsErrorText((e as Error).message));
+        }
+    };
     const [notesOpen, setNotesOpen] = useState(false);
     const name = commerce.name || 'Sin nombre';
 
@@ -68,7 +79,7 @@ export function AccountCard({ commerce, account, screens, now, onDelete }: Props
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <button type="button" aria-label={`Acciones de ${name}`} className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800">
-                                    {setPlan.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <MoreVertical className="w-4 h-4" />}
+                                    {setPlan.isPending || clean.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <MoreVertical className="w-4 h-4" />}
                                 </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-56">
@@ -82,6 +93,11 @@ export function AccountCard({ commerce, account, screens, now, onDelete }: Props
                                         <CalendarPlus className="w-4 h-4 mr-2" /> Extender {TRIAL_DAYS} días
                                     </DropdownMenuItem>
                                 )}
+                                {cleanable && (
+                                    <DropdownMenuItem onClick={cleanData}>
+                                        <Eraser className="w-4 h-4 mr-2" /> Borrar sus archivos
+                                    </DropdownMenuItem>
+                                )}
                                 {signup && (
                                     <DropdownMenuItem onClick={() => setNotesOpen(true)}>
                                         <NotebookPen className="w-4 h-4 mr-2" /> Notas
@@ -92,7 +108,7 @@ export function AccountCard({ commerce, account, screens, now, onDelete }: Props
                                         <DropdownMenuSeparator />
                                         <DropdownMenuItem
                                             className="text-rose-500 focus:text-rose-500"
-                                            onClick={() => { if (window.confirm(`¿Dar de baja a ${name}?`)) change('baja', undefined, `${name} quedó dado de baja`); }}
+                                            onClick={() => { if (window.confirm(`¿Dar de baja a ${name}? Su panel y sus pantallas dejan de funcionar hasta que lo vuelvas a pasar a cliente.`)) change('baja', undefined, `${name} quedó dado de baja`); }}
                                         >
                                             <UserX className="w-4 h-4 mr-2" /> Dar de baja
                                         </DropdownMenuItem>
@@ -136,6 +152,8 @@ export function AccountCard({ commerce, account, screens, now, onDelete }: Props
                             .map(t => <span key={t as string} className="rounded-full bg-slate-800 px-2 py-0.5">{t}</span>)}
                     </div>
                     {signup.notes && <p className="text-xs text-amber-200/80 whitespace-pre-line">📝 {signup.notes}</p>}
+                    {cleanable && <p className="text-xs text-rose-300/90">Venció hace más de {KEEP_DAYS_AFTER_END} días: podés borrar sus archivos desde el menú ⋮.</p>}
+                    {account?.data_cleaned_at && <p className="text-xs text-slate-500">Archivos borrados {timeAgo(account.data_cleaned_at, now)}.</p>}
                 </div>
             )}
 

@@ -8,9 +8,10 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { useUploadDisplayMedia } from '@/hooks/use-display-media';
+import { useCreatePriceList } from '@/hooks/use-price-lists';
 import { PosterView } from '@/components/display/posters/PosterView';
 import { POSTER_TEMPLATES, configFromTemplate } from '@/lib/posters';
-import { FUDO_OPTIONS, RUBROS, SALES_WHATSAPP, SOURCE_OPTIONS, TV_COUNT_OPTIONS, starterPoster, trialErrorText } from '@/lib/trial';
+import { FUDO_OPTIONS, RUBROS, SALES_WHATSAPP, SOURCE_OPTIONS, TV_COUNT_OPTIONS, posterMetadata, starterPoster, trialErrorText } from '@/lib/trial';
 import { TRIAL_DAYS } from '@/lib/accounts';
 
 // "Probalo" (app.event-pix.com.ar/probar): cualquiera crea su cuenta y prueba
@@ -23,6 +24,7 @@ const DEMO_CONFIG = { ...configFromTemplate(DEMO, '16:9'), animation: 'none' as 
 export default function TrialSignup() {
     const navigate = useNavigate();
     const upload = useUploadDisplayMedia();
+    const createList = useCreatePriceList();
     const [step, setStep] = useState<1 | 2>(1);
     const [loading, setLoading] = useState(false);
     const [commerceId, setCommerceId] = useState<string | null>(null);
@@ -68,11 +70,19 @@ export default function TrialSignup() {
             setCommerceId(newId);
             localStorage.setItem('display_user_mode', 'true');
 
-            // 3. Un cartel de ejemplo de su rubro, con el nombre del negocio (si falla, sigue igual).
+            // 3. Un cartel de ejemplo de su rubro, con el nombre del negocio y su lista de
+            //    precios (si algo falla, sigue igual: no es indispensable).
             const starter = starterPoster(rubro, business);
             if (starter) {
+                let config = starter.config;
+                if (starter.items.length) {
+                    try {
+                        const list = await createList.mutateAsync({ commerceId: newId, name: starter.listName, items: starter.items });
+                        config = { ...config, listId: list.id };
+                    } catch { /* sin lista: el cartel igual se crea */ }
+                }
                 try {
-                    await upload.mutateAsync({ commerceId: newId, folderPath: '/', webUrl: 'app://poster', webName: starter.name, type: 'app', metadata: starter.metadata });
+                    await upload.mutateAsync({ commerceId: newId, folderPath: '/', webUrl: 'app://poster', webName: starter.name, type: 'app', metadata: posterMetadata(config) });
                 } catch { /* no es indispensable */ }
             }
             setStep(2);
