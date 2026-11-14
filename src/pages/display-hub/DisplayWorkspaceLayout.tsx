@@ -32,6 +32,8 @@ import { useCommercePlan } from '@/hooks/use-commerce-plan';
 import { useSetupProgress } from '@/hooks/use-setup-progress';
 import { SetupGuide } from '@/components/display/SetupGuide';
 import { TrialBar } from '@/components/display/TrialBar';
+import { AccountEndedScreen } from '@/components/display/AccountEndedScreen';
+import { useUserProfile } from '@/hooks/use-roles';
 import { accountStatus } from '@/lib/accounts';
 import { supportWhatsappUrl } from '@/lib/trial';
 
@@ -99,7 +101,12 @@ export default function DisplayWorkspaceLayout() {
   const currentCommerce = commerces?.find(c => c.id === commerceId);
   // Estado del negocio (prueba o cliente) y avance de la guía para empezar.
   const { data: plan } = useCommercePlan(commerceId);
-  const inTrial = ['prueba', 'vencida'].includes(accountStatus(plan));
+  const planStatus = accountStatus(plan);
+  const inTrial = planStatus === 'prueba' || planStatus === 'vencida';
+  // Prueba vencida o negocio de baja: en vez del panel, "Terminó tu prueba"
+  // (el super admin sigue entrando normalmente).
+  const { data: profile, isLoading: isProfileLoading } = useUserProfile();
+  const isBlocked = (planStatus === 'vencida' || planStatus === 'baja') && !isProfileLoading && profile?.role !== 'super_admin';
   const setup = useSetupProgress(commerceId);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   // Pantallas sin conexión hace más de 10 min (número rojo en "Pantallas").
@@ -256,6 +263,18 @@ export default function DisplayWorkspaceLayout() {
       </div>
     </>
   );
+
+  if (isBlocked && commerceId) {
+    return (
+      <AccountEndedScreen
+        commerceId={commerceId}
+        commerceName={currentCommerce?.name}
+        kind={planStatus === 'baja' ? 'baja' : 'vencida'}
+        trialEndsAt={plan?.trial_ends_at}
+        onLogout={handleLogout}
+      />
+    );
+  }
 
   return (
     <div className="flex h-[100dvh] w-full bg-background text-foreground overflow-hidden font-sans flex-col md:flex-row transition-colors duration-300">

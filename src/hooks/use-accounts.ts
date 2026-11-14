@@ -67,3 +67,39 @@ export const useTrialUsers = (enabled = true) => useQuery({
         return out;
     },
 });
+
+// Admin: borrar los archivos (fotos, videos) y los medios de una prueba que
+// venció hace más de 30 días. Se hace desde acá y no desde la base porque
+// Supabase no deja borrar archivos del Storage con SQL. Quedan el negocio y
+// los datos del registro (para poder escribirle).
+export const useCleanAccountData = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (commerceId: string): Promise<{ files: number; items: number }> => {
+            const { data: media, error } = await supabase
+                .from('display_media')
+                .select('id, type, storage_path')
+                .eq('commerce_id', commerceId);
+            if (error) throw new Error(error.message || error.code);
+            const rows = (media || []) as { id: string; type: string; storage_path: string | null }[];
+            // Solo archivos subidos a la carpeta del negocio (no carteles, apps ni links).
+            const paths = rows.map(r => r.storage_path || '').filter(p => p.startsWith(`${commerceId}/`));
+            for (let i = 0; i < paths.length; i += 100) {
+                const { error: e } = await supabase.storage.from('display-media').remove(paths.slice(i, i + 100));
+                if (e) throw new Error(e.message);
+            }
+            const ids = rows.map(r => r.id);
+            for (let i = 0; i < ids.length; i += 100) {
+                const { error: e } = await supabase.from('display_media').delete().in('id', ids.slice(i, i + 100));
+                if (e) throw new Error(e.message || e.code);
+            }
+            const { error: e2 } = await supabase.from('display_commerces').update({ data_cleaned_at: new Date().toISOString() }).eq('id', commerceId);
+            if (e2) throw new Error(e2.message || e2.code);
+            return { files: paths.length, items: ids.length };
+        },
+        onSuccess: (_, commerceId) => {
+            queryClient.invalidateQueries({ queryKey: ['display_admin_accounts'] });
+            queryClient.invalidateQueries({ queryKey: ['display_media', commerceId] });
+        },
+    });
+};

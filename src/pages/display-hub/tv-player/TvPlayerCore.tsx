@@ -18,6 +18,7 @@ import { useUrgentAlert } from './useUrgentAlert';
 import { UrgentAlertOverlay } from '@/components/display/UrgentAlertOverlay';
 import { ScreenQrOverlay } from '@/components/display/ScreenQrOverlay';
 import { useScreenQr } from './useScreenQr';
+import { useAccountState } from './useAccountState';
 
 // Identidad de Display Digital para las pantallas de espera de la TV. En la app
 // Android el logo sale del APK (WebViewManager intercepta /edm-assets/).
@@ -229,6 +230,9 @@ const TvPlayerCore = () => {
     // Foto de lo que se ve y qué está pasando, para el panel.
     useScreenReporter(deviceCode, items[currentIndex], status === 'playing' || status === 'offline_playing', lite);
 
+    // Si terminó la prueba o el negocio está de baja, la TV muestra un cartel en vez del contenido.
+    const accountState = useAccountState(deviceCode);
+
     // --- UI Renders ---
     
     const getRotationStyle = (orientation: string | undefined): React.CSSProperties => {
@@ -281,6 +285,26 @@ const TvPlayerCore = () => {
     };
 
     const containerStyle = getRotationStyle(deviceSettings.orientation);
+
+    if (accountState !== 'ok') {
+        const ended = accountState === 'trial_ended';
+        return (
+            <div className="fixed inset-0 w-full h-full" style={BRAND_BACKGROUND}>
+                <div style={{ ...containerStyle, backgroundColor: 'transparent' }} className="flex flex-col items-center justify-center font-sans text-center">
+                    <img src={BRAND_LOGO} alt="Display Digital" className="w-[18vw] max-w-[360px] mb-[4vh]" style={BRAND_LOGO_STYLE} />
+                    <p className="text-[3.2vw] text-white font-semibold tracking-tight">
+                        {ended ? 'Terminó la prueba de Display Digital' : 'Pantalla en pausa'}
+                    </p>
+                    <p className="text-[1.6vw] text-slate-400 font-light mt-[2vh] max-w-[60vw]">
+                        {ended ? 'Para seguir mostrando tus carteles y precios, escribinos al ' : 'Para volver a activarla, escribinos al '}
+                        <span className="text-orange-400 font-medium whitespace-nowrap">362 454-7382</span>
+                    </p>
+                    <p className="absolute bottom-[5vh] left-0 right-0 text-[1vw] text-slate-600 font-mono tracking-widest">CÓDIGO {deviceCode}</p>
+                </div>
+                <TvSettingsMenu deviceCode={deviceCode!} onRefresh={() => fetchCampaign()} />
+            </div>
+        );
+    }
 
     if (status === 'loading') {
         return (
